@@ -38,6 +38,18 @@ public sealed class ConnectionCandidateTests
         candidate.DisplayName.ShouldBe("Db.Reports");
     }
 
+    [Fact]
+    public void DisplayName_HeldWithoutHolder_IsItsName() =>
+        (Candidate("Open") with { Tier = CandidateTier.Held }).DisplayName.ShouldBe("Open");
+
+    [Fact]
+    public void DisplayName_GlobalWithoutDot_IsTextDotName()
+    {
+        var candidate = Candidate("Reports") with { Tier = CandidateTier.Global, GlobalTypeText = "Db" };
+
+        candidate.DisplayName.ShouldBe("Db.Reports");
+    }
+
     private static ConnectionCandidate Candidate(string name) =>
         new(
             name,

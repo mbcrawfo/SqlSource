@@ -11,7 +11,8 @@ namespace SqlSource.Generation.Repositories;
 
 /// <summary>
 /// Reads the members of a repository, of its base types and of its primary constructor that can give its methods a
-/// connection, as <see cref="ConnectionCandidate" />s.  Only <see cref="RepositoryShapeReader" /> calls it.
+/// connection, and the marked members of the factories they hold, as <see cref="ConnectionCandidate" />s.  Only
+/// <see cref="RepositoryShapeReader" /> calls it.
 /// </summary>
 internal static class ConnectionCandidateReader
 {
@@ -70,7 +71,7 @@ internal static class ConnectionCandidateReader
                 if (
                     !derivedNames.Contains(member.Name)
                     && (!isInherited || IsReachable(member, type, compilation))
-                    && ReadMember(member, isInherited, fallback) is { } candidate
+                    && ReadMarkedMember(member, isInherited, fallback) is { } candidate
                 )
                 {
                     members.Add(candidate);
@@ -113,18 +114,198 @@ internal static class ConnectionCandidateReader
         return new EquatableArray<ConnectionCandidate>(taken.ToImmutable());
     }
 
-    // A member of a base type that the type can use: a property whose getter it can call.
-    private static bool IsReachable(ISymbol member, INamedTypeSymbol type, Compilation compilation) =>
-        compilation.IsSymbolAccessibleWithin(member, type)
+    /// <summary>
+    /// The marked instance members of the factories that the type holds, each with its <see cref="CandidateHolder" />,
+    /// in the order the holders are declared: the type's own fields and properties first, then each base type's, then
+    /// the primary constructor's parameters.  A holder is a field, property or parameter that is not marked, whose type
+    /// is not a type of a source, and that has at least one such member.  The parameters are holders only when no field
+    /// or property is one, and then only those that no argument of the base type and no initializer reads, as in
+    /// <see cref="Read" />.
+    /// </summary>
+    /// <param name="type">The repository.</param>
+    /// <param name="compilation">
+    /// The compilation, which says which members of a base type and of a factory the type can reach and what an
+    /// initializer reads.
+    /// </param>
+    /// <param name="fallback">The location of a holder that has none in source: the type's attribute.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    public static EquatableArray<ConnectionCandidate> ReadHeld(
+        INamedTypeSymbol type,
+        Compilation compilation,
+        LocationInfo fallback,
+        CancellationToken cancellationToken
+    )
+    {
+        var held = ImmutableArray.CreateBuilder<ConnectionCandidate>();
+        var derivedNames = new HashSet<string>(StringComparer.Ordinal);
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            var isInherited = !SymbolEqualityComparer.Default.Equals(current, type);
+            var currentMembers = current.GetMembers();
+            foreach (var member in currentMembers)
+            {
+                if (
+                    !derivedNames.Contains(member.Name)
+                    && (!isInherited || IsReachable(member, type, compilation))
+                    && HolderOf(member, fallback) is (var holder, var holderType)
+                )
+                {
+                    held.AddRange(ReadFactory(holderType, holder, isInherited, type, compilation));
+                }
+            }
+
+            derivedNames.UnionWith(currentMembers.Select(static member => member.Name));
+        }
+
+        if (held.Count > 0)
+        {
+            return new EquatableArray<ConnectionCandidate>(held.ToImmutable());
+        }
+
+        foreach (
+            var parameter in PrimaryConstructorOf(type, cancellationToken)?.Parameters
+                ?? ImmutableArray<IParameterSymbol>.Empty
+        )
+        {
+            if (
+                HolderOf(parameter, fallback) is (var holder, var holderType)
+                && ReadFactory(holderType, holder, isInherited: false, type, compilation) is { Count: > 0 } candidates
+                && !IsReadBesides(parameter, type, compilation, cancellationToken)
+            )
+            {
+                held.AddRange(candidates);
+            }
+        }
+
+        return new EquatableArray<ConnectionCandidate>(held.ToImmutable());
+    }
+
+    /// <summary>
+    /// What a member gives, which is the one rule of what a marked member gives in every tier: a field, property or
+    /// method of a source's shape is a candidate of its kind, and any other marked member is unsupported, so that no
+    /// convention is chosen over a member the user marked.  An unmarked member gives what the conventions accept: a
+    /// data source, or a string of a convention's name.
+    /// </summary>
+    /// <param name="member">The member, of any kind.</param>
+    /// <param name="isInherited">Whether it is a member of a base type.</param>
+    /// <param name="fallback">The location of a member that has none in source.</param>
+    /// <returns>The candidate, or null when the member gives none.</returns>
+    public static ConnectionCandidate? ReadMarkedMember(ISymbol member, bool isInherited, LocationInfo fallback) =>
+        ReadMember(member, isInherited, fallback, implementer: null);
+
+    // A member of a base type that the type can use: a property whose getter it can call.  A member of a factory is
+    // used through the holder's value, of the factory's type.
+    private static bool IsReachable(
+        ISymbol member,
+        INamedTypeSymbol type,
+        Compilation compilation,
+        ITypeSymbol? throughType = null
+    ) =>
+        compilation.IsSymbolAccessibleWithin(member, type, throughType)
         && (
             member is not IPropertySymbol { GetMethod: { } getter }
-            || compilation.IsSymbolAccessibleWithin(getter, type)
+            || compilation.IsSymbolAccessibleWithin(getter, type, throughType)
         );
+
+    // A field, property or parameter that can hold a factory, with its type: one of a named type that is no source's,
+    // and that is not marked, since a marked one is a source of the type's own.  A type that the compiler knows as
+    // special, such as an int, cannot carry the mark, so its members are not read.
+    private static (CandidateHolder Holder, INamedTypeSymbol Type)? HolderOf(ISymbol symbol, LocationInfo fallback)
+    {
+        var (member, type, isStatic) = symbol switch
+        {
+            IFieldSymbol { CanBeReferencedByName: true } field => (CandidateMember.Field, field.Type, field.IsStatic),
+            IPropertySymbol { CanBeReferencedByName: true, IsIndexer: false, GetMethod: not null } property => (
+                CandidateMember.Property,
+                property.Type,
+                property.IsStatic
+            ),
+            IParameterSymbol parameter => (CandidateMember.Parameter, parameter.Type, false),
+            _ => (default, null, false),
+        };
+        if (
+            type is not INamedTypeSymbol { SpecialType: SpecialType.None } named
+            || HeldKindOf(named) is not null
+            || FindMarking(symbol) is not null
+        )
+        {
+            return null;
+        }
+
+        var location = symbol.Locations.FirstOrDefault(static location => location.IsInSource) is { } inSource
+            ? LocationInfo.From(inSource)
+            : fallback;
+        return (new CandidateHolder(symbol.Name, member, isStatic, named.Name, location), named);
+    }
+
+    // The marked instance members of the factory that the type can reach through the holder, of the factory, of its
+    // base types and of its interfaces, as held candidates.  A member that a more derived one of the name hides, and
+    // an interface's member that the factory implements, is the more derived one or the implementation: one
+    // candidate.
+    private static List<ConnectionCandidate> ReadFactory(
+        INamedTypeSymbol factory,
+        CandidateHolder holder,
+        bool isInherited,
+        INamedTypeSymbol type,
+        Compilation compilation
+    )
+    {
+        var candidates = new List<ConnectionCandidate>();
+        var derivedNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var current in TypesOf(factory))
+        {
+            var currentMembers = current.GetMembers();
+            foreach (var member in currentMembers)
+            {
+                if (
+                    !member.IsStatic
+                    && !derivedNames.Contains(member.Name)
+                    && !IsImplementedBy(member, factory)
+                    && IsReachable(member, type, compilation, factory)
+                    && ReadMember(member, isInherited, holder.Location, factory) is { IsMarked: true } candidate
+                )
+                {
+                    candidates.Add(candidate with { Tier = CandidateTier.Held, Holder = holder });
+                }
+            }
+
+            derivedNames.UnionWith(currentMembers.Select(static member => member.Name));
+        }
+
+        return candidates;
+    }
+
+    // The type, each of its base types, then each of its interfaces, a derived interface before its base.
+    private static IEnumerable<INamedTypeSymbol> TypesOf(INamedTypeSymbol type)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            yield return current;
+        }
+
+        foreach (var @interface in type.AllInterfaces)
+        {
+            yield return @interface;
+        }
+    }
+
+    // Whether the member is an interface's that a class or struct implements, explicitly too: its implementation is
+    // the candidate, or none when the type cannot reach it.
+    private static bool IsImplementedBy(ISymbol member, INamedTypeSymbol type) =>
+        type.TypeKind != TypeKind.Interface
+        && member.ContainingType.TypeKind == TypeKind.Interface
+        && type.FindImplementationForInterfaceMember(member) is not null;
 
     // A member that a call can name.  A write-only property gives nothing, and an indexer needs an argument, so each
     // is one of the others: unsupported when it is marked, so that no convention is chosen over a member the user
-    // marked, and nothing otherwise.
-    private static ConnectionCandidate? ReadMember(ISymbol member, bool isInherited, LocationInfo fallback) =>
+    // marked, and nothing otherwise.  The implementer is a factory, whose members are marked as the interface members
+    // they implement are.
+    private static ConnectionCandidate? ReadMember(
+        ISymbol member,
+        bool isInherited,
+        LocationInfo fallback,
+        INamedTypeSymbol? implementer
+    ) =>
         member switch
         {
             IFieldSymbol { CanBeReferencedByName: true } field => Held(
@@ -133,7 +314,8 @@ internal static class ConnectionCandidateReader
                 field.Type,
                 field.IsStatic,
                 isInherited,
-                fallback
+                fallback,
+                implementer
             ),
             IPropertySymbol { CanBeReferencedByName: true, IsIndexer: false, GetMethod: not null } property => Held(
                 property,
@@ -141,21 +323,28 @@ internal static class ConnectionCandidateReader
                 property.Type,
                 property.IsStatic,
                 isInherited,
-                fallback
+                fallback,
+                implementer
             ),
             IMethodSymbol { CanBeReferencedByName: true, MethodKind: MethodKind.Ordinary } method => Method(
                 method,
                 isInherited,
-                fallback
+                fallback,
+                implementer
             ),
-            _ => Other(member, isInherited, fallback),
+            _ => Other(member, isInherited, fallback, implementer),
         };
 
     // An explicit interface implementation, an operator, an accessor, an indexer, a write-only property or the backing
     // field of a property: unsupported when it is marked, named for its property when it belongs to one.
-    private static ConnectionCandidate? Other(ISymbol member, bool isInherited, LocationInfo fallback)
+    private static ConnectionCandidate? Other(
+        ISymbol member,
+        bool isInherited,
+        LocationInfo fallback,
+        INamedTypeSymbol? implementer
+    )
     {
-        if (FindMarking(member) is not { } marking)
+        if (FindMarking(member, implementer) is not { } marking)
         {
             return null;
         }
@@ -202,7 +391,10 @@ internal static class ConnectionCandidateReader
         var parameters = new List<(IParameterSymbol, ConnectionCandidate)>();
         foreach (var parameter in primary?.Parameters ?? ImmutableArray<IParameterSymbol>.Empty)
         {
-            if (Held(parameter, CandidateMember.Parameter, parameter.Type, false, false, fallback) is { } candidate)
+            if (
+                Held(parameter, CandidateMember.Parameter, parameter.Type, false, false, fallback, implementer: null) is
+                { } candidate
+            )
             {
                 parameters.Add((parameter, candidate));
             }
@@ -297,10 +489,11 @@ internal static class ConnectionCandidateReader
         ITypeSymbol type,
         bool isStatic,
         bool isInherited,
-        LocationInfo fallback
+        LocationInfo fallback,
+        INamedTypeSymbol? implementer
     )
     {
-        var marking = FindMarking(symbol);
+        var marking = FindMarking(symbol, implementer);
         var kind = HeldKindOf(type);
         if (marking is null)
         {
@@ -347,9 +540,14 @@ internal static class ConnectionCandidateReader
 
     // A method is a candidate only when it is marked: a factory, a method that returns a connection string, or an
     // unsupported one.
-    private static ConnectionCandidate? Method(IMethodSymbol method, bool isInherited, LocationInfo fallback)
+    private static ConnectionCandidate? Method(
+        IMethodSymbol method,
+        bool isInherited,
+        LocationInfo fallback,
+        INamedTypeSymbol? implementer
+    )
     {
-        if (FindMarking(method) is not { } marking)
+        if (FindMarking(method, implementer) is not { } marking)
         {
             return null;
         }
@@ -429,13 +627,42 @@ internal static class ConnectionCandidateReader
 
     // The member's own attribute, or that of the nearest member it overrides: an override of a marked member is marked
     // as it is, Database too, since the attribute is not inherited and the override hides the member it overrides.
-    private static AttributeData? FindMarking(ISymbol symbol)
+    // Given an implementer, a factory, each of those is also marked as the interface member it implements in the
+    // factory is; a repository's own members are not, so that implementing an interface never marks them.
+    private static AttributeData? FindMarking(ISymbol symbol, INamedTypeSymbol? implementer = null)
     {
         for (var current = symbol; current is not null; current = OverriddenOf(current))
         {
             if (MarkingOf(current) is { } marking)
             {
                 return marking;
+            }
+
+            if (implementer is not null && ImplementedMarkingOf(current, implementer) is { } implemented)
+            {
+                return implemented;
+            }
+        }
+
+        return null;
+    }
+
+    // The attribute of an interface member of the name that the member implements in the type.
+    private static AttributeData? ImplementedMarkingOf(ISymbol member, INamedTypeSymbol type)
+    {
+        foreach (var @interface in type.AllInterfaces)
+        {
+            foreach (var implemented in @interface.GetMembers(member.Name))
+            {
+                if (
+                    SymbolEqualityComparer.Default.Equals(
+                        type.FindImplementationForInterfaceMember(implemented),
+                        member
+                    ) && MarkingOf(implemented) is { } marking
+                )
+                {
+                    return marking;
+                }
             }
         }
 
