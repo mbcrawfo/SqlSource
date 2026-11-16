@@ -2,7 +2,7 @@
 
 If your database is PostgreSQL or SQL Server, set the dialect to `postgres` or `mssql` and stop reading.  The rest of this page is for the output `sql` on another database, and for SQL that SqlSource reads differently from your database.
 
-Databases disagree about where a comment or a string ends.  SqlSource removes comments from your SQL, so it has to know which rules your SQL follows.  This line, read by three dialects, is three different statements:
+The dialect matters because databases disagree about where a comment or a string ends.  SqlSource removes comments from your SQL, so it has to know which rules your SQL follows.  This line, read by three dialects, is three different statements:
 
 ```sql fragment
 SELECT 1 # x [y--z] -- c
@@ -14,11 +14,11 @@ SELECT 1 # x [y--z] -- c
 | `mysql` | `SELECT 1` | `#` starts a comment |
 | `mssql` | `SELECT 1 # x [y--z]` | `[y--z]` is a quoted identifier, and the last `--` starts a comment |
 
-The [dialect](settings.md#setting-dialect) is the set of rules that SqlSource reads a `.sql` file by.  It connects to nothing and is not the [logical database](settings.md#setting-database).  This page covers how to choose one, its options, what each dialect changes, and what SqlSource still reads differently from the database.  Where a dialect is set, and which place wins, is on [the settings page](settings.md#setting-dialect).
+The [dialect](settings.md#setting-dialect) is the set of rules by which SqlSource reads a `.sql` file.  It connects to nothing, and it is not the [logical database](settings.md#setting-database).  This page covers the dialect names, the options, what each dialect changes, and what SqlSource still reads differently from the database.  [The settings page](settings.md#setting-dialect) says where you set the dialect, and which place wins.
 
 <a id="choosing-a-dialect"></a>
 
-## Choosing a dialect
+## Dialect names
 
 | Dialect | Also accepted | Use it for |
 |----|----|----|
@@ -33,9 +33,12 @@ The [dialect](settings.md#setting-dialect) is the set of rules that SqlSource re
 
 Names are not case-sensitive.
 
-Choose the dialect named for your database.  A database that has no dialect of its own may be read correctly by one that has: the last column says which, such as `postgres` for DuckDB, whose files then need the output `sql` (see [database support](databases/index.md#database-support)).  For any other, use `ansi`.
+Set the dialect named for your database.  A database that has no dialect of its own can be read correctly by one that has: the last column says which.  For example, `postgres` reads DuckDB, whose files then need the output `sql` (see [database support](databases/index.md#database-support)).  For any other database, use `ansi`.
 
-`ansi` is the default, so a project that sets nothing is read by it.  It reads the SQL of every database by one set of rules, and misreads each construct in [the table below](#what-a-dialect-changes) that it says No to and your database says Yes to.  It also reads the quoting forms of PostgreSQL and MySQL that are rarely anything else: `` `...` ``, `$tag$...$tag$` and `E'...'`.  The fix for a misread is to set the dialect.
+- **`ansi` is the default.**  A project that sets nothing is read by `ansi`.
+- **`ansi` reads the SQL of every database by one set of rules.**  So it misreads each construct of [the table below](#what-a-dialect-changes) where its column says No and the column of your database says Yes.
+- **`ansi` also reads the quoting forms of PostgreSQL and MySQL that are rarely anything else**: `` `...` ``, `$tag$...$tag$` and `E'...'`.
+- **The fix for a misread is to set the dialect.**
 
 The dialect also decides which databases the tool can ask about a query: see [database support](databases/index.md#database-support).
 
@@ -50,7 +53,7 @@ The dialect also decides which databases the tool can ask about a query: see [da
 SELECT 'C:\temp\' AS path;
 ```
 
-MySQL and MariaDB have SQL modes that change how a string is read.  If your server runs with one, name it after the dialect, with a comma:
+MySQL and MariaDB have SQL modes that change how a string is read.  If your server runs with one, write its option after the dialect, with a comma:
 
 | Option | Also accepted | SQL mode | What it changes |
 |----|----|----|----|
@@ -72,9 +75,9 @@ MySQL and MariaDB have SQL modes that change how a string is read.  If your serv
 }
 ```
 
-- **Options are not case-sensitive** and come in any order.  Spaces around the name and each option are ignored.
-- **Only `mysql` and `mariadb` have options.**  An option of another dialect, or one that does not exist, is the same error as a name that is not a dialect, and so is an empty one, as in `mysql,`.  Errors by place are on [the settings page](settings.md#setting-dialect).
-- **In a `-- dialect:` marker, the value is the rest of the line**: the name, then the options, separated by commas.  Nothing else may follow it on the line, a comment included.
+- **Options are not case-sensitive, and come in any order.**  Spaces around the name and each option are ignored.
+- **Only `mysql` and `mariadb` have options.**  An option of another dialect, or one that does not exist, is the same error as a name that is not a dialect.  So is an empty option, as in `mysql,`.  [The settings page](settings.md#setting-dialect) gives the errors by place.
+- **In a `-- dialect:` marker, the value is the rest of the line**: the name, then the options, separated by commas.  Nothing else can follow it on the line, not even a comment.
 - **A value written in several places**, options included, follows [the rules of the dialect setting](settings.md#setting-dialect).
 
 <a id="what-a-dialect-changes"></a>
@@ -95,18 +98,21 @@ MySQL and MariaDB have SQL modes that change how a string is read.  If your serv
 | Kept as hints, besides `/*+ ... */` and `/*! ... */` | | | | | | `/*M! ... */` | | `--+ ...` |
 | A name declared with `DECLARE @name` is a local variable, not a parameter ([declared variables](parameters.md#declared-variables)) | No | Yes | No | No | No | No | No | No |
 
-Four details:
+Five details:
 
-- In `mssql` a `]]` inside brackets stands for one `]`.  In `sqlite` the first `]` ends the identifier.
-- In `mysql` and `mariadb` an option changes the first row (see [options](#dialect-options)).
-- In `postgres` and `cockroachdb` an `E'...'` string that is continued on the next line is one string, and each later part takes backslash escapes too.  In `postgres`, `--` comments may stand between the parts, as PostgreSQL allows, and they are removed like any other comment.  In `cockroachdb` only white space may.
-- In `cockroachdb` a bytes literal, `b'...'`, takes backslash escapes as an `E'...'` string does.  So does `b'...'` in `mysql` and `mariadb`, where every string does.
+- In `mssql`, a `]]` inside brackets stands for one `]`.  In `sqlite`, the first `]` ends the identifier.
+- In `mysql` and `mariadb`, an option changes the first row (see [options](#dialect-options)).
+- In `postgres` and `cockroachdb`, an `E'...'` string that is continued on the next line is one string.  Each later part takes backslash escapes too.
+- In `postgres`, `--` comments can stand between the parts of such a string, as PostgreSQL allows.  They are removed like any other comment.  In `cockroachdb`, only white space can stand there.
+- In `cockroachdb`, a bytes literal, `b'...'`, takes backslash escapes as an `E'...'` string does.  So does `b'...'` in `mysql` and `mariadb`, where every string does.
 
 <a id="markers-under-mysql"></a>
 
 ### Markers under `mysql` and `mariadb`
 
-A [marker](sql-files.md#marker) is a `--` comment, so under `mysql` and `mariadb` it needs white space after the two dashes, as those databases need it: `-- name: GetUser` is a marker, and `--name: GetUser` is not a comment at all.  A `#` comment is never a marker, even where `#` starts a comment: `# name: GetUser` is a comment.
+Under `mysql` and `mariadb`, `-- name: GetUser` is a marker, and `--name: GetUser` is not a comment at all.  A [marker](sql-files.md#marker) is a `--` comment, so under these dialects it needs white space after the two dashes, as these databases need it.
+
+A `#` comment is never a marker, even where `#` starts a comment: `# name: GetUser` is a comment.
 
 <a id="still-read-differently"></a>
 
@@ -125,6 +131,6 @@ SqlSource reads these differently from the database, whatever the dialect:
 A misread has one of two results:
 
 - **A build error** that reports an unclosed quote or comment ([SQLSRC101](../diagnostics.md#sqlsrc101), [SQLSRC102](../diagnostics.md#sqlsrc102)) in SQL that is valid for your database.  `keep-comments` does not help.
-- **Missing SQL.**  The misread quotes happen to balance, and the SQL after them is taken for a comment and removed: under `ansi`, `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  Nothing is reported.  `keep-comments` on the query prevents the removal.
+- **Missing SQL.**  The misread quotes happen to balance, and the SQL after them is taken for a comment and removed.  Under `ansi`, `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  Nothing is reported.  `keep-comments` on the query prevents the removal.
 
 If your SQL uses one of these constructs, check the generated SQL: hover over the member, or read its documentation.
