@@ -111,7 +111,7 @@ public sealed partial class StoreQueries(DbConnection connection)
 
 - `Source = "."` gives the class each `.sql` file in the folder of its C# file.  Subfolders are not searched.  See [Source](../reference/attributes.md#setting-source).
 - A query name can be used once across all the files of a class.  See [Which files belong to a type](../reference/attributes.md#files-of-a-type).
-- Every setting of a query comes from its `.sql` file and the settings files of its folder, not from the class.  See [The attribute](../reference/attributes.md#attribute).
+- Every setting of a query comes from its `.sql` file and the settings files of its folder and the folders above it, not from the class.  The folder of the C# file counts only when it is one of those folders, as with `Source = "Queries"`.  See [The attribute](../reference/attributes.md#attribute).
 - Write `Source` as a string where the attribute is.  The tool reads the attribute as text, so it cannot read a constant or `nameof` there.  See [`Source` written as text](../reference/attributes.md#limit-source-written-as-text).
 
 ## If it does not work

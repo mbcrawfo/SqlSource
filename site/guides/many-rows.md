@@ -62,7 +62,7 @@ await transaction.CommitAsync(cancellationToken);
 
 - If you give it no transaction, a collection method begins its own.  It commits it after the last item, and rolls it back if anything throws, so no item is left.  See [Transactions](../reference/collection-methods.md#collection-transactions).
 - To set the isolation level of that transaction, write it on the same line: `-- generator: collection-method transaction=serializable`.  `transaction=off` begins no transaction, so a failure leaves the items before it.  See [`transaction`](../reference/generator-parameters.md#gp-transaction).
-- At the output `methods`, the method uses the transaction that you give it, whatever `transaction` says.  After an exception, what ran is still in your transaction, and you decide whether to roll it back or commit it.  See [Transactions](../reference/collection-methods.md#collection-transactions).
+- At the output `methods`, the method uses the transaction that you give it, whatever `transaction` says.  After an exception, what ran stays in your transaction, unless a database error aborted the transaction or rolled it back.  On PostgreSQL, every database error aborts the transaction, so roll it back.  See [Transactions](../reference/collection-methods.md#collection-transactions).
 - If a `TransactionScope` is open, the method begins no transaction, and runs in the scope's.  This is how to put a repository's collection method, which takes no transaction, in a larger one.  A connection that is not in the scope, such as one opened before it, runs the items in no transaction at all.  See [Transactions and timeouts](../reference/repositories.md#repository-transactions).
 
 <a id="failures"></a>
