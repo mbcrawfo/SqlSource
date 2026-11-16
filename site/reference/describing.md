@@ -201,7 +201,7 @@ billing (postgres): 15 same, 1 differ, 0 failed
 
 ### SQLSRC241 for a query that only another target framework includes
 
-**What you see.**  The build for a target framework other than the first reports [SQLSRC241](../diagnostics.md#sqlsrc241) for a query that must be described, after you ran `describe`.  Only that framework includes the query.  A project that references SqlSource for a later framework only is left out of a solution's run, and the tool says nothing.  If you name that project, the tool reports [SQLSRC204](../diagnostics.md#sqlsrc204).  The build of that project reports SQLSRC241 in the same way.
+**What you see.**  The build for a target framework other than the first reports [SQLSRC241](../diagnostics.md#sqlsrc241) for a query that must be described, after you ran `describe`.  The first framework does not include the query.  A project that references SqlSource for a later framework only is left out of a solution's run, and the tool says nothing.  If you name that project, the tool reports [SQLSRC204](../diagnostics.md#sqlsrc204).  The build of that project reports SQLSRC241 in the same way.
 
 **Why.**  `describe`, and a build that runs the tool, read a project with several target frameworks for its first framework alone.  So they do not see these, and do not describe their queries:
 
