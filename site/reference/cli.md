@@ -2,48 +2,43 @@
 
 This page says how to install the `sqlsource` tool, and lists its commands, options, environment variables and exit codes.  See also [what `describe` does](describing.md), [how a build runs it](msbuild.md#running-in-the-build), [the bundles of `diagnose` and `replay`](bundles.md) and [how the tool reports errors](errors.md#the-tools-errors).
 
-The tool's `diagnose` command makes a bug-report bundle of one query that you can attach to an issue, and its `replay` command checks a bundle with no database: see [reporting a wrong model](../guides/report-a-bug.md#report-a-bug) and [checking a bundle with `replay`](bundles.md#replay).
+The tool's `diagnose` command makes a bug-report bundle of one query, which you can attach to an issue.  Its `replay` command checks a bundle with no database.  See [reporting a wrong model](../guides/report-a-bug.md#report-a-bug) and [checking a bundle with `replay`](bundles.md#replay).
 
 <a id="tool"></a>
 
 ## The tool
-
-The `sqlsource` command of the `SqlSource.Tool` package.  Its `describe` command asks a database about your queries and writes the sidecars.
-
-The `SqlSource.Tool` package adds the `sqlsource` command to a project.  Its `describe` command connects to your database, asks it what the parameters and columns of each of your queries are, and writes the answers into [sidecar files](sidecars.md#sidecar-files) beside your `.sql` files.  You commit the sidecars with the project, so that a build needs no database.  On a machine that has a connection, the build [runs `describe` itself](msbuild.md#running-in-the-build) before it compiles.
 
 ```console
 $ dotnet sqlsource describe --connection billing="Host=localhost;Database=billing;Username=app;Password=secret"
 billing (postgres): 4 described, 0 skipped, 0 failed
 ```
 
-The generator writes a constant or a token method for every query whose output is `sql` or `models`, with the tool or without it.  The tool is for the queries that must be described, those whose [output](settings.md#setting-output) is `models`, `methods` or `repository`, the default: the build checks each of them against its file's sidecar, and reports one that has no current entry there.  A project whose queries all have the output `sql` needs no tool.
+The tool is the `sqlsource` command of the `SqlSource.Tool` package.  It asks your database about your queries, and writes the answers into the [sidecar files](sidecars.md#sidecar-files) beside your `.sql` files.  In the sample, the command line gives the connection of the database `billing`, and the tool describes four queries.
 
-The generator builds the [models](models.md#models) of each described query from the sidecars that the tool writes, and the [method](query-methods.md#query-methods) that runs a query whose output is `methods` or `repository`.
+- **The `describe` command connects to your database.**  It asks the database what the parameters and the columns of each of your queries are.
+- **You commit the sidecars with the project.**  Then a build needs no database.
+- **On a machine that has a connection, the build [runs `describe` itself](msbuild.md#running-in-the-build)** before it compiles.
+
+The tool describes the queries whose [output](settings.md#setting-output) is `repository`, `methods` or `models`, and the build checks each of them against its sidecar.  From the sidecars, the generator builds the [models](models.md#models) of these queries, and the [method](query-methods.md#query-methods) of a query whose output is `repository` or `methods`.  See [which queries are described](describing.md#which-queries).
 
 <a id="install-the-tool"></a>
 
 ## Install the tool
 
-Install it as a local tool of your repository, from the folder at its root.
-
 ```console
 $ dotnet new tool-manifest
 $ dotnet tool install SqlSource.Tool
 ```
 
-The first command creates the tool manifest, a `dotnet-tools.json` file, which records the tool and its version.  Commit that file.  Anyone who clones the repository, and a build server, then gets the same version with `dotnet tool restore`.  A build that [runs the tool](msbuild.md#running-in-the-build) starts this version too.  To run the tool, give it a connection to your database: see [connections](connections.md#connections).
+Install the tool once, as a local tool of your repository.  Run the two commands in the folder at the root of the repository.  If the repository already has a tool manifest, skip the first command.
 
-Keep the tool at the version of the `SqlSource` package your projects use: the two are released together under one version number.  When you update the package, update the tool with `dotnet tool update SqlSource.Tool`.  A package and a tool of different versions can stop the tool from reading your project ([SQLSRC206](../diagnostics.md#sqlsrc206)).  What else the tool needs is under [requirements](#requirements).
+- **The first command creates the tool manifest, a `dotnet-tools.json` file.**  The manifest records the tool and its version.  Commit that file.
+- **Anyone who clones the repository, and a build server, get the same version with `dotnet tool restore`.**  A build that [runs the tool](msbuild.md#running-in-the-build) starts this version too.
+- **Keep the tool at the version of the `SqlSource` package that your projects use.**  The two are released together, under one version number.  When you update the package, update the tool with `dotnet tool update SqlSource.Tool`.
+- **A package and a tool of different versions can stop the tool from reading your project** ([SQLSRC206](../diagnostics.md#sqlsrc206)).
+- **A project whose queries all have the output `sql` needs no tool.**  That is a project that uses SqlSource only to keep its SQL out of its code files.
 
-Once, at the root of your repository, to install the tool (skip the first command if the repository already has a tool manifest):
-
-```console
-$ dotnet new tool-manifest
-$ dotnet tool install SqlSource.Tool
-```
-
-- **`SqlSource.Tool`** adds the `sqlsource` command, which describes your queries ([step 5](../start/first-query.md#describe)).  Commit the `dotnet-tools.json` that `dotnet new tool-manifest` creates, and keep the tool at the version of the `SqlSource` package.  A project that only keeps its SQL out of code files does not need it.
+The `sqlsource` command describes your queries: see [the step that describes your first query](../start/first-query.md#describe).  To run the tool, give it a connection to your database: see [connections](connections.md#connections).  What else the tool needs is under [requirements](#requirements).
 
 <a id="command-reference"></a>
 
@@ -62,7 +57,9 @@ dotnet sqlsource diagnose --scrub <bundle> --out <path>
 dotnet sqlsource replay <bundle> [--verbose] [--log <path>]
 ```
 
-`dotnet sqlsource --help`, and `--help` after a command, such as `dotnet sqlsource diagnose --help`, print the options, and `dotnet sqlsource --version` the version of the tool.  The arguments and the first table of options below are those of `describe`; `diagnose` is in [making a bundle with `diagnose`](bundles.md#diagnose), and `replay` in [checking a bundle with `replay`](bundles.md#replay).
+`dotnet sqlsource --help` prints the options of the tool.  `--help` after a command prints the options of that command, as `dotnet sqlsource diagnose --help` does.  `dotnet sqlsource --version` prints the version of the tool.
+
+The arguments and the first table of options below are those of `describe`.  For `diagnose`, see [making a bundle with `diagnose`](bundles.md#diagnose).  For `replay`, see [checking a bundle with `replay`](bundles.md#replay).
 
 <a id="arguments"></a>
 
@@ -74,11 +71,13 @@ $ dotnet sqlsource describe App.slnx
 $ dotnet sqlsource describe src/App/Queries/Users.sql src/App/Queries/Orders.sql
 ```
 
-- **The project or solution to run on**: a `.sln`, `.slnx` or `.csproj` file, or a folder that holds exactly one of them.  Without it, the current folder.  Only one may be given.  The tool looks in that folder alone, not in the folders below it: none is [SQLSRC201](../diagnostics.md#sqlsrc201) and more than one [SQLSRC202](../diagnostics.md#sqlsrc202).
-- **In a solution**, the tool runs on every C# project that uses the SqlSource package, and leaves the others out without a word.  Every C# project of the solution must have been restored, one with no queries too ([SQLSRC220](../diagnostics.md#sqlsrc220)).
-- **A path that ends in `.sql`** restricts the run to that file.  Several may be given.  It must be a file that a type of the run claims ([SQLSRC212](../diagnostics.md#sqlsrc212)); the rest of the run goes on.
-
-A relative path is taken from the current folder.
+- **The project or solution to run on.**  It is a `.sln`, `.slnx` or `.csproj` file, or a folder that holds exactly one of them.  Without it, the tool runs on the current folder.  You can give only one.
+- **The tool looks for the project or solution in that folder alone**, not in the folders below it.  If the folder holds none, the tool reports [SQLSRC201](../diagnostics.md#sqlsrc201).  If it holds more than one, the tool reports [SQLSRC202](../diagnostics.md#sqlsrc202).
+- **In a solution, the tool runs on every C# project that uses the SqlSource package.**  It leaves the other projects out, and says nothing about them.
+- **Every C# project of the solution must be restored**, a project with no queries too.  If one is not, the tool reports [SQLSRC220](../diagnostics.md#sqlsrc220).
+- **A path that ends in `.sql` restricts the run to that file.**  You can give several.
+- **Each `.sql` path must be a file that a type of the run claims.**  If it is not, the tool reports [SQLSRC212](../diagnostics.md#sqlsrc212), and the rest of the run goes on.
+- **A relative path starts from the current folder.**
 
 <a id="options"></a>
 
@@ -98,7 +97,7 @@ A relative path is taken from the current folder.
 | `--online <auto\|true>` | For the build's use, with `--manifest`: takes a `--manifest`, `--log` or `--env-file` path that holds `=` or `;`, as the build's own may, and prints and logs it in full, writes each error on one line, writes no log for `SQLSOURCE_LOG`, and under `auto` says it is offline, and exits with `0`, when no database with a query to describe has a connection.  See [running in the build](msbuild.md#running-in-the-build) |
 | `--watch` | Describes once, then again each time a file of the run changes, until stopped: see [describe on save](describing.md#describe-on-save).  Not with `--check` or `--manifest` |
 
-A run with `--project`, `--database` or a `.sql` path writes only the sidecars of the files whose queries it selected, and deletes none.
+If a run has `--project`, `--database` or a `.sql` path, it writes only the sidecars of the files whose queries it selected.  It deletes no sidecar.
 
 The tool has six more options: `--help` and `--version`, and four that `diagnose` alone takes.
 
@@ -123,7 +122,9 @@ The tool has six more options: `--help` and `--version`, and four that `diagnose
 | `SQLSOURCE_DEBUG` | Any value that is not empty adds the stack trace to [SQLSRC200](../diagnostics.md#sqlsrc200), for a bug report |
 | `DOTNET_USE_POLLING_FILE_WATCHER` | `true` or `1`, in any case, makes `--watch` look at the folders every second instead of asking the system: see [describe on save](describing.md#describe-on-save) |
 
-A connection or log variable that is empty or holds only white space is not set.  Each connection variable can also be set in a [`.env` file](connections.md#env-file), and the environment wins over it; `SQLSOURCE_LOG`, `SQLSOURCE_DEBUG` and `DOTNET_USE_POLLING_FILE_WATCHER` are read from the environment alone.
+- **A connection variable or a log variable that is empty, or holds only white space, is not set.**
+- **You can also set each connection variable in a [`.env` file](connections.md#env-file).**  If the environment sets the variable too, the environment wins.
+- **The tool reads `SQLSOURCE_LOG`, `SQLSOURCE_DEBUG` and `DOTNET_USE_POLLING_FILE_WATCHER` from the environment alone.**
 
 <a id="exit-codes"></a>
 
@@ -153,7 +154,14 @@ sqlsource: sidecar '/work/App/Queries/Users.sql.json': written
 postgres (postgres): 1 described, 0 skipped, 0 failed
 ```
 
-`--verbose` prints a line for each project, file, database, query and sidecar, saying what the run decided for it, each starting with `sqlsource:`.  A database's line names where its connection came from, and never the connection: `--connection`, a variable's name, or, for a connection from a [`.env` file](connections.md#env-file), the variable and the file, as `connection from SQLSOURCE_CONNECTION_BILLING in /work/.env`.  Use it to see why a query was skipped or a project left out.  Under `--watch` it says the same of each pass, and nothing more.  Without it the tool prints its errors, the summary, and the line that ends a failed run or says that no project uses SqlSource.
+`--verbose` prints a line for each project, file, database, query and sidecar.  Each line starts with `sqlsource:`, and says what the run decided for that thing.  Use `--verbose` to see why a query was skipped, or why a project was left out.
+
+- **The line of a database names where its connection came from, and never the connection.**  It names one of these:
+  - `--connection`;
+  - the name of a variable;
+  - for a connection from a [`.env` file](connections.md#env-file), the variable and the file, as `connection from SQLSOURCE_CONNECTION_BILLING in /work/.env`.
+- **Under `--watch`, `--verbose` says the same of each pass, and nothing more.**
+- **Without `--verbose`, the tool prints its errors and the summary.**  It also prints the line that ends a failed run, or the line that says that no project uses SqlSource.
 
 <a id="logs"></a>
 
@@ -163,46 +171,83 @@ postgres (postgres): 1 described, 0 skipped, 0 failed
 $ dotnet sqlsource describe --log sqlsource.log
 ```
 
-`--log <path>`, or the variable `SQLSOURCE_LOG`, writes a record of the run to a file, one JSON object on each line.  It is your own record of what the run did, with your names, your SQL and what your server said in it: never attach it to an issue, and send it privately when a maintainer asks for it.  What an issue attaches is a bundle, in which your names and strings are renamed: see [reporting a wrong model](../guides/report-a-bug.md#report-a-bug).
+`--log <path>`, or the variable `SQLSOURCE_LOG`, writes a record of the run to a file.  Each line of the file is one JSON object.
 
-- **The file is overwritten by each run.**  The tool refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, so that a slip on the command line never empties a file of your project ([SQLSRC218](../diagnostics.md#sqlsrc218)).  It refuses a `--log` path that holds `=` or `;` too, which is more likely a connection string typed in the wrong place than a path; a path from `SQLSOURCE_LOG` is not held to that.
-- **A `--watch` writes one file from its start until it is stopped**, with every pass in it and where each begins and ends.
-- **A run that reports an error and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.  A `--check` whose only errors are sidecars out of date does not print it, nor does a `--watch`, nor `diagnose` or `replay`, nor the run of a build, which is given no `--log`: see [running in the build](msbuild.md#running-in-the-build) for its logs.
+The log is your own record of what the run did.  It holds your names, your SQL and what your server said.  Never attach a log to an issue.  Send it privately, when a maintainer asks for it.  To an issue, attach a bundle, in which your names and strings are renamed: see [reporting a wrong model](../guides/report-a-bug.md#report-a-bug).
 
-**Read a log before you send it.**  The tool writes each connection value as `***` wherever it finds it whole: the value of each `--connection` on the command line, and the value of each connection, from the command line or a variable, wherever the database driver repeats it in a message, as written, with the spaces at its ends trimmed, or as the driver writes it again.  It writes each password of a connection string as `***` too, where it stands apart from other letters, digits and underscores and is at least four characters long, and so the password that the PostgreSQL driver reads from `PGPASSWORD` or a password file when the connection string gives none.  In the record of your command line, every value of `--database` and `--connection` is written `***`.  A value typed where a path goes (the path of `describe` or `diagnose`, a `.sql` path, a `--project` value, or a value of `diagnose`'s `--query` or `--scrub`) is written `***` too when it holds `=` or `;`, as a connection string does.  A value typed there, or after `--log` or `--env-file`, with neither, such as a password typed alone, can appear as written, and so can a password shorter than four characters, and one that is the name of its logical database or of its dialect, such as `postgres` ([a limit](connections.md#limit-short-password)): search the log for your password before you share it.  The log also holds:
+- **Each run overwrites the file.**  So the tool refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx` ([SQLSRC218](../diagnostics.md#sqlsrc218)).  Then a slip on the command line never empties a file of your project.
+- **The tool also refuses a `--log` path that holds `=` or `;`.**  Such a path is more likely a connection string typed in the wrong place.  A path from `SQLSOURCE_LOG` is not held to that rule.
+- **A `--watch` writes one file, from its start until it is stopped.**  The file holds every pass, and where each pass begins and ends.
+- **A run that reports an error and writes no log ends with a line:** `sqlsource: run again with --log <file> for a record of what the run did`.  These runs do not print the line:
+  - a `--check` whose only errors are sidecars out of date;
+  - a `--watch`;
+  - `diagnose` and `replay`;
+  - a run that is stopped with Ctrl+C, `SIGTERM` or `SIGHUP`;
+  - the run of a build, which is given no `--log`.  For the logs of a build, see [running in the build](msbuild.md#running-in-the-build).
+
+**Read a log before you send it.**  The tool writes each connection value as `***` wherever it finds the value whole:
+
+- the value of each `--connection` on the command line;
+- the value of each connection, from the command line or a variable, wherever the database driver repeats it in a message.
+
+It finds the value as written, with the spaces at its ends trimmed, or as the driver writes it again.  The tool also writes these as `***`:
+
+- each password of a connection string, where it stands apart from other letters, digits and underscores, and is at least four characters long;
+- in the same way, the password that the PostgreSQL driver reads from `PGPASSWORD` or a password file, when the connection string gives none;
+- in the record of your command line, every value of `--database` and `--connection`;
+- a value typed where a path goes, when it holds `=` or `;`, as a connection string does.  A path goes in these places: the path of `describe` or `diagnose`, a `.sql` path, a value of `--project`, a value of `--query` or `--scrub` of `diagnose`, and the bundle of `replay`.
+
+These can appear in the log as written ([a limit](connections.md#limit-short-password)):
+
+- a value typed where a path goes, or after `--log`, `--env-file` or `--out`, that holds neither `=` nor `;`, such as a password typed alone;
+- a password shorter than four characters;
+- a password that is the name of its logical database or of its dialect, such as `postgres`;
+- the password of a PostgreSQL password file that is a pipe, such as `PGPASSFILE=<(...)` in a shell;
+- the login, in an error of SQL Server about a query, such as an error for a database that the login may not open.
+
+Search the log for your password before you share it.  The log also holds:
 
 - the version of the tool, of .NET and of the operating system, and the rest of your command line;
 - the paths of your projects and files, and the names of your queries and databases;
 - the SQL of your queries as the tool sent it to the database, and what the server answered, its errors and warnings included;
-- for a database that could not be opened, what went wrong, in the tool's own words and with the server's SQLSTATE, or SQL Server's error number, which names neither its host nor its user;
-- each error, and how the run ended, with its exit code.  A log that cannot be finished, as when the disk is full, is an error of its own once the run has ended ([SQLSRC218](../diagnostics.md#sqlsrc218)): the tool then exits with `1`, and the log's last line may still hold the exit code the run had before.
+- for a database that could not be opened, what went wrong, in the tool's own words, which name neither the host nor the user.  With it is the SQLSTATE of the server, or the error number of SQL Server;
+- each error, and how the run ended, with its exit code.
+
+If the tool cannot finish the log, as when the disk is full, it reports [SQLSRC218](../diagnostics.md#sqlsrc218) after the run has ended.  The tool then exits with `1`.  The last line of the log can still hold the exit code that the run had before.
 
 <a id="requirements"></a>
 
 ### Requirements
 
-- **The .NET SDK**, and not only a runtime.  The tool asks MSBuild about your projects through `dotnet msbuild`.  It runs on .NET 8 or later.
-- **Restored projects.**  The tool does not restore: run `dotnet restore` first ([SQLSRC220](../diagnostics.md#sqlsrc220)).
+- **The .NET SDK, and not only a runtime.**  The tool asks MSBuild about your projects through `dotnet msbuild`.  The tool runs on .NET 8 or later.
+- **Restored projects.**  The tool does not restore your projects.  Run `dotnet restore` first, or the tool reports [SQLSRC220](../diagnostics.md#sqlsrc220).
 - **The same version as the `SqlSource` package** of your projects ([SQLSRC206](../diagnostics.md#sqlsrc206)).
-- **A database the tool can reach**, of a version it supports, for each logical database with a query to describe.  See [PostgreSQL](databases/index.md#supported-versions) and [SQL Server](databases/index.md#supported-versions).
+- **A database that the tool can reach, for each logical database with a query to describe.**  The database is of a version that the tool supports: see the versions of [PostgreSQL](databases/index.md#supported-versions) and [SQL Server](databases/index.md#supported-versions).
 
 <a id="summary"></a>
 
 ## The summary
-
-Every run ends with one line for each database it ran on:
 
 ```console
 billing (postgres): 4 described, 12 skipped, 0 failed
 reports (postgres): no connection, 5 skipped
 ```
 
+Every run ends with one line for each database that it ran on, as in the sample.  Its words mean:
+
 - **described**: the queries the database was asked about in this run.
 - **skipped**: the queries whose sidecar entry was current.
 - **failed**: the queries that could not be described.  Each has an error above the summary.
 - **no connection**: the database has no connection and needed none, since all its queries were current.
 
-Under `--check` the counts are `same`, `differ` and `failed`.  A name given to `--database` that no query of the run has gets a line of zeros, so that a misspelt name is seen.  The line names it when it is close to a database of the run, in the spelling you gave, and otherwise says `--database at position <n>`, with the position of the value on the command line, since a value typed after `--database` by mistake may be a secret.  A run on a solution in which no project uses SqlSource prints `sqlsource: no project of '<path>' uses SqlSource` and no summary.
+Under `--check`, the counts are `same`, `differ` and `failed`.
+
+A name given to `--database` that no query of the run has gets a line of zeros, so that you see a misspelt name.
+
+- **If the name is close to a database of the run, the line names it**, in the spelling that you gave.
+- **If it is not, the line says `--database at position <n>`**, with the position of the value on the command line.  A value typed after `--database` by mistake can be a secret.
+
+If no project of a solution uses SqlSource, a run on the solution prints `sqlsource: no project of '<path>' uses SqlSource`, and no summary.
 
 <a id="limits"></a>
 
@@ -212,4 +257,8 @@ Under `--check` the counts are `same`, `differ` and `failed`.  A name given to `
 
 ### SQLSRC207 or SQLSRC212 for a path through a symbolic link
 
-- **A project path or a `.sql` path through a symbolic link is not found.**  When the current folder is reached through a symbolic link and you give a full path that goes through the link, the tool compares it with the real path and finds no match: `--project` reports [SQLSRC207](../diagnostics.md#sqlsrc207), and a `.sql` path [SQLSRC212](../diagnostics.md#sqlsrc212), though the file is there.  The message shows both spellings.  Give the path relative to the current folder, or the full real path.
+**What you see.**  A project path or a `.sql` path through a symbolic link is not found, though the file is there.  For `--project`, the tool reports [SQLSRC207](../diagnostics.md#sqlsrc207).  For a `.sql` path, it reports [SQLSRC212](../diagnostics.md#sqlsrc212).  The message shows both spellings of the path.
+
+**Why.**  The current folder is reached through a symbolic link, and you give a full path that goes through the link.  The tool compares that path with the real path, and finds no match.
+
+**What to do.**  Give the path relative to the current folder, or give the full real path.
