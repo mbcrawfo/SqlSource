@@ -1,21 +1,65 @@
 # Bug-report bundles (diagnose, replay)
 
-For the steps to make a bundle and send it with a bug report, see [report a wrong model](../guides/report-a-bug.md).
+To report a query that gets a wrong model, run `diagnose` on that query where you run `describe`.  Attach the zip that it writes to a bug report, and keep the mapping beside the zip to yourself.  For the steps, see [report a wrong model](../guides/report-a-bug.md).
 
 <a id="bundle-contents"></a>
 
 ## What is renamed before you share it
 
-A bundle holds the one query, as a `.sql` file of its own with its dialect and logical database written in it, what your database answered when the tool described the query, what SqlSource made of that answer, or the error that refused the query, and the versions of `sqlsource`, of the server and its driver, of .NET and of the operating system.  It holds none of your other queries, your settings files, your code, your connection string or a log.  The markers that change no description, such as `-- summary:`, `-- column:` and `-- output:`, are left out of its `.sql` file, and a `-- param:` line keeps its query parameter's type and nullability and leaves out its C# type.
+A bundle holds these:
 
-- **Every name of yours gets a new name**: the schemas, tables, views, columns, aliases, functions, types and indexes of your database, its name, the logical database, the query's own name, its query parameters and its tokens.  A new name is a prefix for what it names and eight hexadecimal digits or more, `t_4f0a9c21` for a table, and a spelling has the same new name throughout the bundle.  Under SQL Server, two spellings of one name that differ by case alone, such as `Email` and `EMAIL`, usually get new names that differ by case alone, `c_4f0a9c21` and `C_4f0a9c21`; a name written in three or more cases may now and then give one of them a new name of its own.  Token names are case-sensitive under either database, so `{{Extra}}` and `{{extra}}` get two new names.
-- **Every string literal gets a new one**, of the same form: `'active'` becomes `'l_9b3e07d4'`, and an enum's label is renamed as the literal of the same spelling, so the two still match.  A comment is left empty.
-- **A server's error keeps only its code**, the SQLSTATE or SQL Server's error number, and the query parameters it names, renamed.  Its message, which can quote your names and values, is left out.
-- **Each run picks its new names at random**, so two bundles of one schema share no new name, and no one can check a guess at what a new name stands for.
-- **Numbers are kept**, since a number in a query is as often a length, a precision or a `LIMIT` as a value, and another number could change what the database decides.
-- **A name of yours that is spelled as a keyword or a word of the database's own is kept**, wherever it stands: a column `name`, `date`, `count`, `type` or `value`, or an alias `old`, `new` or `left`.  Under PostgreSQL a token's name is kept only when it is written as the database writes the word, in lower case for a keyword, so `{{table}}` is kept and `{{Table}}` renamed.  SqlSource cannot tell such a name from the database's word, and renaming it would make many everyday queries impossible to rename.  The database's own names stay too: `pg_catalog`, `public`, `sys` and `dbo`, and its built-in functions, operators and types, as does a logical database named for its dialect, `postgres` or `mssql`.
+- the query, as a `.sql` file of its own, with its dialect and its logical database written in it;
+- what your database answered when the tool described the query;
+- what SqlSource made of that answer, or the error that refused the query;
+- the versions of `sqlsource`, of the server and its driver, of .NET and of the operating system.
 
-Before it writes the bundle, `diagnose` checks that every word in it is a new name, a word of the database's, a number or punctuation, and runs the query from the renamed bundle, as `replay` does, to see that it gives the answer your database gave.  So a bundle it writes holds no name, literal or value of yours but those kept above, and shows the problem as you saw it.  If a number in your query is a value you may not share, such as an account number written into its SQL, take the [private route](../guides/report-a-bug.md#raw-bundle) instead.
+A bundle holds none of these:
+
+- your other queries;
+- your settings files;
+- your code;
+- your connection string;
+- a log.
+
+The `.sql` file of a bundle leaves out each marker that changes no description, such as `-- summary:`, `-- column:` and `-- output:`.  A `-- param:` line keeps the type and the nullability of its query parameter, and leaves out its C# type.
+
+- **Every name of yours gets a new name.**  These are your names:
+  - the schemas, tables, views, columns, aliases, functions, types and indexes of your database;
+  - the name of your database;
+  - the logical database;
+  - the name of the query;
+  - its query parameters;
+  - its tokens;
+  - any other name in your SQL, such as the name of another database or of a linked server.
+- **A new name is a prefix for what it names, then eight hexadecimal digits or more.**  An example is `t_4f0a9c21` for a table.  A spelling has the same new name throughout the bundle.
+- **Under SQL Server, two spellings of one name that differ by case alone usually get new names that differ by case alone.**  So `Email` and `EMAIL` get `c_4f0a9c21` and `C_4f0a9c21`.  If a name is written in three or more cases, one of them can now and then get a new name of its own.
+- **Token names are case-sensitive under either database.**  So `{{Extra}}` and `{{extra}}` get two new names.
+- **Every string literal gets a new one, of the same form.**  `'active'` becomes `'l_9b3e07d4'`.
+- **The label of an enum is renamed as the literal of the same spelling**, so the two still match.
+- **A comment is left empty.**
+- **An error of the server keeps only these parts:**
+  - its code: the SQLSTATE of PostgreSQL, or the error number of SQL Server;
+  - under SQL Server, the other numbers of the error, such as its severity and its state;
+  - under PostgreSQL, the position in the query of an error that the server found when it first read the query, moved to the same place in the renamed query;
+  - the query parameters that it names, renamed.
+
+  Every other part is left out, such as its message, which can quote your names and values.
+- **Each run picks its new names at random.**  So two bundles of one schema share no new name.  And no one can check a guess at what a new name stands for.
+- **Numbers are kept.**  A number in a query is as often a length, a precision or a `LIMIT` as a value.  Another number could change what the database decides.
+- **A name of yours that is spelled as a keyword or as a word of the database is kept, wherever it stands.**  Examples are a column `name`, `date`, `count`, `type` or `value`, and an alias `old`, `new` or `left`.  SqlSource cannot tell such a name from the word of the database.  If SqlSource renamed such names, it could not rename many everyday queries.
+- **Under PostgreSQL, the name of a token is kept only when it is written as the database writes the word.**  For a keyword, that is lower case.  So `{{table}}` is kept, and `{{Table}}` is renamed.
+- **The names of the database itself are kept.**  These include:
+  - its built-in functions, operators and types;
+  - its own schemas, such as `pg_catalog`, `information_schema` and `public`, or `sys`, `INFORMATION_SCHEMA` and `dbo`;
+  - its other names, such as the system databases `master` and `tempdb` of SQL Server, and the system columns `ctid` and `xmin` of PostgreSQL.
+- **A logical database that is named for its dialect is kept**: `postgres` or `mssql`.
+
+Before `diagnose` writes the bundle, it checks two things:
+
+- Every word in the bundle is a new name, a word of the database, a number or punctuation.
+- The query, run from the renamed bundle as `replay` runs it, gives the answer that your database gave.
+
+So a bundle that `diagnose` writes holds no name, literal or value of yours but the ones that the list above keeps.  And it shows the problem as you saw it.  If a number in your query is a value that you cannot share, such as an account number written into its SQL, take the [private route](../guides/report-a-bug.md#raw-bundle) instead.
 
 <a id="diagnose"></a>
 
@@ -27,7 +71,7 @@ $ dotnet sqlsource diagnose App.slnx --project src/App/App.csproj --query src/Ap
 $ dotnet sqlsource diagnose --scrub ../report.zip --out ../report-renamed.zip
 ```
 
-`diagnose` writes the bug-report bundle of one query: see [what is renamed before you share it](#bundle-contents) for what it holds, and [reporting a wrong model](../guides/report-a-bug.md#report-a-bug) for what it prints.
+`diagnose` writes the bug-report bundle of one query.  The first two commands make a bundle of the query `GetUser`.  The second names a solution, and one project of it.  The third renames a raw bundle.  For what a bundle holds, see [what is renamed before you share it](#bundle-contents).  For what `diagnose` prints, see [reporting a wrong model](../guides/report-a-bug.md#report-a-bug).
 
 | Option | What it does |
 |----|----|
@@ -37,7 +81,10 @@ $ dotnet sqlsource diagnose --scrub ../report.zip --out ../report-renamed.zip
 | `--scrub <bundle>` | Renames a raw bundle, with no database, no project and no connection, and writes it and its mapping at `--out`.  It takes no other option.  A bundle renamed already is [SQLSRC295](../diagnostics.md#sqlsrc295), and one that cannot be read, or that another version made and that does not answer what this one asks ([SQLSRC290](../diagnostics.md#sqlsrc290)), is an error as for [`replay`](#replay); one whose answer this version does not reproduce is [SQLSRC296](../diagnostics.md#sqlsrc296), and nothing is written |
 | `<path>`, `--project`, `--connection`, `--env-file`, `--verbose`, `--log` | As for `describe`: see [arguments](cli.md#arguments) and [options](cli.md#options).  `<path>` names the project or solution alone, since `--query` names the one `.sql` file |
 
-It has none of `describe`'s other options.  Its connections come from the same places as `describe`'s ([connections](connections.md#connections)), and `SQLSOURCE_CONNECTION` gives the connection of the query's logical database even in a run with several, since `diagnose` describes one query.  The exit code is `0` when it wrote the bundle, a refused query's included, and its mapping unless the bundle is raw, and `1` otherwise.
+- **`diagnose` has none of the other options of `describe`.**
+- **`diagnose` takes its connections from the same places as `describe`.**  See [connections](connections.md#connections).
+- **`SQLSOURCE_CONNECTION` gives the connection of the logical database of the query, even in a run with several logical databases.**  The reason: `diagnose` describes one query.
+- **The exit code is `0` when `diagnose` wrote the bundle and, unless the bundle is raw, its mapping.**  This includes the bundle of a refused query.  In every other case, the exit code is `1`.
 
 <a id="replay"></a>
 
@@ -49,14 +96,20 @@ sqlsource: mssql.table-match: query="UsersWithOrders" tableMatch="several-tables
 sqlsource: reproduced: the pipeline gives this answer
 ```
 
-A bug-report bundle holds one query, what its database answered when the query was described, and what SqlSource made of it.  `replay` runs the query through SqlSource again from the bundle alone, and says whether it gives the same answer.  Give it the zip file, or the folder you unzipped it into.  It needs no database, no connection, no project and no `.env` file, and none of the [requirements](cli.md#requirements) but .NET 8 or later, so you can check a bundle that someone gave you on any machine with the tool.  Run it on a bundle that [`diagnose`](../guides/report-a-bug.md#report-a-bug) made for you, too, before you attach it: it shows what a maintainer will see.  The lines of a renamed bundle give its new names, which its mapping turns back into yours.
+A bug-report bundle holds one query, what its database answered when the query was described, and what SqlSource made of that answer.  `replay` runs the query through SqlSource again from the bundle alone.  Then it says whether SqlSource gives the same answer.
 
-Before its outcome, it prints a line for each decision it made about the query's columns and the table its rows match, each starting with `sqlsource:` and the name of the bundle's database engine.  With `--verbose` it prints a line for everything else it did too.  `--log <path>`, or `SQLSOURCE_LOG`, writes a record of the replay to a file, with the same rules as for `describe` ([logs](cli.md#logs)).  These are its only options.
+- **Give `replay` the zip file, or the folder that you unzipped it into.**
+- **`replay` needs no database, no connection, no project and no `.env` file.**  Of the [requirements](cli.md#requirements), it needs only .NET 8 or later.  So you can check a bundle that someone gave you on any machine with the tool.
+- **Run `replay` on a bundle that [`diagnose`](../guides/report-a-bug.md#report-a-bug) made for you, too, before you attach it.**  It shows what a maintainer sees.  The lines of a renamed bundle give its new names, and its mapping turns them back into yours.
+- **Before the outcome, `replay` prints a line for each decision that it made.**  These are the decisions about the columns of the query, and about the table that its rows match.  Each line starts with `sqlsource:` and the name of the database engine of the bundle.
+- **With `--verbose`, `replay` also prints a line for everything else that it did.**
+- **`--log <path>`, or `SQLSOURCE_LOG`, writes a record of the replay to a file.**  The rules are the same as for `describe`: see [logs](cli.md#logs).
+- **`--verbose` and `--log` are the only options of `replay`.**
 
-It ends with one of three outcomes:
+`replay` ends with one of three outcomes:
 
-- **`sqlsource: reproduced: the pipeline gives this answer`.**  This version gives the answer the bundle holds, the same columns, types, nullability and everything else a sidecar records for the query.  If that answer is wrong, the bundle shows SqlSource giving it with no database.  The exit code is `0`.
-- **`sqlsource: not reproduced`**, then a line for each difference, the bundle's value first, then a line that names the version of `sqlsource` that made the bundle beside yours.  A newer version may decide otherwise; to see the bundle's answer, install the version that made it.  The exit code is `2`.
+- **`sqlsource: reproduced: the pipeline gives this answer`.**  This version gives the answer that the bundle holds: the same columns, types and nullability, and everything else that a sidecar records for the query.  If that answer is wrong, the bundle shows SqlSource giving it with no database.  The exit code is `0`.
+- **`sqlsource: not reproduced`**, then a line for each difference, the value of the bundle first.  Then a line names the version of `sqlsource` that made the bundle, beside yours.  A newer version can decide otherwise.  To see the answer of the bundle, install the version that made it.  The exit code is `2`.
 
   ```console
   $ dotnet sqlsource replay report.zip
@@ -65,12 +118,22 @@ It ends with one of three outcomes:
   sqlsource: the bundle was made by sqlsource 1.4.0, sidecar format 1; this is sqlsource 1.6.0, sidecar format 1
   ```
 
-- **`sqlsource: replayed:` and an answer**, for a bundle that holds no answer of its own to compare with: the query's entry as a sidecar holds it, on one line, or the error that refused the query, as `sqlsource: replayed: SQLSRC226 at describe parameters`.  The exit code is `0`.
+- **`sqlsource: replayed:` and an answer**, for a bundle that holds no answer of its own to compare with.  The answer is the entry of the query as a sidecar holds it, on one line.  Or it is the error that refused the query, as `sqlsource: replayed: SQLSRC226 at describe parameters`.  The exit code is `0`.
 
-A bundle of a query that SqlSource refused holds the error and the step it was reported at.  `reproduced` then means that this version refuses the query with the same error at the same step, and a difference reads `expected SQLSRC231, replayed SQLSRC226 at describe parameters`.  Columns are counted from 0, so `columns[2]` is the third.
+More rules of the outcome:
 
-A bundle that holds its maker's own names and SQL, as a raw bundle of yours or one sent to you privately does, says so first, with `sqlsource: this bundle is not renamed, and must not be posted`.  Never attach it to an issue or post it anywhere: a raw bundle of yours goes to a maintainer by [the private route](../guides/report-a-bug.md#raw-bundle), and one sent to you stays with you.
+- **A bundle of a query that SqlSource refused holds the error, and the step that the error was reported at.**  Then `reproduced` means that this version refuses the query with the same error at the same step.  A difference reads `expected SQLSRC231, replayed SQLSRC226 at describe parameters`.
+- **Columns are counted from 0**, so `columns[2]` is the third.
 
-A control character in a text that `replay` prints from a bundle, such as the escape that starts a sequence a terminal would act on, or a line break, is printed as its code, so that a bundle from someone else cannot change what your terminal shows: `\u001B` for the escape and `\u000A` for a line break in a message, and inside a quoted value as JSON writes it, `\n` for a line break and `\t` for a tab.  A tab outside a quoted value is printed as it is.
+If a bundle holds the names and the SQL of the person who made it, `replay` says so first, with `sqlsource: this bundle is not renamed, and must not be posted`.  A raw bundle of yours holds them, and so does a bundle sent to you privately.  Never attach such a bundle to an issue, and never post it anywhere:
 
-A bundle that cannot be read or replayed is an error, from [SQLSRC288](../diagnostics.md#sqlsrc288) to [SQLSRC291](../diagnostics.md#sqlsrc291), at its full path, and the exit code is `1`.  A path that holds `=` or `;` is named as `The path at position <n>` instead, on a line labelled `bundle`, as a value of the command line that may be a secret is.
+- A raw bundle of yours goes to a maintainer by [the private route](../guides/report-a-bug.md#raw-bundle).
+- A raw bundle sent to you stays with you.
+
+`replay` prints a control character of a text from a bundle as its code.  An example is the escape that starts a sequence that a terminal acts on, or a line break.  So a bundle from someone else cannot change what your terminal shows:
+
+- In a message, the escape is `\u001B`, and a line break is `\u000A`.
+- Inside a quoted value, a control character is written as JSON writes it: `\n` for a line break, and `\t` for a tab.
+- A tab outside a quoted value is printed as it is.
+
+A bundle that cannot be read or replayed is an error, from [SQLSRC288](../diagnostics.md#sqlsrc288) to [SQLSRC291](../diagnostics.md#sqlsrc291).  The error names the bundle at its full path, and the exit code is `1`.  If the path holds `=` or `;`, the error names it as `The path at position <n>` instead, on a line labelled `bundle`.  The tool names each value of the command line that can be a secret in this way.
