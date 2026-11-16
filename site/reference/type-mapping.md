@@ -26,17 +26,17 @@ A column has the C# type of the first of these places that gives one:
 1. the `-- column: name -> Type` marker of its query: see [the `-- column:` marker](model-properties.md#column-marker);
 2. the [column types](model-properties.md#setting-column-types), by the column of a table or view that it is read from;
 3. the [type override](#setting-type-overrides), by its database type;
-4. a library of the [library types](library-types-and-json.md#setting-library-types) that is on for the query, NodaTime, NetTopologySuite or System.Text.Json, only for a query whose output is `repository` or `methods`;
+4. a library of the [library types](library-types-and-json.md#setting-library-types) that is on for the query: NodaTime, NetTopologySuite or System.Text.Json.  Only a query whose output is `repository` or `methods` gets this step;
 5. the type map of [PostgreSQL](databases/postgresql/types.md#type-map) or [SQL Server](databases/sqlserver/types.md#types).
 
-A parameter has the C# type of its [`-- param:` marker](parameters.md#param-marker), after `->`, then that of the type override, of the library and of the type map.
+A parameter has the C# type that its [`-- param:` marker](parameters.md#param-marker) gives after `->`.  Without a C# type after `->`, it has the type of the type override, then of the library, then of the type map.
 
 - **A marker, the column types and the type override each give a type that you chose.**  A query method reads and sends such a type through your [converters](converters.md#converters) when it has them.  A class of yours in a column that holds JSON goes through System.Text.Json's serializer: see [a class in a JSON column](library-types-and-json.md#json-class).
 - **On PostgreSQL, Npgsql reads and sends a library's type**, through its plugin for NodaTime or NetTopologySuite.  On SQL Server, the query method itself reads and sends it.  On both, a converter of yours is used in its place, in the direction that it converts, except for NetTopologySuite on SQL Server.
 - **The driver reads and sends a type of the type map.**
 - **On SQL Server, the query method reads and sends a type of NetTopologySuite, whatever place chose it.**  No converter of yours replaces that: see [NetTopologySuite on SQL Server](databases/sqlserver/libraries.md#nettopologysuite).
-- **In a query whose output is `repository` or `methods`, a PostgreSQL array parameter is an `IEnumerable<T>` of its element**, in place of `T[]`: an `IEnumerable<int>` for an `int4[]`.  See [array parameters](databases/postgresql/query-methods.md#array-parameters).  The property of a column, and of a parameter of a query whose output is `models`, stays `T[]`.
-- **A [list parameter](parameters.md#list-parameters), written after `IN` with no parentheses, is an `IEnumerable<T>` of the C# type of its values**, under `repository`, `methods` and `models`: an `IEnumerable<int>` for a list of `integer`.  Its values get their C# type as a parameter does, and their type is never nullable.
+- **In a query whose output is `repository` or `methods`, a PostgreSQL array parameter is an `IEnumerable<T>` of its element.**  It replaces `T[]`: an `int4[]` gives an `IEnumerable<int>`.  See [array parameters](databases/postgresql/query-methods.md#array-parameters).  The property of a column, and of a parameter of a query whose output is `models`, stays `T[]`.
+- **A [list parameter](parameters.md#list-parameters) is an `IEnumerable<T>` of the C# type of its values**, under `repository`, `methods` and `models`.  A list parameter is written after `IN` with no parentheses.  A list of `integer` is an `IEnumerable<int>`.  Its values get their C# type as a parameter does, and their type is never nullable.
 
 <a id="setting-type-overrides"></a>
 
@@ -71,7 +71,7 @@ A parameter has the C# type of its [`-- param:` marker](parameters.md#param-mark
 SELECT id, happened_at, amount FROM events;
 ```
 
-A type override gives a database type the C# type of your choice, in place of the C# type that the type map of [PostgreSQL](databases/postgresql/types.md#type-map) or [SQL Server](databases/sqlserver/types.md#types) gives it.  Examples are a `timestamp with time zone` as a `System.DateTimeOffset`, a `numeric` as a `double`, and an enum of your schema as a C# enum.  Each entry is a key and a type: `"key": "type"` in a settings file, and `key=type` in a marker.  The key names the database type.  The type is the C# type that every column and parameter of that database type gets.
+A type override gives a database type the C# type of your choice.  It replaces the C# type that the type map of [PostgreSQL](databases/postgresql/types.md#type-map) or [SQL Server](databases/sqlserver/types.md#types) gives.  Examples are a `timestamp with time zone` as a `System.DateTimeOffset`, a `numeric` as a `double`, and an enum of your schema as a C# enum.  Each entry is a key and a type: `"key": "type"` in a settings file, and `key=type` in a marker.  The key names the database type.  The type is the C# type that every column and parameter of that database type gets.
 
 In the samples:
 
@@ -132,7 +132,7 @@ On both databases:
 - **A part in quotes is compared exactly, case included.  A plain part is compared ignoring case.**  So `public."Status"` maps the type `Status` alone, while `public.Status` maps `Status` and `status` alike.
 - **`public.Status` and `public.status` are two keys.**  `public.status` and `public."status"` are one key, and so are `public.Status` and `public."Status"`.  Two entries for them are two entries for one type.
 - **Of the entries for one type whose keys differ only by case, the entry of the most specific place wins**, as for any type.
-- **Among the entries of one place, a key spelled exactly as the name of the type wins over a key that matches it only ignoring case.**  So in one place, `public.Status` and `public.status` each map their own type.
+- **In one place, a key spelled exactly as the name of the type wins over a key that matches it only ignoring case.**  So in one place, `public.Status` and `public.status` each map their own type.
 - **A plain key at a higher place replaces the entries below it for every type that it matches.**  A query's `public.status=default` takes both `Status` and `status` out of the entries of the project.
 - **To change one of two types whose names differ only by case, quote it.**  A query's `public."status"=default` takes `status` alone out, and `Status` keeps the entry of the project.
 
@@ -155,11 +155,11 @@ On both databases:
 - **A tuple, `dynamic`, `void`, a pointer, and anything after the type are not valid either.**
 - **The type must exist, and be the name of one type.**  If the project and its references do not have the type, the error is [SQLSRC250](../diagnostics.md#sqlsrc250).  So is a full name that two references have, and a short name of two types in two namespaces.  SQLSRC250 names the types.
 - **The project must be able to see the type.**  If it cannot, the error is [SQLSRC251](../diagnostics.md#sqlsrc251).
-- **A property must be able to have the type.**  If it cannot, the error is [SQLSRC252](../diagnostics.md#sqlsrc252).  Examples are a `static` class, `System.Nullable<int>`, a type marked `[Obsolete]` as an error, and a generic type whose type argument breaks a constraint, such as `System.Collections.Generic.List<System.Nullable<string>>`.
+- **A property must be able to have the type.**  If it cannot, the error is [SQLSRC252](../diagnostics.md#sqlsrc252).  Examples are a `static` class, `System.Nullable<int>` and a type marked `[Obsolete]` as an error.  Another is a generic type whose type argument breaks a constraint, such as `System.Collections.Generic.List<System.Nullable<string>>`.
 
-**The value `default`** gives the database type back to the type map, or to a library of the [library types](library-types-and-json.md#setting-library-types) that is on for a query method.
+**The value `default`** gives the database type back to the type map.  In a query method, a library of the [library types](library-types-and-json.md#setting-library-types) that is on gives it its type instead.
 
-**The default.**  A database type that has no entry in any place has the C# type of the type map, or of a library in a query method.
+**The default.**  A database type with no entry in any place has the C# type of the type map, or of a library in a query method.
 
 **The places.**  The type override can be written in these places:
 
@@ -193,13 +193,16 @@ On both databases:
 - **`default` takes the type out of the entries of every place below.**
 - **Nothing removes every entry at once.**
 
-**When an error is reported.**  For an entry of the type override, the build reports SQLSRC250, SQLSRC251 or SQLSRC252 at the name of a query only when all of these are true:
+**When an error is reported.**  For an entry of the type override, the build reports SQLSRC250, SQLSRC251 or SQLSRC252 at the name of a query.  It does so only when all of these are true:
 
 - The output of the query is `repository`, `methods` or `models`.
 - The entry of the query in its sidecar is current.
-- Of the columns and parameters of the query, parameters first, the first one that has no C# type has the key of the entry: as its own type, as the element of its array or as the base type of its domain.
+- The first column or parameter of the query with no C# type, parameters first, has the key of the entry in one of these ways:
+  - as its own type;
+  - as the element of its array;
+  - as the base type of its domain.
 
-Through these conditions, a query gets one such error at most.  SQLSRC251 is also reported at each query of a `public` model that has a property of a type that is not `public`, once for each such property: see [SQLSRC251](../diagnostics.md#sqlsrc251).  An entry that no query uses is never an error, so a project can set its entries before it has the queries.
+Through these conditions, a query gets one such error at most.  SQLSRC251 is also reported at each query of a `public` model that has a property of a type that is not `public`.  It is reported once for each such property: see [SQLSRC251](../diagnostics.md#sqlsrc251).  An entry that no query uses is never an error, so a project can set its entries before it has the queries.
 
 **The tool.**  The `sqlsource` tool does not read `typeOverrides`, which changes nothing that is described.  A `-- type-override:` marker that is not valid is an error for the tool, as it is for the build.  Until the marker is fixed, the tool describes no query of its file.
 

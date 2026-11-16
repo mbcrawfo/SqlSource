@@ -56,12 +56,12 @@ In the samples:
 **Only for query methods.**  A library's types reach only a query whose [output](settings.md#setting-output) is `repository` or `methods`, for each type that claims the query.
 
 - **A query whose output is `models` keeps the types of the type map in its models**, whatever the library types say.  For such a query, the library types are read and checked, and do nothing else.
-- **To give such a query the types of a library, name them with the type override or the column types**, as for rows read through Dapper.
+- **To give such a query the types of a library, name them with the type override or the column types.**  Rows read through Dapper get their types so.
 - **One model can get two sets of types, which is [SQLSRC257](../diagnostics.md#sqlsrc257).**  This happens to a model that a query with a method, with the library on, shares with a `models` query.  It also happens to a model that two queries with methods share, one with the library on and one with it off.  Name the models apart with [`-- output-model:`](models.md#setting-model-name), or turn the library on or off alike for both.
 
-**Below your own choices.**  A library gives a column or parameter its type only where no marker, column type or type override gives one: see [the order in which a C# type is chosen](type-mapping.md#property-types).  So a project that maps `timestamptz` with the type override keeps its type with NodaTime on.  `"timestamptz": "default"` in a nearer settings file, or `-- type-override: timestamptz=default`, gives `timestamptz` back to the library there.
+**Below your own choices.**  A library gives a column or parameter its type only where no marker, column type or type override gives one.  See [the order in which a C# type is chosen](type-mapping.md#property-types).  So a project that maps `timestamptz` with the type override keeps its type with NodaTime on.  `"timestamptz": "default"` in a nearer settings file, or `-- type-override: timestamptz=default`, gives `timestamptz` back to the library there.
 
-**Only what you did not choose.**  The library types decide the type of a column or parameter only where nothing else gives it one.  A type that you choose with the type override, a column type or a marker is read and sent the same whether its library is on or not.  For example:
+**Only what you did not choose.**  The library types decide the type of a column or parameter only where nothing else gives it one.  You can choose a type with the type override, a column type or a marker.  Such a type is read and sent the same whether its library is on or not.  For example:
 
 - On SQL Server, `datetime2=NodaTime.Instant` is converted for a project that references NodaTime, with NodaTime off, as [NodaTime on SQL Server](databases/sqlserver/libraries.md#nodatime) says.
 - On SQL Server, `geography=NetTopologySuite.Geometries.Point` is read and sent for a project that references `NetTopologySuite.IO.SqlServerBytes`, with NetTopologySuite off.
@@ -138,7 +138,7 @@ public sealed record OrderMetadata(string Channel, int Priority);
 public sealed record Tag(string Name);
 ```
 
-A column or parameter of a type that holds JSON can be given a class of your project, by a type override, a column type or a marker.  The query methods then read and send it through System.Text.Json's serializer.  You write no converter, and register nothing on the data source.
+You can give a class of your project to a column or parameter of a type that holds JSON.  A type override, a column type or a marker gives it.  The query methods then read and send it through System.Text.Json's serializer.  You write no converter, and register nothing on the data source.
 
 In the samples, `metadata` and `tags` are `jsonb` columns:
 
@@ -150,8 +150,10 @@ The rules:
 
 - **A class is a type that is not one of System.Text.Json, and not one that the driver reads for some database type.**  The types of [PostgreSQL](databases/postgresql/types.md#type-table) and [SQL Server](databases/sqlserver/types.md#type-table) list the types that the driver reads.  A class can be a class or a record of yours, a struct, or a collection, such as `List<Tag>` or `Tag[]`, which is serialized whole.
 - **A `JsonElement`, a `string` or a `long` given to a JSON column is not a class**, and is read as before.
-- **A type that holds JSON is one of these**, with the `json` of the [library types](#setting-library-types) on or off: PostgreSQL's `json` and `jsonb`, a domain over one of them, SQL Server's `json`, and an alias type over it.
-- **A column or parameter of another type that the type map reads as a `string`, such as `text` or `nvarchar(max)`, holds JSON only by [the JSON opt-in](#json-opt-in).**
+- **A type that holds JSON is one of these, whether the `json` of the [library types](#setting-library-types) is on or off:**
+  - PostgreSQL's `json` and `jsonb`, and a domain over one of them;
+  - SQL Server's `json`, and an alias type over it.
+- **A column or parameter of another string type holds JSON only by [the JSON opt-in](#json-opt-in).**  A string type is one that the type map reads as a `string`, such as `text` or `nvarchar(max)`.
 - **Without the opt-in, a class given to such a column keeps the rules of [converters](converters.md#converters).**  Its converters are used.  Without them, the driver is given the class, and throws `InvalidCastException`.  So an `Email` of yours over an `nvarchar` is never written as JSON.
 - **An array of PostgreSQL's JSON type is read and sent element by element**, such as a `jsonb[]` given an `OrderMetadata[]`.  A `NULL` element stays null for a class.  It throws `InvalidCastException` for a struct written without `?`, as for an array that a [converter](converters.md#converters) converts.
 - **The serializer uses System.Text.Json's own default options.**  Property names are as your class writes them, `Channel`, and are matched with their case.
@@ -162,7 +164,7 @@ The rules:
 - **A struct of yours follows the same rule.**  A JSON `null` is null in a `Point?` property or a `Point?[]` element.  It throws the same `InvalidCastException` in a `Point` property or a `Point[]` element.
 - **A SQL `NULL` never reaches the serializer.**  It gives its property null, or throws as any column does: see [how a row is read](query-methods.md#reading-rows).
 - **Text that is not the JSON of your class throws System.Text.Json's `JsonException` when it is read**, such as an array where an object is expected.
-- **Your converters replace the serializer.**  A [converter](converters.md#converters) of yours between `string` and the class is used in place of the serializer, in its direction, so that you choose the options: see [the recipe](../guides/json.md#class-in-a-json-column).
+- **Your converters replace the serializer.**  A [converter](converters.md#converters) of yours between `string` and the class is used in place of the serializer, in its direction.  So you choose the options: see [the recipe](../guides/json.md#class-in-a-json-column).
 - **A SQL `NULL` never reaches such a converter, but a JSON `null` does**, as the text `null`.  What the converter gives for it is the converter's choice.
 - **A class with a converter of one direction alone is [SQLSRC280](../diagnostics.md#sqlsrc280)** for a query that needs the other direction.
 - **A class whose converters are all of other types, such as `long`, is [SQLSRC279](../diagnostics.md#sqlsrc279)**, and is not serialized.
@@ -198,7 +200,7 @@ UPDATE dbo.orders SET metadata = @metadata WHERE id = @id;
 SELECT id, preferences FROM dbo.customers WHERE id = @id;
 ```
 
-The JSON opt-in says that a column or a parameter of a string type holds JSON.  The class of yours that the column or parameter is given is then read and sent through System.Text.Json's serializer, as a class in a `json` or `jsonb` column is: see [a class in a JSON column](#json-class).
+The JSON opt-in says that a column or a parameter of a string type holds JSON.  The query methods then read and send the class of yours that it is given through System.Text.Json's serializer.  A class in a `json` or `jsonb` column is read and sent the same way: see [a class in a JSON column](#json-class).
 
 In the samples, `orders.metadata`, `orders.tags` and `customers.preferences` are `nvarchar(max)` columns that hold JSON.  A database before SQL Server 2025 keeps JSON so, since it has no `json` type.
 
@@ -215,13 +217,16 @@ The rules:
 - **In a marker, the word `json` and white space come after `->`, before the C# type.**  This holds in the `-- column:` of the file header, in the `-- column:` of a query and in a `-- param:`.  The word is matched ignoring case.
 - **`-> json` alone gives the column a type named `json`.**
 - **The opt-in is not in the type override**, which maps a database type and not a column that holds JSON.  A domain over `text` that holds JSON is mapped by its columns, or by the markers of each query.
-- **The opt-in applies to a column or parameter that the type map reads as a `string`**, such as PostgreSQL's `text` and `varchar` and SQL Server's `nvarchar(max)`.  Such a column is then read and sent as a `json` column of the same class is.  A parameter is still sent as its own database type.
+- **The opt-in applies to a column or parameter that the type map reads as a `string`.**  Examples are PostgreSQL's `text` and `varchar`, and SQL Server's `nvarchar(max)`.  Such a column is then read and sent as a `json` column of the same class is.  A parameter is still sent as its own database type.
 - **On a `json` or `jsonb` column, the opt-in is allowed and changes nothing.**
 - **Its C# type is a class of yours**, as [a class in a JSON column](#json-class) says.  An array or a collection of one is serialized whole.
-- **The opt-in on a column or parameter of another database type, such as `int` or `text[]`, is [SQLSRC283](../diagnostics.md#sqlsrc283)** at a query whose output is `repository` or `methods`.  So is the opt-in with a type of System.Text.Json, or with a type that the driver reads, such as `JsonElement` or `string`.  The query then gets no method.
+- **In a query whose output is `repository` or `methods`, the opt-in on another database type is [SQLSRC283](../diagnostics.md#sqlsrc283).**  Examples are a column or parameter of `int` or `text[]`.  So is the opt-in with a type of System.Text.Json, or with a type that the driver reads, such as `JsonElement` or `string`.  The query then gets no method.
 - **A query whose output is `models` takes the type of the opt-in for its property**, and reads nothing more of it.
 - **A [converter](converters.md#converters) of yours between `string` and the class** replaces the serializer here too.
-- **Two places that differ only in `json` are [SQLSRC112](../diagnostics.md#sqlsrc112).**  These are two `-- param:` markers of one parameter, two `-- column:` markers of one column in a query, or two `-- column:` lines of one key in the file header.
+- **Two places that differ only in `json` are [SQLSRC112](../diagnostics.md#sqlsrc112).**  They are one of these pairs:
+  - two `-- param:` markers of one parameter;
+  - two `-- column:` markers of one column in a query;
+  - two `-- column:` lines of one key in the file header.
 - **`-> json default`, and an object whose `json` is `true` and whose type is `default`, are not valid.**  In a marker this is [SQLSRC111](../diagnostics.md#sqlsrc111), and in a settings file it is [SQLSRC019](../diagnostics.md#sqlsrc019).
 - **SQLSRC019 also reports an object with a member other than `type` and `json`.**
 - **Nothing is described again.**  Adding or removing the opt-in, at any place, leaves the sidecar entry of the query current.  So it needs no `dotnet sqlsource describe`.
