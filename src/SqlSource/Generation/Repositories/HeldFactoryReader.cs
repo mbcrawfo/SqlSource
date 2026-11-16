@@ -10,7 +10,7 @@ namespace SqlSource.Generation.Repositories;
 
 /// <summary>
 /// Reads the marked instance members of the factories that a repository holds, the <see cref="CandidateTier.Held" />
-/// candidates, with the rules of what a member gives of <see cref="ConnectionCandidateReader" />.  Only
+/// candidates, with the rules of what a member gives of <see cref="ConnectionCandidateReader" />, which it calls.  Only
 /// <see cref="RepositoryShapeReader" /> calls it.
 /// </summary>
 internal static class HeldFactoryReader
@@ -67,34 +67,6 @@ internal static class HeldFactoryReader
         return new EquatableArray<ConnectionCandidate>(held.ToImmutable());
     }
 
-    /// <summary>
-    /// The attribute of an interface member that the member implements in the type, a factory: such a member is marked
-    /// as the interface member is, <c>Database</c> too, as an override of a marked member is.
-    /// </summary>
-    /// <param name="member">A member of the factory or of a base type, or one that such a member overrides.</param>
-    /// <param name="type">The factory.</param>
-    internal static AttributeData? ImplementedMarkingOf(ISymbol member, INamedTypeSymbol type)
-    {
-        foreach (var @interface in type.AllInterfaces)
-        {
-            foreach (var implemented in @interface.GetMembers(member.Name))
-            {
-                if (
-                    ConnectionCandidateReader.MarkingOf(implemented) is { } marking
-                    && SymbolEqualityComparer.Default.Equals(
-                        type.FindImplementationForInterfaceMember(implemented),
-                        member
-                    )
-                )
-                {
-                    return marking;
-                }
-            }
-        }
-
-        return null;
-    }
-
     // A field, property or parameter that can hold a factory, with the type its value is used as: the type of a
     // Nullable<T> value is T.  It holds one only when it is not marked, since a marked one is a source of the type's
     // own, and when its type has a factory's type to read, as FactoryTypesOf says.
@@ -136,9 +108,11 @@ internal static class HeldFactoryReader
             .ToList();
     }
 
-    // The marked instance members of the factory that the type can reach through the holder, as held candidates.  An
-    // interface's member that a class or struct of the factory implements, explicitly too, is its implementation, or
-    // none when the type cannot reach it: one candidate.
+    // The marked instance members of the factory that the type can reach through the holder, as held candidates, in
+    // the order of the types the call looks in, each derived type's before its base's.  The members are tested
+    // cheapest first: a member that is static, or that bears no mark and implements no marked interface member, is
+    // never asked whether the type reaches it or whether a member hides it.  An interface's member that the factory's
+    // class or struct implements is its implementation: one candidate.
     private static List<ConnectionCandidate> ReadFactory(
         ITypeSymbol factory,
         CandidateHolder holder,
@@ -149,97 +123,141 @@ internal static class HeldFactoryReader
     {
         var factoryTypes = FactoryTypesOf(factory);
         var implementer = factoryTypes.FirstOrDefault(static each => each.TypeKind != TypeKind.Interface);
+        var lookedIn = LookedInTypesOf(factoryTypes);
         var candidates = new List<ConnectionCandidate>();
-        foreach (var member in VisibleMembersOf(factoryTypes, factory, type, compilation))
+        foreach (var current in lookedIn)
         {
-            if (
-                !member.IsStatic
-                && !IsImplementedBy(member, implementer)
-                && ConnectionCandidateReader.ReadMarkedMember(member, isInherited, holder.Location, implementer)
-                    is { IsMarked: true } candidate
-            )
+            foreach (var member in current.GetMembers())
             {
-                candidates.Add(candidate with { Tier = CandidateTier.Held, Holder = holder });
+                if (
+                    !member.IsStatic
+                    && ConnectionCandidateReader.FindMarking(member, implementer) is not null
+                    && !IsImplementedBy(member, implementer)
+                    && ConnectionCandidateReader.IsReachable(member, type, compilation, factory)
+                    && !IsHidden(member, current, lookedIn, type, compilation, factory)
+                    && ConnectionCandidateReader.ReadMarkedMember(member, isInherited, holder.Location, implementer)
+                        is { } candidate
+                )
+                {
+                    candidates.Add(candidate with { Tier = CandidateTier.Held, Holder = holder });
+                }
             }
         }
 
         return candidates;
     }
 
-    // The members of the factory's types, of their base types and of their interfaces, each type once, a derived
-    // interface before its base, that the type can reach through the holder and that no more derived member it can
-    // reach hides: a method hides a method of its signature alone, and any other member every member of its name.
-    private static IEnumerable<ISymbol> VisibleMembersOf(
-        List<INamedTypeSymbol> factoryTypes,
-        ITypeSymbol factory,
-        INamedTypeSymbol type,
-        Compilation compilation
-    )
+    // The types that a call through a value of the factory's types looks in, each once: a class or struct and its base
+    // types, whose interfaces' members it reaches only through their implementations, and an interface and every
+    // interface it derives from, a derived one before its base.
+    private static List<INamedTypeSymbol> LookedInTypesOf(List<INamedTypeSymbol> factoryTypes)
     {
         var seen = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
-        var hidingNames = new HashSet<string>(StringComparer.Ordinal);
-        var hidingMethods = new List<IMethodSymbol>();
-        foreach (var current in factoryTypes.SelectMany(TypesOf).Where(seen.Add))
+        var types = new List<INamedTypeSymbol>();
+        foreach (var factoryType in factoryTypes)
         {
-            var reachable = current
-                .GetMembers()
-                .Where(member => ConnectionCandidateReader.IsReachable(member, type, compilation, factory))
-                .ToList();
-            foreach (var member in reachable)
-            {
-                if (
-                    !hidingNames.Contains(member.Name)
-                    && (
-                        member is not IMethodSymbol method
-                        || !hidingMethods.Exists(hiding => HaveOneSignature(hiding, method))
-                    )
-                )
-                {
-                    yield return member;
-                }
-            }
-
-            foreach (var member in reachable)
-            {
-                if (member is IMethodSymbol method)
-                {
-                    hidingMethods.Add(method);
-                }
-                else
-                {
-                    _ = hidingNames.Add(member.Name);
-                }
-            }
+            var own =
+                factoryType.TypeKind == TypeKind.Interface
+                    ? factoryType.AllInterfaces.Insert(0, factoryType)
+                    : BaseTypesOf(factoryType);
+            types.AddRange(own.Where(seen.Add));
         }
+
+        return types;
     }
 
-    // The type, each of its base types, then each of its interfaces, a derived interface before its base.
-    private static IEnumerable<INamedTypeSymbol> TypesOf(INamedTypeSymbol type)
+    private static ImmutableArray<INamedTypeSymbol> BaseTypesOf(INamedTypeSymbol type)
     {
+        var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         for (var current = type; current is not null; current = current.BaseType)
         {
-            yield return current;
+            types.Add(current);
         }
 
-        foreach (var @interface in type.AllInterfaces)
-        {
-            yield return @interface;
-        }
+        return types.ToImmutable();
     }
 
-    // The name, the arity, and each parameter's type and kind of reference.
+    // Whether a member that the type can reach, of a type that derives from the member's, hides the member as C# hides
+    // it: a method hides a method of its signature and every member of its name that is not a method, and any other
+    // member every member of its name.  Two interfaces that neither derives from the other hide nothing of each other,
+    // so a call that both answer is ambiguous, and both are candidates.  Only the members of the name are looked at.
+    private static bool IsHidden(
+        ISymbol member,
+        INamedTypeSymbol declaring,
+        List<INamedTypeSymbol> lookedIn,
+        INamedTypeSymbol type,
+        Compilation compilation,
+        ITypeSymbol factory
+    )
+    {
+        foreach (var derived in lookedIn)
+        {
+            if (!DerivesFrom(derived, declaring))
+            {
+                continue;
+            }
+
+            foreach (var hiding in derived.GetMembers(member.Name))
+            {
+                if (
+                    (
+                        hiding is not IMethodSymbol hidingMethod
+                        || member is not IMethodSymbol method
+                        || HaveOneSignature(hidingMethod, method)
+                    ) && ConnectionCandidateReader.IsReachable(hiding, type, compilation, factory)
+                )
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // Whether the type is a class that derives from the other, or an interface that extends it, and is not it.
+    private static bool DerivesFrom(INamedTypeSymbol type, INamedTypeSymbol other)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, other))
+            {
+                return true;
+            }
+        }
+
+        return other.TypeKind == TypeKind.Interface
+            && type.AllInterfaces.Contains(other, SymbolEqualityComparer.Default);
+    }
+
+    // The arity, and each parameter's type and kind of reference.  The names are equal, since the members were found by
+    // the name.
     private static bool HaveOneSignature(IMethodSymbol first, IMethodSymbol second) =>
-        first.Name == second.Name
-        && first.Arity == second.Arity
+        first.Arity == second.Arity
         && first.Parameters.Length == second.Parameters.Length
         && first
             .Parameters.Zip(second.Parameters, static (one, other) => (One: one, Other: other))
-            .All(static pair =>
-                pair.One.RefKind == pair.Other.RefKind
-                && SymbolEqualityComparer.Default.Equals(pair.One.Type, pair.Other.Type)
-            );
+            .All(static pair => pair.One.RefKind == pair.Other.RefKind && AreOneType(pair.One.Type, pair.Other.Type));
 
-    // Whether the member is an interface's that the factory's class or struct implements.
+    // Whether two parameter types are one in a signature: a type parameter of each method is the one of its position,
+    // since each method declares its own; an array or a generic type is one when its parts are.
+    private static bool AreOneType(ITypeSymbol first, ITypeSymbol second) =>
+        (first, second) switch
+        {
+            (
+                ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } one,
+                ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } other
+            ) => one.Ordinal == other.Ordinal,
+            (IArrayTypeSymbol one, IArrayTypeSymbol other) => one.Rank == other.Rank
+                && AreOneType(one.ElementType, other.ElementType),
+            (INamedTypeSymbol { IsGenericType: true } one, INamedTypeSymbol { IsGenericType: true } other) =>
+                SymbolEqualityComparer.Default.Equals(one.OriginalDefinition, other.OriginalDefinition)
+                    && one.TypeArguments.Zip(other.TypeArguments, AreOneType).All(static same => same),
+            _ => SymbolEqualityComparer.Default.Equals(first, second),
+        };
+
+    // Whether the member is an interface's that the factory's class or struct implements, as a type parameter's class
+    // constraint can: a class member hides an interface member there.
     private static bool IsImplementedBy(ISymbol member, INamedTypeSymbol? implementer) =>
         implementer is not null
         && member.ContainingType.TypeKind == TypeKind.Interface

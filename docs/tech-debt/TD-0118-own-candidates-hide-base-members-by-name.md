@@ -7,7 +7,7 @@
 - a method `Open(int retries)` of the repository hides a marked `Open()` of its base type, which the repository could call;
 - a `private` member of a base type between the two hides a marked member of the base type below it.
 
-The factory walk of [`HeldFactoryReader`](../../src/SqlSource/Generation/Repositories/HeldFactoryReader.cs) hides as C# does: a method hides only a method of its signature, and a member the repository cannot reach hides nothing.
+The factory walk of [`HeldFactoryReader`](../../src/SqlSource/Generation/Repositories/HeldFactoryReader.cs) hides as C# does: a member hides only the members of its name in the types its type derives from, a method hides a method only of its signature, and a member the repository cannot reach hides nothing.
 
 ## Why it exists
 
@@ -19,7 +19,7 @@ Low.  A repository that declares a member of the name of its base type's marked 
 
 ## Proposed fix
 
-Make `ReachableMembersOf` hide as `HeldFactoryReader.VisibleMembersOf` does: collect the members of each more derived type that the repository can reach, let a method hide only a method of the same name, arity and parameter types and kinds of reference, and let any other member hide the members of its name.  Share the hiding between the two walks.  Add tests to `ConnectionCandidateReaderTests` of an overload in the repository and of a private member of a base type between two, and keep `Read_BaseMemberHiddenByTheRepository_IsNotACandidate`, in which a property hides a property, passing.  Remove the limit "A marked member of a base type is not found" from `site/reference/repository-connections.md` and its row of `site/guides/troubleshooting.md`.
+Make `ReachableMembersOf` hide as `HeldFactoryReader.IsHidden` does: a member of a base type is hidden by a member of its name, of a more derived type, that the repository can reach, unless both are methods and their arity, parameter types and kinds of reference differ.  Share the hiding between the two walks.  Add tests to `ConnectionCandidateReaderTests` of an overload in the repository and of a private member of a base type between two, and keep `Read_BaseMemberHiddenByTheRepository_IsNotACandidate`, in which a property hides a property, passing.  Remove the limit "A marked member of a base type is not found" from `site/reference/repository-connections.md` and its row of `site/guides/troubleshooting.md`.
 
 ## Trigger
 

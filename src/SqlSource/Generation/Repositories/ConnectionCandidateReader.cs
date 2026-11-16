@@ -13,7 +13,7 @@ namespace SqlSource.Generation.Repositories;
 /// Reads the members of a repository, of its base types and of its primary constructor that can give its methods a
 /// connection, as <see cref="ConnectionCandidate" />s, and holds the rules of what a member gives that
 /// <see cref="HeldFactoryReader" /> shares.  Only <see cref="RepositoryShapeReader" /> and
-/// <see cref="HeldFactoryReader" /> call it.
+/// <see cref="HeldFactoryReader" /> call it, and it calls neither.
 /// </summary>
 internal static class ConnectionCandidateReader
 {
@@ -507,12 +507,34 @@ internal static class ConnectionCandidateReader
                 return marking;
             }
 
-            if (
-                implementer is not null
-                && HeldFactoryReader.ImplementedMarkingOf(current, implementer) is { } implemented
-            )
+            if (implementer is not null && ImplementedMarkingOf(current, implementer) is { } implemented)
             {
                 return implemented;
+            }
+        }
+
+        return null;
+    }
+
+    // The attribute of an interface member that the member implements in the factory: such a member is marked as the
+    // interface member is, Database too, as an override of a marked member is.  The mark is asked first, since most
+    // interface members bear none.
+    private static AttributeData? ImplementedMarkingOf(ISymbol member, INamedTypeSymbol factory)
+    {
+        foreach (var @interface in factory.AllInterfaces)
+        {
+            foreach (var implemented in @interface.GetMembers(member.Name))
+            {
+                if (
+                    MarkingOf(implemented) is { } marking
+                    && SymbolEqualityComparer.Default.Equals(
+                        factory.FindImplementationForInterfaceMember(implemented),
+                        member
+                    )
+                )
+                {
+                    return marking;
+                }
             }
         }
 
@@ -539,7 +561,7 @@ internal static class ConnectionCandidateReader
 
     // The symbol's own attribute, by the name alone first, so that the full name is made only for an attribute that can
     // be the connection's.
-    internal static AttributeData? MarkingOf(ISymbol symbol) =>
+    private static AttributeData? MarkingOf(ISymbol symbol) =>
         symbol
             .GetAttributes()
             .FirstOrDefault(static attribute =>

@@ -504,11 +504,12 @@ public sealed class HeldFactoryReaderTests
             """
             namespace App
             {
-                            public interface IDatabaseFactory
+                public interface IDatabaseFactory
                 {
                     [SqlSourceConnection]
                     Task<DbConnection> Open(CancellationToken ct);
                 }
+
                 [SqlSourceGenerate]
                 public partial class UserRepository<TFactory>(TFactory dbf)
                     where TFactory : IDatabaseFactory;
@@ -530,11 +531,12 @@ public sealed class HeldFactoryReaderTests
             """
             namespace App
             {
-                            public interface IDatabaseFactory
+                public interface IDatabaseFactory
                 {
                     [SqlSourceConnection]
                     Task<DbConnection> Open(CancellationToken ct);
                 }
+
                 public class FactoryBase
                 {
                     public Task<DbConnection> Open(CancellationToken ct) => null!;
@@ -561,11 +563,12 @@ public sealed class HeldFactoryReaderTests
             """
             namespace App
             {
-                            public interface IDatabaseFactory
+                public interface IDatabaseFactory
                 {
                     [SqlSourceConnection]
                     Task<DbConnection> Open(CancellationToken ct);
                 }
+
                 public sealed class DatabaseFactory : IDatabaseFactory
                 {
                     Task<DbConnection> IDatabaseFactory.Open(CancellationToken ct) => null!;
@@ -609,11 +612,12 @@ public sealed class HeldFactoryReaderTests
             """
             namespace App
             {
-                            public interface IDatabaseFactory
+                public interface IDatabaseFactory
                 {
                     [SqlSourceConnection]
                     Task<DbConnection> Open(CancellationToken ct);
                 }
+
                 [SqlSourceGenerate]
                 public partial class UserRepository
                 {
@@ -635,11 +639,12 @@ public sealed class HeldFactoryReaderTests
             """
             namespace App
             {
-                            public interface IDatabaseFactory
+                public interface IDatabaseFactory
                 {
                     [SqlSourceConnection]
                     Task<DbConnection> Open(CancellationToken ct);
                 }
+
                 public abstract class RepositoryBase
                 {
                     protected IDatabaseFactory Shared { get; } = null!;
@@ -666,11 +671,12 @@ public sealed class HeldFactoryReaderTests
             """
             namespace App
             {
-                            public interface IDatabaseFactory
+                public interface IDatabaseFactory
                 {
                     [SqlSourceConnection]
                     Task<DbConnection> Open(CancellationToken ct);
                 }
+
                 [SqlSourceGenerate]
                 public partial class UserRepository(IDatabaseFactory dbf);
             }
@@ -680,5 +686,93 @@ public sealed class HeldFactoryReaderTests
         var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
         candidate.Location.Path.ShouldBe(GeneratorHarness.SourcePath);
         candidate.Location.ShouldNotBe(candidate.Holder.ShouldNotBeNull().Location);
+    }
+
+    // A method of a derived type hides a member of its base type of its name that is no method.
+    [Fact]
+    public void Read_MethodHidingAMarkedProperty_HidesIt()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IConnectionOpener
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open { get; }
+                }
+
+                public interface IDatabaseFactory : IConnectionOpener
+                {
+                    new DbConnection Open();
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(IDatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
+    // Each generic method declares its own type parameters, which are one by their position.
+    [Fact]
+    public void Read_GenericMethodOfTheSameSignature_HidesTheBases()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public class FactoryBase
+                {
+                    [SqlSourceConnection]
+                    public DbConnection Open<T>(T options) => null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public new DbConnection Open<T>(T options) => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
+    // Two interfaces that neither derives from the other hide nothing of each other: the call is ambiguous, and both
+    // are candidates.
+    [Fact]
+    public void Read_SiblingInterfacesOfOneSignature_AreBothCandidates()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IMainOpener
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public interface IAuditOpener
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public interface IDatabaseFactory : IMainOpener, IAuditOpener;
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(IDatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.Select(static candidate => candidate.Name).ShouldBe(["Open", "Open"]);
     }
 }
