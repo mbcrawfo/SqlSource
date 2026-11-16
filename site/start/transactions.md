@@ -6,7 +6,7 @@ At the end of this page, two queries run in one transaction that you commit, and
 
 ## Run queries in a transaction
 
-A repository method takes no transaction, and each call gets a connection of its own.  So two calls of repository methods do not run in one transaction of yours.  Give each query that must run in the transaction the line `-- output: methods`.  The method of such a query takes your connection and your transaction.  By default, it is an `internal` extension method of the connection.
+A repository method takes no transaction, so you cannot give it yours.  Whether it still runs in a transaction of yours depends on its connection and its database: see [transactions and timeouts](../reference/repositories.md#repository-transactions).  Give each query that must run in the transaction the line `-- output: methods`.  The method of such a query takes your connection and your transaction.  By default, it is an `internal` extension method of the connection.
 
 The sample is a second repository of the same application, `AccountRepository`.  It reads a table `accounts` with the columns `id`, `owner` and `balance`.  Its queries are in `AccountRepository.sql`, beside the class:
 

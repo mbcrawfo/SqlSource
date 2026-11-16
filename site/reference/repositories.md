@@ -234,7 +234,7 @@ By default, every repository gets its interface, named `I` and the name of the t
 A repository method takes no transaction and no command timeout.  It runs on the connection that its source gives, under the default timeout of the driver, and gives its command no transaction.  It can still run in a transaction of your code's in two cases:
 
 - **On PostgreSQL, on a connection on which your code has begun a transaction, Npgsql runs the command in that transaction.**  This holds for a borrowed connection, and for an open connection that a factory returns.  See [the connection](#repository-connection).
-- **Inside a `TransactionScope`, a connection that the method opens takes part in the ambient transaction**, unless its connection string turns enlisting off.  On PostgreSQL, a data source with `Multiplexing=true` cannot take part: Npgsql throws when the method opens the connection.
+- **On PostgreSQL, inside a `TransactionScope`, a connection that the method opens takes part in the ambient transaction**, unless its connection string turns enlisting off.  A data source with `Multiplexing=true` cannot take part: Npgsql throws when the method opens the connection.
 
 If a query needs to run in a transaction with other queries, or needs its own timeout, give it the output `methods` instead.  Put the query in a file of its own with that output, or write `-- output: methods` on the query.  Your own code in the repository then opens a connection, begins the transaction, and calls the [method that takes a connection](connection-methods.md#methods-that-take-a-connection) of the query.  See [the recipe](../start/transactions.md#queries-in-a-transaction).
 
