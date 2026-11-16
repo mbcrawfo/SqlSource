@@ -1,4 +1,4 @@
-# base db3285d4adf7542f6e80e96d7f0b8182cd091a9f
+# base b8bbc9493fea6bf2ff9f159ac243e5429bc69876
 # Words by wc -w, base > now: index.md 2,077 > 2,204; nullability.md 1,606 > 1,791; types.md 1,177 > 1,233; libraries.md 2,439 > 2,529; query-methods.md 4,391 > 4,426, still over 3,500 with every SQL Server fact kept.
 unit	disposition	to	arg	words	note
 @site/reference/databases/sqlserver/index.md:3	move	site/reference/databases/sqlserver/index.md	-	-	Split into an intro sentence, a list of the four subjects of the pages, and the sentence on the dialects page.  Added, by the brief's reframing of Azure SQL: "Azure SQL is accepted, and not tested", linking databases/index.md#azure-sql, which states it
