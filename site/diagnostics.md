@@ -2406,7 +2406,7 @@ Database: PostgreSQL.
 
 The query starts with a kind of statement that the tool does not describe.
 
-The tool describes a PostgreSQL query by asking the server to prepare it.  The tool describes only `SELECT` (without `INTO`), `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `VALUES` and `TABLE`, with `WITH` around any of them.  This query starts with a statement of another kind: `CALL`, `CREATE`, `EXPLAIN`, `SHOW`, `SET` and the rest of the commands that the server refuses to prepare.
+The tool describes a PostgreSQL query by asking the server to prepare it.  The tool describes only `SELECT` (without `INTO`), `INSERT`, `UPDATE`, `DELETE`, `MERGE` (PostgreSQL 15 and later), `VALUES` and `TABLE`, with `WITH` around any of them.  This query starts with a statement of another kind: `CALL`, `CREATE`, `EXPLAIN`, `SHOW`, `SET` and the rest of the commands that the server refuses to prepare.
 
 The tool reads the first word of the statement before it sends anything.  So the message names that word, and the server is not asked.
 
