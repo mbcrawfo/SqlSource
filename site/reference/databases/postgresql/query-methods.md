@@ -137,7 +137,7 @@ The same holds for an array of a library's type, such as NodaTime's or NetTopolo
   - A [synchronous method](../../query-methods.md#synchronous-methods) given a connection that has no transaction open throws `NotSupportedException`, and runs nothing.
   - A synchronous method given a connection in a transaction that the caller has begun on it runs.
   - A synchronous [collection method](../../collection-methods.md#collection-methods) runs in the transaction that it begins of its own.  So it runs on such a data source too, except where it begins no transaction.  It begins none under `transaction=off`, or when a `System.Transactions` transaction is open, as inside a `TransactionScope`.
-  - A [synchronous repository method](../../repositories.md#synchronous-repository-methods) throws too, except on a borrowed connection in which your code began a transaction.  It throws since it runs on a connection with no transaction open.
+  - A [synchronous repository method](../../repositories.md#synchronous-repository-methods) runs on a connection with no transaction open, so it throws too.
   - On a borrowed connection in which your code began a transaction, a synchronous repository method runs, as above.
   - The synchronous collection method of the repository runs, as above.
 - **Give the code that calls synchronous methods a data source without multiplexing**, which is the default.  Or call the asynchronous method that `method-type=both` gives beside the synchronous one.
