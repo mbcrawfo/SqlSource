@@ -1364,7 +1364,7 @@ Here `Constants.sql` makes the class `Sql` of `App.Outer.Sample` public.  `App.O
 - **A visibility that the method takes from its nested class, as in the second example.**  Give the method a class of its own with `-- nested-class:`.  Or put it on the type or in the extension class with `-- member-location:`.  Do not write `-- visibility: internal` on it: that gives the class two visibilities, [SQLSRC124](#sqlsrc124).
 - **The default visibility of a repository method, as in the third example.**  Write `-- visibility: internal` on the query, or in the file header for every query of the file.
 
-Notes:
+Where `protected` is allowed, and what the message of a repository query says:
 
 - **`protected` is allowed on a sealed class or record, and in a nested class of a static class.**
 - **The message of a repository query says to write `-- visibility:` alone.**  A repository method is always on the type.
@@ -1448,7 +1448,7 @@ The error is at the name of the query.  Until it is fixed, its file produces no 
 - Write `-- member-location: nested-class` on the query.
 - If the name is that of a nested class of the type's queries, give that class another name with `-- nested-class:`.
 
-Notes:
+Two other errors are about the name of a query:
 
 - **A query named like the type itself is [SQLSRC009](#sqlsrc009).**
 - **A query method on the type that would take a name the type has is [SQLSRC274](#sqlsrc274).**
@@ -1530,8 +1530,6 @@ SELECT COUNT(other) AS others
 FROM tested;
 ```
 
-Notes:
-
 - **The aggregates of `geometry` and `geography`, such as `geometry::UnionAggregate`, are aggregates too.**
 - **An aggregate that `OVER` follows is not one of these places.**
 - **A `NOT` reaches only the condition it stands in.**  One in a `WHERE` reaches no list in the `HAVING` after it.  One before a `CASE` or an `IIF` reaches no list in its `WHEN` or its condition.  A list that no `NOT` reaches runs empty everywhere.
@@ -1579,8 +1577,6 @@ Reported by: the tool.
 $ dotnet sqlsource describe src/App/App.csproj
 ```
 
-Notes:
-
 - **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
 
 See: [Arguments](reference/cli.md#arguments)
@@ -1601,8 +1597,6 @@ Reported by: the tool.
 $ dotnet sqlsource describe App.slnx
 ```
 
-Notes:
-
 - **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
 
 See: [Arguments](reference/cli.md#arguments)
@@ -1618,8 +1612,6 @@ The path given to `sqlsource describe` does not exist, or it is a file that is n
 **Fix:**
 
 1. Give the path of a solution, of a C# project, or of a folder that holds exactly one of them.
-
-Notes:
 
 - **A solution filter, `.slnf`, and a project of another language are not read.**
 - **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
@@ -1645,7 +1637,7 @@ $ dotnet sqlsource describe src/Tools/Tools.csproj
 - Add the package with `dotnet add package SqlSource`, and restore.
 - Run the command on the project that has the queries.
 
-Notes:
+The tool reads projects by these rules:
 
 - **A project of a solution that was not named is not an error.**  The tool leaves it out, and says nothing.
 - **A project with several target frameworks is read by the first of them.**  So a project that references SqlSource for a later framework alone is this error.
@@ -1698,8 +1690,6 @@ Here the SqlSource package of the project and the `sqlsource` tool are of differ
 
 1. Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool`.
 
-Notes:
-
 - **When the build runs the tool, the message names the manifest file that the build wrote, by its full path**, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, whatever the path holds.
 - **Any other reason, such as one that names a line, is a bug in SqlSource.**  The package wrote a file that the tool of its own version does not expect.  [Report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
@@ -1721,8 +1711,6 @@ sqlsource : error SQLSRC207: '/work/Tools.csproj' is not a project of '/work/App
 **Fix:**
 
 1. Give the path of a `.csproj` file that the solution lists.  `dotnet sln list` shows them.
-
-Notes:
 
 - **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
 
@@ -1825,7 +1813,7 @@ The error is reported once for each token without a default, at the name of its 
 - Give the default once for the query, with a marker: `-- token: {{where:WHERE deleted_at IS NULL}}`.
 - If the query only wants its SQL, give it the output `sql`, which needs no default.
 
-Notes:
+The default follows these rules:
 
 - **An empty default, `{{where:}}`, describes the query with nothing there.**
 - **The default is a sample for describing and nothing else.**  The generated method still takes the token as an argument.
@@ -1857,7 +1845,7 @@ The database keeps the dialect of the first file that names it, in the order of 
 - Give the queries of one of the two files another database.
 - Give that file the dialect of the other file.
 
-Notes:
+Some queries and files are not counted:
 
 - **A query whose output is `sql` belongs to no database, and is not counted.**
 - **A file that already has [SQLSRC209](#sqlsrc209) is not counted either.**
@@ -1884,8 +1872,6 @@ sqlsource : error SQLSRC212: '/work/App/Queries/User.sql' is not a .sql file tha
    - The file is not a file of the project, as when `SqlSourceIncludeFiles` is off and the project does not list it.
    - No type claims the file.  A type claims the `.sql` file named for it beside its own source file, or the ones its `Source` names.
    - The run has `--project`, and no type of the projects named claims the file.  With `--project`, the file must be claimed by a type of one of the projects named.
-
-Notes:
 
 - **The rest of the run goes on.**
 - **On Linux and macOS, a path written with backslashes whose `..` go above the root of the file system is reported here too**, with its `..` as typed.
@@ -1934,8 +1920,6 @@ The error is reported once for a database, at its first query that must be descr
 
 **`--connection` can be given for a name that no database of the run has.**  Then the `help:` line lists the names that are close to a database of the run, so that you see a misspelt one.  It counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`.  A name that is far from every database of the run is not printed, such as the start of a connection string typed without its `name=`.
 
-Notes:
-
 - **A database whose queries all have a current entry needs no connection.**  Its summary line says `no connection`.  Under `--force` every query is described, so every database of the run needs one.
 - **A build that [runs the tool](reference/msbuild.md#running-in-the-build) because it found a connection reports this error only when another database with a query to describe has one.**  When none has, the build goes on with the committed sidecars, unless one of these is true:
   - `SQLSOURCE_CONNECTION` is set for several databases: [SQLSRC215](#sqlsrc215).
@@ -1963,7 +1947,7 @@ The error is reported once for each of the two databases that has a query to des
 - Give both databases their connection on the command line: `--connection app-v2=<connection string> --connection app_v2=<connection string>`.
 - Rename one of the two databases.
 
-Notes:
+This error also follows these rules:
 
 - **A connection on the command line for one of the two is not enough.**  The variable would then be read for the other alone, and a reader of the command could not tell.
 - **A build that [runs the tool](reference/msbuild.md#running-in-the-build) reports this error too when the variable is set**, in the environment or in the `.env` file.  It does not go on with the committed sidecars.
@@ -2123,8 +2107,6 @@ What the end of the message means:
 | Names a difference that the database reports, such as `columns[2].nullable` | `dotnet sqlsource describe --force`: the tool cannot see a change to the schema, and skips a query whose SQL is as it was |
 | Says the sidecar has a higher format than this tool writes | Update the `SqlSource.Tool` package: a newer tool wrote the sidecar, and `describe` leaves it as it is |
 
-Notes:
-
 - **Columns and parameters are counted from 0**: `columns[2]` is the third column.
 - **Only the first difference of a query is named.**
 - **What is compared is what changes generated code.**  That is these:
@@ -2165,8 +2147,6 @@ $ dotnet sqlsource describe
 1. Run `dotnet restore` on the solution or the project.
 2. Run the command again.
 
-Notes:
-
 - **In a solution every C# project is checked, one that has no SQL too.**  A run on a fresh checkout must not succeed by finding nothing.
 - **A reference that keeps the MSBuild files of the package out of the project gives this error after a restore as well**, `ExcludeAssets="build"` for one.  Remove that from the reference.
 
@@ -2191,8 +2171,6 @@ The file is left as it is.  Every query of its `.sql` file that the run was aske
 
 1. Update the tool with `dotnet tool update SqlSource.Tool`, to the version of the SqlSource package that the project uses.
 
-Notes:
-
 - **A sidecar of a lower format version is no error.**  Nor is one of another version of the tool, or one that cannot be read, a merge conflict for one.  The tool describes the queries of such a sidecar and writes it again.
 - **A run that can delete a sidecar does not delete one of a higher format version either**, when a file needs no entry any more.
 
@@ -2214,8 +2192,6 @@ sqlsource : error SQLSRC222: '/srv/locked' cannot be read: Access to the path '/
 **Fix:**
 
 1. Give yourself the right to read the folder.
-
-Notes:
 
 - **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.  The reason is then only `the system would not list its files`, since the words of the system repeat the path.
 
@@ -2267,10 +2243,11 @@ The `server:` line says what went wrong, in the tool's own words.  If the server
 
 The error is reported once, at the first query of the database that the run would have described.  Each of those queries counts as failed.
 
-**Fix:** do the one of these that the `server:` line points to.
+**Fix:** do one of these.
 
 - Start the database.
 - Correct the connection string that `--connection` or the variable of the database gives.
+- Do what the row of the `server:` line in the tables below says.
 
 In a build that [runs the tool](reference/msbuild.md#running-in-the-build), the error fails the build.  The `help:` line then also says how to build without the database: `To build without the database, remove its connection or set SqlSourceOnline to false`.
 
