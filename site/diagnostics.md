@@ -3946,13 +3946,24 @@ See: [Setting a column's nullability or type with a marker](reference/model-prop
 
 Reported by: the build.
 
-The type override has an entry for the name the database gives an array type, and a column or a parameter of the query has that array type, or is of a domain over it.  PostgreSQL names the array of a type with `_` before the type's name, so the array of `public.user_status` is `public._user_status`.  An entry for that name maps nothing, `default` included, since the type override names an array of a type outside `pg_catalog` as its element's key with `[]`: `public.user_status[]`.  A type whose own name starts with `_` and is no array, such as a composite type `public._tag`, is still mapped by its own name, and its array by `public._tag[]`.  The message names the column or parameter, the entry, the place that wrote it and the key to write.  It is reported once for the query, for its first column or parameter that has no C# type, as `SQLSRC246` and `SQLSRC249` to `SQLSRC252` are, and the query has no models until it is fixed.
+The type override has an entry for the name that the database gives an array type.  A column or a parameter of the query has that array type, or is of a domain over it.  The message names the column or parameter, the entry, the place that wrote it and the key to write.
+
+PostgreSQL names the array of a type with `_` before the name of the type, so the array of `public.user_status` is `public._user_status`.  An entry for that name maps nothing, `default` included.  The type override names an array of a type outside `pg_catalog` by the key of its element with `[]`: `public.user_status[]`.
+
+The build reports the error once for the query, for its first column or parameter that has no C# type.  It does the same for `SQLSRC246` and `SQLSRC249` to `SQLSRC252`.  The query has no models until the error is fixed.  Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC261: The type override's entry for 'public._user_status', in the typeOverrides of the settings file /work/App/sqlsource.json, maps nothing: 'public._user_status' is the database's own name of the array type of column 'statuses', and an entry names that array as its element's key with [].  Write the entry for 'public.user_status[]' instead.
 ```
 
-Rename the entry to the key the message gives: the member `"public.user_status[]": "System.Collections.Generic.List<string>"` in a settings file's `typeOverrides`, or `-- type-override: public.user_status[]=System.Collections.Generic.List<string>` in a marker.  When the type override already has an entry for that key, remove the one the message names.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+**Fix:** do one of these.
+
+- If the type override has no entry for the key that the message gives, rename the entry to that key.
+- If the type override already has an entry for that key, remove the entry that the message names.
+
+The renamed entry, as a member of `typeOverrides` in a settings file, is `"public.user_status[]": "System.Collections.Generic.List<string>"`.  As a marker, it is `-- type-override: public.user_status[]=System.Collections.Generic.List<string>`.
+
+- **A type whose own name starts with `_` and is no array is still mapped by its own name.**  A composite type `public._tag` is one.  Its array is mapped by `public._tag[]`.
 
 See: [Type overrides](reference/type-mapping.md#setting-type-overrides)
 
@@ -3964,7 +3975,11 @@ Reported by: the tool.
 
 Database: SQL Server.
 
-SQL Server gives a parameter a type at each place the query uses it, and SqlSource takes each use as a copy of the parameter, typed on its own.  A use that says nothing of the type, such as `@p IS NULL`, is left out; the uses that fix a type must agree.  Here two of them give the parameter two types: `WHERE id = @p OR name = @p` compares it with an `int` column and with an `nvarchar(100)` one.  The message names the first two types in the order of the uses.
+SQL Server gives a query parameter two different types at two of the places where the query uses it.  The message names the first two types, in the order of the uses.
+
+SQL Server gives a parameter a type at each place where the query uses it.  SqlSource takes each use as a copy of the parameter, typed on its own.  A use that says nothing of the type, such as `@p IS NULL`, is left out.  The uses that fix a type must agree.
+
+In this sample, `WHERE id = @p OR name = @p` compares the parameter with an `int` column and with an `nvarchar(100)` one:
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC262: The copies of the parameter '@p' of the query 'FindUser' have the types 'int' and 'nvarchar(100)'
@@ -3973,7 +3988,12 @@ SQL Server gives a parameter a type at each place the query uses it, and SqlSour
     help: declare the parameter's type with -- param:
 ```
 
-Declare the parameter's type with a `-- param:` marker, `-- param: @p nvarchar(100)`: SQL Server then checks every use against the type you chose.  Or use two parameters, one for each type.  The optional filter, `(@name IS NULL OR name = @name)`, is not this error: its use in `@name IS NULL` fixes no type, and the parameter takes the type of the column.
+**Fix:** do one of these.
+
+- Declare the type of the parameter with a `-- param:` marker, such as `-- param: @p nvarchar(100)`.  SQL Server then checks every use against the type that you chose.
+- Use two parameters, one for each type.
+
+**The optional filter, `(@name IS NULL OR name = @name)`, is not this error.**  Its use in `@name IS NULL` fixes no type, and the parameter takes the type of the column.
 
 See: [SQL Server parameters](reference/databases/sqlserver/index.md#parameters)
 
@@ -3985,7 +4005,9 @@ Reported by: the tool.
 
 Database: SQL Server.
 
-SQL Server works out the columns of a query from its text, without running it, so every path through the query must return the same columns.  Here the paths return different ones: an `IF` whose two `SELECT`s differ in the number or the types of their columns.  A query has one set of columns, and one model for its rows, whichever path runs.
+The paths through the query return different columns.  An `IF` whose two `SELECT`s differ in the number or the types of their columns is one example.
+
+SQL Server works out the columns of a query from its text, without running it.  So every path through the query must return the same columns.  A query has one set of columns, and one model for its rows, whichever path runs.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC263: The query 'FindUser' returns rows of different shapes on different paths
@@ -4002,7 +4024,12 @@ ELSE
     SELECT id FROM dbo.users WHERE id = @id;
 ```
 
-Make every path return the same number of columns, of the same types, or split the query into one query for each set of columns and choose between them in your code:
+**Fix:** do one of these.
+
+- Make every path return the same number of columns, of the same types.
+- Split the query into one query for each set of columns, and choose between them in your code.
+
+The query split into two queries:
 
 ```sql mssql
 -- name: FindUserByName
@@ -4012,7 +4039,7 @@ SELECT id, name FROM dbo.users WHERE name = @name;
 SELECT id, name FROM dbo.users WHERE id = @id;
 ```
 
-Paths whose columns differ only in their names are not this error: SQL Server gives such a column no name, which is [SQLSRC266](#sqlsrc266).  Give it one name on every path.
+- **Paths whose columns differ only in their names are not this error.**  SQL Server gives such a column no name, which is [SQLSRC266](#sqlsrc266).  Give the column one name on every path.
 
 See: [What SQL Server can describe](reference/databases/sqlserver/index.md#what-can-be-described)
 
@@ -4024,7 +4051,9 @@ Reported by: the tool.
 
 Database: SQL Server.
 
-The query runs SQL that it builds in a string, `EXEC(@sql)`.  SQL Server works out the columns of a query from its text, without running it, and the string holds its SQL only when the query runs, so SQL Server cannot say what it returns.
+The query runs SQL that it builds in a string, `EXEC(@sql)`.
+
+SQL Server works out the columns of a query from its text, without running it.  The string holds its SQL only when the query runs.  So SQL Server cannot say what the query returns.
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC264: The query 'ListOrders' runs SQL that the server cannot read until it runs
@@ -4039,14 +4068,19 @@ DECLARE @sql nvarchar(max) = N'SELECT id, total FROM dbo.orders WHERE customer_i
 EXEC(@sql);
 ```
 
-Write the SQL in the query, with a query parameter where the string took a value:
+**Fix:** do one of these.
+
+- Write the SQL in the query.  Use a query parameter where the string took a value.
+- `EXEC` a literal string, such as `EXEC(N'SELECT id, total FROM dbo.orders')`, which SQL Server can read.
+
+The query with its SQL written in it:
 
 ```sql mssql
 -- name: ListOrders
 SELECT id, total FROM dbo.orders WHERE customer_id = @customer_id;
 ```
 
-Or `EXEC` a literal string, `EXEC(N'SELECT id, total FROM dbo.orders')`, which SQL Server can read.  A part of the SQL that changes between calls, such as the name of a table, can be a [token](reference/tokens.md#tokens), which the generated method takes as an argument.
+- **A part of the SQL that changes between calls can be a [token](reference/tokens.md#tokens).**  The name of a table is such a part.  The generated method takes the token as an argument.
 
 See: [What SQL Server can describe](reference/databases/sqlserver/index.md#what-can-be-described)
 
@@ -4058,7 +4092,9 @@ Reported by: the tool.
 
 Database: SQL Server.
 
-The query creates a temporary table, a `#` table, and uses it in a later statement.  SQL Server works out the columns of a query from its text, without running it, and the table does not exist until the query runs, so SQL Server cannot work out the statements that use it.
+The query creates a temporary table, a `#` table, and uses it in a later statement.
+
+SQL Server works out the columns of a query from its text, without running it.  The table does not exist until the query runs.  So SQL Server cannot work out the statements that use it.
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC265: The query 'RecentTotals' uses a temporary table in a batch of several statements
@@ -4075,7 +4111,12 @@ INSERT #recent (customer_id, total) SELECT customer_id, total FROM dbo.orders WH
 SELECT customer_id, SUM(total) AS total FROM #recent GROUP BY customer_id;
 ```
 
-Make the query one statement:
+**Fix:** do one of these.
+
+- Make the query one statement.
+- Declare a table variable in the place of the temporary table, such as `DECLARE @recent TABLE (customer_id int NOT NULL, total decimal(12,2) NOT NULL)`.  SQL Server reads its columns from its declaration.
+
+The query as one statement:
 
 ```sql mssql
 -- name: RecentTotals
@@ -4085,7 +4126,7 @@ WHERE placed_at > @since
 GROUP BY customer_id;
 ```
 
-Or declare a table variable in the place of the temporary table, `DECLARE @recent TABLE (customer_id int NOT NULL, total decimal(12,2) NOT NULL)`, whose columns SQL Server reads from its declaration.  A query that reads a temporary table it does not create is [SQLSRC225](#sqlsrc225) instead, with `Msg 208`, `Invalid object name`.
+- **A query that reads a temporary table that it does not create is not this error.**  It is [SQLSRC225](#sqlsrc225), with `Msg 208`, `Invalid object name`.
 
 See: [What SQL Server can describe](reference/databases/sqlserver/index.md#what-can-be-described)
 
@@ -4097,7 +4138,9 @@ Reported by: the tool.
 
 Database: SQL Server.
 
-A column of the query has no name, so its property in the output model would have none.  SQL Server gives no name to a column that is an expression or a literal without an alias, such as `COUNT(*)`, `price * quantity` or `1`.  The message gives the column's position, from 1, and the query.  It is what [SQLSRC253](#sqlsrc253) is for PostgreSQL, and the tool reports it when it describes the query.
+A column of the query has no name, so its property in the output model would have none.  The message gives the position of the column, from 1, and the query.
+
+SQL Server gives no name to a column that is an expression or a literal without an alias, such as `COUNT(*)`, `price * quantity` or `1`.
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC266: Column 2 of the query 'CountOrders' has no name
@@ -4111,12 +4154,19 @@ A column of the query has no name, so its property in the output model would hav
 SELECT customer_id, COUNT(*) FROM dbo.orders GROUP BY customer_id;
 ```
 
-Give the column an alias, which names its property, then run `dotnet sqlsource describe` again:
+**Fix:**
+
+1. Give the column an alias.  The alias names its property.
+2. Run `dotnet sqlsource describe` again.
+
+The column with an alias:
 
 ```sql mssql
 -- name: CountOrders
 SELECT customer_id, COUNT(*) AS order_count FROM dbo.orders GROUP BY customer_id;
 ```
+
+- **This error is to SQL Server what [SQLSRC253](#sqlsrc253) is to PostgreSQL.**  The tool reports this error when it describes the query.
 
 See: [What SQL Server can describe](reference/databases/sqlserver/index.md#what-can-be-described)
 
@@ -4126,15 +4176,24 @@ See: [What SQL Server can describe](reference/databases/sqlserver/index.md#what-
 
 Reported by: the build.
 
-The project references a version of Microsoft.Data.SqlClient older than 6.1, and SqlSource gives the queries of the `mssql` dialect the C# types of Microsoft.Data.SqlClient 6.1 and later.  The message names the version the project references.
+The project references a version of Microsoft.Data.SqlClient older than 6.1.  The message names the version that the project references.
+
+SqlSource gives the queries of the `mssql` dialect the C# types of Microsoft.Data.SqlClient 6.1 and later.  Until the package is updated, no query of the `mssql` dialect gets its method.  Its models are still generated.
 
 ```console
 CSC : error SQLSRC267: This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs Microsoft.Data.SqlClient 6.1 or later, so no query method is generated.  Update the package.
 ```
 
-Until the package is updated, no query of the `mssql` dialect gets its method; its models are still generated.  Update the `Microsoft.Data.SqlClient` package to 6.1 or later.  When another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  EF Core 8 and 9 bring Microsoft.Data.SqlClient 5.1, so a project that uses either references Microsoft.Data.SqlClient 6.1 or later directly, beside the EF Core packages.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models`, `methods` or `repository` under the `mssql` dialect.  A query with a `vector` column or parameter also gets [SQLSRC270](#sqlsrc270), at its name, and the same update clears both.
+**Fix:**
 
-See: [Which version of Microsoft.Data.SqlClient](reference/databases/sqlserver/types.md#which-sqlclient)
+1. Update the `Microsoft.Data.SqlClient` package to 6.1 or later.
+2. If another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.
+
+- **EF Core 8 and 9 bring Microsoft.Data.SqlClient 5.1.**  So a project that uses either references Microsoft.Data.SqlClient 6.1 or later directly, beside the EF Core packages.
+- **The error has no file and line, because it is about the references of the project.**  The build reports it once for the project.  It reports it only while a query has the output `repository`, `methods` or `models` under the `mssql` dialect.
+- **A query with a `vector` column or parameter also gets [SQLSRC270](#sqlsrc270), at its name.**  The same update clears both errors.
+
+See: [Supported versions](reference/databases/index.md#supported-versions), [Which version of Microsoft.Data.SqlClient](reference/databases/sqlserver/types.md#which-sqlclient)
 
 ## SQLSRC268
 
@@ -4142,21 +4201,28 @@ See: [Which version of Microsoft.Data.SqlClient](reference/databases/sqlserver/t
 
 Reported by: the build.
 
-The project references Microsoft.Data.SqlClient 8 or later, and this version of SqlSource knows the C# types of Microsoft.Data.SqlClient up to version 7.  It gives the queries of the `mssql` dialect the types that Microsoft.Data.SqlClient 7 reads, which are right unless the newer driver reads one of them as another type.  The message names the version the project references.
+The project references Microsoft.Data.SqlClient 8 or later.  This version of SqlSource knows the C# types of Microsoft.Data.SqlClient up to version 7.  The message names the version that the project references.
+
+SqlSource gives the queries of the `mssql` dialect the types that Microsoft.Data.SqlClient 7 reads.  These types are right unless the newer driver reads one of them as another type.
 
 ```console
 info SQLSRC268: This project references Microsoft.Data.SqlClient 8.0.1, which is newer than this version of SqlSource knows.  Its models use the types of Microsoft.Data.SqlClient 7.
 ```
 
-Update the `SqlSource` package when a version that knows the driver is released.  This is information, not a warning, so that a project that sets `TreatWarningsAsErrors` still builds on the day it updates Microsoft.Data.SqlClient.  A project can list it in `NoWarn` to hide it:
+**Fix:**
+
+1. Update the `SqlSource` package when a version that knows the driver is released.
+
+- **It has no file and line.**  The build reports it once for the project, and only while a query has the output `repository`, `methods` or `models` under the `mssql` dialect.
+- **As information, it is not in the output of `dotnet build`.**  See [SQLSRC248](#sqlsrc248) for where to find it.
+
+This is information, not a warning, so that a project that sets `TreatWarningsAsErrors` still builds on the day it updates Microsoft.Data.SqlClient.  A project can list it in `NoWarn` to hide it:
 
 ```xml
 <PropertyGroup>
     <NoWarn>$(NoWarn);SQLSRC268</NoWarn>
 </PropertyGroup>
 ```
-
-It has no file and line, and is reported once for the project, only while a query's output is `models`, `methods` or `repository` under the `mssql` dialect.  As information, it is not in the output of `dotnet build`: see [SQLSRC248](#sqlsrc248) for where to find it.
 
 See: [Which version of Microsoft.Data.SqlClient](reference/databases/sqlserver/types.md#which-sqlclient)
 
@@ -4168,13 +4234,19 @@ Reported by: the build.
 
 A query gets this error only while its entry in the sidecar is current.  It is for the query's first column or parameter that has no C# type, and parameters come before columns.
 
-The project does not reference Microsoft.Data.SqlClient, and a column or a parameter of a query of the `mssql` dialect has a type whose C# type is one of Microsoft.Data.SqlClient's own: `vector`, which it reads as `Microsoft.Data.SqlTypes.SqlVector<float>`.  Without a reference, the project cannot name that type.  The message names the column or parameter and its type.
+The project does not reference Microsoft.Data.SqlClient.  A column or a parameter of a query of the `mssql` dialect has a type whose C# type is one of Microsoft.Data.SqlClient's own.  That type is `vector`, which Microsoft.Data.SqlClient reads as `Microsoft.Data.SqlTypes.SqlVector<float>`.  The message names the column or parameter and its type.
+
+Without a reference, the project cannot name that C# type.  The build reports the error at the name of the query, once for the query.  Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Documents.sql(1,10): error SQLSRC269: The column 'embedding' has the type 'vector(3)', whose C# type depends on Microsoft.Data.SqlClient, and this project does not reference it.  Reference Microsoft.Data.SqlClient.
 ```
 
-Reference the `Microsoft.Data.SqlClient` package from the project, at 6.1 or later.  Every other type that Microsoft.Data.SqlClient reads without another package has a C# type of .NET itself, and needs no reference.  The error is reported at the query's name, once for the query, and under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+**Fix:**
+
+1. Reference the `Microsoft.Data.SqlClient` package from the project, at 6.1 or later.
+
+- **No other type needs the reference.**  Every other type that Microsoft.Data.SqlClient reads without another package has a C# type of .NET itself.
 
 See: [Which version of Microsoft.Data.SqlClient](reference/databases/sqlserver/types.md#which-sqlclient)
 
@@ -4186,13 +4258,20 @@ Reported by: the build.
 
 A query gets this error only while its entry in the sidecar is current.  It is for the query's first column or parameter that has no C# type, and parameters come before columns.
 
-The project references a version of Microsoft.Data.SqlClient older than 6.1, and a column or a parameter of a query of the `mssql` dialect has a type whose C# type that version does not have: `vector`, which Microsoft.Data.SqlClient reads as `Microsoft.Data.SqlTypes.SqlVector<float>`, first in 6.1.  The message names the column or parameter, its type, the version its C# type needs and the version the project references.
+The project references a version of Microsoft.Data.SqlClient older than 6.1.  A column or a parameter of a query of the `mssql` dialect has a type whose C# type that version does not have.  That type is `vector`, which Microsoft.Data.SqlClient reads as `Microsoft.Data.SqlTypes.SqlVector<float>`, first in 6.1.  The message names the column or parameter, its type, the version that its C# type needs and the version that the project references.
+
+The build reports the error at the name of the query, once for the query.  The query has no models until the error is fixed.  Under the output `models`, its constant or token method is still generated.  Under `repository` or `methods`, it gets no method.
 
 ```console
 /work/App/Queries/Documents.sql(1,10): error SQLSRC270: The column 'embedding' has the type 'vector(3)', whose C# type needs Microsoft.Data.SqlClient 6.1 or later, and this project references Microsoft.Data.SqlClient 6.0.5.  Update the package.
 ```
 
-Update the `Microsoft.Data.SqlClient` package to 6.1 or later, which also clears [SQLSRC267](#sqlsrc267), reported for the project beside it.  When another package brings the older version, as EF Core 8 and 9 do, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  The error is reported at the query's name, once for the query; the query has no models until it is fixed, and under the output `models` its constant or token method is still generated, while under `methods` or `repository` it gets no method.
+**Fix:**
+
+1. Update the `Microsoft.Data.SqlClient` package to 6.1 or later.  This also clears [SQLSRC267](#sqlsrc267), which the build reports for the project beside this error.
+2. If another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself.  Use the version you want.
+
+- **EF Core 8 and 9 bring an older version.**
 
 See: [Which version of Microsoft.Data.SqlClient](reference/databases/sqlserver/types.md#which-sqlclient)
 
@@ -4202,17 +4281,33 @@ See: [Which version of Microsoft.Data.SqlClient](reference/databases/sqlserver/t
 
 Reported by: the tool.
 
-The tool reports a `.sql` file saved in another encoding, such as Windows-1252, when a query of it needs an entry in its sidecar or when the tool cannot read the file as SQL.  A file that starts with a byte order mark is never reported.  Such a file has no one text: a build on Windows reads it in the system's code page, while the tool, and a build on macOS or Linux, read each character that is not UTF-8 as a replacement character, `�`, which then stands in the generated SQL too.  The tool describes no query of the file until it is saved as UTF-8.  A file that the tool can read as SQL and whose queries all have the output `sql` is not reported.
+The tool reports a `.sql` file saved in another encoding, such as Windows-1252, in one of two cases:
 
-The build does not report this error itself.  It reports a query of the file that has no entry as missing one ([SQLSRC241](#sqlsrc241)), and on Windows, when the characters outside ASCII are in a query's SQL and not only in its comments, reports the query's entry as out of date ([SQLSRC244](#sqlsrc244)).  Otherwise the build may report nothing while the tool reports the file.
+- a query of the file needs an entry in its sidecar;
+- the tool cannot read the file as SQL.
 
-The tool also reports a C# file in another encoding whose `[SqlSourceGenerate]` has a `Source` written with a character outside ASCII, at that `Source`, or has no `Source` and is on a type whose name is written with one, at the name.  A build on Windows reads that `Source` or that name in the system's code page, and so can look for other `.sql` files than the tool, which plans nothing for the type until the file is saved as UTF-8.  A C# file in another encoding is read as before when its `Source`, or its type's name, is written with ASCII characters only, an escape such as `\u00ea` included.
+The tool describes no query of the file until the file is saved as UTF-8.
+
+Such a file has no one text.  A build on Windows reads it in the code page of the system.  The tool, and a build on macOS or Linux, read each character that is not UTF-8 as a replacement character, `�`.  That character then stands in the generated SQL too.
 
 ```console
 /work/App/Queries/Users.sql : error SQLSRC271: '/work/App/Queries/Users.sql' is not saved as UTF-8, so its text depends on the system that reads it.  Save it as UTF-8.
 ```
 
-Save the file as UTF-8, with the "Save with encoding" command of your editor, and run `dotnet sqlsource describe` again.  That fixes the entries the build reported as missing or out of date.  For a `.sql` file the error is reported once, at the file with no line or column; for a C# file it is reported at the `Source` argument or the type's name, with its line and column.  When the file has a parse error of its own, the tool reports this error instead of the parse errors, since what it read may not be what the build reads.  A file that is also [SQLSRC209](#sqlsrc209) gets this error alone.
+**Fix:**
+
+1. Save the file as UTF-8, with the "Save with encoding" command of your editor.
+2. Run `dotnet sqlsource describe` again.  That fixes the entries that the build reported as missing or out of date.
+
+- **A file that starts with a byte order mark is never reported.**
+- **A file that the tool can read as SQL, and whose queries all have the output `sql`, is not reported.**
+- **The build does not report this error itself.**  It reports a query of the file that has no entry as missing one ([SQLSRC241](#sqlsrc241)).  On Windows, it can also report the entry of a query as out of date ([SQLSRC244](#sqlsrc244)).  It does so when the characters outside ASCII are in the SQL of the query, and not only in its comments.  Otherwise the build may report nothing while the tool reports the file.
+- **The tool also reports a C# file in another encoding, in two cases.**  The first is a `[SqlSourceGenerate]` with a `Source` written with a character outside ASCII: the error is at that `Source`.  The second is a `[SqlSourceGenerate]` with no `Source`, on a type whose name is written with such a character: the error is at the name.
+- **A build on Windows reads that `Source`, or that name, in the code page of the system.**  So the build can look for other `.sql` files than the tool.  The tool describes nothing for the type until the file is saved as UTF-8.
+- **A C# file in another encoding is read as before when its `Source`, or the name of its type, is written with ASCII characters only.**  An escape such as `\u00ea` counts as ASCII.
+- **For a `.sql` file, the tool reports the error once, at the file, with no line or column.**  For a C# file, it reports the error at the `Source` argument or the name of the type, with its line and column.
+- **When the file has a parse error of its own, the tool reports this error instead of the parse errors.**  What the tool read may not be what the build reads.
+- **A file that is also [SQLSRC209](#sqlsrc209) gets this error alone.**
 
 See: [Describing again](reference/sidecars.md#describing-again)
 
@@ -4224,13 +4319,24 @@ Reported by: the build.
 
 The error is at the query's name.  If several types claim the query's file, the query still gets it only once.  The query also gets each other error about its method, and gets no method until all are fixed.  Its models are still generated.
 
-A query's name marker gives it the shape `one`, `one-optional` or `many`, and its entry in the sidecar says that its statement returns no rows, as an `UPDATE` without `RETURNING` or `OUTPUT` does.  Those shapes read rows, so the query's method cannot be generated.  The message names the query and its shape.
+The name marker of the query gives it the shape `one`, `one-optional` or `many`.  But its entry in the sidecar says that its statement returns no rows, as an `UPDATE` without `RETURNING` or `OUTPUT` does.  The message names the query and its shape.
+
+Those shapes read rows, so the method of the query cannot be generated.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC272: The query 'RenameUser' has the shape 'one', and its statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.
 ```
 
-Remove the shape, which gives a query without rows the shape `rowcount`, or write `-> rowcount` for the number of rows the statement affected, or `-> none` for nothing.  When the statement should return rows, change it, and run `dotnet sqlsource describe` again.  The error is reported only while the query's output is `methods` or `repository`, since a shape changes nothing under `models` or `sql`.
+**Fix:** do one of these.
+
+- Remove the shape.  A query without rows then gets the shape `rowcount`.
+- Write `-> rowcount` for the number of rows that the statement affected.
+- Write `-> none` for nothing.
+- If the statement should return rows:
+  1. Change the statement.
+  2. Run `dotnet sqlsource describe` again.
+
+**The build reports the error only while the output of the query is `repository` or `methods`.**  A shape changes nothing under `models` or `sql`.
 
 See: [Result shapes](reference/sql-files.md#result-shapes)
 
@@ -4240,13 +4346,25 @@ See: [Result shapes](reference/sql-files.md#result-shapes)
 
 Reported by: the build.
 
-A query of the `postgres` dialect has the output `methods` or `repository`, and the project does not reference Npgsql, or a query of the `mssql` dialect has one of them and the project does not reference Microsoft.Data.SqlClient.  The query's method runs on the driver, so it is not generated.  The message names the database and the package.
+A query has the output `repository` or `methods`, and the project does not reference the driver of its database.  That is one of these:
+
+- a query of the `postgres` dialect, in a project that does not reference Npgsql;
+- a query of the `mssql` dialect, in a project that does not reference Microsoft.Data.SqlClient.
+
+The message names the database and the package.
+
+The method of the query runs on the driver, so it is not generated.  The models are still generated.
 
 ```console
 CSC : error SQLSRC273: A query for PostgreSQL has the output methods or repository, and this project does not reference Npgsql, which its method needs.  Reference Npgsql, or set the output to models.
 ```
 
-Reference the package from the project: `Npgsql` 8.0 or later for PostgreSQL, `Microsoft.Data.SqlClient` 6.1 or later for SQL Server.  A project that runs its queries some other way, with Dapper on a connection that a package of its own brings, sets the output to `models`, which gives the SQL and the models without the methods.  The error has no file and line, because it is about the project's references, and it is reported once for the project and database, however many of its queries have the output `methods` or `repository`.  The models are still generated.
+**Fix:** do one of these.
+
+- Reference the package from the project: `Npgsql` 8.0 or later for PostgreSQL, `Microsoft.Data.SqlClient` 6.1 or later for SQL Server.
+- If the project runs its queries some other way, set the output to `models`.  Dapper on a connection that a package of the project brings is such a way.  The output `models` gives the SQL and the models without the methods.
+
+**The error has no file and line, because it is about the references of the project.**  The build reports it once for the project and database, however many of its queries have the output `repository` or `methods`.
 
 See: [Query methods](reference/query-methods.md#query-methods)
 
@@ -4258,24 +4376,40 @@ Reported by: the build.
 
 If several types claim the query's file, the query gets this error once.  A cause that belongs to one type, such as a member of that type, is the exception: each type that has it reports it.  If two types of one namespace claim the file, each gives the query a method of one signature.  The query then gets one error for each type, each naming the other.  The query also gets each other error about its method, and gets no method until all are fixed.
 
-The method of a query whose output is `methods` or `repository` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  Under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) a synchronous method has the query's name alone, and under `both` an asynchronous method always has `Async` after it, whatever `async-method-suffix` says, so that it never has the name of the synchronous method beside it.  Each name of a query's methods is checked, and the message names the one that is taken; a query with one taken gets none of its methods, but for a clash with a method of another type in an extension class, the last case below, which leaves out its methods of that name alone.  It is taken when it is:
+The method of a query whose output is `repository` or `methods` would have the name of something else, so it is not generated.  The message names the query, the name of the method and what takes the name.
 
-- under the [member location](reference/members.md#locations) `extension-class`, the default of the output `methods`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
-- under `class`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type that is on the type too, or of a nested class that the type's queries put members in;
-- for a `repository` query, also the name of the member of a base type, or the primary-constructor parameter, that its method gets its connection from, which the method would hide;
-- for a synchronous method of a `repository` query that takes no argument, which is one with no parameters and no tokens, also the name `Finalize`, since a method of that name and no argument would be taken for the type's finalizer, and the compiler warns of it; the query's asynchronous method, which takes a cancellation token, and a synchronous method that takes a parameter or a token are not refused;
-- for a public method of a `repository` query, also the name of the type's [interface](#sqlsrc035), which holds the method too, and whose member cannot have its name; the interface is still generated, without the method;
-- under `nested-class`, the name of the constant, token method or method of another query of the type in the same class, which may come from another file of the type;
-- the name of the method of another query of the same type in the same class, which is reported at both queries;
-- under `extension-class`, the name of the method of a query of another type whose methods go into the same extension class, as two types of one name nested in two types do, or of a method of the same name and the same parameters in the extension class of another type of the same namespace, which a call on a connection could not tell apart from it.  Both queries get the error, and neither gets its methods of that name.  Two methods of one name in the classes of two types whose parameters differ, one with an input model and one without, say, are two overloads, and each is generated.
+The name of the method is the name of the query, with `Async` after it under `async-method-suffix`.  Under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters), a synchronous method has the name of the query alone.  Under `both`, an asynchronous method always has `Async` after it, whatever `async-method-suffix` says.  So it never has the name of the synchronous method beside it.
 
-The message names the query, the method's name and what takes it.
+Each name of the methods of a query is checked, and the message names the one that is taken.  A query with one name taken gets none of its methods.  The exception is the last case below, a clash with a method of another type in an extension class.  That clash leaves out the methods of that name alone.
+
+The name is taken in each of these cases:
+
+- **Under the [member location](reference/members.md#locations) `extension-class`, it is the name of the extension class that holds the method.**  It is also taken by a member of `DbConnection` or of `object`, such as `Open` or `ToString`.  A call on a connection would find that member before the extension method.  `extension-class` is the default of the output `methods`.
+- **Under `class`, it is the name of a member of the type, of the type itself, or of one of its type parameters.**  It is also taken by the constant or token method of another query of the type, when that method is on the type too.  A nested class that the queries of the type put members in also takes it.
+- **For a `repository` query, it is also the name of the member that its method gets its connection from.**  That is the member of a base type, or the primary-constructor parameter, which the method would hide.
+- **For a synchronous method of a `repository` query that takes no argument, it is also the name `Finalize`.**  Such a method has no parameters and no tokens.  A method of that name and no argument would be taken for the finalizer of the type, and the compiler warns of it.  The asynchronous method of the query, which takes a cancellation token, is not refused.  Nor is a synchronous method that takes a parameter or a token.
+- **For a public method of a `repository` query, it is also the name of the [interface](#sqlsrc035) of the type.**  The interface holds the method too, and a member of it cannot have its name.  The interface is still generated, without the method.
+- **Under `nested-class`, it is the name of the constant, token method or method of another query of the type in the same class.**  That query may come from another file of the type.
+- **It is the name of the method of another query of the same type in the same class.**  The build reports the error at both queries.
+- **Under `extension-class`, it is the name of a method of another type, in the same extension class or in another of the same namespace.**  That is one of two methods:
+  - the method of a query of another type whose methods go into the same extension class.  Two types of one name nested in two types do that;
+  - a method of the same name and the same parameters in the extension class of another type of the same namespace.  A call on a connection could not tell the two apart.
+
+  Both queries get the error, and neither gets its methods of that name.  Two methods of one name in the classes of two types whose parameters differ are two overloads, and each is generated.  One method with an input model and one without is such a pair.
+
+The build reports the error at the name of the query.  The models of the query are still generated.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC274: The method of the query 'Open' cannot be named 'Open', because DbConnection has a member of that name, which a call on a connection finds before the method.  Rename the query.
 ```
 
-Rename the query, with its `-- name:` marker, or rename the member that takes the name.  For a query `Get` under `async-method-suffix` beside a query `GetAsync` without it, or for `Get` and `GetAsync` under `method-type=both`, rename one of them.  For the methods of two types, rename one of the queries, or write `-- member-location: class` in the files of one of the types to put its methods on the type itself.  The error is reported at the query's name, and the query's models are still generated.
+**Fix:** do one of these.
+
+- Rename the query, with its `-- name:` marker.
+- Rename the member that takes the name.
+- For the methods of two types, write `-- member-location: class` in the files of one of the types.  That puts its methods on the type itself.
+
+If a query `Get` under `async-method-suffix` stands beside a query `GetAsync` without it, rename one of the two queries.  Do the same for `Get` and `GetAsync` under `method-type=both`.  For the methods of two types, you can also rename one of the queries.
 
 See: [Query methods](reference/query-methods.md#query-methods)
 
@@ -4287,9 +4421,13 @@ Reported by: the build.
 
 If several types claim the query's file, the query does not get this error more often.  A token that hides a repository's connection is the exception: each type whose connection it hides reports it.  The query also gets each other error about its method, and gets no method until all are fixed.
 
-A token of a query whose output is `methods` or `repository` has the name of one of the arguments a query method can have: `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`.  A token is an argument of the method too, so it cannot take one of these names, even in a query without parameters, whose method has no `parameters`, and the method is not generated.  The message names the token, the query and what has the name.
+A token of a query whose output is `repository` or `methods` has the name of an argument of a query method.  These are the names: `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`.  The message names the token, the query and what has the name.
 
-A token of a `repository` query also cannot take the name of what its method gets its connection through, which the token's argument would hide: the primary-constructor parameter that gives the connection, or the type when the connection comes from a `static` member of the type.
+A token is an argument of the method too, so it cannot take one of these names.  That holds even in a query without parameters, whose method has no `parameters`.  So the method is not generated.
+
+A token of a `repository` query also cannot take the name of what its method gets its connection through.  The argument of the token would hide it.  That is the primary-constructor parameter that gives the connection, or the type, when the connection comes from a `static` member of the type.
+
+The first sample is a token with the name of an argument.  The second is a token with the name of the primary-constructor parameter:
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC275: The token 'transaction' of the query 'ListFrom' has the name of an argument that a query method can have: connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.
@@ -4299,7 +4437,12 @@ A token of a `repository` query also cannot take the name of what its method get
 /work/App/Queries/Users.sql(1,10): error SQLSRC275: The token 'dataSource' of the query 'ListFrom' has the name of the primary-constructor parameter 'dataSource', which gives the repository methods of 'App.UserRepository' their connection.  Rename the token.
 ```
 
-Rename the token, everywhere the query writes it and in its `-- token:` marker, or, for a `repository` query, rename the parameter.  The error is reported at the query's name, once for each such token, and the query's models are still generated.
+**Fix:** do one of these.
+
+- Rename the token, everywhere the query writes it and in its `-- token:` marker.
+- For a `repository` query, rename the parameter.
+
+**The build reports the error at the name of the query, once for each such token.**  The models of the query are still generated.
 
 See: [Query methods](reference/query-methods.md#query-methods)
 
@@ -4309,19 +4452,27 @@ See: [Query methods](reference/query-methods.md#query-methods)
 
 Reported by: the build.
 
-Under the [member location](reference/members.md#locations) `extension-class`, the default of the output `methods`, the methods of a type go into a `static partial class` named after the type with `Extensions` after it, `SampleExtensions` for `Sample`, in the type's namespace.  That class cannot be generated, so the type gets none of its methods, when:
+Under the [member location](reference/members.md#locations) `extension-class`, the default of the output `methods`, the methods of a type go into a `static partial class`.  The class has the name of the type with `Extensions` after it, `SampleExtensions` for `Sample`, and is in the namespace of the type.  Here the class cannot be generated, so the type gets none of its methods.  The message names the type, the class and what stops it.
 
-- the project already has a type of the class's full name, or a namespace of it, such as a class `App.SampleExtensions` that you wrote;
-- SqlSource writes a model of that full name, named by `-- output-model:` or `-- input-model:`, or by a query's name and a suffix, or a model in a namespace of that name;
-- two types whose methods go into the one class, as two types `Queries` nested in two types of one namespace do, are of two accessibilities: the class is `public` when one of the type's methods is public, and `internal` otherwise, and one class cannot be both.
+The class cannot be generated in each of these cases:
 
-Two types of one accessibility that give one class share it, each writing a part of it.  The message names the type, the class and what stops it.
+- **The project already has a type of the full name of the class, or a namespace of it.**  A class `App.SampleExtensions` that you wrote is one.
+- **SqlSource writes a model of that full name, or a model in a namespace of that name.**  The model is named by `-- output-model:` or `-- input-model:`, or by the name of a query and a suffix.
+- **Two types whose methods go into the one class are of two accessibilities.**  Two types `Queries` nested in two types of one namespace give one class.  The class is `public` when one of the methods of the type is public, and `internal` otherwise.  One class cannot be both.
+
+The build reports the error at the `[SqlSourceGenerate]` of the type, once for each type whose methods would go into the class.  The models of the type are still generated.
 
 ```console
 /work/App/Sample.cs(5,6): error SQLSRC276: The query methods of 'App.Sample' cannot go into the extension class 'App.SampleExtensions', because the project has a type of that name.  Rename the type or what has the name, or set -- member-location: to put the methods on the type.
 ```
 
-Rename the type, or the type, namespace or model that has the class's name, or give the methods of the two types one widest visibility.  Or write `-- member-location: class` in the type's files, which puts the methods on the type itself and needs no extension class.  The error is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class, and the type's models are still generated.
+**Fix:** do one of these.
+
+- Rename the type, or the type, namespace or model that has the name of the class.
+- Give the methods of the two types one widest visibility.
+- Write `-- member-location: class` in the files of the type.  That puts the methods on the type itself, and needs no extension class.
+
+**Two types of one accessibility that give one class share it.**  Each of the two types writes a part of the class.
 
 See: [Query methods](reference/query-methods.md#query-methods)
 
@@ -4333,29 +4484,39 @@ Reported by: the build.
 
 A method of the project's own code gets this error whether or not a query uses it.  The output of the project, its types and its files do not change this.  A query that gets the error for a converter of a referenced assembly keeps its models.
 
-A method marked `[SqlSourceConverter]` must be a converter: a `static` method of one argument, declared in a type, that returns the argument converted to another type, as `public static Email FromDatabase(string value)` does.  The method is not one, and the message names it and the first of these that is wrong with it:
+A method marked `[SqlSourceConverter]` must be a converter, and this method is not one.  A converter is a `static` method of one argument, declared in a type, that returns the argument converted to another type.  `public static Email FromDatabase(string value)` is one.
 
-- `it is a local function`: the method is declared inside another method.  Only a method declared in a type is a converter, and the attribute on a lambda is ignored.
-- `it is an operator`: the method is an operator, as `operator +`, or a conversion, as `implicit operator Email(string value)`, which the generated code cannot call by name.  Mark a static method that does the conversion instead; the operator can call it.
-- `it is not static`: the method is an instance method.
-- `it is abstract or virtual`: the method is a `static abstract` or `static virtual` member of an interface, which a call through the interface cannot reach.
-- `it is generic`: the method has type parameters of its own.
-- `it is in an extension block`: the method is declared inside an `extension` block, which the generated code cannot call it through.  Declare it in a class or a struct, as a member of the type it converts or of a static class.
-- `it is in a generic type`: the method is in a generic type, or in a type nested in one.
-- `it does not take exactly one argument`: the method has no argument, or more than one.
-- `its argument is ref, out, in, params or optional`: the argument has one of those modifiers, or a default value.
-- `it returns nothing`: the method returns `void`, `Task` or `ValueTask`, or `Task<T>` or `ValueTask<T>`.  A converter returns its result itself.
-- `its return type is annotated as nullable`: the method returns a type written with `?`, as `string?` or `int?`.  A converter's result is never null.  Its argument may be written with `?`, as `Email?` or `UserId?`: it converts the type without the `?`, and is never given null.
-- `this project cannot call it`: the method is `private`, `protected` or `private protected` (a `protected internal` method can be called), it is in a type that the project cannot reach, or it is in a `file` type, which code in another file of the project cannot name.
-- `it is marked [Obsolete] as an error`: the method, or a type it is in, has `[Obsolete]` with `true` as its second argument, so that no call of it compiles.  A method marked `[Obsolete]` as a warning is a converter.
+The message names the method and the first of these that is wrong with it:
+
+- **`it is a local function`.**  The method is declared inside another method.  Only a method declared in a type is a converter, and the attribute on a lambda is ignored.
+- **`it is an operator`.**  The method is an operator, as `operator +`, or a conversion, as `implicit operator Email(string value)`, which the generated code cannot call by name.  Mark a static method that does the conversion instead.  The operator can call it.
+- **`it is not static`.**  The method is an instance method.
+- **`it is abstract or virtual`.**  The method is a `static abstract` or `static virtual` member of an interface, which a call through the interface cannot reach.
+- **`it is generic`.**  The method has type parameters of its own.
+- **`it is in an extension block`.**  The method is declared inside an `extension` block, through which the generated code cannot call it.  Declare it in a class or a struct, as a member of the type it converts or of a static class.
+- **`it is in a generic type`.**  The method is in a generic type, or in a type nested in one.
+- **`it does not take exactly one argument`.**  The method has no argument, or more than one.
+- **`its argument is ref, out, in, params or optional`.**  The argument has one of those modifiers, or a default value.
+- **`it returns nothing`.**  The method returns `void`, `Task` or `ValueTask`, or `Task<T>` or `ValueTask<T>`.  A converter returns its result itself.
+- **`its return type is annotated as nullable`.**  The method returns a type written with `?`, as `string?` or `int?`.  The result of a converter is never null.  Its argument can be written with `?`, as `Email?` or `UserId?`: it then converts the type without the `?`, and is never given null.
+- **`this project cannot call it`.**  The method is `private`, `protected` or `private protected`, it is in a type that the project cannot reach, or it is in a `file` type.  A `protected internal` method can be called.  Code in another file of the project cannot name a `file` type.
+- **`it is marked [Obsolete] as an error`.**  The method, or a type it is in, has `[Obsolete]` with `true` as its second argument, so no call of it compiles.  A method marked `[Obsolete]` as a warning is a converter.
 
 ```console
 /work/App/Email.cs(5,18): error SQLSRC277: The method 'App.Email.FromDatabase(string)' is marked [SqlSourceConverter], but it is not static.  A converter is a static method of one argument that returns the converted value.
 ```
 
-Change the method so that it is a converter, or remove its `[SqlSourceConverter]` when it is not meant to be one.  The error is reported at the method's name, at an operator's symbol, or at the type that a conversion converts to.
+**Fix:** do one of these.
 
-A converter declared in a referenced assembly, on a type that a type override, a column type or a `-- param:` marker names, is reported at the name of each query whose output is `methods` or `repository` and whose method would convert through it, since the project cannot change the method.  That query gets no method until the library is fixed, or until the project declares a converter of its own between the same two types, which is used instead of the library's.  The library's own build reports the error at the method, since the method is in the library's code.  A library's converter is used only when the project can call it: when it is `public`, or `internal` in a library that gives the project its internals with `InternalsVisibleTo`.
+- Change the method so that it is a converter.
+- If the method is not meant to be a converter, remove its `[SqlSourceConverter]`.
+
+The build reports the error at the name of the method.  For an operator, it is at the symbol of the operator.  For a conversion, it is at the type that the conversion converts to.
+
+- **A converter in a referenced assembly is reported at each query that would convert through it.**  That is a converter on a type that a type override, a column type or a `-- param:` marker names.  The project cannot change the method.  So the build reports the error at the name of each query whose output is `repository` or `methods` and whose method would convert through it.
+- **That query gets no method until the library is fixed.**  It also gets its method once the project declares a converter of its own between the same two types.  The converter of the project is used instead of the converter of the library.
+- **The build of the library reports the error at the method.**  The method is in the code of the library.
+- **The converter of a library is used only when the project can call it.**  That is when it is `public`, or `internal` in a library that gives the project its internals with `InternalsVisibleTo`.
 
 See: [Converters](reference/converters.md#converters)
 
@@ -4367,15 +4528,24 @@ Reported by: the build.
 
 A method of the project's own code gets this error whether or not a query uses it.  The output of the project, its types and its files do not change this.  A query that gets the error for a converter of a referenced assembly keeps its models.
 
-Two methods of the project marked `[SqlSourceConverter]` take the same type and return the same type, so either could convert between the two.  The message names both methods and the two types.
+Two methods of the project marked `[SqlSourceConverter]` take the same type and return the same type, so either could convert between the two types.  The message names both methods and the two types.
 
 ```console
 /work/App/Conversions.cs(8,25): error SQLSRC278: The converters 'App.Conversions.ToEmail(string)' and 'App.Email.FromDatabase(string)' both convert 'string' to 'App.Email'.  Keep one.
 ```
 
-Remove `[SqlSourceConverter]` from one of them, or remove the method.  The error is reported at the name of each of the methods.  Two converters of opposite directions, one from `string` to `Email` and one from `Email` to `string`, are a pair and not this error, and a converter of a type to itself, as `DateTime` to `DateTime`, is one converter.  A method that has [SQLSRC277](#sqlsrc277) is not counted until it is fixed.  An argument written with `?` takes the type without it, since a converter is never given null, so `ToDatabase(Email? email)` and `ToDatabase(Email email)` both convert `Email` to `string`, and are this error together.
+**Fix:** do one of these.
 
-Two such converters declared in referenced assemblies, on the types that a type override, a column type or a `-- param:` marker names, are reported at the name of each query whose output is `methods` or `repository` and whose method would convert through one of them, and that query gets no method.  Declare a converter of your own between the same two types, which is used instead of both.
+- Remove `[SqlSourceConverter]` from one of the two methods.
+- Remove one of the methods.
+
+The build reports the error at the name of each of the methods.
+
+- **Two converters of opposite directions are a pair, and not this error.**  One from `string` to `Email` and one from `Email` to `string` are such a pair.
+- **A converter of a type to itself, as `DateTime` to `DateTime`, is one converter.**
+- **A method that has [SQLSRC277](#sqlsrc277) is not counted until it is fixed.**
+- **An argument written with `?` takes the type without it, since a converter is never given null.**  So `ToDatabase(Email? email)` and `ToDatabase(Email email)` both convert `Email` to `string`, and are this error together.
+- **Two such converters in referenced assemblies are reported at each query that would convert through one of them.**  They are converters on the types that a type override, a column type or a `-- param:` marker names.  The build reports the error at the name of each query that would convert through one of them, if its output is `repository` or `methods`.  That query gets no method.  Declare a converter of your own between the same two types, which is used instead of both.
 
 See: [Converters](reference/converters.md#converters)
 
@@ -4385,21 +4555,35 @@ See: [Converters](reference/converters.md#converters)
 
 Reported by: the build.
 
-A type override, a column type or a `-- param:` marker gives a column or a parameter of a query whose output is `methods` or `repository` a C# type that the database's driver never reads, such as your own `Email` or `UserId`, and the project has converters of that type, but none between it and the C# type that the driver reads the column's database type as.  So no converter can read the column or send the parameter.  A converter of an `int` never reads a `bigint` column, which the driver reads as a `long`: SqlSource never narrows or widens a value.  The message names the column or parameter, its type, the types its converters convert from and to, the type the driver reads, and the database type.
+A type override, a column type or a `-- param:` marker gives a column or a parameter a C# type that the driver never reads.  Your own `Email` or `UserId` is such a type.  The query has the output `repository` or `methods`.  The project has converters of that type.  But none of them is between it and the C# type that the driver reads the database type of the column as.
+
+The message names the column or parameter, its type, and the types that its converters convert from and to.  It also names the type that the driver reads, and the database type.
+
+So no converter can read the column or send the parameter.  SqlSource never narrows or widens a value: a converter of an `int` never reads a `bigint` column, which the driver reads as a `long`.  The build reports the error at the name of the query.  The query gets no method until it is fixed, and its models are still generated.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'id' has type 'App.UserId', whose converters convert from and to 'int', and not from and to 'long', the type the database type 'int8' is read as.  Add a converter between 'App.UserId' and 'long'.
 ```
 
-Add a converter between the column's or parameter's type and the type the message names, in each direction the queries need: from it for a column, to it for a parameter.  Or change the converters you have to take and return that type, or map the column to another type.  The type the driver reads is the one it reads the database type as with no type override, a domain as its base type, so a converter of `MyApp.Email` over a domain of `text` converts from and to `string`.
-
-The error has a second form, when the column's or parameter's database type has no C# type that the driver reads it as, such as a composite type, `regclass` or a range of a subtype SqlSource does not know: such a type has nothing to convert from.
+The error has a second form, when the database type of the column or parameter has no C# type that the driver reads it as.  A composite type, `regclass` or a range of a subtype that SqlSource does not know is such a type.  It has nothing to convert from.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'address' has type 'App.Address', which has converters, but the database type 'public.address' has no C# type to convert from.  Choose a C# type without converters for it, or remove the converters of 'App.Address'.
 ```
 
-For an array whose element type a type override, a column type or a `-- param:` marker chose, such as `email[]` under `"public.email": "App.Email"` or `posts.tag_ids` under `"posts.tag_ids": "TagId[]"`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  On SQL Server, the query methods of a project that references NodaTime convert NodaTime's types themselves, so a NodaTime type given to a database type that it is not converted from, as `datetimeoffset=NodaTime.LocalDateTime`, is this error too, and the message names the type it is converted from and to: see [NodaTime on SQL Server](reference/databases/sqlserver/libraries.md#nodatime).  So are System.Text.Json's types, on SQL Server and, for `JsonNode`, `JsonObject` and `JsonArray`, on Npgsql 8 and 9, which the query methods convert from and to a `string`: one given to a database type that is not read as a `string`, as `int=System.Text.Json.JsonElement` on SQL Server, is this error, for a column and a parameter alike, and the message says that its converters convert from and to `string`, not `int`: see JSON on [SQL Server](reference/databases/sqlserver/libraries.md#json) and [PostgreSQL](reference/databases/postgresql/libraries.md#json).  A class of yours in a column that holds JSON whose converters are all of other types than `string` is this error too, and is not read through System.Text.Json's serializer: see [a class in a JSON column](reference/library-types-and-json.md#json-class).  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
+**Fix:** do one of these.
+
+- Add a converter between the type of the column or parameter and the type that the message names.  Add one in each direction that the queries need: from it for a column, to it for a parameter.
+- Change the converters that you have to take and return that type.
+- Map the column to another type.
+
+The type that the driver reads is the one that it reads the database type as with no type override.  It reads a domain as its base type.  So a converter of `MyApp.Email` over a domain of `text` converts from and to `string`.
+
+- **For an array whose element type was chosen, the converters of the element are used, element by element.**  A type override, a column type or a `-- param:` marker chooses it, as `email[]` under `"public.email": "App.Email"` or `posts.tag_ids` under `"posts.tag_ids": "TagId[]"`.  The message, in either form, names the element of the column or parameter and the type of the element.
+- **A type that the driver reads for some database type is never this error.**  `string`, `DateTimeOffset` and `DateOnly` are such types.  So a converter between such a type and another type does not touch the columns that are read as it.
+- **On SQL Server, the query methods of a project that references NodaTime convert the types of NodaTime themselves.**  So a NodaTime type given to a database type that it is not converted from is this error too, as `datetimeoffset=NodaTime.LocalDateTime`.  The message names the type that it is converted from and to.  See [NodaTime on SQL Server](reference/databases/sqlserver/libraries.md#nodatime).
+- **The types of System.Text.Json are this error in the same way.**  The query methods convert them from and to a `string`: on SQL Server, and on Npgsql 8 and 9 for `JsonNode`, `JsonObject` and `JsonArray`.  Such a type is this error when it is given to a database type that is not read as a `string`.  `int=System.Text.Json.JsonElement` on SQL Server is one such case.  That holds for a column and a parameter alike.  The message says that its converters convert from and to `string`, not `int`.  See JSON on [SQL Server](reference/databases/sqlserver/libraries.md#json) and [PostgreSQL](reference/databases/postgresql/libraries.md#json).
+- **A class of yours in a column that holds JSON, whose converters are all of other types than `string`, is this error too.**  It is not read through the serializer of System.Text.Json.  See [a class in a JSON column](reference/library-types-and-json.md#json-class).
 
 See: [Converters](reference/converters.md#converters)
 
@@ -4409,13 +4593,22 @@ See: [Converters](reference/converters.md#converters)
 
 Reported by: the build.
 
-A type override, a column type or a `-- param:` marker gives a column or a parameter of a query whose output is `methods` or `repository` a C# type, and the project has a converter between that type and the C# type that the driver reads the column's database type as, but only in the other direction.  A column needs a converter from the type the driver reads, and a parameter one to it.  The message names the column or parameter, its type, the converter it has, and the method it needs.
+A type override, a column type or a `-- param:` marker gives a column or a parameter a C# type.  The query has the output `repository` or `methods`.  The project has a converter between that type and the C# type that the driver reads the database type as.  But the converter is only in the other direction.  The message names the column or parameter, its type, the converter that it has, and the method that it needs.
+
+A column needs a converter from the type that the driver reads, and a parameter needs one to it.  The build reports the error at the name of the query.  The query gets no method until it is fixed, and its models are still generated.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC280: The column 'email' has type 'App.Email', which has a converter to 'string' but none from it, which a column needs.  Add a static method marked [SqlSourceConverter] that takes 'string' and returns 'App.Email'.
 ```
 
-Add the converter that the message names, a static method marked `[SqlSourceConverter]` that takes the one type and returns the other, on the type itself or in a class of the project.  A method that takes a type and returns the same type serves both directions.  For an array whose elements are converted one by one, the message names the element of the column or parameter, and the converter to add is of the element's type.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
+**Fix:**
+
+1. Add the converter that the message names, on the type itself or in a class of the project.
+
+The converter is a static method marked `[SqlSourceConverter]` that takes the one type and returns the other.
+
+- **A method that takes a type and returns the same type serves both directions.**
+- **For an array whose elements are converted one by one, the message names the element of the column or parameter.**  The converter to add is of the type of the element.
 
 See: [Converters](reference/converters.md#converters)
 
@@ -4425,13 +4618,27 @@ See: [Converters](reference/converters.md#converters)
 
 Reported by: the build.
 
-The `libraryTypes` of a settings file, or a `-- library-types:` marker, turns a library on, such as NodaTime, for queries whose output is `methods` or `repository`, and the project does not reference what the library needs on the database of those queries.  On PostgreSQL that is the library's plugin for Npgsql, which brings the library and lets Npgsql read and send its types: `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`.  On SQL Server it is `NodaTime`, or for NetTopologySuite `NetTopologySuite.IO.SqlServerBytes`, with NetTopologySuite 2.5.0 or later referenced by name: `NetTopologySuite.IO.SqlServerBytes` alone brings NetTopologySuite 2.0.0, which is [SQLSRC282](#sqlsrc282).  System.Text.Json, which `json` turns on, is in every .NET project.  The message names the library, the database and the package that is missing.
+The `libraryTypes` of a settings file, or a `-- library-types:` marker, turns a library on, such as NodaTime, for queries whose output is `repository` or `methods`.  The project does not reference what the library needs on the database of those queries.  The message names the library, the database and the package that is missing.
+
+What the library needs:
+
+- **On PostgreSQL, it is the plugin of the library for Npgsql: `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`.**  The plugin brings the library, and lets Npgsql read and send its types.
+- **On SQL Server, it is `NodaTime`, or for NetTopologySuite, `NetTopologySuite.IO.SqlServerBytes` with NetTopologySuite 2.5.0 or later referenced by name.**  `NetTopologySuite.IO.SqlServerBytes` alone brings NetTopologySuite 2.0.0, which is [SQLSRC282](#sqlsrc282).
+- **System.Text.Json, which `json` turns on, is in every .NET project.**
 
 ```console
 /work/App/sqlsource.json(5,5): error SQLSRC281: NodaTime is on for the PostgreSQL query methods it reaches here, but the project does not reference Npgsql.NodaTime.  Reference Npgsql.NodaTime, or turn NodaTime off for these queries.
 ```
 
-Reference the package the message names from the project.  Or, where the error points, set the library to `off`, or remove the entry, for those queries: a library that nothing turns on is on only where the project references what it needs.  The error is reported at the entry that says `on`, the member of the settings file or the line of the marker, once for each database whose `methods` or `repository` queries it reaches, however many queries, files and types those are.  A query whose output is `models` or `sql` is not reported.  The queries keep their methods and their models, with the C# types they have while the library is off.
+**Fix:** do one of these.
+
+- Reference the package that the message names from the project.
+- Where the error points, set the library to `off` for those queries, or remove the entry.  A library that nothing turns on is on only where the project references what it needs.
+
+The build reports the error at the entry that says `on`: the member of the settings file, or the line of the marker.  It reports it once for each database whose `repository` or `methods` queries the entry reaches, however many queries, files and types those are.
+
+- **A query whose output is `models` or `sql` is not reported.**
+- **The queries keep their methods and their models.**  They have the C# types that they have while the library is off.
 
 See: [Library types](reference/library-types-and-json.md#setting-library-types)
 
@@ -4441,13 +4648,29 @@ See: [Library types](reference/library-types-and-json.md#setting-library-types)
 
 Reported by: the build.
 
-The project references a version of a library older than SqlSource supports, and a query whose output is `methods` or `repository` uses the library: a column or parameter of the query has one of the library's types, which the [library types](reference/library-types-and-json.md#setting-library-types) give it or which SqlSource converts for it.  SqlSource needs NodaTime 3.1.9 or later, NetTopologySuite 2.5.0 or later, and for a query of SQL Server that uses NetTopologySuite, `NetTopologySuite.IO.SqlServerBytes` 2.1.0 or later.  `NetTopologySuite.IO.SqlServerBytes` 2.1.0 alone brings NetTopologySuite 2.0.0, so a SQL Server project references NetTopologySuite by name too.  The message names the package, the version the project references and the oldest that SqlSource supports.
+The project references a version of a library older than SqlSource supports.  A query whose output is `repository` or `methods` uses the library.  That is, a column or parameter of the query has one of the types of the library.  The [library types](reference/library-types-and-json.md#setting-library-types) give it that type, or SqlSource converts the type for it.  The message names the package, the version that the project references and the oldest that SqlSource supports.
+
+SqlSource needs these versions:
+
+- NodaTime 3.1.9 or later;
+- NetTopologySuite 2.5.0 or later;
+- for a query of SQL Server that uses NetTopologySuite, `NetTopologySuite.IO.SqlServerBytes` 2.1.0 or later.
+
+`NetTopologySuite.IO.SqlServerBytes` 2.1.0 alone brings NetTopologySuite 2.0.0, so a SQL Server project references NetTopologySuite by name too.
+
+Until the package is updated, a query that uses the library gets no method.  Its models are still generated, with the types of the library.  The queries that do not use the library keep their methods.
 
 ```console
 CSC : error SQLSRC282: This project references NodaTime 3.1.8, and SqlSource needs NodaTime 3.1.9 or later for the query methods that use it, so they are not generated.  Update the package.
 ```
 
-Until the package is updated, a query that uses the library gets no method; its models are still generated, with the library's types.  Any other error about its method is reported beside this one: fix it too, or the query still has no method once the package is updated.  The queries that do not use the library keep their methods.  Update the package to the version the message gives or later.  When another package brings the older version, reference the library's package from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project and package, however many queries and databases use the library, and never for a query whose output is `models` or `sql`.
+**Fix:**
+
+1. Update the package to the version that the message gives, or later.
+2. If another package brings the older version, reference the package of the library from the project itself.  Use the version you want.
+3. Fix each other error about the method that the build reports beside this one.  Otherwise the query still has no method once the package is updated.
+
+- **The error has no file and line, because it is about the references of the project.**  The build reports it once for the project and package, however many queries and databases use the library.  It never reports it for a query whose output is `models` or `sql`.
 
 See: [Library types](reference/library-types-and-json.md#setting-library-types)
 
@@ -4459,13 +4682,26 @@ Reported by: the build.
 
 The query gets this error once for each column and parameter whose C# type has the word `json` where the opt-in does not apply.
 
-A column type, a `-- column:` marker or a `-- param:` marker gives a column or a parameter of a query whose output is `methods` or `repository` a C# type with the word `json` before it, `"json": true` in a settings file or `-> json OrderMetadata` in a marker, and the opt-in cannot read and send that column or parameter as JSON.  The opt-in says that a column of a string type, such as `text` or `nvarchar(max)`, holds JSON, so that your own class is read and sent through System.Text.Json's serializer, as a `json` or `jsonb` column of it is.  It does not apply to a column or parameter of any other database type, such as `int` or `text[]`, or with a C# type that is not a class of your own: a type of System.Text.Json, such as `JsonElement`, or a type that the database's driver reads, such as `string` or `long`.  On an array of a JSON type, such as `jsonb[]`, each element is read and sent on its own, so the opt-in takes an array of your class, `OrderMetadata[]`, and not an array of a type of System.Text.Json or of a type the driver reads, such as `JsonElement[]` or `string[]`; the message then names the element.  The message names the column or parameter, its C# type, the place that chose it, as [SQLSRC250](#sqlsrc250) does, and the reason.
+A column type, a `-- column:` marker or a `-- param:` marker gives a column or a parameter a C# type with the word `json` before it.  That is `"json": true` in a settings file, or `-> json OrderMetadata` in a marker.  The query has the output `repository` or `methods`, and the opt-in cannot read and send that column or parameter as JSON.  The message names the column or parameter, its C# type, the place that chose it, as [SQLSRC250](#sqlsrc250) does, and the reason.
+
+The opt-in says that a column of a string type, such as `text` or `nvarchar(max)`, holds JSON.  Your own class is then read and sent through the serializer of System.Text.Json, as it is for a `json` or `jsonb` column.  The opt-in does not apply in these cases:
+
+- **A column or parameter of any other database type, such as `int` or `text[]`.**
+- **A C# type that is not a class of your own.**  A type of System.Text.Json, such as `JsonElement`, is one.  A type that the driver of the database reads, such as `string` or `long`, is another.
+- **On an array of a JSON type, an array of a type of System.Text.Json or of a type that the driver reads.**  `JsonElement[]` and `string[]` are such arrays.  On an array of a JSON type, such as `jsonb[]`, each element is read and sent on its own.  So the opt-in takes an array of your class, `OrderMetadata[]`.  The message then names the element.
+
+The build reports the error at the name of the query.  The query gets no method until it is fixed, and its models are still generated.
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC283: The column 'id' is mapped to json 'App.OrderMetadata' in a -- column: marker of the query, but the database type 'int4' is read as 'int', not as a string.  Remove json, or use it only to map a column or parameter of a string or JSON type to a class of this project.
 ```
 
-Remove the word `json` from the place the message names, or `"json": true` from the column type, to map the column or parameter as any other type is mapped.  Or move the opt-in to the column or parameter that holds JSON, and give it your class: a `string` column of a database that has no JSON type, or a `json` or `jsonb` column, on which the opt-in is allowed and changes nothing.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A query whose output is `models` is not reported.
+**Fix:** do one of these.
+
+- Remove the word `json` from the place that the message names, or `"json": true` from the column type.  The column or parameter is then mapped as any other type is mapped.
+- Move the opt-in to the column or parameter that holds JSON, and give it your class.  The opt-in fits a `string` column of a database that has no JSON type.  It also fits a `json` or `jsonb` column, on which the opt-in is allowed and changes nothing.
+
+**A query whose output is `models` is not reported.**
 
 See: [The JSON opt-in](reference/library-types-and-json.md#json-opt-in), [a class in a JSON column](reference/library-types-and-json.md#json-class)
 
@@ -4475,15 +4711,25 @@ See: [The JSON opt-in](reference/library-types-and-json.md#json-opt-in), [a clas
 
 Reported by: the build.
 
-The warning is at the query's name, under the output `models`, `methods` or `repository`.  A query gets it once for each column and parameter whose C# type has such a short name.
+The warning is at the query's name, under the output `repository`, `methods` or `models`.  A query gets it once for each column and parameter whose C# type has such a short name.
 
-A C# type that you chose, by the type override, the column types or a `-- param:` or `-- column:` marker, is a short name, of one part, or has one in its type arguments, and the one type of that name that the project can see is of an assembly that the project has only through a package that it does not reference itself, one that another package, or a project that it references, brings.  That may not be the type you meant.  A package can bring a type of a common name, such as `AccountId`, that has nothing to do with yours, and an update of the package can stop bringing it, or bring another of the name.  The type is used all the same.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250) does, then the short name, the full name of the type it finds and that type's assembly.
+A C# type that you chose is a short name, of one part, or has one in its type arguments.  You chose it by the type override, the column types, or a `-- param:` or `-- column:` marker.  The project can see one type of that name.  That type is of an assembly that the project has only through a package that it does not reference itself.  Another package, or a project that it references, brings that package.
+
+The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250) does.  Then it names the short name, the full name of the type that it finds, and the assembly of that type.
+
+That may not be the type you meant.  A package can bring a type of a common name, such as `AccountId`, that has nothing to do with yours.  An update of the package can stop bringing it, or bring another of the name.  The type is used all the same.
 
 ```console
 /work/App/Queries/Users.sql(1,10): warning SQLSRC284: 'int8' is mapped to 'AccountId' for column 'id', in the typeOverrides of the settings file /work/App/sqlsource.json, and the short name 'AccountId' finds 'Brought.Client.AccountId', of the assembly Brought.Client, which this project has only through a package that it does not reference itself.  If that is the type meant, write its full name, 'Brought.Client.AccountId'; otherwise correct the name.
 ```
 
-If that is the type you meant, write its full name, from its namespace, as the message gives it: `Brought.Client.AccountId`.  You may also reference that assembly's own package from the project, which turns the warning off whatever brought it.  If you meant another type, correct the name: write the full name, from its namespace, of the type you meant.  The query's models are generated, and under the output `methods` or `repository` its method, whether or not the warning is fixed.
+**Fix:** do one of these.
+
+- If that is the type you meant, write its full name, from its namespace, as the message gives it: `Brought.Client.AccountId`.
+- If that is the type you meant, you can also reference that assembly's own package from the project.  That turns the warning off, whatever brought it.
+- If you meant another type, correct the name.  Write the full name of the type you meant, from its namespace.
+
+Until the warning is fixed, the query uses the type that the short name finds.  Whether or not the warning is fixed, the models of the query are generated, and under the output `repository` or `methods` its method.
 
 This is a warning, so that a build goes on when an update of a package brings a new type of a name you use.  A project can list it in `NoWarn` to turn it off, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
 
@@ -4508,14 +4754,20 @@ See: [Type overrides](reference/type-mapping.md#setting-type-overrides), [column
 
 Reported by: the tool.
 
-`sqlsource describe` reads the run's `.env` file for its connections, and the file cannot be read: the system would not open or read it.  The message names the file and ends with the reason the system gave.  The run goes on as if the file gave no connection at all, so the databases that needed a connection from it report [SQLSRC213](#sqlsrc213), unless another source gives one.
+`sqlsource describe` reads the `.env` file of the run for its connections, and the file cannot be read: the system would not open or read it.  The message names the file and ends with the reason that the system gave.
+
+The run goes on as if the file gave no connection at all.  So the tool reports [SQLSRC213](#sqlsrc213) for each database that needed a connection from the file, unless another source gives one.
 
 ```console
 $ dotnet sqlsource describe /work/App
 /work/App/.env : error SQLSRC285: '/work/App/.env' cannot be read: Access to the path '/work/App/.env' is denied.
 ```
 
-Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment, with `--env-file none`, or in a build [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file) `none`, so that the run reads no file.
+**Fix:** do one of these.
+
+- Give yourself the right to read the file.
+- Remove the file.
+- Give the connections another way, with `--connection` or in the variables of the environment.  Then make the run read no file, with `--env-file none`, or in a build with [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file) `none`.
 
 See: [A `.env` file](reference/connections.md#env-file)
 
@@ -4525,22 +4777,32 @@ See: [A `.env` file](reference/connections.md#env-file)
 
 Reported by: the tool.
 
-A line of the `.env` file sets a connection variable, `SQLSOURCE_CONNECTION` or one that starts with `SQLSOURCE_CONNECTION_`, and the tool cannot tell what it sets.  The error is at the line and the column of the variable's name, and says which variable and why.  The value is never printed, since it is a connection and holds credentials.  A line that sets any other variable is not read by the tool, and is never an error.  The run goes on as if the file gave no connection at all, even from its good lines, since a file that is partly wrong is not one to trust.
+A line of the `.env` file sets a connection variable, `SQLSOURCE_CONNECTION` or one that starts with `SQLSOURCE_CONNECTION_`, and the tool cannot tell what it sets.  The error is at the line and the column of the name of the variable.  The message says which variable and why.
+
+The value is never printed, since it is a connection and holds credentials.
+
+The run goes on as if the file gave no connection at all, even from its good lines.  A file that is partly wrong is not one to trust.
 
 The reason is one of six:
 
-- `it has no '='`: the line is the variable's name and nothing else.
-- `the key is not a valid name`: the text before the `=` starts with `SQLSOURCE_CONNECTION` but is not a name of letters, digits and `_` that does not start with a digit, such as `SQLSOURCE_CONNECTION-A`.  A letter or a digit is one of any script, since the variable of a database called `données` is `SQLSOURCE_CONNECTION_DONNÉES`.
-- `a quote is not closed`: the value starts with `'` or `"` and the line ends before the matching quote.
-- `text follows the closing quote`: after the closing quote there is something other than white space or a `#` comment.
-- `a backslash starts no escape that .env takes`: a value in double quotes holds a `\` before a character other than `\`, `"`, `n`, `r` or `t`.  Write a literal backslash as `\\`, or put the value in single quotes, which take every character as it is.
-- `it is not saved as UTF-8`: the variable's name or value holds a `�`, which is what the tool reads for each byte of the file that is not UTF-8, as for the `ä` of a password in a file saved as Windows-1252 or Latin-1.  Only the lines of connection variables are checked, so the rest of the file may be saved as it is.  A value that really holds `�` cannot be given in a `.env` file; give it with `--connection`.
+- **`it has no '='`.**  The line is the name of the variable and nothing else.
+- **`the key is not a valid name`.**  The text before the `=` starts with `SQLSOURCE_CONNECTION` but is not a name of letters, digits and `_` that does not start with a digit.  `SQLSOURCE_CONNECTION-A` is such a text.  A letter or a digit is one of any script, since the variable of a database called `données` is `SQLSOURCE_CONNECTION_DONNÉES`.
+- **`a quote is not closed`.**  The value starts with `'` or `"`, and the line ends before the matching quote.
+- **`text follows the closing quote`.**  After the closing quote there is something other than white space or a `#` comment.
+- **`a backslash starts no escape that .env takes`.**  A value in double quotes holds a `\` before a character other than `\`, `"`, `n`, `r` or `t`.  Write a literal backslash as `\\`, or put the value in single quotes, which take every character as it is.
+- **`it is not saved as UTF-8`.**  The name or the value of the variable holds a `�`.  The tool reads a `�` for each byte of the file that is not UTF-8.  An `ä` of a password in a file saved as Windows-1252 or Latin-1 is such a byte.  Only the lines of connection variables are checked, so the rest of the file can stay as it is saved.  A value that really holds `�` cannot be given in a `.env` file; give it with `--connection`.
 
 ```console
 /work/.env(2,1): error SQLSRC286: The line that sets 'SQLSOURCE_CONNECTION_BILLING' cannot be read: a quote is not closed
 ```
 
-Fix the line named; for `it is not saved as UTF-8`, save the file as UTF-8 with the "Save with encoding" command of your editor.  A connection string that holds a `#`, a quote or a backslash is safest in single quotes, as `SQLSOURCE_CONNECTION_BILLING='Host=db;Password=a#b'`.
+**Fix:**
+
+1. Fix the line that the message names.
+2. For `it is not saved as UTF-8`, save the file as UTF-8 with the "Save with encoding" command of your editor.
+
+- **A line that sets any other variable is not read by the tool, and is never an error.**
+- **A connection string that holds a `#`, a quote or a backslash is safest in single quotes.**  `SQLSOURCE_CONNECTION_BILLING='Host=db;Password=a#b'` is one.
 
 See: [A `.env` file](reference/connections.md#env-file)
 
@@ -4550,9 +4812,11 @@ See: [A `.env` file](reference/connections.md#env-file)
 
 Reported by: the tool.
 
-`sqlsource describe --watch` asks the system to tell it when a file changes, and the system refused to watch a folder or failed while it did.  The message names the folder and ends with the reason the system gave.  The watch goes on, and describes again, reading your projects again, since the folder may have changed unseen.  Each time it reads your projects again it tries the folder again, so a file you save there may not be described until it can watch the folder.  An error that repeats with the same folder and the same reason is written once in a watch.
+`sqlsource describe --watch` asks the system to tell it when a file changes.  The system refused to watch a folder, or failed while it watched one.  The message names the folder and ends with the reason that the system gave.
 
-The usual cause is one of the two limits that Linux puts on watching files, of `inotify instances` and of `inotify watches`, which a machine with many projects, or with other tools that watch folders, such as editors, can reach.
+The usual cause is one of the two limits that Linux puts on watching files, of `inotify instances` and of `inotify watches`.  A machine with many projects can reach them, as can one with other tools that watch folders, such as editors.
+
+The watch goes on.  It describes again, and reads your projects again, since the folder may have changed unseen.  Each time it reads your projects again, it tries the folder again.  So a file that you save there may not be described until the watch can watch the folder.  An error that repeats with the same folder and the same reason is written once in a watch.
 
 ```console
 $ dotnet sqlsource describe /work/App --watch
@@ -4560,9 +4824,19 @@ $ dotnet sqlsource describe /work/App --watch
     help: set DOTNET_USE_POLLING_FILE_WATCHER=true to poll for changes instead
 ```
 
-On Linux, raise the limit that the message names.  For a message about `inotify instances`, as above, raise `fs.inotify.max_user_instances`, with `sudo sysctl fs.inotify.max_user_instances=1024`, and add `fs.inotify.max_user_instances=1024` to `/etc/sysctl.conf` to keep it.  For one about `inotify watches`, such as `The configured user limit (65536) on the number of inotify watches has been reached, or the operating system failed to allocate a required resource.`, raise `fs.inotify.max_user_watches` the same way, to `524288`.  Or set the environment variable `DOTNET_USE_POLLING_FILE_WATCHER` to `true` or `1` before you start the watch: it then looks at the folders at a fixed interval instead of asking the system, which needs no limit and finds a change within a second or two.  Polling is also the way to watch a folder on a network share or in a container that does not pass on file changes.
+**Fix:** do one of these.
 
-A watch that polls, with `DOTNET_USE_POLLING_FILE_WATCHER` set, reports this error when it cannot list a folder, such as one that you may not read, or one that was deleted where the watch was not also looking at the folder that held it, such as your repository's own folder, and then gives no help line.  It says so once while the folder stays that way, and sees the folder's changes again as soon as it can list it.
+- On Linux, raise the limit that the message names.  For a message about `inotify instances`, as above, raise `fs.inotify.max_user_instances`:
+  1. Run `sudo sysctl fs.inotify.max_user_instances=1024`.
+  2. Add `fs.inotify.max_user_instances=1024` to `/etc/sysctl.conf` to keep it.
+
+  For a message about `inotify watches`, such as `The configured user limit (65536) on the number of inotify watches has been reached, or the operating system failed to allocate a required resource.`, raise `fs.inotify.max_user_watches` the same way, to `524288`.
+- Set the environment variable `DOTNET_USE_POLLING_FILE_WATCHER` to `true` or `1` before you start the watch.  The watch then looks at the folders at a fixed interval instead of asking the system.  That needs no limit, and finds a change within a second or two.
+
+**Polling is also the way to watch a folder on a network share, or in a container that does not pass on file changes.**
+
+- **A watch that polls, with `DOTNET_USE_POLLING_FILE_WATCHER` set, reports this error when it cannot list a folder.**  A folder that you may not read is one such folder.  A folder that was deleted is another, when the watch was not also looking at the folder that held it.  The folder of your repository itself is such a folder, since no watch looks at the folder above it.
+- **The error of a watch that polls has no help line.**  The watch reports it once while the folder stays that way.  It sees the changes of the folder again as soon as it can list it.
 
 See: [Describe on save](reference/describing.md#describe-on-save)
 
@@ -4572,14 +4846,27 @@ See: [Describe on save](reference/describing.md#describe-on-save)
 
 Reported by: the tool.
 
-A bundle is a zip file, or an unzipped folder, that someone made of one query for a bug report, and `sqlsource replay <bundle>` runs that query from it without a database.  This error means the path you gave is not a bundle the tool can read.  The message ends with the reason: the path does not exist, it is not a zip file or a folder of a bundle, a file that every bundle holds is missing, or a file of it is damaged.
+`sqlsource replay <bundle>` runs a query from a bundle, without a database.  The path that you gave is not a bundle that the tool can read.  The message ends with the reason, one of these:
+
+- the path does not exist;
+- it is not a zip file or a folder of a bundle;
+- a file that every bundle holds is missing;
+- a file of it is damaged.
+
+A bundle is a zip file, or an unzipped folder, that someone made of one query for a bug report.
 
 ```console
 $ dotnet sqlsource replay /work/report.zip
 /work/report.zip : error SQLSRC288: The bundle cannot be read: there is no query.sql at the root of the zip
 ```
 
-Check the path first, and that the zip file was not cut short by the download or the mail that carried it.  If the path is right, ask the person who made the bundle for it again; a bundle that was edited by hand, or unzipped and zipped again with a file left out, is read the same way as a damaged one.
+**Fix:**
+
+1. Check the path first.
+2. Check that the download or the mail that carried the zip file did not cut it short.
+3. If the path is right, ask the person who made the bundle for it again.
+
+- **A bundle that was edited by hand is read the same way as a damaged one.**  So is a bundle that was unzipped and zipped again with a file left out.
 
 See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
@@ -4589,14 +4876,17 @@ See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
 Reported by: the tool.
 
-The bundle was made by a newer version of `sqlsource` than the one you run, in a form that this version does not know.  The message names the member that is newer, `bundleVersion` or `captureVersion`, or `formatVersion`, the sidecar format that the bundle's answer is written in, then the number the bundle has and the number this version reads.
+A newer version of `sqlsource` than the one you run made the bundle, in a form that this version does not know.  The message names the member that is newer: `bundleVersion` or `captureVersion`, or `formatVersion`, the sidecar format that the answer of the bundle is written in.  Then it names the number that the bundle has and the number that this version reads.
 
 ```console
 $ dotnet sqlsource replay /work/report.zip
 /work/report.zip : error SQLSRC289: The bundle's bundleVersion is 2, and this version of sqlsource reads 1
 ```
 
-Update the `sqlsource` tool to the latest version, and replay the bundle again.
+**Fix:**
+
+1. Update the `sqlsource` tool to the latest version.
+2. Replay the bundle again.
 
 See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
@@ -4606,14 +4896,27 @@ See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
 Reported by: the tool.
 
-`sqlsource replay`, or `sqlsource diagnose --scrub` before it renames a raw bundle, runs the query from what the bundle holds, and the bundle has no answer to something that the query asks.  The message names the question, the version of `sqlsource` that made the bundle, and the version you run.  This happens when you run a version other than the one that made the bundle, since a different version can ask something the other never did.  It also happens when a file of the bundle was edited by hand or damaged, so that an answer it holds can no longer be read.  An unzipped folder without the bundle's own description file, `bundle.json`, says `another version of sqlsource`, since it does not tell which version made it.
+`sqlsource replay`, or `sqlsource diagnose --scrub` before it renames a raw bundle, runs the query from what the bundle holds.  The bundle has no answer to something that the query asks.  The message names the question, the version of `sqlsource` that made the bundle, and the version you run.
+
+This happens in one of two cases:
+
+- **You run a version other than the one that made the bundle.**  A different version can ask something that the other never did.
+- **A file of the bundle was edited by hand or damaged.**  An answer that it holds can then no longer be read.
+
+An unzipped folder without `bundle.json`, the bundle's own description file, says `another version of sqlsource`, since it does not tell which version made it.
 
 ```console
 $ dotnet sqlsource replay /work/report.zip
 /work/report.zip : error SQLSRC290: The bundle has no answer to 'columns' that the query asks: it was made by sqlsource 1.4.0, and this is sqlsource 1.6.0
 ```
 
-Install the version of `sqlsource` that the message names as the maker of the bundle, for example with `dotnet tool update SqlSource.Tool --version 1.4.0`, and replay or scrub the bundle again.  When the message says `another version of sqlsource`, ask the person who made the bundle which version it was.  When it names the same version twice, the bundle was edited by hand or damaged, and installing another version does not help: ask the person who made the bundle for it again, since a bundle edited by hand cannot be replayed.
+**Fix:** do one of these.
+
+- Install the version that made the bundle:
+  1. Install the version of `sqlsource` that the message names as the maker of the bundle.  For example, run `dotnet tool update SqlSource.Tool --version 1.4.0`.
+  2. Replay or scrub the bundle again.
+- If the message says `another version of sqlsource`, ask the person who made the bundle which version it was.
+- If the message names the same version twice, ask the person who made the bundle for it again.  The bundle was edited by hand or damaged, and installing another version does not help.  A bundle edited by hand cannot be replayed.
 
 See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
@@ -4623,14 +4926,19 @@ See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
 Reported by: the tool.
 
-The bundle is of a query for a database engine that this version of `sqlsource` cannot run a query of without a database.  The message names the engine.  It happens when the bundle was made by a newer version that supports an engine this one does not.
+The bundle is of a query for a database engine that this version of `sqlsource` cannot run a query of without a database.  The message names the engine.
+
+This happens when a newer version, which supports an engine that this one does not, made the bundle.
 
 ```console
 $ dotnet sqlsource replay /work/report.zip
 /work/report.zip : error SQLSRC291: The bundle is of the engine 'mysql', which this version of sqlsource does not describe
 ```
 
-Update the `sqlsource` tool to the latest version, and replay the bundle again.
+**Fix:**
+
+1. Update the `sqlsource` tool to the latest version.
+2. Replay the bundle again.
 
 See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
@@ -4640,16 +4948,20 @@ See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
 Reported by: the tool.
 
-`sqlsource diagnose --query <file>:<name>` makes a bug report of one query, and the query it names cannot be described from that file.  The message names the query and the file, and ends with the reason, one of two:
-
-- `the file has no query of that name`: no `-- name:` of the file gives the name after the last `:`.  Names are compared exactly, by case too, so `getUser` does not find `GetUser`.
-- `the query's output is sql, which needs no description`: the query is in the file, but its output is `sql`, so it is never described against the database and a bug report of it would hold nothing.
+`sqlsource diagnose --query <file>:<name>` makes a bug report of one query, and the query that it names cannot be described from that file.  The message names the query and the file, and ends with the reason:
 
 ```console
 /work/App/Queries/Users.sql : error SQLSRC292: There is no query 'getUser' to diagnose in '/work/App/Queries/Users.sql': the file has no query of that name
 ```
 
-Copy the name from the query's `-- name:` line, letter for letter.  A query whose output is `sql` gets no description to report: if its generated code is wrong, open an issue that shows the query and the code you got.
+The reason is one of two, each with its own fix:
+
+- **`the file has no query of that name`.**  No `-- name:` of the file gives the name after the last `:`.
+  - Names are compared exactly, by case too, so `getUser` does not find `GetUser`.
+  - Fix: copy the name from the `-- name:` line of the query, letter for letter.
+- **`the query's output is sql, which needs no description`.**  The query is in the file, but its output is `sql`.
+  - So the query is never described against the database, and a bug report of it would hold nothing.  A query whose output is `sql` gets no description to report.
+  - Fix: if its generated code is wrong, open an issue that shows the query and the code you got.
 
 See: [Making a bundle with `diagnose`](reference/bundles.md#diagnose)
 
@@ -4659,7 +4971,9 @@ See: [Making a bundle with `diagnose`](reference/bundles.md#diagnose)
 
 Reported by: the tool.
 
-`sqlsource diagnose` gives every name of your schema and of your query a new name in the bundle it makes, so that the bundle can be posted in a public issue, and checks the bundle before it writes it.  This error means the check found something it could not rename safely.  Rather than blank it out, which would make a bundle that no longer shows the problem, it writes no bundle.  The message gives the reason, the place in the bundle and the text it found, or `(none)` when the reason names no text.
+`sqlsource diagnose` gives every name of your schema and of your query a new name in the bundle that it makes.  The bundle can then be posted in a public issue.  It checks the bundle before it writes it.  Here the check found something that it could not rename safely.  The message gives the reason, the place in the bundle and the text that it found, or `(none)` when the reason names no text.
+
+Rather than blank the text out, `diagnose` writes no bundle.  A bundle with the text blanked out would no longer show the problem.
 
 The text found is yours, such as a name of your schema, so do not paste this error into an issue.
 
@@ -4668,9 +4982,14 @@ The text found is yours, such as a name of your schema, so do not paste this err
     help: make a raw bundle with --no-obfuscate and keep it, then open an issue on GitHub that says a raw bundle is ready, without attaching it: a maintainer will say how to send it
 ```
 
-Make a raw bundle instead, by running the same command with `--no-obfuscate`.  It keeps every name of yours, so keep it to yourself.  Open an issue on GitHub that says a raw bundle is ready, and do not attach the bundle: a maintainer will say how to send it.
+**Fix:**
 
-See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
+1. Make a raw bundle instead: run the same command with `--no-obfuscate`.
+2. Keep the raw bundle to yourself.  It keeps every name of yours.
+3. Open an issue on GitHub that says a raw bundle is ready.
+4. Do not attach the bundle.  A maintainer tells you how to send it.
+
+See: [Making a bundle with `diagnose`](reference/bundles.md#diagnose), [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
 
 ## SQLSRC294
 
@@ -4678,16 +4997,23 @@ See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
 
 Reported by: the tool.
 
-`sqlsource diagnose` checks the bundle it renamed by running the query from it, as `sqlsource replay` does, before it writes it.  This error means the renamed bundle gives another answer than your query got from your database, so it would not show the problem, and no bundle was written.  The message names the place in the bundle where the answers differ.  It is a fault of the renaming and not of your query.
+`sqlsource diagnose` checks the bundle that it renamed before it writes it, by running the query from it, as `sqlsource replay` does.  Here the renamed bundle gives another answer than the one your query got from your database.  So the bundle would not show the problem, and no bundle was written.  The message names the place in the bundle where the answers differ.
+
+This is a fault of the renaming, and not of your query.
 
 ```console
 /tmp/report.zip : error SQLSRC294: The renamed bundle does not reproduce the query's answer: its replay differs at expected.json
     help: make a raw bundle with --no-obfuscate and keep it, then open an issue on GitHub that says a raw bundle is ready, without attaching it: a maintainer will say how to send it
 ```
 
-Make a raw bundle instead, by running the same command with `--no-obfuscate`.  It keeps every name of yours, so keep it to yourself.  Open an issue on GitHub that says a raw bundle is ready, and do not attach the bundle: a maintainer will say how to send it.
+**Fix:**
 
-See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
+1. Make a raw bundle instead: run the same command with `--no-obfuscate`.
+2. Keep the raw bundle to yourself.  It keeps every name of yours.
+3. Open an issue on GitHub that says a raw bundle is ready.
+4. Do not attach the bundle.  A maintainer tells you how to send it.
+
+See: [Making a bundle with `diagnose`](reference/bundles.md#diagnose), [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
 
 ## SQLSRC295
 
@@ -4695,18 +5021,20 @@ See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
 
 Reported by: the tool.
 
-`sqlsource diagnose --scrub <bundle>` gives the names of a raw bundle, one that `diagnose --no-obfuscate` made, new names, so that it can be posted.  This error means the bundle you gave is not a raw bundle, and nothing was written.  The message names the bundle and ends with the reason, one of two:
-
-- `it is renamed already`: `diagnose` without `--no-obfuscate`, or an earlier `--scrub`, made it, and its names are new names already.
-- `it has no bundle.json that says it is raw`: the bundle has no `bundle.json`, the file in which `diagnose` says how it made a bundle, or its `bundle.json` does not say the bundle is raw, as for a bundle edited by hand, or unzipped and zipped again without it.
+`sqlsource diagnose --scrub <bundle>` gives the names of a raw bundle new names, so that the bundle can be posted.  A raw bundle is one that `diagnose --no-obfuscate` made.  Here the bundle that you gave is not a raw bundle, and nothing was written.  The message names the bundle and ends with the reason:
 
 ```console
 /tmp/report.zip : error SQLSRC295: '/tmp/report.zip' is not a raw bundle: it is renamed already
 ```
 
-A bundle that is renamed already can be posted as it is, with the mapping that was written beside it kept to yourself.  For the other reason, make the raw bundle again with `diagnose --no-obfuscate`, and give `--scrub` that one.
+The reason is one of two, each with its own fix:
 
-See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
+- **`it is renamed already`.**  `diagnose` without `--no-obfuscate`, or an earlier `--scrub`, made it, and its names are new names already.
+  - Fix: post the bundle as it is.  Keep the mapping that was written beside it to yourself.
+- **`it has no bundle.json that says it is raw`.**  The bundle has no `bundle.json`, the file in which `diagnose` says how it made a bundle.  Or its `bundle.json` does not say that the bundle is raw, as for a bundle edited by hand, or unzipped and zipped again without it.
+  - Fix: make the raw bundle again with `diagnose --no-obfuscate`, and give `--scrub` that one.
+
+See: [Making a bundle with `diagnose`](reference/bundles.md#diagnose), [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
 
 ## SQLSRC296
 
@@ -4714,15 +5042,22 @@ See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
 
 Reported by: the tool.
 
-`sqlsource diagnose --scrub <bundle>` runs the query from the raw bundle, as `sqlsource replay` does, before it gives its names new names.  This error means the version of `sqlsource` you run gives another answer from what the bundle holds than the one the bundle records, so a renamed bundle would not show the problem either, and nothing was written.  It happens when the bundle was made by another version, whose answer to the same query differs.  The message names the first place where the answers differ, the version that made the bundle, and the version you run.
+`sqlsource diagnose --scrub <bundle>` runs the query from the raw bundle, as `sqlsource replay` does, before it gives its names new names.  Here the version of `sqlsource` that you run gives another answer from what the bundle holds than the one that the bundle records.  So a renamed bundle would not show the problem either, and nothing was written.  The message names the first place where the answers differ, the version that made the bundle, and the version you run.
+
+This happens when another version made the bundle, and its answer to the same query differs.
 
 ```console
 /tmp/report.zip : error SQLSRC296: This version of sqlsource does not reproduce the bundle's answer, so it is not renamed: columns[0].nullable: true -> false; it was made by sqlsource 1.4.0, and this is sqlsource 1.6.0
 ```
 
-Install the version of `sqlsource` that the message names as the maker of the bundle, for example with `dotnet tool update SqlSource.Tool --version 1.4.0`, and scrub the bundle again.  When it names the same version twice, the bundle was edited by hand or damaged: make the raw bundle again with `diagnose --no-obfuscate`.
+**Fix:** do one of these.
 
-See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle), [Checking a bundle with `replay`](reference/bundles.md#replay)
+- Install the version that made the bundle:
+  1. Install the version of `sqlsource` that the message names as the maker of the bundle.  For example, run `dotnet tool update SqlSource.Tool --version 1.4.0`.
+  2. Scrub the bundle again.
+- If the message names the same version twice, the bundle was edited by hand or damaged.  Make the raw bundle again with `diagnose --no-obfuscate`.
+
+See: [Making a bundle with `diagnose`](reference/bundles.md#diagnose), [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle), [Checking a bundle with `replay`](reference/bundles.md#replay)
 
 ## SQLSRC297
 
@@ -4732,13 +5067,27 @@ Reported by: the build.
 
 The error is at the query's name, once for the query.
 
-A query that turns on the `collection-method` generator parameter, and has parameters, sets the `transaction` generator parameter to an isolation level that its database does not have.  PostgreSQL has no `read-uncommitted` and no `snapshot`, so a query of the `postgres` dialect cannot ask for either; SQL Server has all five levels.  The message names the query, the level and the database.
+A query turns on the `collection-method` generator parameter, and has parameters.  It sets the `transaction` generator parameter to an isolation level that its database does not have.  The message names the query, the level and the database.
+
+PostgreSQL has no `read-uncommitted` and no `snapshot`, so a query of the `postgres` dialect cannot ask for either.  SQL Server has all five levels.
+
+The query keeps its own method.  Only its [collection method](reference/collection-methods.md#collection-methods) is not generated until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(2,10): error SQLSRC297: The query 'AddUser' asks for the transaction isolation level 'snapshot', which PostgreSQL does not have
 ```
 
-Write a level the database has: `read-committed`, `repeatable-read` or `serializable`, `on`, which begins the transaction at the database's default level, or `off`, which begins none.  The query keeps its own method; only its [collection method](reference/collection-methods.md#collection-methods) is not generated until it is fixed.  A query without `collection-method`, or without parameters, is not reported, whatever `transaction` says.
+**Fix:**
+
+1. Write a level that the database has, or `on` or `off`.
+
+For a query of the `postgres` dialect, these values fit:
+
+- `read-committed`, `repeatable-read` or `serializable`;
+- `on`, which begins the transaction at the default level of the database;
+- `off`, which begins none.
+
+**A query without `collection-method`, or without parameters, is not reported, whatever `transaction` says.**
 
 See: [A collection method's transactions](reference/collection-methods.md#collection-transactions)
 
@@ -4750,13 +5099,21 @@ Reported by: the build.
 
 The error is at the query's name, once for the query.
 
-A query whose output is `methods` or `repository` streams its rows, with the [collection type](reference/return-types.md#setting-collection-type) `IAsyncEnumerable` and the shape `many`, and the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) is `sync`.  A stream reads each row as the caller asks for it, which only an asynchronous method can do, so there is no synchronous one.  The message names the query.
+A query whose output is `repository` or `methods` streams its rows, with the [collection type](reference/return-types.md#setting-collection-type) `IAsyncEnumerable` and the shape `many`.  The generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) of the query is `sync`.  The message names the query.
+
+A stream reads each row as the caller asks for it, which only an asynchronous method can do.  So there is no synchronous method.  The query gets no method, and no [collection method](reference/collection-methods.md#collection-methods) either, until the error is fixed.  Its models are still generated.
 
 ```console
 /work/App/Queries/Users.sql(3,10): error SQLSRC298: The query 'ListUsers' streams its rows as an IAsyncEnumerable, which has no synchronous method; give it method-type=async or method-type=both
 ```
 
-Write `-- generator: method-type=async` in the query, or `method-type=both`, under which it keeps its stream, named with `Async` after the query's name, and gets no synchronous method, but for a synchronous [collection method](reference/collection-methods.md#collection-methods) when it has one.  Or give it a collection type that is read whole, such as `List`, which a synchronous method can return.  The query gets no method, and no [collection method](reference/collection-methods.md#collection-methods) either, until it is fixed; its models are still generated.  A query of another shape is not reported, whatever its collection type.
+**Fix:** do one of these.
+
+- Write `-- generator: method-type=async` in the query.
+- Write `method-type=both` in the same way.  The query then keeps its stream, named with `Async` after the name of the query.  It gets no synchronous method, but for a synchronous [collection method](reference/collection-methods.md#collection-methods) when it has one.
+- Give the query a collection type that is read whole, such as `List`, which a synchronous method can return.
+
+**A query of another shape is not reported, whatever its collection type.**
 
 See: [Collection type](reference/return-types.md#setting-collection-type)
 
@@ -4768,7 +5125,11 @@ Reported by: the build.
 
 The error is at the query's name, once for the query, beside its other errors.  A query that has no entry in its sidecar yet gets [SQLSRC241](#sqlsrc241), not this error.  It gets this error once it is described, as it gets the other errors about its method.  Its models are still generated.
 
-A query whose output is `repository` would have a [synchronous method](reference/query-methods.md#synchronous-methods), under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) `sync` or `both`, but the one member that gives its database's connection is a method that returns a `Task` or `ValueTask` of a connection, which a synchronous method cannot call.  The message names the query, the database, the type and the member.
+A query whose output is `repository` would have a [synchronous method](reference/query-methods.md#synchronous-methods), under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) `sync` or `both`.  But the one member that gives the connection of its database is a method that returns a `Task` or `ValueTask` of a connection.  A synchronous method cannot call it.  The message names the query, the database, the type and the member.
+
+Under `method-type=both`, the query keeps its asynchronous method, and its asynchronous [collection method](reference/collection-methods.md#collection-methods) when it has one, on the type and in its interface.  Only the synchronous ones are not generated until the error is fixed.  Under `sync`, the query gets no method.
+
+In this sample, the one connection is a method that returns a task:
 
 ```csharp
 [SqlSourceGenerate]
@@ -4783,8 +5144,11 @@ public partial class UserRepository
 /work/App/Queries/Users.sql(2,10): error SQLSRC299: The query 'GetUser' would have a synchronous method, but the one connection of its database 'postgres' in 'App.UserRepository', 'OpenAsync', returns a task, which a synchronous method cannot call.  Mark a member that returns no task [SqlSourceConnection] beside it, or give the query method-type=async.
 ```
 
-Mark a second member `[SqlSourceConnection]` beside it that returns no task: a connection string, a data source, a connection, or a method that returns a connection.  The synchronous methods then get their connection from it, and the asynchronous methods keep the one that returns a task.  Or write `-- generator: method-type=async` in the query, which then has no synchronous method.
+**Fix:** do one of these.
 
-Under `method-type=both` the query keeps its asynchronous method, and its asynchronous [collection method](reference/collection-methods.md#collection-methods) when it has one, on the type and in its interface; only the synchronous ones are not generated until it is fixed.  Under `sync` the query gets no method.  A query under `method-type=async` is not reported.
+- Mark a second member `[SqlSourceConnection]` beside it that returns no task.  That member is a connection string, a data source, a connection, or a method that returns a connection.  The synchronous methods then get their connection from it, and the asynchronous methods keep the one that returns a task.
+- Write `-- generator: method-type=async` in the query, which then has no synchronous method.
+
+**A query under `method-type=async` is not reported.**
 
 See: [Synchronous repository methods](reference/repositories.md#synchronous-repository-methods)
