@@ -211,7 +211,7 @@ Under `mssql`, the opposite can happen too: SqlSource takes a name for a variabl
 
 <a id="limit-parameter-taken-for-a-variable"></a>
 
-### A parameter is missing from the input model after a `DECLARE`
+### SQLSRC231 for a parameter after a `DECLARE`
 
 **What you see.**  Under `mssql`, describing a query stops with [SQLSRC231](../diagnostics.md#sqlsrc231): "SQL Server reads '@id' as a parameter and SqlSource does not".  The query parameter follows a `DECLARE` with no `;`.
 
