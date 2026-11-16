@@ -25,7 +25,7 @@ The [output](settings.md#setting-output) of a query decides whether it is descri
 - **The tool reads `[SqlSourceGenerate]` from your C# source without compiling it.**  This limits how you can write `Source` there: see [a limit](attributes.md#limit-source-written-as-text).
 - **The tool describes the queries of the dialects `postgres` and `mssql`.**  The tool describes a query through its [dialect](settings.md#setting-dialect).  It asks PostgreSQL about a query of `postgres`, and SQL Server about a query of `mssql`.  The [database support table](databases/index.md#database-support) lists every dialect.
 - **A query that must be described, and whose dialect cannot be described, is [SQLSRC209](../diagnostics.md#sqlsrc209).**  The dialects that cannot be described are those marked No in [database support](databases/index.md#database-support), such as `ansi`, `mysql` or `sqlite`.  The tool reports the error, and so does the build.
-- **A project that sets neither the dialect nor the output gets SQLSRC209 for each file that a class reads.**  The default output is `repository`, and the default dialect is `ansi`.
+- **A project that sets neither the dialect nor the output gets SQLSRC209 for each file that a type claims.**  The default output is `repository`, and the default dialect is `ansi`.
 
 To mend SQLSRC209, do one of these:
 
@@ -187,7 +187,7 @@ billing (postgres): 15 same, 1 differ, 0 failed
   - the table column that each column is read from, which a [column type](model-properties.md#setting-column-types) is matched against.
 - **It does not compare the versions of the tool or of the server.**  So a sidecar that a developer wrote passes against a server of another patch release.
 - **Its exit code tells the two failures apart.**  See [exit codes](cli.md#exit-codes).
-  - `2` means that a sidecar is out of date and nothing else went wrong: someone forgot to describe.
+  - `2` means that a sidecar is out of date and nothing else went wrong: someone forgot to describe, or the schema changed.  Run `describe`, or `describe --force` after a change to the schema.
   - `1` means that the check could not be made, such as when a database could not be opened.
 - **With `--database`, `--project` or a `.sql` path, it reports only what `describe` with the same filters would change**:
   - the queries that it would describe;
