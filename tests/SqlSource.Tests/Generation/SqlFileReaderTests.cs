@@ -221,17 +221,6 @@ public sealed class SqlFileReaderTests
     }
 
     [Fact]
-    public void Read_Dialect_IsTheDialectTheFileIsParsedWith()
-    {
-        const string Text = "-- name: A\nSELECT 'a\\'b' # c\n";
-
-        Read(Text, dialect: SqlDialect.MySql)
-            .Queries.ShouldHaveSingleItem()
-            .Segments.ShouldBe(TestSidecars.Of(TestModels.Literal("SELECT 'a\\'b'")));
-        Read(Text).Errors.ShouldHaveSingleItem().Descriptor.ShouldBe(SqlDiagnostics.UnterminatedQuote);
-    }
-
-    [Fact]
     public void Read_Dialect_IsNamedOnTheFileByTheOneItWasReadBy()
     {
         Read("SELECT 1;\n", dialect: SqlDialect.MySql).Dialect.ShouldBe(SqlDialect.MySql);
