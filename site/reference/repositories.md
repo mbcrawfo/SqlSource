@@ -199,7 +199,7 @@ public partial interface IUserRepository
 }
 ```
 
-A type that claims a query whose output is `repository` gets a `partial interface` of its public repository methods, which the type implements.  Code that takes the interface can be given a fake of it in a test, with no database.  In the first two samples, the project turns the interfaces off, and `UserRepository` turns its own back on, named `IUserStore`.  In the last sample, `Greeter` takes the interface `IUserRepository`, and your own `partial interface` adds a member to it.
+A type that claims a query whose output is `repository` gets a `partial interface` of its public repository methods, which the type implements.  Code that takes the interface can be given a fake of it in a test, with no database.  In the first two samples, the project turns the interfaces off, and `UserRepository` turns its own back on, named `IUserStore`.  The last sample is for a repository with the default name: `Greeter` takes the interface `IUserRepository`, and your own `partial interface` adds a member to it.
 
 - **Its members are the public repository methods of the type**, with their signatures and documentation.  Under `method-type=both`, it has the synchronous method of a query and its asynchronous one.
 - **Only public repository methods are in it.**  A method of another output, a method that is not `public`, such as an `internal` or a `protected` one, and a method with an error are not in it.
@@ -230,7 +230,10 @@ By default, every repository gets its interface, named `I` and the name of the t
 
 ## Transactions and timeouts
 
-A repository method takes no transaction and no command timeout.  It runs on the connection that its source gives, in no transaction of yours, under the default timeout of the driver.
+A repository method takes no transaction and no command timeout.  It runs on the connection that its source gives, under the default timeout of the driver, and gives its command no transaction.  It can still run in a transaction of your code's in two cases:
+
+- **On PostgreSQL, on a borrowed connection on which your code has begun a transaction, Npgsql runs the command in that transaction.**  See [the connection](#repository-connection).
+- **Inside a `TransactionScope`, a connection that the method opens takes part in the ambient transaction**, unless its connection string turns enlisting off.
 
 If a query needs to run in a transaction with other queries, or needs its own timeout, give it the output `methods` instead.  Put the query in a file of its own with that output, or write `-- output: methods` on the query.  Your own code in the repository then opens a connection, begins the transaction, and calls the [method that takes a connection](connection-methods.md#methods-that-take-a-connection) of the query.  See [the recipe](../start/transactions.md#queries-in-a-transaction).
 
