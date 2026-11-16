@@ -41,7 +41,7 @@ Its class, in `Methods/OrderQueries.cs`, passes an array:
     }
 ```
 
-**What you get.**  `ListOrdersByStatusesParams.Statuses` is an `IEnumerable<string>?`, which takes an array, a `List<string>` or any other sequence.  The query method sends a parameter for each value, on PostgreSQL and on SQL Server.  The test `@statuses IS NULL` makes the filter optional, as [Filter by an optional list of values](#filter-by-a-list) shows.  In the example, the folder sets the [output](../reference/settings.md#setting-output) `methods`, and the file header turns on [`async-method-suffix`](naming-and-placement.md#async-names).  The query's `-- member-location: class` puts the method on its class.  So the method is `OrderQueries.ListOrdersByStatusesAsync`, and takes the connection first.
+**What you get.**  `ListOrdersByStatusesParams.Statuses` is an `IEnumerable<string>?`, which takes an array, a `List<string>` or any other sequence.  The query method sends a parameter for each value, on PostgreSQL and on SQL Server.  The test `@statuses IS NULL` makes the filter optional, as [Filter by an optional list of values](#filter-by-a-list) shows.  In the example, the folder sets the [output](../reference/settings.md#setting-output) `methods`, and the file header turns on [`async-method-suffix`](../reference/generator-parameters.md#gp-async-method-suffix).  The query's `-- member-location: class` puts the method on its class.  So the method is `OrderQueries.ListOrdersByStatusesAsync`, and takes the connection first.
 
 **The rules you need.**
 

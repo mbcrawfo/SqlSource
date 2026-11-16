@@ -32,7 +32,7 @@ sqlsource: watching for changes; press Ctrl+C to stop
 
 <a id="start-the-watcher-with-your-editor"></a>
 
-## Start the watcher with your editor
+## Start the watch with your editor
 
 Have your editor start `dotnet sqlsource describe --watch` for you, so the sidecars stay current as you save.  The next three sections do this in VS Code, Rider and Visual Studio.
 

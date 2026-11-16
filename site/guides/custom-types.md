@@ -75,6 +75,7 @@ Give a parameter its type on its `-- param:` line:
 // sqlsource.json, in the project's folder
 {
     "root": true,
+    "dialect": "postgres",
     "columnTypes": {
         "customers.id": "CustomerId",
         "orders.customer_id": "CustomerId",
@@ -149,6 +150,7 @@ If your id type is made by Vogen or StronglyTypedId, write two converters for it
    // sqlsource.json, in the project's folder
    {
        "root": true,
+       "dialect": "postgres",
        "columnTypes": {
            "customers.id": "CustomerId",
        },

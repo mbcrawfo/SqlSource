@@ -92,6 +92,7 @@ If you need a class and not a record, set the shape of the models:
 // sqlsource.json, in the project's folder
 {
     "root": true,
+    "dialect": "postgres",
     "outputModelType": "class",
 }
 ```

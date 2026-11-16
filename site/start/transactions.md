@@ -1,12 +1,12 @@
 # Run queries in a transaction (or with a timeout)
 
-At the end of this page, two queries run in one transaction that you commit, and a query has its own timeout.
+At the end of this page, two queries run in one transaction, with a commit or a rollback, and a query has its own timeout.
 
 <a id="queries-in-a-transaction"></a>
 
 ## Run queries in a transaction
 
-A repository method takes no transaction, so you cannot give it yours.  Whether it still runs in a transaction of yours depends on its connection and its database: see [transactions and timeouts](../reference/repositories.md#repository-transactions).  Give each query that must run in the transaction the line `-- output: methods`.  The method of such a query takes your connection and your transaction.  By default, it is an `internal` extension method of the connection.
+A repository method takes no transaction, so you cannot give it yours.  Whether it still runs in a transaction of yours depends on its connection and its database.  Give each query that must run in the transaction the line `-- output: methods`.  The method of such a query takes your connection and your transaction.  By default, it is an `internal` extension method of the connection.
 
 The sample is a second repository of the same application, `AccountRepository`.  It reads a table `accounts` with the columns `id`, `owner` and `balance`.  Its queries are in `AccountRepository.sql`, beside the class:
 
@@ -99,7 +99,7 @@ public partial interface IAccountRepository
 
 ---
 
-`Withdraw` is a method of your own on the repository.  It opens a connection, begins the transaction, calls the two methods and commits.
+`Withdraw` is a method of your own on the repository.  It opens a connection, begins the transaction, calls the two methods and commits.  If a method throws before the commit, `await using` disposes the transaction, and the driver rolls it back: neither change is kept.
 
 - **Give every method the transaction.**  On SQL Server, a method that does not get it throws `InvalidOperationException`.
 - **The `partial interface` adds `Withdraw` to `IAccountRepository`**, so code that takes the interface can call it.
