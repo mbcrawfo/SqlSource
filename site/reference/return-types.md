@@ -120,7 +120,7 @@ The rules of the connection:
 
 The rules of leaving the loop early:
 
-- **Leaving the loop early reads the rest of the rows.**  At a `break`, or at an exception in the loop's body, the method reads and discards the rows still to come before the loop ends.  On SQL Server, it also reads and discards the statements after them.  So on a large result, leaving early takes as long as reading those rows.
+- **Leaving the loop early reads the rest of the rows.**  At a `break`, or at an exception in the loop's body, the rows still to come are read and discarded before the loop ends.  On SQL Server, so are the statements after them.  So on a large result, leaving early takes as long as reading those rows.
 - **Leaving early does not cancel the query.**  A transaction is left as it was, unless one of these happens:
   - The database raises an error for one of those rows, such as a division by zero.
   - On SQL Server, the database raises an error for one of those statements.
@@ -138,7 +138,7 @@ The rules of leaving the loop early:
 The rules of each row:
 
 - **Each row is read as every `many` method reads it**, with the same checks and [converters](converters.md#converters).
-- **An error at a row that the loop reads is thrown when the loop reaches that row**, after the rows before it.  Such an error is a null in a column whose property cannot be null, or an error that the database raises for that row.  See [how a row is read](query-methods.md#reading-rows).
+- **An error at a row that the loop reads is thrown when the loop reaches that row**, after the rows before it.  Examples are a null in a column whose property cannot be null, and an exception that a converter throws.  An error that the database raises for that row is another.  See [how a row is read](query-methods.md#reading-rows).
 - **A row that the loop leaves unread is not checked or converted.**  Of its errors, only one that the database raises can reach your code, as the rules of leaving the loop early say.
 - **On SQL Server, a rollback after an error at a row is thrown as `TransactionRolledBackException`.**  The loop throws it when an error that the rest of the query raises rolls the transaction back after one of these:
   - A check or a converter throws for a row in a transaction.

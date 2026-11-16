@@ -32,7 +32,10 @@ A property's name is the PascalCase of the name of its column or parameter.  To 
 Each case below is an error at the query's name.  Until you fix the error, the query has no models, and under `repository` or `methods` it has no method.  Under `models` the generator still writes its constant or token method.  To fix the error, give the column an alias or rename the parameter.  Then describe the query again.
 
 - **A column with no name is an error.**  PostgreSQL calls such a column `?column?`, as for an expression `price * quantity` without an alias: [SQLSRC253](../diagnostics.md#sqlsrc253).  SQL Server gives such a column no name, and the tool reports it as [SQLSRC266](../diagnostics.md#sqlsrc266) when it describes the query.
-- **A name whose PascalCase is not a C# identifier is [SQLSRC254](../diagnostics.md#sqlsrc254).**  That is one of these: a name of underscores alone, a name whose PascalCase starts with a digit, or a name with a character that an identifier cannot hold, such as `unit-price`.
+- **A name whose PascalCase is not a C# identifier is [SQLSRC254](../diagnostics.md#sqlsrc254).**  That is one of these:
+  - a name of underscores alone;
+  - a name whose PascalCase starts with a digit;
+  - a name with a character that an identifier cannot hold, such as `unit-price`.
 - **Two columns, or two parameters, whose properties have one name ignoring case are [SQLSRC255](../diagnostics.md#sqlsrc255).**  Examples are `SELECT u.id, o.id`, and `user_id` beside `userId`.  SqlSource compares the names ignoring case, since Dapper matches a column to a property ignoring case.
 - **A name that a record or `object` already has a member of, or the name of the model itself, is [SQLSRC256](../diagnostics.md#sqlsrc256).**  The names of those members are `EqualityContract`, `Equals`, `GetHashCode`, `ToString`, `GetType`, `MemberwiseClone`, `Finalize`, `ReferenceEquals`, `PrintMembers`, `Deconstruct` and `Clone`.
 
@@ -81,7 +84,9 @@ If a library reads the rows by the names of their columns, as Dapper does, set t
 - **The value is the column's name, then the nullability, the C# type, or both in that order.**  The nullability is `null` or `not null`, and the C# type follows `->`.  Examples are `-- column: note null -> NoteText`, and `-- column: settings null -> json CustomerSettings`, with the word `json` before the type.
 - **`null` gives a property that can be null, and `not null` gives a property that cannot be null.**
 - **One marker names one column.**  Write one marker for each column.
-- **Two markers for one column are fine in one of these cases:** they say the same thing, or one gives the nullability and the other gives the type.
+- **Two markers for one column are fine in one of these cases:**
+  - They say the same thing.
+  - One gives the nullability, and the other gives the type.
 - **Two markers for one column that disagree are [SQLSRC112](../diagnostics.md#sqlsrc112).**  They disagree when they give two nullabilities or two C# types, or one type with `json` and without it.
 - **`-> json Type` says that the column holds JSON.**  Write it for a column of a string type, such as `text` or `nvarchar(max)`.  Your class in that column is then read through System.Text.Json's serializer: see [the JSON opt-in](library-types-and-json.md#json-opt-in).
 - **`->` and a C# type give the column that type.**  The type is written as a type override's type is: a keyword, a full name or a short name.

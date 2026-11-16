@@ -94,7 +94,7 @@ Without a member location, the members of each output go to its default, as the 
 - **Each query has its own.**  A file can put the members of some queries on the type, some in a nested class and some in the extension class.  Two files of one type can place theirs differently.
 - **A value in the file header or in a settings file reaches every query below it, whatever its output.**  [A placement for a whole file or folder](#placement-for-a-file) says what to do where it does not fit.
 - **A repository method is always on the type.**  `class` fits a query whose output is `repository`.  On such a query, `extension-class` or `nested-class` is [SQLSRC122](../diagnostics.md#sqlsrc122).
-- **Only a `methods` method can go in the extension class.**  On a query whose output is `repository`, `models` or `sql`, `extension-class` is [SQLSRC122](../diagnostics.md#sqlsrc122), since a constant extends nothing.
+- **Only a `methods` method can go in the extension class.**  On a query whose output is `repository`, `models` or `sql`, `extension-class` is [SQLSRC122](../diagnostics.md#sqlsrc122).  A constant extends nothing, and a repository method is always on the type.
 
 ```sql postgres
 -- name: GetUser -> one-optional
@@ -147,7 +147,7 @@ In this sample, `GetUser` and `CountUsers` write no member location and no visib
 
 A member location or a visibility in a file header or a settings file reaches every query below it, whatever its output.  If the value does not fit a query, that is an error.  The error leaves the file without members and without models for the type until it is fixed.  If only the models of the query's method do not fit, the error leaves out only that method.  The message says where the value was written.  Two cases catch a project out:
 
-- **`"memberLocation": "ExtensionClass"` in a settings file is [SQLSRC122](../diagnostics.md#sqlsrc122) at every query whose output is `repository`, `models` or `sql`.**  This holds in its folder and the folders below it, since only a `methods` method can go in the extension class.  In the same way, `"memberLocation": "NestedClass"` is an error at every repository query, whose method is always an instance method of the type.  Write `-- member-location:` on the queries that the value does not fit, or leave it out: each output's members then go to its own default.
+- **`"memberLocation": "ExtensionClass"` in a settings file is [SQLSRC122](../diagnostics.md#sqlsrc122) at every query whose output is `repository`, `models` or `sql`.**  This holds in its folder and the folders below it, since only a `methods` method can go in the extension class.  In the same way, `"memberLocation": "NestedClass"` is [SQLSRC122](../diagnostics.md#sqlsrc122) at every repository query, whose method is always an instance method of the type.  Write `-- member-location:` on the queries that the value does not fit, or leave it out: each output's members then go to its own default.
 - **A visibility in the header of a file that mixes outputs reaches its query methods too:**
 
 ```sql postgres
@@ -210,8 +210,8 @@ The values are `public`, `internal`, `protected` and `private`.  What a value se
 Without a visibility, a repository method is `public` whatever the accessibility of the type, unless `public` does not fit its models, as below.  Any other query takes the default of its member location.  The setting is written `-- visibility:`, in the file header or inside a query, and `visibility` in a settings file.
 
 - **A value in the file header or in a settings file reaches every query below it**, as a member location does.  Where the value does not fit a query, it is [SQLSRC123](../diagnostics.md#sqlsrc123), and [A placement for a whole file or folder](#placement-for-a-file) says what the error leaves out.
-- **`-- visibility: private` in the header of a file of `methods` and `sql` queries is an error at its query methods.**  It gives the constants a private nested class, but the query methods go to the extension class.  Write `-- visibility:` or `-- member-location:` on those queries, as that section shows.
-- **A nested class has one visibility.**  If a query writes no visibility for its class, it takes the one that another query of the type writes for the class, in any of the type's files.
+- **`-- visibility: private` in the header of a file of `methods` and `sql` queries is an error at its query methods.**  It gives the constants a private nested class, but the query methods go to the extension class.  Write `-- visibility:` or `-- member-location:` on those queries, as [a placement for a whole file or folder](#placement-for-a-file) shows.
+- **A nested class has one visibility.**  If a query writes no visibility for its class, it takes the one that another query of the type writes for the class.  That query can be in any of the type's files.
 - **Two queries that write two different visibilities for one nested class are [SQLSRC124](../diagnostics.md#sqlsrc124).**  Every file with a query in that class then gets no members and no models for the type until it is fixed.
 - **A query method that writes no visibility for its nested class can still be [SQLSRC123](../diagnostics.md#sqlsrc123).**  This happens when the visibility that it takes does not fit the models that it takes or returns, and it leaves out that method alone.
 - **The models do not follow the visibility.**  The models of a query are `public` or `internal` by the type that claims it, whatever the visibility of its members: see [accessibility](models.md#model-accessibility).
@@ -219,7 +219,11 @@ Without a visibility, a repository method is `public` whatever the accessibility
 **What does not fit.**  A visibility does not fit when one of these is true:
 
 - **`private` or `protected` in the extension class.**  A class that is not nested cannot be private or protected.
-- **`public` in the extension class, for a query method that takes or returns a model, when the type, or a type around it, is not `public`.**  The models of such a type are internal, and the method cannot take or return them.
+- **`public` in the extension class, for a query method, when all of these are true:**
+  - The method takes or returns a model that is internal.
+  - The type, or a type around it, is not `public`.
+
+  The models of such a type are internal, and the method cannot take or return them.
 - **`public` or `protected` for a query method, when all of these are true:**
   - The visibility is for a method on the type, or for the nested class that holds the method.
   - The method takes or returns a model that is internal.
@@ -231,7 +235,7 @@ Without a visibility, a repository method is `public` whatever the accessibility
   - on the type, when it is a static class, a struct or a record struct;
   - for the nested class of a struct or a record struct.
 
-**What fits, with no diagnostic.**  A visibility fits, and nothing is reported, when one of these is true:
+**What fits, with no diagnostic.**  Each of these fits, and the build reports nothing, unless a case of "What does not fit" above applies to it:
 
 - **`public` for the members on a type that is `internal`.**  They are then internal in effect, as a repository method is by default.
 - **`protected` for the repository methods of an abstract base repository.**  Its derived types call them.
@@ -288,7 +292,7 @@ The nested class names the class, nested in the type, that holds the members of 
 Without a value, the class is `Sql`.  The setting is written `-- nested-class:`, in the file header or inside a query, and `nestedClass` in a settings file.
 
 - **Each query has its own.**  So one file can fill two classes, as `Users.Get` and `Orders.List`, and two files of one type can fill one.  A class is written only when a query of the type puts a member in it.
-- **It is a setting of the `.sql` file.**  It comes from the settings files of the folder of the `.sql` file and the folders above it, as every other setting does, and not from those of the type's C# file.  For a type that reads the file named for it beside its C# file, as it does without [`Source`](attributes.md#setting-source), the two are the same folder.
+- **It is a setting of the `.sql` file.**  It comes from the settings files of the folder of the `.sql` file and the folders above it, as every other setting does.  The folder of the type's C# file counts only when it is the folder of the `.sql` file or a folder above it.  For a type that reads the file named for it beside its C# file, as it does without [`Source`](attributes.md#setting-source), the two are the same folder.
 - **It is ignored where the member location is not `nested-class`.**  So a `nestedClass` for a whole project, beside a file whose queries go on the type, is no error.
 - **A value that is not valid is [SQLSRC111](../diagnostics.md#sqlsrc111) in a marker, and [SQLSRC019](../diagnostics.md#sqlsrc019) in a settings file.**  After SQLSRC019, a farther settings file or the default gives the name.
 - **A type that already has the name is [SQLSRC007](../diagnostics.md#sqlsrc007).**  The name can be a member, a nested type or a type parameter of the type, or its own name.  Every file with a query in that class then gets no members and no models for the type until it is fixed.  The other names that its members cannot have are under [Where the members go](#locations).

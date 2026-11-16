@@ -316,7 +316,7 @@ A model is generated once for its full name, however many queries and types ask 
 Two types in one namespace that claim one file share the models of its queries in the same way.  The file gives both types the same settings for the models.
 
 - **Two models of one name that differ are [SQLSRC257](../diagnostics.md#sqlsrc257)**, which names the first difference.
-- **The error is at the later query.**  The queries are taken in the order of the paths of their files, then of their order in a file, then of the names of the types that claim them.  The error stands at the `-- input-model:` or `-- output-model:` marker of the later query, or at its name when it has none.
+- **The error is at the later query.**  SqlSource orders the queries by the paths of their files.  It orders the queries of one file as the file writes them.  It orders one query that two types claim by the names of those types.  The error stands at the `-- input-model:` or `-- output-model:` marker of the later query, or at its name when it has none.
 - **The model of the earlier query is generated.**  The later query has no model of that kind until the two agree.
 - **An input model and an output model are never shared.**  So one name for both is SQLSRC257 too, and two equal suffixes give a query such a name.
 - **A model shared across outputs can differ by the types of a library.**  A query whose output is `repository` or `methods` gets the types of a library where the [library types](library-types-and-json.md#setting-library-types) turn it on.  An example is NodaTime's `Instant` for a `timestamptz` on PostgreSQL.  A query whose output is `models` keeps the `System.DateTime` of the type map.
