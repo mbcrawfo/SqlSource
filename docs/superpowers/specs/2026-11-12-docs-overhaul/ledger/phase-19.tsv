@@ -1,4 +1,4 @@
-# base 4667ffffa8d6008a8c1d72d8b178ae1ebd48d0cd
+# base 1bc582cf6afda6b3ddd68c9d394875ec200c2919
 unit	disposition	to	arg	words	note
 @site/reference/databases/index.md:7	merge-pair	site/reference/databases/index.md#supported-versions	MP-23	-	README 7/2.  PostgreSQL 14 and SQL Server 2017 are cells of the table; Azure SQL, accepted, and not tested, is a bullet and #azure-sql; other databases not described is the opening sentence under the table and the table of #database-support; what describing is stands once, under #database-support (code span `sqlsource` 1 to 0 in this section, kept there).  Numerals 14 and 2017 6 to 2: the loose sentences gave the minimums four more times
 @site/reference/databases/index.md:9	move-split	-	-	-	README 27/2, cut at its semicolon: the tool's runtime is a restatement, the versions are the merge
