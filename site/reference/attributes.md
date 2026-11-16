@@ -17,16 +17,18 @@ SqlSource has three attributes that you write on your code.  This table gives ea
 
 ## The attribute
 
-`[SqlSourceGenerate]` marks a type that the generator adds to.  The package puts the attribute, the [`[SqlSourceConverter]`](converters.md#converters) and [`[SqlSourceConnection]`](repositories.md#repository-connection) attributes and the exceptions that a query method throws, [`UnexpectedRowCountException`](exceptions.md#unexpected-row-count), [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back) and [`CollectionItemException`](exceptions.md#collection-item-exception), in your project, as internal types in the namespace `SqlSource`, so the code below needs `using SqlSource;` and nothing else.  The exceptions are left out when your project uses another project's, and are public when it sets [`SqlSourcePublicExceptions`](exceptions.md#public-exceptions): see [projects that share internals](exceptions.md#projects-that-share-internals).  It also adds `Microsoft.CodeAnalysis.EmbeddedAttribute`, in the generated file `SqlSource-EmbeddedAttribute.g.cs`, an internal attribute that keeps every one of these types but the exceptions out of sight of other projects: see [the limit](#limit-embedded-attribute) if your project declares it too.
-
 ```csharp
 [SqlSourceGenerate(Source = "Queries")]
 internal static partial class Reports;
 ```
 
-- **It goes on a class, a struct, a record or a record struct.**  The type may be static, generic, or nested in other types.  A static type has no instance, so its queries need an output other than `repository` ([SQLSRC034](../diagnostics.md#sqlsrc034)): the files of `Reports` above set the output `methods`, `models` or `sql`.
-- **The type and every type that contains it must be `partial`** ([SQLSRC001](../diagnostics.md#sqlsrc001)), and none may be `file` ([SQLSRC002](../diagnostics.md#sqlsrc002)).  The generator adds its members in a second declaration of each.
-- **A type with an error gets no members**, and asks for no models.  The code that uses them then fails to compile too, so fix the first error the build reports.
+`[SqlSourceGenerate]` marks a type that the generator adds members to.  The package adds this attribute, two other attributes and three exceptions to your project, in the namespace `SqlSource`: see [what the package adds](#what-the-package-adds).
+
+- **It goes on a class, a struct, a record or a record struct.**  The type can be static, generic, or nested in other types.
+- **The queries of a static type need an output other than `repository`** ([SQLSRC034](../diagnostics.md#sqlsrc034)).  A static type has no instance.  So in the sample, the files of `Reports` must set the output `methods`, `models` or `sql`.
+- **The type and every type that contains it must be `partial`** ([SQLSRC001](../diagnostics.md#sqlsrc001)).  The generator adds its members in a second declaration of each.
+- **Neither the type nor a type that contains it can be `file`** ([SQLSRC002](../diagnostics.md#sqlsrc002)).
+- **A type with an error gets no members, and asks for no models.**  Your code that uses its members then fails to compile too.  So fix the first error that the build reports.
 
 The attribute has three properties:
 
@@ -36,7 +38,7 @@ The attribute has three properties:
 | `GenerateInterface` | Whether a repository gets its interface, over the project's choice: [repository interfaces](repositories.md#repository-interfaces) |
 | `InterfaceName` | The name of a repository's interface, `IUserRepository` by default: [repository interfaces](repositories.md#repository-interfaces) |
 
-Every other setting of a query, its [output](settings.md#setting-output) and [where its members go](members.md#locations) among them, comes from its `.sql` file, through its markers and the [settings files](settings-file.md#settings-files) of its folder, and not from the type that claims it.
+Every other setting of a query comes from its `.sql` file, through its markers and the [settings files](settings-file.md#settings-files) of its folder.  It does not come from the type that claims the query.  This is true of the [output](settings.md#setting-output) of the query and of [where its members go](members.md#locations).
 
 <a id="files-of-a-type"></a>
 
@@ -51,12 +53,17 @@ Repository/
         Monthly.sql        not searched: it is in a subfolder
 ```
 
-A type gets the file named for it, beside its C# file, or the files that its [`Source`](#setting-source) names, `Source = "."` for every `.sql` file of that folder, by the rules and with the errors given there.  What follows is what the generator does with the files.
+A type claims the file named for it, beside the C# file that carries the attribute, or the files that its [`Source`](#setting-source) names.  `Source = "."` claims every `.sql` file of that folder.  [`Source`](#setting-source) gives the rules and the errors.  This section says what the generator does with the files that a type claims.
 
-- **A type's files are one set.**  A query name is used once across all of them: a second use is [SQLSRC008](../diagnostics.md#sqlsrc008), and the file with the second one gets no members and no models for that type.
-- **Two types may claim one file**, and each gets its own members from it, though two types of one namespace can give one method twice: see [where the methods go](connection-methods.md#method-location).  They take the same settings from it, since every setting of a query comes from the file and its settings files: one output, one member location, one suffix and one shape of model for both.  Two types in one namespace share the models of the file's queries; two in two namespaces get a model each, unless the [namespace of the models](models.md#setting-model-namespace) gives them one ([shared models](models.md#shared-models)).  A type that needs other settings needs a file of its own.
+- **The files of a type are one set.**  A query name can be used only once across all of them.  A second use is [SQLSRC008](../diagnostics.md#sqlsrc008).  The file with the second use then gets no members and no models for that type.
+- **Two types can claim one file.**  Each type gets its own members from it.  Two types of one namespace can give one method twice: see [where the methods go](connection-methods.md#method-location).
+- **Two types that claim one file take the same settings from it.**  Every setting of a query comes from the file and its settings files.  So both types get one output, one member location, one suffix and one shape of model.  A type that needs other settings needs a file of its own.
+- **Two types in one namespace share the models of the queries of the file.**  Two types in two namespaces get a model each, unless the [namespace of the models](models.md#setting-model-namespace) gives them one ([shared models](models.md#shared-models)).
 - **A `.sql` file that no type claims is ignored**: see [Source](#setting-source).
-- **A file with an error in how it is written produces no members** until it is fixed: see [`.sql` files](errors.md#what-an-error-costs).  The other files of the type are unaffected.  An error about describing a query or about its sidecar, such as [SQLSRC241](../diagnostics.md#sqlsrc241), leaves the query without models until it is fixed, and so without a [method](query-methods.md#which-methods) under `methods` or `repository`; under `models` it keeps its constant or token method.
+- **A file with an error in how it is written produces no members until you fix it**: see [`.sql` files](errors.md#what-an-error-costs).  The other files of the type are unaffected.
+- **An error about describing a query, or about its sidecar, leaves the query without models until you fix it.**  [SQLSRC241](../diagnostics.md#sqlsrc241) is such an error.
+  - Under `repository` or `methods`, the query then gets no [method](query-methods.md#which-methods).
+  - Under `models`, the query keeps its constant or token method.
 
 <a id="setting-source"></a>
 
@@ -76,22 +83,42 @@ public partial class UserQueries;
 public partial class SharedQueries;
 ```
 
-`Source` is a property of the attribute and nothing else.  It says which `.sql` files belong to the type.
+`Source` says which `.sql` files a type claims.  It is a property of the attribute, and you can write it nowhere else.
 
-- Without `Source`, the type gets the one `.sql` file named for it in the folder of the C# file that carries the attribute: `UserRepository.sql` for `UserRepository`.  The name is the type's own, without its type parameters, so `Repository<T>` gets `Repository.sql`, and a nested type `Outer.Inner` gets `Inner.sql`.  For a partial type, the folder is the one of the file that carries the attribute.
-- A `Source` that ends in `.sql` names one file.  Any other `Source` names a folder, whose own `.sql` files the type gets: `Source = "."` is every `.sql` file in the folder of the C# file.  Subfolders are not searched.
-- `Source` is relative to the folder of the C# file, never to the project.  Both `/` and `\` separate folders.  Paths are compared ignoring case, so a project builds the same on every operating system: two `.sql` files of a type whose paths differ only by case are [SQLSRC013](../diagnostics.md#sqlsrc013).
-- An empty `Source`, `Source = ""`, is the same as no `Source`.  A `Source` of white space is not: it is read as the name of a folder, like any other `Source`, and so matches nothing.
-- A `Source` that matches nothing is [SQLSRC004](../diagnostics.md#sqlsrc004), and no file named for the type when there is no `Source` is [SQLSRC005](../diagnostics.md#sqlsrc005).
-- Two types may use the same file.  A `.sql` file that no type uses is ignored, so a folder of migration scripts elsewhere in the project does no harm.
+- **A `Source` that ends in `.sql` names one file.**
+- **Any other `Source` names a folder, and the type claims the `.sql` files of that folder.**  `Source = "."` is every `.sql` file in the folder of the C# file.  SqlSource does not search subfolders.
+- **Without `Source`, the type claims the one `.sql` file named for it.**  The file is in the folder of the C# file that carries the attribute: `UserRepository.sql` for `UserRepository`.
+- **The name of that file is the name of the type itself, without its type parameters.**  So `Repository<T>` claims `Repository.sql`, and a nested type `Outer.Inner` claims `Inner.sql`.
+- **For a partial type, the folder is the folder of the file that carries the attribute.**
+- **An empty `Source`, `Source = ""`, is the same as no `Source`.**
+- **A `Source` of white space is not the same as no `Source`.**  SqlSource reads it as the name of a folder, like any other `Source`, so it matches nothing.
+- **`Source` is relative to the folder of the C# file, never to the project.**  Both `/` and `\` separate folders.
+- **SqlSource ignores case when it compares paths**, so that a project builds the same on every operating system.  Two `.sql` files of a type whose paths differ only by case are [SQLSRC013](../diagnostics.md#sqlsrc013).
+- **A `Source` that matches nothing is [SQLSRC004](../diagnostics.md#sqlsrc004).**
+- **If there is no `Source`, and no file is named for the type, that is [SQLSRC005](../diagnostics.md#sqlsrc005).**
+- **Two types can claim one file**: see [which files belong to a type](#files-of-a-type).
+- **A `.sql` file that no type claims is ignored.**  So a folder of migration scripts elsewhere in the project does no harm.
 
-This is separate from [which files the compiler is given](msbuild.md#included-files), which comes first: a type can only claim a file that the project includes.  The attribute itself is on [the Attributes page](#attribute).
+A type can claim only a file that the project includes.  [Which files the compiler is given](msbuild.md#included-files) is a separate rule, and it applies first.  The attribute itself is described under [the attribute](#attribute).
 
 <a id="what-the-package-adds"></a>
 
 ## What the package adds to your project
 
-- **`SqlSource`** is the generator.  Add it to each project whose queries you want generated.  It runs in the compiler when you build and adds no runtime dependency: no assembly of it ships with your application, and it is not a dependency of a package you build.  Only the code it generates, the attributes you mark your types, their connection sources and your converters with, and the exceptions its methods throw, are compiled into your project.
+`SqlSource` is the generator.  Add the package to each project whose queries you want generated.
+
+- **The package adds no runtime dependency.**  The generator runs in the compiler when you build.  No assembly of it ships with your application, and it is not a dependency of a package that you build.
+- **Only what the generator writes is compiled into your project.**  That is the code it generates for your queries, and the types in this list.
+- **Three attributes**, as internal types in the namespace `SqlSource`:
+  - [`[SqlSourceGenerate]`](#attribute), which you mark your types with;
+  - [`[SqlSourceConnection]`](repositories.md#repository-connection), which you mark their connection sources with;
+  - [`[SqlSourceConverter]`](converters.md#converters), which you mark your converters with.
+- **Three exceptions that a query method throws**, as internal types in the namespace `SqlSource`: [`UnexpectedRowCountException`](exceptions.md#unexpected-row-count), [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back) and [`CollectionItemException`](exceptions.md#collection-item-exception).
+  - If your project uses the exceptions of another project, the package leaves them out.
+  - If your project sets [`SqlSourcePublicExceptions`](exceptions.md#public-exceptions), they are public.
+  - See [projects that share internals](exceptions.md#projects-that-share-internals).
+- **`Microsoft.CodeAnalysis.EmbeddedAttribute`**, an internal attribute, in the generated file `SqlSource-EmbeddedAttribute.g.cs`.  It keeps the three attributes out of sight of other projects, but not the exceptions.  If your project declares it too, see [the limit](#limit-embedded-attribute).
+- **Code that uses these types needs `using SqlSource;` and nothing else.**
 
 <a id="limits"></a>
 
@@ -101,10 +128,31 @@ This is separate from [which files the compiler is given](msbuild.md#included-fi
 
 ### SQLSRC208, and nothing is described, for a type whose `Source` is a constant or `nameof`
 
-- **The tool reads the attribute without compiling your code.**  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text, so `Source` must be written out where the attribute is, as a string: `Source = "Queries"`.  A constant, `nameof`, a concatenation or a cast there compiles, and the tool reports [SQLSRC208](../diagnostics.md#sqlsrc208) and describes nothing for the type.  The build then reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none, or, for the file, [SQLSRC209](../diagnostics.md#sqlsrc209) under a dialect that has no database to ask, such as `ansi`.  Two more things follow from the same reading.  An alias of the attribute (`using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]`) works in the build and is not seen by the tool, so the type's queries are not described, and the build reports SQLSRC241 for them in the same way.  An attribute inside `#if` is read with the compilation constants the tool gets from your project, which may not be those of the configuration you build.  Write the attribute under its own name, and outside `#if` where you can.
+**What you see.**  One of these:
+
+- `sqlsource describe` reports [SQLSRC208](../diagnostics.md#sqlsrc208) and describes nothing for the type.  The `Source` of the type is a constant, `nameof`, a concatenation or a cast.  The build then reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each query of the type that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](../diagnostics.md#sqlsrc209) for the file instead.
+- The type is marked with an alias of the attribute (`using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]`).  The alias works in the build, but the tool does not see it.  So the tool does not describe the queries of the type, and the build reports SQLSRC241 for them in the same way.
+
+**Why.**  The tool reads the attribute without compiling your code.  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text.  So `Source` must be written out where the attribute is, as a string: `Source = "Queries"`.  A constant, `nameof`, a concatenation or a cast there compiles, but the tool cannot read it.  For the same reason, the tool reads an attribute inside `#if` with the compilation constants that it gets from your project.  These can differ from the constants of the configuration that you build.
+
+**What to do.**
+
+1. Write `Source` as a string where the attribute is.
+2. Write the attribute under its own name.
+3. Write the attribute outside `#if` where you can.
 
 <a id="limit-embedded-attribute"></a>
 
 ### A compile error about `Microsoft.CodeAnalysis.EmbeddedAttribute`
 
-- **A project that declares `Microsoft.CodeAnalysis.EmbeddedAttribute` itself compiles only when its declaration can be joined to SqlSource's.**  SqlSource adds `internal sealed partial class EmbeddedAttribute : System.Attribute`, in the namespace `Microsoft.CodeAnalysis`, to every project.  A declaration of that name in your code, or in code that another package adds to your project, compiles when it is an `internal partial class` that derives from `System.Attribute` or names no base class, `sealed` or not.  Any other fails the build with the compiler's errors, which SqlSource cannot report first: CS0260 when it is not `partial`, CS0262 when it is `public`, CS0263 when it derives from another class, CS0441 when it is `static`, and CS0261 when it is a record, each with more errors after it.  Make the declaration an `internal partial class`, or remove it.
+**What you see.**  The build fails with the compiler's errors about your declaration of `Microsoft.CodeAnalysis.EmbeddedAttribute`.  You get one of these, each with more errors after it:
+
+- CS0260 when it is not `partial`;
+- CS0262 when it is `public`;
+- CS0263 when it derives from another class;
+- CS0441 when it is `static`;
+- CS0261 when it is a record.
+
+**Why.**  SqlSource adds `internal sealed partial class EmbeddedAttribute : System.Attribute`, in the namespace `Microsoft.CodeAnalysis`, to every project.  A project that declares `Microsoft.CodeAnalysis.EmbeddedAttribute` itself compiles only when its declaration can be joined to SqlSource's.  This is true of a declaration in your code, and of one in code that another package adds to your project.  The declaration must be an `internal partial class` that derives from `System.Attribute` or names no base class, `sealed` or not.  SqlSource cannot report the problem before the compiler does.
+
+**What to do.**  Make the declaration an `internal partial class`, or remove it.
