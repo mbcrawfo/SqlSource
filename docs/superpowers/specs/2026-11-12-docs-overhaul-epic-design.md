@@ -483,7 +483,7 @@ Placed:
 - phase 16, `members.md#generator`, both notes: the sentence on SQLSRC003 and SQLSRC012 moved to `msbuild.md#build-requirements`.  `members.md` keeps the sentence that links it.
 - phase 17, `collection-methods.md#collection-transactions`: the two bullets of each database's levels moved to `generator-parameters.md#gp-transaction`, and a bullet that links them stands in their place.
 - phase 21, SQLSRC003: the several-frameworks sentence copied to `msbuild.md#build-requirements`.
-- phase 21, SQLSRC018: the sentence on an array that sets nothing copied to `settings-file.md#settings-files`.  The rest stays in the error.
+- phase 21, SQLSRC018: the sentence on an array that sets nothing copied to `settings-file.md#file-contents`.  The rest stays in the error.
 - phase 21, SQLSRC109: the sentence that a dialect is not a generator parameter copied to `generator-parameters.md#setting-generator-parameters`.  The words of earlier previews stay in the error: they are not part of the reference.
 - phase 21, SQLSRC121: the database collation and a marker's spelling copied to `parameters.md#query-parameters`.  The sentence on `SERVERPROPERTY` stays in the error, since it leads a list.
 

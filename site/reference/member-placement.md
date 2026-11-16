@@ -1,6 +1,6 @@
 # Where the members go (location, visibility, nested class)
 
-This page says where the [members that SqlSource generates](members.md) for a query go, how visible they are, and what their nested class is named.
+This page says where the [members that SqlSource generates](members.md) for a query go, how visible they are, and what the nested class is named.
 
 <a id="locations"></a>
 
