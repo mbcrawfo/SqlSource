@@ -8,14 +8,18 @@ Each section of this page is one `SQLSRC` diagnostic, under its id.  The help li
 
 Reported by: the build.
 
-SqlSource adds members through a second declaration of the type, which C# allows only when every declaration is `partial`.  The same holds for each type the type is nested in.
+The type, or a type that it is nested in, is not declared `partial`.
+
+SqlSource adds members through a second declaration of the type, and of each type that it is nested in.  C# allows a second declaration only when every declaration is `partial`.
 
 ```csharp
 [SqlSourceGenerate]
 public class UserRepository { }
 ```
 
-Add `partial` to the type named in the message.
+**Fix:**
+
+1. Add `partial` to the type that the message names.
 
 See: [The attribute](reference/attributes.md#attribute)
 
@@ -25,14 +29,19 @@ See: [The attribute](reference/attributes.md#attribute)
 
 Reported by: the build.
 
-A type declared with the `file` modifier exists only in its own source file, so generated code cannot add to it.  The same holds for a type nested in a file-local type.
+The type is file-local, or it is nested in a file-local type.
+
+A type declared with the `file` modifier exists only in its own source file.  So generated code cannot add to it, or to a type nested in it.
 
 ```csharp
 [SqlSourceGenerate]
 file partial class UserRepository { }
 ```
 
-Remove the `file` modifier, or move the attribute to a type that is not file-local.
+**Fix:** do one of these.
+
+- Remove the `file` modifier.
+- Move the attribute to a type that is not file-local.
 
 See: [The attribute](reference/attributes.md#attribute)
 
@@ -42,9 +51,16 @@ See: [The attribute](reference/attributes.md#attribute)
 
 Reported by: the build.
 
+The project targets a framework older than .NET 8.
+
 The generated code uses API that first appeared in .NET 8.
 
-Target `net8.0` or later.  For a project that targets several frameworks, put the attributed types under a condition that excludes the older ones.
+**Fix:** do one of these.
+
+- Target `net8.0` or later.
+- If the project targets several frameworks, put the attributed types under a condition that excludes the older frameworks.
+
+See: [What the build needs](reference/msbuild.md#build-requirements)
 
 ## SQLSRC004
 
@@ -52,14 +68,25 @@ Target `net8.0` or later.  For a project that targets several frameworks, put th
 
 Reported by: the build.
 
-`Source` is relative to the folder of the source file that carries the attribute.  A value that ends in `.sql` names one file.  Any other value names a folder, and the type gets the `.sql` files directly in it; subfolders are not searched.
+No `.sql` file matches the `Source` of the attribute.
+
+`Source` is relative to the folder of the source file that carries the attribute.  A value that ends in `.sql` names one file.  Any other value names a folder, and the type gets the `.sql` files directly in it.  Subfolders are not searched.
 
 ```csharp
 [SqlSourceGenerate(Source = "Queries/User.sql")] // The file is Queries/Users.sql.
 public partial class UserRepository { }
 ```
 
-Check the spelling, and that the path starts from the folder of this source file and not from the project.  If the file exists, check that the build sees it.  The package registers the `.sql` files under the project's own folder, so a file outside it, such as a linked file, must be listed as an `AdditionalFiles` item.  So must every `.sql` file of a project that sets `SqlSourceIncludeFiles` to `false`.
+**Fix:**
+
+1. Check the spelling of the path.
+2. Check that the path starts from the folder of this source file, and not from the project.
+3. If the file exists, check that the build sees it.
+
+The package registers the `.sql` files under the folder of the project.  A file must be listed as an `AdditionalFiles` item in these cases:
+
+- The file is outside the folder of the project, such as a linked file.
+- The project sets `SqlSourceIncludeFiles` to `false`.  Then every `.sql` file of the project must be listed.
 
 See: [Source](reference/attributes.md#setting-source)
 
@@ -69,13 +96,20 @@ See: [Source](reference/attributes.md#setting-source)
 
 Reported by: the build.
 
-Without `Source`, the type gets the `.sql` file named for it in the folder of the source file that carries the attribute, `UserRepository.sql` for `UserRepository`.  That folder has no file of that name.
+The folder of the source file that carries the attribute has no SQL file named for the type.
+
+Without `Source`, the type gets the `.sql` file named for it in that folder: `UserRepository.sql` for `UserRepository`.
 
 ```console
 /work/App/Queries/UserRepository.cs(3,2): error SQLSRC005: No 'UserRepository.sql' beside this file.  Add it, or set Source.
 ```
 
-Add `UserRepository.sql` next to the source file, or rename the file you have.  For a file of another name, or several, set `Source`: `Source = "Users.sql"` for one file, `Source = "."` for every `.sql` file of the folder.  If the file is there, check that the build sees it, as described for [SQLSRC004](#sqlsrc004).
+**Fix:** do one of these.
+
+- Add `UserRepository.sql` next to the source file.
+- Rename the file you have.
+- For a file of another name, or for several files, set `Source`.  `Source = "Users.sql"` is one file, and `Source = "."` is every `.sql` file of the folder.
+- If the file is there, check that the build sees it, as described for [SQLSRC004](#sqlsrc004).
 
 See: [Source](reference/attributes.md#setting-source)
 
@@ -85,7 +119,11 @@ See: [Source](reference/attributes.md#setting-source)
 
 Reported by: the build.
 
-A query whose [member location](reference/members.md#locations) is `nested-class` puts its members in a class nested in the type, named `Sql` unless [the nested class](reference/members.md#setting-nested-class) is named otherwise, and the type already has a member with that name.  The message names it.  The same error is reported when the type itself, or one of its type parameters, has the name: a nested class cannot share either name.
+A query whose [member location](reference/members.md#locations) is `nested-class` puts its members in a class nested in the type.  That class is named `Sql`, unless [the nested class](reference/members.md#setting-nested-class) is named otherwise.  The type already has a member with that name, and the message names it.
+
+The build reports the same error when the type itself, or one of its type parameters, has that name.  A nested class cannot share either name.
+
+The build reports the error at the `[SqlSourceGenerate]` of the type, once for each name that is taken.  A file of the type can have a query whose members would go in a class of that name.  Such a file produces no members and no models for the type.  The other files of the type keep theirs.
 
 ```csharp
 [SqlSourceGenerate]
@@ -99,9 +137,11 @@ public partial class UserRepository
 /work/App/Queries/UserRepository.cs(3,2): error SQLSRC007: 'UserRepository' already has a member named 'Sql', which a file of it names as its nested class.  Rename the member, or set -- nested-class: or -- member-location: in the file.
 ```
 
-The error is reported at the type's `[SqlSourceGenerate]`, once for each name that is taken.  Each file of the type with a query whose members would go in a class of that name produces no members and no models for it, and the type's other files keep theirs.
+**Fix:** do one of these.
 
-Rename the member, the type or the type parameter, give the nested class another name with `-- nested-class:` in the file or `nestedClass` in a settings file, or write `-- member-location: class` so that the queries become members of the type itself.
+- Rename the member, the type or the type parameter.
+- Give the nested class another name, with `-- nested-class:` in the file or `nestedClass` in a settings file.
+- Write `-- member-location: class`, so that the queries become members of the type itself.
 
 See: [Where the members go](reference/members.md#locations)
 
@@ -111,9 +151,13 @@ See: [Where the members go](reference/members.md#locations)
 
 Reported by: the build.
 
-Two `.sql` files of one type each have a query with the same name, and a type cannot have two members with one name.  The error is at the second query, and the message names the file that holds the first.  The file that holds the second query produces no members and no models for that type.
+Two `.sql` files of one type each have a query with the same name.  The error is at the second query, and the message names the file that holds the first.
 
-Rename one of the queries.
+A type cannot have two members with one name.  The file that holds the second query produces no members and no models for that type.
+
+**Fix:**
+
+1. Rename one of the two queries.
 
 See: [Which files belong to a type](reference/attributes.md#files-of-a-type)
 
@@ -123,7 +167,28 @@ See: [Which files belong to a type](reference/attributes.md#files-of-a-type)
 
 Reported by: the build.
 
-A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type, and to a query whose output is `methods` whose method is in a nested class.  Under the [member location](reference/members.md#locations) `nested-class` that type is the generated class, so no query there can have its name, `Sql` unless [the nested class](reference/members.md#setting-nested-class) is named otherwise, and no query method there can have it either.  An asynchronous method has the query's name, with `Async` after it under `async-method-suffix`, and always under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) `both`, and a synchronous method, under `sync` or `both`, has the query's name alone, so under `both` the class can have neither name, whatever the query's shape.  Under `class` it is the attributed type, so no query whose output is `sql` or `models` can have that type's name.
+The member of a query would have the name of the type that contains the member.  The error is at the name of the query.
+
+A member cannot have the name of the type that contains it.  The file produces no members and no models for the type until the error is fixed.
+
+The rule applies to two kinds of query:
+
+- A query whose output is `models` or `sql`, whose constant or token method is a member of that type.
+- A query whose output is `methods`, whose method is in a nested class.
+
+The type that contains the member depends on the [member location](reference/members.md#locations):
+
+- **Under `nested-class`, it is the generated class.**  No query there can have the name of that class: `Sql`, unless [the nested class](reference/members.md#setting-nested-class) is named otherwise.  No query method there can have that name either.
+- **Under `class`, it is the attributed type.**  No query whose output is `models` or `sql` can have the name of that type.
+
+A query method takes its name from the query:
+
+- An asynchronous method has the query's name, with `Async` after it under `async-method-suffix`, and always under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) `both`.
+- A synchronous method, under `sync` or `both`, has the query's name alone.
+
+So under `both`, the generated class can have neither of the two names, whatever the shape of the query.
+
+A query method on the type or in the extension class has no member of the class to clash with.  What its name cannot be is [SQLSRC274](#sqlsrc274).
 
 ```sql
 -- name: Sql
@@ -131,7 +196,11 @@ A member cannot have the name of the type that contains it.  This applies to a q
 SELECT 1;
 ```
 
-The error is at the query's name, and the file produces no members and no models for the type until it is fixed.  Rename the query, or write `-- nested-class:` or `-- member-location:` on it.  A query method on the type or in the extension class has no member of the class to clash with: what its name cannot be is [SQLSRC274](#sqlsrc274).
+**Fix:** do one of these.
+
+- Rename the query.
+- Write `-- nested-class:` on the query.
+- Write `-- member-location:` on the query.
 
 See: [Where the members go](reference/members.md#locations)
 
@@ -141,7 +210,9 @@ See: [Where the members go](reference/members.md#locations)
 
 Reported by: the build.
 
-The code SqlSource generates for a type is C# 12, the default language version of a project that targets .NET 8, and the project sets `LangVersion` to an older one.  The message quotes the version the project uses.
+The project sets `LangVersion` to a version older than the code that SqlSource generates.  The message quotes the version that the project uses.
+
+That code is C# 12, the default language version of a project that targets .NET 8.  The build reports the error at each `[SqlSourceGenerate]` attribute, and no type gets members until it is fixed.
 
 ```xml
 <PropertyGroup>
@@ -150,9 +221,16 @@ The code SqlSource generates for a type is C# 12, the default language version o
 </PropertyGroup>
 ```
 
-Remove `LangVersion` to get the default of the target framework, or set it to `12` or later.  It can be set in the project file, in `Directory.Build.props`, and by a `-p:` argument of the build command.
+**Fix:** do one of these.
 
-The error is reported at each `[SqlSourceGenerate]` attribute, and no type gets members until it is fixed.  A project that targets a framework older than .NET 8 has an older language version by default; it gets [SQLSRC003](#sqlsrc003) and not this error, because targeting .NET 8 fixes both.
+- Remove `LangVersion` to get the default of the target framework.
+- Set `LangVersion` to `12` or later.
+
+The project file, `Directory.Build.props` and a `-p:` argument of the build command can each set it.
+
+- **A project that targets a framework older than .NET 8 gets [SQLSRC003](#sqlsrc003) and not this error.**  Its language version is older by default, and targeting .NET 8 fixes both errors.
+
+See: [What the build needs](reference/msbuild.md#build-requirements)
 
 ## SQLSRC013
 
@@ -160,11 +238,19 @@ The error is reported at each `[SqlSourceGenerate]` attribute, and no type gets 
 
 Reported by: the build.
 
-Two `.sql` files of the project have paths that differ only by upper and lower case: `Users.sql` and `users.sql` in one folder, or a file of the same name in `Queries` and in `queries`.  SqlSource compares paths ignoring case, so that a project builds the same on every operating system, and the two are one file to it.  It would use the one the project lists first and ignore the other.  The error is at the start of the file that would be ignored, and the message names the other one.
+Two `.sql` paths of the project differ only by upper and lower case.  The error is at the start of the file that SqlSource would ignore, and the message names the other one.  The build reports the error only for a `.sql` file that a type claims.
 
-Rename one of the files, or one of the folders.  Such a pair can exist only on a file system that tells upper case from lower, and already breaks a checkout of the repository on Windows and on macOS.
+SqlSource compares paths ignoring case, so that a project builds the same on every operating system.  So the two paths are one file to it.  It would use the one that the project lists first, and ignore the other.
 
-A project that lists one file twice, with spellings that differ by case, gets the same error, because SqlSource may not ask the file system whether two paths are one file.  That takes an `AdditionalFiles` item written by hand for a file that the package already includes, here `Queries/Users.sql`:
+The cause is one of these.
+
+**Two files have paths that differ only by case.**  Examples are `Users.sql` and `users.sql` in one folder, or a file of the same name in `Queries` and in `queries`.  Such a pair can exist only on a file system that tells upper case from lower.  It already breaks a checkout of the repository on Windows and on macOS.
+
+**Fix:**
+
+1. Rename one of the files, or one of the folders.
+
+**The project lists one file twice, with spellings that differ by case.**  SqlSource is not allowed to ask the file system whether two paths are one file, so the build reports the same error.  An `AdditionalFiles` item written by hand, for a file that the package already includes, causes it.  Here the file is `Queries/Users.sql`:
 
 ```xml
 <ItemGroup>
@@ -172,9 +258,10 @@ A project that lists one file twice, with spellings that differ by case, gets th
 </ItemGroup>
 ```
 
-Remove the item, since the package already includes the file.  To change the item the package adds, write `Update` in place of `Include`, and spell the path as it is on disk.
+**Fix:** do one of these.
 
-The error is reported only for a `.sql` file that a type uses.
+- Remove the item, since the package already includes the file.
+- To change the item that the package adds, write `Update` in place of `Include`.  Spell the path as it is on disk.
 
 See: [Source](reference/attributes.md#setting-source)
 
@@ -184,7 +271,16 @@ See: [Source](reference/attributes.md#setting-source)
 
 Reported by: the build and the tool.
 
-A settings file, `sqlsource.json`, holds one JSON object, and this one does not: its text is not JSON, or it is JSON whose top level is an array, a string or another value that is not an object.  The message says which.  The JSON of a settings file may have `//` and `/* */` comments, and a comma after the last member of an object or the last element of an array; anything else that JSON does not allow is this error, a missing comma or a key without quotes among them, and so is a value nested more than 64 levels deep.  The error is at the first character that breaks the JSON, or at the end of a file that is cut short; for a top level that is not an object, it is at the whole value.
+A settings file, `sqlsource.json`, holds one JSON object, and this one does not.  The message says which of these is the cause:
+
+- The text is not JSON.
+- The text is JSON whose top level is an array, a string or another value that is not an object.
+
+The JSON of a settings file can have `//` and `/* */` comments.  It can also have a comma after the last member of an object or the last element of an array.  Anything else that JSON does not allow is this error, such as a missing comma or a key without quotes.  So is a value nested more than 64 levels deep.
+
+The error is at the first character that breaks the JSON, or at the end of a file that is cut short.  For a top level that is not an object, the error is at the whole value.
+
+While the JSON is wrong, the file gives nothing.  None of its settings applies, and neither does its `root`.
 
 ```jsonc
 {
@@ -194,7 +290,9 @@ A settings file, `sqlsource.json`, holds one JSON object, and this one does not:
 }
 ```
 
-Correct the JSON.  While it is wrong the file gives nothing: none of its settings applies, and neither does its `root`.
+**Fix:**
+
+1. Correct the JSON.
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -204,7 +302,9 @@ See: [Settings files](reference/settings-file.md#settings-files)
 
 Reported by: the build and the tool.
 
-A key of the top-level object of a settings file is not one of its keys.  Keys are matched exactly, case included, so `Dialect` is reported.  The message quotes the key, and the error is at it.
+A key of the top-level object of a settings file is not one of the keys of a settings file.  The message quotes the key, and the error is at the key.
+
+Keys are matched exactly, case included, so `Dialect` gets this error.  While the key is wrong, its value is not read, and the other members still apply.
 
 ```jsonc
 {
@@ -213,7 +313,12 @@ A key of the top-level object of a settings file is not one of its keys.  Keys a
 }
 ```
 
-The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes`, `libraryTypes`, `nestedClass`, `memberLocation` and `visibility`.  Correct the key, or remove the member.  While it is wrong its value is not read, and the other members still apply.
+**Fix:** do one of these.
+
+- Correct the key.
+- Remove the member.
+
+The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes`, `libraryTypes`, `nestedClass`, `memberLocation` and `visibility`.
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -223,7 +328,7 @@ See: [Settings files](reference/settings-file.md#settings-files)
 
 Reported by: the build and the tool.
 
-A key is written twice in the top-level object of a settings file.  The first member applies, and each later one is reported at its key, whatever its value.
+A key is written twice in the top-level object of a settings file.  The first member applies.  Each later member gets this error at its key, whatever its value.
 
 ```jsonc
 {
@@ -233,7 +338,9 @@ A key is written twice in the top-level object of a settings file.  The first me
 }
 ```
 
-Remove one of the two members, and keep the value you want.
+**Fix:**
+
+1. Remove the member whose value you do not want.
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -243,7 +350,22 @@ See: [Settings files](reference/settings-file.md#settings-files)
 
 Reported by: the build and the tool.
 
-A value of a settings file is not of the JSON type its key takes.  `root` takes `true` or `false`, `generatorParameters` an array of strings, `typeOverrides` and `libraryTypes` an object whose values are strings, `columnTypes` an object whose values are strings or objects of a `"type"` string and an optional `"json"` boolean, and every other key a string.  `null` is of the wrong type for every key.  The message names the key and what it takes, and the error is at the value.
+A value of a settings file is not of the JSON type that its key takes.  The message names the key and what it takes, and the error is at the value.
+
+Each key takes one JSON type:
+
+- `root` takes `true` or `false`.
+- `generatorParameters` takes an array of strings.
+- `typeOverrides` and `libraryTypes` take an object whose values are strings.
+- `columnTypes` takes an object whose values are strings, or objects of a `"type"` string and an optional `"json"` boolean.
+- Every other key takes a string.
+
+`null` is of the wrong type for every key.
+
+While a value is of the wrong type, the file does not set its setting.  Arrays and objects follow these rules:
+
+- An element of `generatorParameters`, or a member of `typeOverrides`, `columnTypes` or `libraryTypes`, that is of the wrong type gets this error on its own.  It is left out, and the others still apply.
+- An array that has elements, none of them a string, sets nothing.  `[]` sets nothing too.
 
 ```jsonc
 {
@@ -257,7 +379,12 @@ A value of a settings file is not of the JSON type its key takes.  `root` takes 
 }
 ```
 
-Write the value as its key takes it: `"root": true`, `"generatorParameters": ["keep-comments"]`.  While a value is of the wrong type its setting is not set by the file.  An element of `generatorParameters`, or a member of `typeOverrides`, `columnTypes` or `libraryTypes`, of the wrong type is reported on its own and left out, and the others still apply; an array that has elements, none of them a string, sets nothing, and so does `[]`.  To leave a setting unset, remove its member: an empty string, or one of white space, also sets nothing for a key that takes a string, and is not an error.
+**Fix:** do one of these.
+
+- Write the value as its key takes it, such as `"root": true` or `"generatorParameters": ["keep-comments"]`.
+- To leave a setting unset, remove its member.
+
+For a key that takes a string, an empty string also sets nothing, and so does a string of white space.  Such a string is not an error.
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -267,9 +394,18 @@ See: [Settings files](reference/settings-file.md#settings-files)
 
 Reported by: the build and the tool.
 
-A value of a settings file is of the JSON type its key takes, but its setting does not take it.  The message quotes the value, trimmed, and names the key; for a member of `typeOverrides`, `columnTypes` or `libraryTypes` it quotes the member as `key: value`.  The error is at the string, or for a member from its key to its value.
+A value of a settings file has the JSON type that its key takes, but its setting does not take the value.  The message quotes the value, trimmed, and names the key.  For a member of `typeOverrides`, `columnTypes` or `libraryTypes`, the message quotes the member as `key: value`.  The error is at the string.  For a member, the error runs from its key to its value.
 
-A member of `columnTypes` written as an object takes a `"type"` string, its C# type, and may take `"json"`, `true` or `false`, and no other member; with `"json": true` its type cannot be `default`.  An object that has no `"type"` string, a `"json"` that is not `true` or `false`, a member twice or any other member is quoted by its key alone, and one whose type is not valid as `key: type`, and the message says what the object takes.
+A member of `columnTypes` can be written as an object.  The object takes a `"type"` string, its C# type.  It can also take `"json"`, `true` or `false`, and no other member.  With `"json": true`, its type cannot be `default`.  The message quotes the object by its key alone when the object has one of these:
+
+- no `"type"` string;
+- a `"json"` that is not `true` or `false`;
+- a member twice;
+- any other member.
+
+If the type of the object is not valid, the message quotes it as `key: type`.  In each case, the message says what the object takes.
+
+While the value is wrong, this file does not set the setting, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides`, `columnTypes` and `libraryTypes`, each element or member that is not valid gets this error on its own.  The others still apply.
 
 ```jsonc
 {
@@ -290,25 +426,87 @@ A member of `columnTypes` written as an object takes a `"type"` string, its C# t
 }
 ```
 
-Correct the value, or remove it.  While it is wrong the setting is not set by this file, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides`, `columnTypes` and `libraryTypes` each element or member that is not valid is reported on its own, and the others still apply.  For a key that takes a string, a value that is empty or white space sets nothing and is not an error, and such an element of `generatorParameters` is skipped; a member of `typeOverrides`, `columnTypes` or `libraryTypes` whose key or value is empty or white space is reported.
+**Fix:** do one of these.
 
-`dialect` takes a dialect's name, `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, `postgresql` also means `postgres`, and `cockroach` also means `cockroachdb`.  After `mysql` or `mariadb` the value may name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  An option that does not exist, an option after any other dialect, and a comma with nothing before it or after it each make the whole value wrong.
+- Correct the value.
+- Remove the value.
 
-`output` takes `sql`, `models`, `methods` or `repository`, in any case and with or without hyphens and spaces.  `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`, `memberLocation` takes `extension-class`, `class` or `nested-class`, and `visibility` takes `public`, `internal`, `protected` or `private`, all matched in the same way.  `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier, `modelNamespace` takes a namespace such as `App.Models`, none of whose parts is a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name, and `nestedClass` takes one identifier that is none of those and not `var`.  `database` takes one word of letters, digits, `-`, `_` and `.`.
+The values that each key takes follow.
 
-`generatorParameters` takes one word in each element: a generator parameter, `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` or `method-type`, alone or followed by `=on`, `=off` or `=default`, or `default` alone, in any case; `transaction` also takes the words of an isolation level, and `method-type` takes only `=async`, `=sync`, `=both` or `=default`.  A name that is not one is reported, `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews among them, and so is a value that is not one of the parameter's or `default`, and `default` followed by `=`.  `[]` names no parameter and changes nothing, and `["default"]` gives every parameter its default.  The rules are in [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
+`dialect` takes the name of a dialect, in any case: `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`.  Some names have another spelling:
 
-`typeOverrides` takes members `"key": "type"`, and the key and the type of each are trimmed:
+- `sqlserver` and `tsql` also mean `mssql`.
+- `postgresql` also means `postgres`.
+- `cockroach` also means `cockroachdb`.
 
-- **The key is a type's one-word name**, `timestamptz` and not `timestamp with time zone`, `float8` and not `double precision`; every built-in type has one.  A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`: a name without one must be a type SqlSource knows, so `user_status` and the misspelling `timestampz` are reported.  A value serves PostgreSQL and SQL Server alike, so a name of either one's types, `int4` or `nvarchar`, is not reported.  A schema or a name may be in double quotes, each written `\"` in JSON, as in `"\"my schema\".\"order-status\""`, and a part may be in `U&"..."` with escapes, an escape that is not valid making the member not valid.
-- **A key is not written in brackets.**  `"[dbo].[Email]"` is reported, and the message shows the forms that are read: `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly and is written `"\"dbo\".\"Email\""` as a JSON key.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
-- **The C# type is a keyword, a full name or a short name**, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end: `"int4": "int"` and not `"int4": "int?"`.  It may also be `default`.
+After `mysql` or `mariadb`, the value can name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  Each of these makes the whole value wrong:
+
+- an option that does not exist;
+- an option after any other dialect;
+- a comma with nothing before it or after it.
+
+These keys take one value from a list.  The value matches in any case, and with or without hyphens and spaces:
+
+- `output` takes `repository`, `methods`, `models` or `sql`.
+- `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`.
+- `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`.
+- `memberLocation` takes `extension-class`, `class` or `nested-class`.
+- `visibility` takes `public`, `internal`, `protected` or `private`.
+
+These keys take a name or a word:
+
+- `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier.
+- `modelNamespace` takes a namespace such as `App.Models`.  None of its parts can be a reserved keyword or `file`, `required`, `scoped` or `extension`.  C# does not take these as the name of a type.
+- `nestedClass` takes one identifier.  It cannot be one of those words, and it cannot be `var`.
+- `database` takes one word of letters, digits, `-`, `_` and `.`.
+
+`generatorParameters` takes one word in each element, in any case.  The word is one of these:
+
+- A generator parameter, alone or followed by `=on`, `=off` or `=default`.  The generator parameters are `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` and `method-type`.
+- `default` alone.
+
+`transaction` also takes the words of an isolation level.  `method-type` takes only `=async`, `=sync`, `=both` or `=default`.
+
+In `generatorParameters`, each of these gets this error:
+
+- a name that is not a generator parameter, `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews among them;
+- a value that is not one of the values of the generator parameter, or `default`;
+- `default` followed by `=`.
+
+`[]` names no generator parameter and changes nothing.  `["default"]` gives every generator parameter its default.  The rules are in [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
+
+`typeOverrides` takes members `"key": "type"`.  The key and the type of each member are trimmed.
+
+- **The key is the one-word name of a type.**  Write `timestamptz` and not `timestamp with time zone`, and `float8` and not `double precision`.  Every built-in type has one.
+- **A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema.**  Examples are `public.user_status` and `dbo.Email`.  A name without a schema must be a type that SqlSource knows.  So `user_status` and the misspelling `timestampz` get this error.
+- **A value serves PostgreSQL and SQL Server alike.**  So a name of the types of either database, such as `int4` or `nvarchar`, does not get this error.
+- **A schema or a name can be in double quotes.**  Each quote is written `\"` in JSON, as in `"\"my schema\".\"order-status\""`.
+- **A part can be in `U&"..."` with escapes.**  An escape that is not valid makes the member not valid.
+- **A key is not written in brackets.**  `"[dbo].[Email]"` gets this error.  The message shows the forms that SqlSource reads:
+  - `dbo.Email`, which matches the name of the type in any case.
+  - `"dbo"."Email"`, which matches its case exactly.  As a JSON key, it is written `"\"dbo\".\"Email\""`.
+  - For a key without a schema, the plain form alone: `[INT]` is `INT`.  A quoted name without a schema must be in lower case.
+  - For a part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, the quoted form alone: `"my schema"`.
+- **The C# type is a keyword, a full name or a short name**, such as `System.DateTimeOffset` or `DateTimeOffset`.  It has no `?` at the end: `"int4": "int"` and not `"int4": "int?"`.  It can also be `default`.
 
 The rules are in [type overrides](reference/type-mapping.md#setting-type-overrides).
 
-`columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](reference/model-properties.md#setting-column-types).
+`columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column that a value is read from: `table.column` or `schema.table.column`.  Each part is plain or in double quotes.  So each of these gets this error:
 
-`libraryTypes` takes members `"library": "state"`, each trimmed and matched ignoring case, hyphens and spaces: the library is `nodaTime`, `netTopologySuite` or `json`, and the state `on`, `off` or `default`.  The message names them.  The rules are in [library types](reference/library-types-and-json.md#setting-library-types).
+- `id`, a key of one part;
+- a key of four parts;
+- a key in brackets;
+- a key with `[]`.
+
+Its C# type is read as the type of a type override is, or is `default`.  The rules are in [column types](reference/model-properties.md#setting-column-types).
+
+`libraryTypes` takes members `"library": "state"`.  Each is trimmed and matched ignoring case, hyphens and spaces.  The library is `nodaTime`, `netTopologySuite` or `json`, and the state is `on`, `off` or `default`.  The message names them.  The rules are in [library types](reference/library-types-and-json.md#setting-library-types).
+
+Values that are empty or white space follow these rules:
+
+- **For a key that takes a string, a value that is empty or white space sets nothing.**  It is not an error.
+- **An element of `generatorParameters` that is empty or white space is skipped.**
+- **A member of `typeOverrides`, `columnTypes` or `libraryTypes` whose key or value is empty or white space gets this error.**
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -318,9 +516,23 @@ See: [Settings files](reference/settings-file.md#settings-files)
 
 Reported by: the build.
 
-Two members of `typeOverrides`, two of `columnTypes`, or two of `libraryTypes`, have one key, or two elements of `generatorParameters` give one generator parameter two different states.  Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved: `integer` and `int4` name one PostgreSQL type, `"users".id` and `users.id` one column, `nodaTime` and `NodaTime` one library, and an unqualified built-in type name is one in any case, so `timestamptz` and `TIMESTAMPTZ` are one key.  Keys that differ only in the case of a plain part of a qualified name are two keys and nothing is reported: `users.id` and `Users.ID`, or `dbo.Email` and `DBO.EMAIL`, both apply, and a type or column whose name matches one of them exactly takes that one.  The first member of two that are one applies, and the second is reported at its key; the message quotes both keys and names the setting.
+An entry of a settings file repeats another entry of the same setting.  The cause is one of these:
 
-In `generatorParameters`, `keep-comments` and `keep-comments=off` are two states of one parameter, and so are `keep-comments=default` and either of them, even where the default is the same.  The first applies, and the second is reported at its element.  The same state twice is no error.
+- Two members of `typeOverrides`, two of `columnTypes`, or two of `libraryTypes`, have one key.
+- Two elements of `generatorParameters` give one generator parameter two different states.
+
+Of two members that are one, the first applies, and the build reports the second at its key.  The message quotes both keys and names the setting.
+
+Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved.  So each of these pairs is one key:
+
+- `integer` and `int4` name one PostgreSQL type.
+- `"users".id` and `users.id` name one column.
+- `nodaTime` and `NodaTime` name one library.
+- `timestamptz` and `TIMESTAMPTZ` are one key, since an unqualified built-in type name is one in any case.
+
+Keys that differ only in the case of a plain part of a qualified name are two keys, and the build reports nothing.  So `users.id` and `Users.ID` both apply, and so do `dbo.Email` and `DBO.EMAIL`.  A type or column whose name matches one of them exactly takes that one.
+
+In `generatorParameters`, `keep-comments` and `keep-comments=off` are two states of one generator parameter.  So are `keep-comments=default` and either of them, even where the default is the same.  The first applies, and the build reports the second at its element.  The same state twice is no error.
 
 ```jsonc
 {
@@ -336,7 +548,9 @@ In `generatorParameters`, `keep-comments` and `keep-comments=off` are two states
 }
 ```
 
-Remove one of the two, and keep the C# type or the state you want.
+**Fix:**
+
+1. Remove one of the two entries.  Keep the one with the C# type or the state that you want.
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -348,9 +562,18 @@ Reported by: the build.
 
 The error comes before the build compiles anything.
 
-The build's C# compiler is older than the one SqlSource needs, which is the compiler of the .NET SDK 9.0.300 and later, and of Visual Studio 2022 17.14 and later.  The message names the version of the compiler the build found.  The build stops, and no query gets a method: a compiler that old cannot run SqlSource at all.
+The C# compiler of the build is older than the compiler that SqlSource needs.  The message names the version of the compiler that the build found.
 
-Update the .NET SDK to 9.0.300 or later, or Visual Studio to 2022 17.14 or later.  A project can still target .NET 8: the SDK builds it, and what it runs on is the framework it targets.  A `global.json` that pins an older SDK keeps the build on the old compiler, so change the version it pins.
+SqlSource needs the compiler of the .NET SDK 9.0.300 or later, or of Visual Studio 2022 17.14 or later.  A compiler that old cannot run SqlSource at all.  So the build stops, and no query gets a method.
+
+**Fix:**
+
+1. Update the .NET SDK to 9.0.300 or later, or Visual Studio to 2022 17.14 or later.
+2. If a `global.json` pins an older SDK, change the version that it pins.  Such a file keeps the build on the old compiler.
+
+- **A project can still target .NET 8.**  The SDK builds it, and the project runs on the framework that it targets.
+
+See: [What the build needs](reference/msbuild.md#build-requirements)
 
 ## SQLSRC022
 
