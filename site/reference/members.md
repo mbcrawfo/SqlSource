@@ -380,7 +380,7 @@ A [query method](query-methods.md#query-methods) has the same summary and remark
 - on SQL Server, a line for the `InvalidOperationException` that it throws when it is given a transaction that has [completed](databases/sqlserver/query-methods.md#method-results);
 - on SQL Server, for the shapes `one`, `one-optional` and `many`, a line for [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back).
 
-A [collection method](collection-methods.md#collection-methods) has a line for [`CollectionItemException`](exceptions.md#collection-item-exception), and one for `UnexpectedRowCountException` under `one` and `one-optional`.  On SQL Server, a collection method that reads rows also has a line for the `InvalidOperationException` of a query that returns [more than one result set](databases/sqlserver/query-methods.md#collection-methods).
+A [collection method](collection-methods.md#collection-methods) has a line for [`CollectionItemException`](exceptions.md#collection-item-exception), and one for `UnexpectedRowCountException` under `one` and `one-optional`.  On SQL Server, a collection method also has the two SQL Server lines of a query method.  They are the line for the completed transaction's `InvalidOperationException`, and the line for `TransactionRolledBackException` under `one`, `one-optional` and `many`.  On SQL Server, a collection method that reads rows also has a line for the `InvalidOperationException` of a query that returns [more than one result set](databases/sqlserver/query-methods.md#collection-methods).
 
 The extension class of the methods has a summary that names the type.  So does a nested class that is `public` or `protected`.
 
