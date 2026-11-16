@@ -163,6 +163,7 @@ A [synchronous method](#synchronous-repository-methods) gets its connection in t
 - **On a borrowed connection, a repository method gives its command no transaction.**  To run queries in a transaction, give them the output `methods`: see [transactions and timeouts](#repository-transactions).
 - **On SQL Server, Microsoft.Data.SqlClient refuses the command on a borrowed connection that has a pending transaction.**  It throws `InvalidOperationException`, from a synchronous method as from an asynchronous one.
 - **On PostgreSQL, Npgsql runs the command in the transaction of the borrowed connection.**
+- **An open connection that a factory returns, with a transaction that your code began on it, is the same case.**  Microsoft.Data.SqlClient refuses the command, and Npgsql runs it in that transaction.
 - **On PostgreSQL, a connection string makes a bare connection.**  The connection knows none of the plugins and mappings of your data source: see [limits](databases/postgresql/query-methods.md#limit-connection-string-repository).  Give a PostgreSQL repository a data source.
 
 The attribute is `SqlSource.SqlSourceConnectionAttribute`.  SqlSource generates it into your project beside `[SqlSourceGenerate]`.  Its one property, `Database`, names the [logical database](settings.md#setting-database) as the `database` setting does.
