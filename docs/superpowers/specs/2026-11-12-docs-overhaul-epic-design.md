@@ -1,5 +1,17 @@
 # User documentation overhaul - epic outline
 
+**2026-11-16.  Closed.**  From here on this outline is a record and is not kept current.  Phase 26 removed the epic's inventory, ledger, merge worksheets and checker: commit `79a9c4892c1093ae87f918d2beebf7da13e9a7ed` is the last that holds them, under `docs/superpowers/specs/2026-11-12-docs-overhaul/`.  The owner publishes the site by hand once more after phase 26 merges: `gh workflow run docs.yml --ref main`.
+
+What was delivered differently from the plan:
+
+- **Pages.**  76 in place of the map's 70.  Phase 25 split six pages and merged none: `members.md` to `member-placement.md`, `repositories.md` to `repository-connections.md`, `parameters.md` to `list-parameters.md`, `models.md` to `shared-models.md`, `query-methods.md` to `synchronous-methods.md`, and `msbuild.md` to `online-build.md`.  The Reference group "Generated code" became two groups, "Generated code" and "Generated methods".
+- **Pages outside 600 to 3,500 words**, each with its reason in [Resize](#resize): `diagnostics.md` (49,774), `reference/databases/sqlserver/query-methods.md` (4,442), `reference/type-mapping.md` (3,740), `reference/settings.md` (3,598), `reference/databases/other.md` (300), `reference/databases/index.md` (474), `start/how-it-works.md` (484), `start/testing.md` (546), `start/install.md` (568) and `start/call-queries.md` (586).
+- **Pull requests.**  One for each phase, 27 in all: #283, #285 to #288, #290 to #310, and the pull request of phase 26.  No phase took two or none.
+- **Rules that changed.**  No `--prerelease` and no sentence about previews (owner, phase 1); `guides/troubleshooting.md` also lists build errors that are not about the SQL (owner, phase 4); "Generated code" split in two by phase 25 instead of a group of 13 entries; the shape of a diagnostic section, its place on `reference/errors.md`, the order of the outputs and five fixed words are rules of `site/AGENTS.md` (phase 26).
+- **Corrections.**  73 rows of `corrected` beyond the map's C-01 to C-08, two of them phase 26's.
+- **Items opened.**  `TD-0116`, the SQL Server message of the list limit (phase 9), and `TD-0117`, Get started's running example and `examples/*/Repository` (phase 26).  No `docs/deferred` item: the search word "rollback" of `start/transactions.md`, which phase 10 dropped, was delivered in phase 26 (owner).
+- **Rules with no room.**  None: all four rules of phase 26 fit in `site/AGENTS.md`.
+
 This is the outline of an epic that rebuilds the user documentation as a website.  It records what the owner decided, the structure of the new site, the rules that keep the structure, and the phases that deliver it.  Each phase has a document of its own, named in [Phases](#phases), which is the brief for the agent that does that phase.  The appendix [`2026-11-12-docs-overhaul/content-map.md`](2026-11-12-docs-overhaul/content-map.md) says where every part of today's documentation goes.
 
 This outline is kept current until the epic closes.  A phase that changes the plan updates it in the same pull request.

@@ -1,6 +1,0 @@
-# base e71155bf858cb746f7f3b3f293d9e08935c7b112
-unit	disposition	to	arg	words	note
-@site/guides/troubleshooting.md:17	corrected	site/guides/troubleshooting.md#at-run-time	-	"Column 'name' is null." on PostgreSQL, or `SqlNullValueException`, "Data is Null.", on SQL Server.	last read: the first message is Npgsql's, on PostgreSQL (reference/query-methods.md#reading-rows; postgresql/query-methods.md)
-@site/reference/online-build.md:16	corrected	site/reference/online-build.md#running-in-the-build	-	*	last read: the sample build line lacked the help link that the build prints before the project, as start/errors.md shows (SqlDiagnostics.cs helpLinkUri)
--	new	site/reference/repositories.md#repository-transactions	-	-	owner, p26 Q2: the sentence that a transaction your code disposes without committing is rolled back by the driver (DbTransaction.Dispose; Npgsql NpgsqlTransaction and SqlClient SqlTransaction roll back an uncommitted transaction on dispose)
--	new	site/start/transactions.md	-	-	owner, p26 Q2: the restatement after the Withdraw sample, and "with a commit or a rollback" in the first sentence for the map's search word rollback; the Rules line links the owner
