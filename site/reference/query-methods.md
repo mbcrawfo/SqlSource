@@ -51,6 +51,7 @@ A type that claims the file of a query gives the query its methods when all of t
   - Nothing else takes the name of any of its methods ([SQLSRC274](../diagnostics.md#sqlsrc274)).
   - The query does not stream its rows under `method-type=sync` ([SQLSRC298](../diagnostics.md#sqlsrc298)).
   - No token has the name of an argument that a query method can have ([SQLSRC275](../diagnostics.md#sqlsrc275)).
+  - For a repository query, no token has the name of the primary-constructor parameter that gives the connection ([SQLSRC275](../diagnostics.md#sqlsrc275)).  Nor does a token have the name of the repository, when the repository is not generic and a `static` member gives the connection.
   - If the method goes in the extension class, that class can be written ([SQLSRC276](../diagnostics.md#sqlsrc276)).
 - **For a repository query, the type has the connection of the query.**  All of these are true:
   - The type is not static ([SQLSRC034](../diagnostics.md#sqlsrc034)).
@@ -71,7 +72,8 @@ If a query whose output is `repository` or `methods` fails one of the other cond
 - **The other queries of the type still get their methods.**
 - **A [placement error](members.md#locations) leaves the whole file of the query without members, and without models for the type.**  An example is a visibility that does not fit the member location of the query ([SQLSRC123](../diagnostics.md#sqlsrc123)).
 - **If a visibility does not fit only the models that the method takes or returns, the query loses its method alone.**  This is also SQLSRC123, and it costs what an error of the conditions costs.
-- **Each type that claims a file gets its own methods from the file, by its own settings.**  [Where the methods go](connection-methods.md#method-location) says when two such types give one method that takes a connection twice.
+
+Each type that claims a file gets its own methods from the file, by its own settings.  [Where the methods go](connection-methods.md#method-location) says when two such types give one method that takes a connection twice.
 
 Some queries whose output is `repository` or `methods` cannot get a method.  Give each of them the output `sql`:
 
@@ -164,7 +166,10 @@ internal static async Task<GetUserDto[]> GetUserAsync(
 - **A synchronous collection method does what the asynchronous one does.**  It does each of these in the same way:
   - It reads the collection once, and runs the items 1,000 at a time.
   - It begins a transaction of its own, unless it is given one or one is ambient, by the generator parameter [`transaction`](collection-methods.md#collection-transactions).
-  - It throws the same exceptions: [`CollectionItemException`](exceptions.md#collection-item-exception) with the `ItemIndex` of the item, `UnexpectedRowCountException` and, on SQL Server, `TransactionRolledBackException` and the `InvalidOperationException` of a query that returns more than one result set, as [what it throws](collection-methods.md#collection-failures) says.
+  - It throws the same exceptions, as [what it throws](collection-methods.md#collection-failures) says:
+    - [`CollectionItemException`](exceptions.md#collection-item-exception), with the `ItemIndex` of the item;
+    - `UnexpectedRowCountException`;
+    - on SQL Server, `TransactionRolledBackException`, and the `InvalidOperationException` of a query that returns more than one result set.
 - **The name of a synchronous collection method, the name of the query, is checked as the name of a method is**, by [where the methods go](connection-methods.md#method-location).  If something else takes it, the query is [SQLSRC274](../diagnostics.md#sqlsrc274).  This holds for the collection method of a stream too, which has no synchronous method of that name.
 
 <a id="reading-rows"></a>
@@ -188,11 +193,11 @@ internal static async Task<GetUserDto[]> GetUserAsync(
 
   See JSON on [PostgreSQL](databases/postgresql/libraries.md#json) and [SQL Server](databases/sqlserver/libraries.md#json), and [a class in a JSON column](library-types-and-json.md#json-class).
 - **The method reads each column as the C# type of its property, and sends each parameter as one, unless a converter converts it.**
-- **If a type override, a column type or a `-- param:` marker names a C# type with no converter, the method gives that type to the driver as it is.**  That suits a type that the driver knows, or was taught.  For a type that the driver was never taught, the driver throws `InvalidCastException`: see [converters](converters.md#converters).
+- **If a [type override](type-mapping.md#setting-type-overrides), a [column type](model-properties.md#setting-column-types) or a `-- param:` marker names a C# type with no converter, the method gives that type to the driver as it is.**  That suits a type that the driver knows, or was taught.  For a type that the driver was never taught, the driver throws `InvalidCastException`: see [converters](converters.md#converters).
 - **A class of yours in a column that holds JSON is read and sent through the serializer of System.Text.Json instead.**  See [a class in a JSON column](library-types-and-json.md#json-class).
 - **The method does not give the driver a type that the query methods convert themselves**, whichever place chose it.  These are the types of NodaTime, NetTopologySuite and System.Text.Json on SQL Server, and `JsonNode`, `JsonObject` and `JsonArray` on Npgsql 8 and 9.  See [SqlSource's own conversions](converters.md#converters).
-- **A column or parameter whose type a [library](library-types-and-json.md#setting-library-types) gives is read and sent by Npgsql on PostgreSQL, and by the query method itself on SQL Server.**  On PostgreSQL, the types of NodaTime and NetTopologySuite need their plugins on the data source of your application, and Npgsql throws `InvalidCastException` without them: see [what a method reads and throws](databases/postgresql/query-methods.md#method-results).  On SQL Server, see [NodaTime](databases/sqlserver/libraries.md#nodatime), [JSON](databases/sqlserver/libraries.md#json) and [NetTopologySuite](databases/sqlserver/libraries.md#nettopologysuite).
-- **A [converter](converters.md#converters) of yours of the direction that a library type needs is used in place of the library**, but for the types of NetTopologySuite on SQL Server.
+- **A column or parameter whose type a [library](library-types-and-json.md#setting-library-types) gives is read and sent by Npgsql on PostgreSQL, and by the query method itself on SQL Server.**  On PostgreSQL, the types of NodaTime and NetTopologySuite need their plugins on the data source of your application.  Without them, Npgsql throws `InvalidCastException`: see [what a method reads and throws](databases/postgresql/query-methods.md#method-results).  On SQL Server, see [NodaTime](databases/sqlserver/libraries.md#nodatime), [JSON](databases/sqlserver/libraries.md#json) and [NetTopologySuite](databases/sqlserver/libraries.md#nettopologysuite).
+- **A [converter](converters.md#converters) of yours of the direction that a library type needs is used in place of the reading and sending by Npgsql or by the query method**, but for the types of NetTopologySuite on SQL Server.
 - **If a type override or a column type chose the type of a column, and that type has a [converter](converters.md#converters), the converter gives the value of the property.**  The method reads the column as the type that the driver reads its database type as, and gives that value to the converter.
 - **A null never reaches the converter.**  If the property cannot be null, the method throws as above, before it calls the converter.
 

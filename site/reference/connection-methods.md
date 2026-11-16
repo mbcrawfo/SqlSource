@@ -56,7 +56,7 @@ A method that takes a connection goes where the [member location](members.md#set
 - **The extension class is named after the name of the type alone.**  `Outer.Queries<T>` gives `QueriesExtensions`.
 - **The extension class is `public` when one of the methods of the type in it is `public`.**  A method is `public` when `-- visibility: public` asks for it, and the type and every type around it are `public`.  Otherwise the class is `internal`.  Each method keeps its own visibility in the class.
 - **Two types share one extension class when their classes have one name in one namespace.**  An example is two types `Queries`, nested in two types of one namespace.  They share it only when the class is `public` for both or `internal` for both.
-- **A type gets none of its methods in an extension class that cannot be written** ([SQLSRC276](../diagnostics.md#sqlsrc276)).  This is so when two types that share the class give it two visibilities.  It is also so when a type of your project, or a model, has the full name of the class.
+- **A type gets none of its methods in an extension class that cannot be written** ([SQLSRC276](../diagnostics.md#sqlsrc276)).  This is so when two types whose classes have one name in one namespace give the class two visibilities.  It is also so when a type of your project, or a model, has the full name of the class.
 - **A method in the extension class cannot have the name of a member of `DbConnection` or `object`** ([SQLSRC274](../diagnostics.md#sqlsrc274)).  A call on a connection would find a member such as `Open` or `ToString` instead of the method.
 - **A method in the extension class cannot have the name of the class itself** ([SQLSRC274](../diagnostics.md#sqlsrc274)).
 
@@ -119,7 +119,7 @@ What the method returns depends on the result shape of the query: see [what each
 A method that takes a connection opens the connection only when it is closed.  To run several queries on one open connection, or in a transaction, open the connection yourself.
 
 - **If the `State` of the connection is `Closed`, the method opens the connection, and closes it again.**  It closes the connection before it returns or throws.
-- **If the connection was not closed, the method leaves it as it was.**  It stays open, in its transaction and with its session settings, unless an error rolls the transaction back on SQL Server.  The method does not report that error: see [what a method reads and throws](databases/sqlserver/query-methods.md#method-results).
+- **If the connection was not closed, the method leaves it as it was.**  It stays open, in its transaction and with its session settings.  On SQL Server, an error that the method does not report can still roll the transaction back: see [what a method reads and throws](databases/sqlserver/query-methods.md#method-results).
 - **A method that [streams its rows](return-types.md#streaming-rows) opens a closed connection when the loop asks for the first row.**  It closes the connection again when the loop ends.
 - **While the loop of a streaming method runs, the connection is busy with the query.**  So the body of the loop cannot run another command on it.  This is so on PostgreSQL, and on a SQL Server connection without `MultipleActiveResultSets`.
 

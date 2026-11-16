@@ -56,7 +56,7 @@ catch (TransactionRolledBackException exception)
 
 The rules:
 
-- **On PostgreSQL, no method throws it.**  An error that PostgreSQL raises aborts the transaction, and the method throws the error as Npgsql's `PostgresException`.  PostgreSQL then refuses each later command in the transaction until you roll it back.  See [PostgreSQL](databases/postgresql/query-methods.md#method-results).
+- **On PostgreSQL, no method throws it.**  An error that PostgreSQL raises aborts the transaction.  A query method throws the error as Npgsql's `PostgresException`.  A collection method throws the error of an item inside a [`CollectionItemException`](#collection-item-exception).  PostgreSQL then refuses each later command in the transaction until you roll it back.  See PostgreSQL's [query methods](databases/postgresql/query-methods.md#method-results) and [collection methods](databases/postgresql/query-methods.md#collection-methods).
 - **Its `InnerException` is the first exception**, one of these:
   - `UnexpectedRowCountException`;
   - the exception for a null in a column whose property cannot be null;
@@ -98,7 +98,7 @@ catch (CollectionItemException exception) when (exception.InnerException is SqlE
 - **Catch it where your code would catch the exception of the driver.**  Then test its `InnerException`, as the sample does.
 - **It derives from `System.Data.Common.DbException`**, the base of `SqlException` and `PostgresException`.  So code that catches `DbException` catches it too.
 - **Its `SqlState`, `IsTransient`, `BatchCommand` and `ErrorCode` are those of its inner exception.**  So a retry policy that tests `IsTransient` works unchanged.
-- **If it comes from [another project](#projects-that-share-internals), that project must target .NET 6 or later.**  It can also have such a target among its `TargetFrameworks`.  A project built for `netstandard2.0` or `netstandard2.1` alone cannot pass on the first three.  Your project then gets [SQLSRC038](../diagnostics.md#sqlsrc038).
+- **If it comes from [another project](#projects-that-share-internals), that project must target .NET 6 or later, or have such a target among its `TargetFrameworks`.**  Otherwise your project gets [SQLSRC038](../diagnostics.md#sqlsrc038): a project built for `netstandard2.0` or `netstandard2.1` alone cannot pass on `SqlState`, `IsTransient` and `BatchCommand`.
 - **It wraps only a database error at an item.**  An exception of the method's own, such as `UnexpectedRowCountException`, is thrown as [what a collection method throws](collection-methods.md#collection-failures) says.  So is an error that no item raised.
 - **It is in the namespace `SqlSource`, and as visible as `UnexpectedRowCountException`**, beside which SqlSource generates it.  So another assembly catches it by its type only when it sees it.  Otherwise, that assembly catches it as `DbException`: see [the limit](#limit-caught-by-type).
 

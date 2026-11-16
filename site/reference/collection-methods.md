@@ -95,12 +95,14 @@ The [generator parameter `transaction`](generator-parameters.md#gp-transaction) 
 
 - **On PostgreSQL, `read-uncommitted` and `snapshot` are [SQLSRC297](../diagnostics.md#sqlsrc297).**  PostgreSQL has neither level.
 - **On SQL Server, `snapshot` needs the database to allow it.**  See [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
-- **Under `off`, what a failed item leaves in the database depends on the database.**  On PostgreSQL, the round trip of the failed item is rolled back, and the round trips before it stay.  On SQL Server, each item is committed on its own, so the items before the failed one stay.  On both, the round trips after it do not run.  See [PostgreSQL](databases/postgresql/query-methods.md#collection-methods) and [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
+- **Under `off`, what a failed item leaves in the database depends on the database.**  On both, the round trips before the one of the failed item stay, and those after it do not run.  See [PostgreSQL](databases/postgresql/query-methods.md#collection-methods) and [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
+- **On PostgreSQL under `off`, the round trip of the failed item is rolled back.**
+- **On SQL Server under `off`, each item is committed on its own.**  With `XACT_ABORT` off, an error such as a duplicate key fails its item alone: the other items of its round trip stay, those after it included.  Under `SET XACT_ABORT ON`, or at an error that ends the batch, the items before it stay, and the items after it do not run.
 - **The isolation level of its own transaction is for that transaction alone.**  This is so under `on`, and under a level.  The later statements of the connection run at the level that they ran at before the call.
 - **Its own transaction is all or nothing.**  It holds every item.  If anything throws, the method rolls the transaction back, and nothing of any item is left.  This holds for a database error at an item, an exception of the method's own such as `UnexpectedRowCountException`, a null item and a cancellation.
 - **If the database has already rolled its own transaction back, the method throws the first exception all the same.**  SQL Server does so at some errors.
 - **The caller's transaction is used as it is.**  At the output `methods`, a collection method that is given a `transaction` runs every item in it, whatever `transaction` says.  It neither commits that transaction nor rolls it back.
-- **After an exception, what ran is still in the caller's transaction.**  Whether to roll it back or commit it is yours to decide.
+- **After an exception, what ran is still in the caller's transaction, unless a database error aborted the transaction or rolled it back.**  On PostgreSQL, every database error aborts it, as the next bullet says.  On SQL Server, some errors roll it back: see [SQL Server](databases/sqlserver/query-methods.md#collection-methods).  Otherwise, whether to roll the transaction back or commit it is yours to decide.
 - **On PostgreSQL, a database error aborts the caller's transaction.**  PostgreSQL then takes no other command in it until you roll it back, and what ran in it is rolled back with it.  See [PostgreSQL](databases/postgresql/query-methods.md#collection-methods).
 - **On SQL Server, a transaction that has completed is refused**, as for a query method.  See [the connection](connection-methods.md#method-connection).
 - **An ambient transaction is used as it is too.**  If `System.Transactions.Transaction.Current` is set as the method starts, as inside a `TransactionScope`, the method begins no transaction, whatever `transaction` says.  It runs the items in the ambient transaction.  A connection opened inside the scope takes part in that transaction.
@@ -111,7 +113,7 @@ The [generator parameter `transaction`](generator-parameters.md#gp-transaction) 
 
 ## What it throws
 
-A collection method throws the exceptions of its query method, and one of its own for a database error at an item.
+A collection method throws the exceptions of its query method.  It also throws some of its own, such as one for a database error at an item.
 
 - **A database error at an item is thrown as [`CollectionItemException`](exceptions.md#collection-item-exception).**  Its `ItemIndex` is the position of the item, counted from 0.  Its `InnerException` is the exception of the driver: a `PostgresException` or a `SqlException`.
 - **An error that no item raised is thrown as the exception of the driver, as it is.**  An example is an error that the database raises after every item of a round trip has run.  A PostgreSQL constraint declared `DEFERRABLE INITIALLY DEFERRED` raises one, since PostgreSQL checks it at the commit.

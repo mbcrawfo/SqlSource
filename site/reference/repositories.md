@@ -81,7 +81,7 @@ A repository method has the name of the query.  Under the [generator parameter](
   - the member of a base type, or the primary-constructor parameter, that gives the method its connection;
   - for a public method, the name of the interface of the type.
 - **A [synchronous method](generator-parameters.md#setting-generator-parameters) that takes no argument cannot be named `Finalize`** ([SQLSRC274](../diagnostics.md#sqlsrc274)).  The compiler would take it for the finalizer of the type.
-- **A token cannot be named `parameters` or `cancellationToken`, or as any other argument that a query method can have** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A token also cannot have the name of the primary-constructor parameter that gives the connection.  Nor can it have the name of a type that is not generic, when a `static` member of the type gives the connection.
+- **A token cannot be named `parameters` or `cancellationToken`, or as any other argument that a query method can have** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A token also cannot have the name of the primary-constructor parameter that gives the connection.  Nor can it have the name of the repository, when the repository is not generic and a `static` member gives the connection.
 - **The repository methods of a type are in the file of its methods**, `App.UserRepository-Methods.g.cs`, with its other query methods and its interface.
 
 <a id="repository-connection"></a>
@@ -305,4 +305,4 @@ The [collection method](collection-methods.md#collection-methods) of the query f
 - **A stream has no synchronous method**, as for [a query method](query-methods.md#synchronous-methods).  Under `sync`, a stream is [SQLSRC298](../diagnostics.md#sqlsrc298).  Under `both`, it keeps its asynchronous method alone, with both collection methods when it has one.
 - **Under any `method-type`, a token cannot be named `cancellationToken`** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A primary-constructor parameter that gives the connection cannot have that name either, under any `method-type` ([SQLSRC036](../diagnostics.md#sqlsrc036)).
 - **On PostgreSQL, a data source with `Multiplexing=true` refuses a synchronous repository method**, with `NotSupportedException`: see [what a method reads and throws](databases/postgresql/query-methods.md#method-results).
-- **On SQL Server, a borrowed connection with a pending transaction refuses a synchronous method**, with `InvalidOperationException`, as it refuses the asynchronous method.
+- **On SQL Server, Microsoft.Data.SqlClient refuses the command of a synchronous method on a borrowed connection with a pending transaction**, with `InvalidOperationException`, as it refuses that of the asynchronous method.
