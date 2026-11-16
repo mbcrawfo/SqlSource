@@ -10,7 +10,7 @@ Queries/
     Users.sql.json      written by sqlsource describe
 ```
 
-A sidecar is the file `Users.sql.json` beside `Users.sql`: a JSON file named after its `.sql` file.  It is the tool's record of what the database said about the parameters and the columns of each query of the file.  The [tool](cli.md#tool) writes it, you commit it, and you never edit it by hand.  The build reads it in place of a database.  The generator builds the [models](models.md#models) and the [query method](query-methods.md#query-methods) of a query from the entry of the query in the sidecar.  The build also checks the sidecar, and reports a query that must be described and has no current entry.
+A sidecar is the file `Users.sql.json` beside `Users.sql`: a JSON file named after its `.sql` file.  It is the tool's record of what the database said about the parameters and the columns of each query of the file.  The [tool](cli.md#tool) writes it, you commit it, and you never edit it by hand: the tool writes the whole file.  The build reads it in place of a database.  The generator builds the [models](models.md#models) and the [query method](query-methods.md#query-methods) of a query from the entry of the query in the sidecar.  The build also checks the sidecar, and reports a query that must be described and has no current entry.
 
 - **Commit the sidecars with the project.**  The build reads them in place of a database.  So every developer and every build server builds without a connection.  A copy of the project without the sidecars reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each query that must be described.
 - **Only the person who changes a query, or the schema, needs a database**, to describe the query again.
@@ -118,12 +118,13 @@ The tool cannot see a change to the schema.  So it skips a query whose SQL is as
 
 If the run described any query of that file, [SQLSRC217](../diagnostics.md#sqlsrc217) says that the sidecar was left as it was.  Fix the query, or describe the whole file, and run `describe` again.
 
-**When no query of a file needs an entry any more, the tool deletes the sidecar of the file.**  That is when each query of the file was removed, or now has the output `sql`.  The tool deletes a sidecar only when both of these are true:
+**When no query of a file needs an entry any more, the tool deletes the sidecar of the file.**  That is when each query of the file was removed, or now has the output `sql`.  The tool deletes a sidecar only when all of these are true:
 
 - the run has no `--project`, `--database` or `.sql` path;
-- the run reported no error.
+- the run reported no error;
+- the run does not say that it is offline.
 
-So a run over part of the project never removes what another part needs.
+So a run over part of the project never removes what another part needs.  When no database with a query to describe has a connection, a run of the tool by the build says that it is offline.  See [running in the build](msbuild.md#running-in-the-build).
 
 **A run that is stopped while it writes a sidecar leaves the old file or the new one**, never part of either.  The run can leave a temporary file beside the sidecar, with a name like `Users.sql.json.<id>.tmp`.  The next `describe` of the whole project removes that file once it is a minute old.
 
@@ -137,7 +138,7 @@ So a run over part of the project never removes what another part needs.
 
 **What you see.**  Two projects of one solution include the same `.sql` file, each with a type that claims it.  You can see one of these, or both:
 
-- **Entries vanish from the sidecar of the file**, or the sidecar itself is gone, after a run of `describe` on one of the two projects.  The build of the other project then reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each query that lost its entry.
+- **Entries are missing from the sidecar of the file, or vanish from it**, or the sidecar itself is gone, after a run of `describe` on one of the two projects.  The build of the other project then reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each query that lost its entry.
 - **The build of one project warns of an entry that the other project needs** ([SQLSRC245](../diagnostics.md#sqlsrc245)).  It is the project in which the query has the output `sql`.
 
 **Why.**  The file has one sidecar for both projects.  Both projects read the settings of the file, its [output](settings.md#setting-output) among them, from its markers and from the settings files of its own folder.  So the two projects need the same entries in the sidecar.  They differ when the build of one project misses a settings file that the other project finds for the `.sql` file.  A query can then need an entry for one project and not for the other.  One of these can cause it:
