@@ -44,7 +44,7 @@ jobs:
 
 **The rules you need.**
 
-- **A build in CI never describes, so this step is how the job describes.**  The build reads the sidecars that are checked in.  See [running in the build](../reference/msbuild.md#running-in-the-build) and [Check in CI](../reference/describing.md#check-in-ci).
+- **A build in CI never describes, so this step is how the job describes.**  The build reads the sidecars that are checked in.  See [running in the build](../reference/online-build.md#running-in-the-build) and [Check in CI](../reference/describing.md#check-in-ci).
 - **`--check` needs a database with your schema, and a connection for every database of the run.**  Replace `./scripts/migrate.sh` with your own step that creates the schema.  See [Check in CI](../reference/describing.md#check-in-ci).
 - **`SQLSOURCE_CONNECTION` gives the connection when the run has one database.**  A run with several databases sets a variable for each one.  See [connections](../reference/connections.md#connections).
 - **A sidecar that is missing or out of date is [SQLSRC219](../diagnostics.md#sqlsrc219).**  The exit code of `--check` tells it from a check that could not be made.  See [Read the exit code](#exit-code) and [exit codes](../reference/cli.md#exit-codes).

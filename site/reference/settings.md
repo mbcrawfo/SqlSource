@@ -93,14 +93,14 @@ A place that a row does not list cannot hold that setting.  **Default** is the v
 | [Type overrides](type-mapping.md#setting-type-overrides) | `typeOverrides` | `-- type-override:` | yes | yes | | | None |
 | [Column types](model-properties.md#setting-column-types) | `columnTypes` | `-- column:` | yes | yes, for a column of the query's result | | | None |
 | [Library types](library-types-and-json.md#setting-library-types) | `libraryTypes` | `-- library-types:` | yes | yes | | | On for PostgreSQL where the project references the library's plugin, `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, and off otherwise; `json` off |
-| [Member location](members.md#setting-member-location) | `memberLocation` | `-- member-location:` | yes | yes | | | `class` for the output `repository`, `extension-class` for `methods`, and `nested-class` for `models` or `sql` |
-| [Visibility](members.md#setting-visibility) | `visibility` | `-- visibility:` | yes | yes | | | `public` for `repository`, and otherwise by the member location, as [its section](members.md#setting-visibility) says |
-| [Nested class](members.md#setting-nested-class) | `nestedClass` | `-- nested-class:` | yes | yes | | | `Sql` |
+| [Member location](member-placement.md#setting-member-location) | `memberLocation` | `-- member-location:` | yes | yes | | | `class` for the output `repository`, `extension-class` for `methods`, and `nested-class` for `models` or `sql` |
+| [Visibility](member-placement.md#setting-visibility) | `visibility` | `-- visibility:` | yes | yes | | | `public` for `repository`, and otherwise by the member location, as [its section](member-placement.md#setting-visibility) says |
+| [Nested class](member-placement.md#setting-nested-class) | `nestedClass` | `-- nested-class:` | yes | yes | | | `Sql` |
 | [`Source`](attributes.md#setting-source) | | | no | no | `Source` | | The file named for the type in the folder of the C# file |
 | [Repository interfaces](repositories.md#repository-interfaces) | | | no | no | `GenerateInterface`, `InterfaceName` | `SqlSourceRepositoryInterfaces` | On, named `I` and the type's name |
-| [A repository's connection](repositories.md#repository-connection) | | | no | no | `Database` of `[SqlSourceConnection]` | | None: the build finds the connection source by its name or type |
-| [Running the tool in the build](msbuild.md#online-build) | | | no | no | | `SqlSourceOnline` | `auto` |
-| [The build's `.env` file](msbuild.md#setting-env-file) | | | no | no | | `SqlSourceEnvFile` | The `.env` in the project's folder |
+| [A repository's connection](repository-connections.md#repository-connection) | | | no | no | `Database` of `[SqlSourceConnection]` | | None: the build finds the connection source by its name or type |
+| [Running the tool in the build](online-build.md#online-build) | | | no | no | | `SqlSourceOnline` | `auto` |
+| [The build's `.env` file](online-build.md#setting-env-file) | | | no | no | | `SqlSourceEnvFile` | The `.env` in the project's folder |
 | [Which `.sql` files are included](msbuild.md#included-files) | | | no | no | | `SqlSourceIncludeFiles` | On: every `.sql` file under the project's folder |
 | [Public exceptions](exceptions.md#public-exceptions) | | | no | no | | `SqlSourcePublicExceptions` | Off: the exceptions are `internal` |
 
@@ -138,12 +138,12 @@ The rules:
   - A key of a settings file that is not in the table, and is not `root` or `$schema`, is [SQLSRC016](../diagnostics.md#sqlsrc016).
   - A marker where its row says that it cannot stand is [SQLSRC116](../diagnostics.md#sqlsrc116).
   - A `-- dialect:` marker inside a query or after SQL is the exception: it is [SQLSRC115](../diagnostics.md#sqlsrc115).  See [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
-- **Every type that claims a file gets the same settings for the queries of the file.**  The places of the settings of a query are the query, its file and the settings files of the folder of the file.  So two types that claim one file take the same settings from it: one output, one suffix, one shape of model, one [member location](members.md#setting-member-location).
+- **Every type that claims a file gets the same settings for the queries of the file.**  The places of the settings of a query are the query, its file and the settings files of the folder of the file.  So two types that claim one file take the same settings from it: one output, one suffix, one shape of model, one [member location](member-placement.md#setting-member-location).
 
   Only two things can differ, because they follow from the type itself:
 
   - The namespace of the models.  It is the namespace of the type, unless the [model namespace](models.md#setting-model-namespace) is set.
-  - The default [visibility](members.md#setting-visibility) of the members of `methods`, `models` and `sql` queries on the type.  It follows the accessibility of the type.
+  - The default [visibility](member-placement.md#setting-visibility) of the members of `methods`, `models` and `sql` queries on the type.  It follows the accessibility of the type.
 
   If a type needs other settings, give it a file of its own.
 
@@ -194,7 +194,7 @@ The output is the setting that says what SqlSource produces for a query.  SqlSou
 | `models` | Its SQL, as a constant or as a method where the query has tokens, and its [models](models.md#models): types for its parameters and for a row of its result |
 | `sql` | Its SQL alone: a constant, or a method where the query has tokens |
 
-The type of a `repository` query needs a connection for it, as [the connection](repositories.md#repository-connection) says.  Set one of the other three outputs in these cases:
+The type of a `repository` query needs a connection for it, as [the connection](repository-connections.md#repository-connection) says.  Set one of the other three outputs in these cases:
 
 - **Set `methods` for a query that your own code runs on a connection, in a transaction that it manages, or with a command timeout.**  The method of a `methods` query takes the connection.
 - **Set `models` for a project that runs the SQL itself.**
@@ -240,7 +240,7 @@ SELECT id, kind FROM events;
 A logical database is a name for one particular database that your queries run against, such as `billing`.  The `database` setting names the logical database that a query belongs to.  In the sample, `ListEvents` belongs to `events`, and every other query of the file to `billing`.  The setting has two uses:
 
 - **The tool reads it to choose the connection that it describes a query through.**  The tool asks that database about the query, through a connection that you give the tool by that name: see [connections](connections.md#connections).  The [sidecar](sidecars.md#sidecar-files) of the file records the name.
-- **The build reads it to choose the connection source of a [repository method](repositories.md#repository-connection).**  A [repository](repositories.md#repository-methods) that uses several logical databases marks a connection source for each.
+- **The build reads it to choose the connection source of a [repository method](repository-connections.md#repository-connection).**  A [repository](repositories.md#repository-methods) that uses several logical databases marks a connection source for each.
 
 The dialect and the logical database answer different questions.  The dialect is *which kind of SQL* a file is written in; the logical database is *which database* the tool asks about it.  Several logical databases can share a dialect: `billing` and `reports` can both be `postgres`.
 

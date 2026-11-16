@@ -43,7 +43,7 @@ public partial class Accounting(
 - **Several databases can share one dialect.**  Here `billing` and `reports` are both `postgres`.  See [database](../reference/settings.md#setting-database).
 - **The variable of a name is `SQLSOURCE_CONNECTION_` and the name in upper case**, with each character that is not a letter or a digit written as `_`: `SQLSOURCE_CONNECTION_BILLING_V2` for `billing-v2`.  See [connections](../reference/connections.md#connections).
 - **The build reads the database of each query too.**  It chooses the connection of each repository method by it.  See [database](../reference/settings.md#setting-database).
-- **A repository that uses several databases marks one connection for each**, as `[SqlSourceConnection(Database = "billing")]`.  See [One repository on two databases](#repository-on-two) and [a repository's connection](../reference/repositories.md#repository-connection).
+- **A repository that uses several databases marks one connection for each**, as `[SqlSourceConnection(Database = "billing")]`.  See [One repository on two databases](#repository-on-two) and [a repository's connection](../reference/repository-connections.md#repository-connection).
 - **For files written for another kind of database, set their dialect.**  See [Read one folder with another dialect](#folder-with-another-dialect).
 
 <a id="repository-on-two"></a>
@@ -105,8 +105,8 @@ SQLSOURCE_CONNECTION_BILLING="Server=localhost,1433;Database=billing;User ID=app
 **The rules you need.**
 
 - A `-- database:` line in the file header names the logical database of each query of the file.  A file with no such line belongs to the database named after its dialect, `postgres` or `mssql`.  See [Database](../reference/settings.md#setting-database).
-- If the repository queries of a class use more than one database, mark one member for each database.  The build then finds no member by its name or type.  See [The connection](../reference/repositories.md#repository-connection).
-- On SQL Server, which has no data source, mark a connection string, a method that returns a connection, or a connection.  See [The connection](../reference/repositories.md#repository-connection).
+- If the repository queries of a class use more than one database, mark one member for each database.  The build then finds no member by its name or type.  See [The connection](../reference/repository-connections.md#repository-connection).
+- On SQL Server, which has no data source, mark a connection string, a method that returns a connection, or a connection.  See [The connection](../reference/repository-connections.md#repository-connection).
 - The tool needs a connection for each name.  `SQLSOURCE_CONNECTION` alone serves no database when the run has more than one.  See [Connections](../reference/connections.md#connections).
 
 <a id="folder-with-another-dialect"></a>

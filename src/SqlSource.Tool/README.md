@@ -33,7 +33,7 @@ $ dotnet sqlsource describe --watch
 - `describe --check` writes nothing, and fails when a sidecar is missing or out of date: run it in CI.
 - `describe --watch` describes again each time you save a file: see [describe on save](https://mbcrawfo.github.io/SqlSource/guides/describe-on-save.html).
 
-[What describe does](https://mbcrawfo.github.io/SqlSource/reference/describing.html) has the rules of each.  A build with a connection runs `describe` itself before it compiles, and a build in CI never does: see [running in the build](https://mbcrawfo.github.io/SqlSource/reference/msbuild.html#running-in-the-build).
+[What describe does](https://mbcrawfo.github.io/SqlSource/reference/describing.html) has the rules of each.  A build with a connection runs `describe` itself before it compiles, and a build in CI never does: see [running in the build](https://mbcrawfo.github.io/SqlSource/reference/online-build.html#running-in-the-build).
 
 If a model is wrong, `diagnose` writes a bug-report bundle of its query, and `replay` checks a bundle: see [report a wrong model](https://mbcrawfo.github.io/SqlSource/guides/report-a-bug.html).
 

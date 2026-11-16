@@ -61,7 +61,7 @@ A property that can be null has a C# type with `?`: `int?`, which is `System.Nul
 - **A column whose `-- column:` marker says `null` or `not null` gets that nullability, whatever the tool recorded.**  The column keeps its name: see [the marker](#column-marker).
 - **A parameter's property can be null only in one of these cases:**
   - its [`-- param:` marker](parameters.md#param-marker) says `null`;
-  - it is a [list parameter](parameters.md#list-parameters), and the query tests the list for null, as `@ids IS NULL` does.
+  - it is a [list parameter](list-parameters.md#list-parameters), and the query tests the list for null, as `@ids IS NULL` does.
 
 <a id="column-marker"></a>
 

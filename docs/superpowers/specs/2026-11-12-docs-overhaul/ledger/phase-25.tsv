@@ -1,0 +1,31 @@
+# base 4cc1c24a45510dff5f043782a5246fb471e2f54a
+# Word counts (old > new): members.md 4266 > 1317, member-placement.md new 2998; repositories.md 3794 > 2386, repository-connections.md new 1445; parameters.md 3710 > 2217, list-parameters.md new 1540; models.md 3659 > 2493, shared-models.md new 1212; query-methods.md 3561 > 2487, synchronous-methods.md new 1103; msbuild.md 3507 > 879, online-build.md new 2674
+unit	disposition	to	arg	words	note
+@site/reference/members.md:52-187	move	site/reference/member-placement.md#locations	-	-	split: the section moves whole to its new page
+@site/reference/members.md:189-255	move	site/reference/member-placement.md#setting-visibility	-	-	split: the section moves whole to its new page
+@site/reference/members.md:257-298	move	site/reference/member-placement.md#setting-nested-class	-	-	split: the section moves whole to its new page
+@site/reference/members.md:1	move-split	-	-	-	The title loses the words that name what moved to member-placement.md
+@site/reference/members.md:1/1	move	site/reference/members.md	-	What is generated	The title's words that stay
+-	new	site/reference/member-placement.md	-	-	The new page's title and opening sentence
+-	new	site/reference/members.md	-	-	The pointer to member-placement.md, where the sections stood
+@site/reference/repositories.md:87-169	move	site/reference/repository-connections.md#repository-connection	-	-	split: the section moves whole to its new page
+-	new	site/reference/repository-connections.md	-	-	The new page's title and opening sentence
+-	new	site/reference/repositories.md	-	-	The pointer to repository-connections.md, where the sections stood
+@site/reference/parameters.md:87-173	move	site/reference/list-parameters.md#list-parameters	-	-	split: the section moves whole to its new page
+@site/reference/parameters.md:1	move-split	-	-	-	The title loses the words that name what moved to list-parameters.md
+@site/reference/parameters.md:1/1	move	site/reference/parameters.md	-	Query parameters (`@name`, `-- param:`	The title's words that stay
+-	new	site/reference/list-parameters.md	-	-	The new page's title and opening sentence
+-	new	site/reference/parameters.md	-	-	The pointer to list-parameters.md, where the sections stood
+@site/reference/models.md:249-292	move	site/reference/shared-models.md#table-models	-	-	split: the section moves whole to its new page
+@site/reference/models.md:294-329	move	site/reference/shared-models.md#shared-models	-	-	split: the section moves whole to its new page
+-	new	site/reference/shared-models.md	-	-	The new page's title and opening sentence
+-	new	site/reference/models.md	-	-	The pointer to shared-models.md, where the sections stood
+@site/reference/query-methods.md:83-173	move	site/reference/synchronous-methods.md#synchronous-methods	-	-	split: the section moves whole to its new page
+-	new	site/reference/synchronous-methods.md	-	-	The new page's title and opening sentence
+-	new	site/reference/query-methods.md	-	-	The pointer to synchronous-methods.md, where the sections stood
+@site/reference/msbuild.md:70-146	move	site/reference/online-build.md#running-in-the-build	-	-	split: the section moves whole to its new page
+@site/reference/msbuild.md:148-179	move	site/reference/online-build.md#online-build	-	-	split: the section moves whole to its new page
+@site/reference/msbuild.md:181-208	move	site/reference/online-build.md#setting-env-file	-	-	split: the section moves whole to its new page
+-	new	site/reference/online-build.md	-	-	The new page's title and opening sentence
+-	new	site/reference/msbuild.md	-	-	The pointer to online-build.md, where the sections stood
+@site/guides/lists.md:26	move	site/guides/lists.md#list-after-in	-	-	position: "site/reference/parameters.md#list-parameters" > "site/reference/list-parameters.md#list-parameters", the path in a comment of the block, as in its twin examples/*/Methods/OrderQueries.cs

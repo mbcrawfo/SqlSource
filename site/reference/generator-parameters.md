@@ -131,7 +131,7 @@ The values of `table-models` are `on` and `off`, and its default is `on`.
 - **If it is on, a query that reads a whole table gets a row model named after the table.**
 - **With `table-models=off`, the query gets a row model named after the query.**
 
-See [table models](models.md#table-models).
+See [table models](shared-models.md#table-models).
 
 <a id="gp-async-method-suffix"></a>
 
@@ -143,7 +143,7 @@ For example, with `async-method-suffix` on, the asynchronous method of the query
 - **The name of a synchronous method never ends with `Async`.**
 - **Under `method-type=both`, the name of an asynchronous method always ends with `Async`.**
 
-See [synchronous methods](query-methods.md#synchronous-methods).
+See [synchronous methods](synchronous-methods.md#synchronous-methods).
 
 <a id="gp-array-pool"></a>
 
@@ -165,10 +165,10 @@ The rules:
 
 ### `list-padding`
 
-For example, a query method sends a [list parameter](parameters.md#list-parameters) of three values as four, with its third value twice.  The values of `list-padding` are `on` and `off`, and its default is `on`.
+For example, a query method sends a [list parameter](list-parameters.md#list-parameters) of three values as four, with its third value twice.  The values of `list-padding` are `on` and `off`, and its default is `on`.
 
 - **If it is on, a query method pads each list parameter to one of a few sizes.**  The sizes are 1, 2, 4 and so on to 512, and then each multiple of 512.  The method repeats the last value of the list to fill the size.
-- **So the database sees a few forms of the query, whatever the counts.**  The database keeps a plan of each form.  See [padding](parameters.md#list-padding).
+- **So the database sees a few forms of the query, whatever the counts.**  The database keeps a plan of each form.  See [padding](list-parameters.md#list-padding).
 - **With `list-padding=off`, a query method sends each list at its own count of values.**  So each count is a form of its own, and a list sends a parameter for each of its values alone.
 
 <a id="gp-collection-method"></a>
@@ -203,7 +203,7 @@ The rules:
 `method-type` says whether a query whose output is `repository` or `methods` gets asynchronous methods or synchronous ones.  Its values are:
 
 - `async`, the default: the query gets an asynchronous method.
-- `sync`: the query gets a [synchronous method](query-methods.md#synchronous-methods) in place of the asynchronous one.
+- `sync`: the query gets a [synchronous method](synchronous-methods.md#synchronous-methods) in place of the asynchronous one.
 - `both`: the query gets the two.
 
 The rules:

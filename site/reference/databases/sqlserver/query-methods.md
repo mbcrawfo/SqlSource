@@ -22,7 +22,7 @@ AddOrderDto order = await orders.AddOrder(
 
 A described query whose output is `repository` or `methods` gets a method that runs it through Microsoft.Data.SqlClient: see [query methods](../../query-methods.md#query-methods).  The project must reference Microsoft.Data.SqlClient 6.1 or later ([SQLSRC273](../../../diagnostics.md#sqlsrc273), [SQLSRC267](../../../diagnostics.md#sqlsrc267)).
 
-- **A repository's [connection source](../../repositories.md#repository-connection) is a connection string, a factory method or a connection that the repository borrows.**  Microsoft.Data.SqlClient has no data source.  From a connection string, as above, each call makes a `SqlConnection`, opens it and disposes it.
+- **A repository's [connection source](../../repository-connections.md#repository-connection) is a connection string, a factory method or a connection that the repository borrows.**  Microsoft.Data.SqlClient has no data source.  From a connection string, as above, each call makes a `SqlConnection`, opens it and disposes it.
 - **A `methods` method runs on the `DbConnection` that you give it**, such as a `SqlConnection`.
 - **A value that fits its type never changes how it is sent.**  Above, `placed_at` is a `datetime2(7)`, `total` a `decimal(12,2)` and `status` an `nvarchar(20)`.  So the method sends `@placedAt` as a `datetime2`, with all seven digits of its time, `@total` as a `decimal(12,2)` and `@status` as an `nvarchar(20)`.  What happens to a value that does not fit is in [how a parameter is sent](#method-parameters).
 
@@ -65,7 +65,7 @@ How a method names a parameter and sends a null is on [the Query methods page](.
 SELECT id, placed_at FROM dbo.orders WHERE id IN @ids;
 ```
 
-SQL Server has no arrays, so a query method sends a list of values as a [list parameter](../../parameters.md#list-parameters).  Above, `ListOrdersByIdsParams.Ids` is an `IEnumerable<int>`.  Each of its values is sent as an `int`, the type of `id`, as [any parameter](#method-parameters) of that type is.  The test of a list for null, `@ids IS NULL`, is sent as a `bit` that has the name of the list.
+SQL Server has no arrays, so a query method sends a list of values as a [list parameter](../../list-parameters.md#list-parameters).  Above, `ListOrdersByIdsParams.Ids` is an `IEnumerable<int>`.  Each of its values is sent as an `int`, the type of `id`, as [any parameter](#method-parameters) of that type is.  The test of a list for null, `@ids IS NULL`, is sent as a `bit` that has the name of the list.
 
 - **A list after a `NOT` cannot stand inside an aggregate, a `GROUP BY` or an `OUTPUT` clause**, under the output `repository` or `methods`.  SQL Server refuses there the form in which such a list is sent when it is empty or null.  So a query such as `SELECT COUNT(IIF(category NOT IN @categories, 1, NULL)) AS others FROM dbo.products` is [SQLSRC127](../../../diagnostics.md#sqlsrc127) at build.  Test the list in a `WITH` query, and aggregate its result, as the error's page shows.
 - **An aggregate that `OVER` follows is not one of these places.**
@@ -73,7 +73,7 @@ SQL Server has no arrays, so a query method sends a list of values as a [list pa
 - **A `NOT` reaches only the condition that it stands in.**  So a `NOT` in a `WHERE` leaves a list in the `HAVING` after it alone.
 - **Inside an aggregate of your own, a list after a `NOT` fails when the query runs**, if the list is empty or null: see [the limit](#limit-list-in-an-aggregate).
 - **An empty list assumes that the connection leaves `ANSI_NULLS` on**, as Microsoft.Data.SqlClient does: see [the limit](#limit-ansi-nulls-off).
-- **A query sends at most 2,098 parameters.**  SQL Server takes 2,100 parameters in one request, and Microsoft.Data.SqlClient uses two of them to send a query with parameters.  What counts, and what a method does past it, is in [the limit of parameters](../../parameters.md#list-limit).
+- **A query sends at most 2,098 parameters.**  SQL Server takes 2,100 parameters in one request, and Microsoft.Data.SqlClient uses two of them to send a query with parameters.  What counts, and what a method does past it, is in [the limit of parameters](../../list-parameters.md#list-limit).
 - **For more values than that, send them as one JSON array** in an `nvarchar(max)` parameter, and read it with `OPENJSON`.  This needs a database whose compatibility level is 130 or later:
 
   ```sql mssql
@@ -94,7 +94,7 @@ SQL Server has no arrays, so a query method sends a list of values as a [list pa
 
 ## What a method reads and throws
 
-- **Give each `methods` method the transaction of a connection that has one.**  Without it, Microsoft.Data.SqlClient refuses the command with `InvalidOperationException` before anything is sent, as [the connection](../../connection-methods.md#method-connection) says.  The message names the call that was refused: `ExecuteReader`, `ExecuteScalar` or `ExecuteNonQuery` from a [synchronous method](../../query-methods.md#synchronous-methods), and `BeginExecuteReader` or `BeginExecuteNonQuery` from an asynchronous one.  So under `method-type=both`, the two methods of a query throw messages that differ in that word.
+- **Give each `methods` method the transaction of a connection that has one.**  Without it, Microsoft.Data.SqlClient refuses the command with `InvalidOperationException` before anything is sent, as [the connection](../../connection-methods.md#method-connection) says.  The message names the call that was refused: `ExecuteReader`, `ExecuteScalar` or `ExecuteNonQuery` from a [synchronous method](../../synchronous-methods.md#synchronous-methods), and `BeginExecuteReader` or `BeginExecuteNonQuery` from an asynchronous one.  So under `method-type=both`, the two methods of a query throw messages that differ in that word.
 - **A connection that a repository borrows must have no transaction that your code began on it with `BeginTransaction`.**  Otherwise Microsoft.Data.SqlClient refuses the command with `InvalidOperationException`, as a repository method takes no transaction: see [transactions and timeouts](../../repositories.md#repository-transactions).
 - **A `methods` method refuses a transaction that has completed.**  If the transaction was committed or rolled back before the call, every method throws `InvalidOperationException`, "The transaction given to the query 'ListOrders' has completed; it is no longer usable.", with the query's name.  Nothing runs: the connection is not opened, and no command is sent.  Without this, Microsoft.Data.SqlClient would run the command outside any transaction and commit it on its own.
 - **A loop over [streamed rows](../../return-types.md#streaming-rows) checks the transaction when the loop starts.**  So it throws when the loop asks for its first row, and it also refuses a transaction that completes between the call and the loop.

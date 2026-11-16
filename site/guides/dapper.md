@@ -160,7 +160,7 @@ public partial class UserRepository(DbConnection connection)
 
 - To run the queries with Dapper or your own ADO.NET code, set the output to `models`.  You can also set it for one folder, one file or one query.  See [Output](../reference/settings.md#setting-output).
 - The constants are in a private class `Sql` of the type.  They are plain strings, so any library can run them.  See [Constants](../reference/members.md#constants).
-- By default, a query that does not read a whole table gets an output model named after the query, such as `GetUserDto`.  See [Table models](../reference/models.md#table-models).  For the names, the shape and the properties of the models, see [Models](../reference/models.md#models).
+- By default, a query that does not read a whole table gets an output model named after the query, such as `GetUserDto`.  See [Table models](../reference/shared-models.md#table-models).  For the names, the shape and the properties of the models, see [Models](../reference/models.md#models).
 
 <a id="dapper-and-adonet"></a>
 
@@ -284,7 +284,7 @@ DefaultTypeMap.MatchNamesWithUnderscores = true;
 
   See [The `-- column:` marker](../reference/model-properties.md#column-marker) and [Which properties can be null](../reference/model-properties.md#model-nullability).
 
-- **A [list parameter](../reference/parameters.md#list-parameters), `IN @ids`, works on SQL Server alone, and only without a null test.**  On SQL Server, Dapper sends one parameter for each value of a list, and a null list as an empty one.  But Dapper rewrites every `@ids` of the query.  So `@ids IS NULL` is an error from two values up, and it is true for an empty list, as for a null one.  On PostgreSQL, Dapper sends a list as one array.  Write `id = ANY(@ids)` there, an [array parameter](../reference/databases/postgresql/query-methods.md#array-parameters).
+- **A [list parameter](../reference/list-parameters.md#list-parameters), `IN @ids`, works on SQL Server alone, and only without a null test.**  On SQL Server, Dapper sends one parameter for each value of a list, and a null list as an empty one.  But Dapper rewrites every `@ids` of the query.  So `@ids IS NULL` is an error from two values up, and it is true for an empty list, as for a null one.  On PostgreSQL, Dapper sends a list as one array.  Write `id = ANY(@ids)` there, an [array parameter](../reference/databases/postgresql/query-methods.md#array-parameters).
 
 Each database needs more, below: [PostgreSQL](#dapper-with-postgresql) and [SQL Server](#dapper-with-sql-server).  On both, a [type override](../reference/type-mapping.md#setting-type-overrides) to a type that the driver does not give needs a Dapper type handler.  On SQL Server, send a `datetime2` parameter as a `datetime2`, since Dapper sends a `DateTime` as a `datetime`.
 

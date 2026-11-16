@@ -94,7 +94,7 @@ SqlSource treats a column as one that can be null when one of these is true:
 - **An outer join can fill the column with null.**  This is a column of the optional side of a `LEFT`, `RIGHT` or `FULL` join.
 - **A list after a `NOT` or used as a value can make a joined column one that can be null.**  This is so when all of these are true:
   - The query holds one of the words `LEFT`, `RIGHT`, `FULL`, `OUTER`, `ROLLUP`, `CUBE`, `GROUPING`, `MERGE`, `OLD` or `NEW`.
-  - The query holds a [list](../../parameters.md#list-parameters) after a `NOT` or used as a value.
+  - The query holds a [list](../../list-parameters.md#list-parameters) after a `NOT` or used as a value.
   - The column is of a table that the query joins to another, on either side of the join.
 
   A condition such as `o.id NOT IN @ids` or `(o.id IN @ids) IS FALSE` can be on the optional side of a `LEFT JOIN`.  Then it drops the rows that the join fills with null, for every list but an empty one.  An empty list keeps those rows.  So SqlSource treats every joined column of such a query as one that can be null.  The column of a query with no join is not affected, and neither is any column of a query that holds none of the words.

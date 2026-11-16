@@ -58,21 +58,21 @@ A collection method reads its rows as a `many` method reads them.  It reads them
 - **A synchronous collection method takes no `cancellationToken`.**
 - **A [token](tokens.md#tokens) is one `string` argument, as in the query method.**  The collection method uses its text for every item.
 - **Once a query has a collection method, a call of its query method that passes `new(...)`, `null` or `default` as the input model no longer compiles.**  Either method takes it, so the call is ambiguous: the compiler's error CS0121.  Name the type of the input model, as in `new AddUserParams("Ada", email)` or `default(AddUserParams)`.
-- **A collection method follows [`method-type`](query-methods.md#synchronous-methods)**, as the query method does, at either output:
+- **A collection method follows [`method-type`](synchronous-methods.md#synchronous-methods)**, as the query method does, at either output:
   - under `async`, the default, it is asynchronous;
   - under `sync`, it is synchronous;
-  - under `both`, the query gets a synchronous collection method and an asynchronous one.  Each is an overload of the query method of the same name, as [synchronous methods](query-methods.md#synchronous-methods) name them.
+  - under `both`, the query gets a synchronous collection method and an asynchronous one.  Each is an overload of the query method of the same name, as [synchronous methods](synchronous-methods.md#synchronous-methods) name them.
 - **The method reads the collection once, as it goes, and never holds it whole.**  So the collection can be a LINQ query or an iterator of your own.
 - **If `parameters` is null, the method throws `ArgumentNullException` before anything runs.**
 - **An empty collection opens no connection and begins no transaction.**  The method returns an empty collection, `0` or, for `none`, nothing.
-- **The method checks each item as it reads it.**  If an item is null, the method throws `ArgumentNullException`, "Item 1499 of the collection is null.".  The message gives the position of the item, counted from 0.  A [list parameter](parameters.md#list-limit) of an item throws as the list parameter of the query method does.
+- **The method checks each item as it reads it.**  If an item is null, the method throws `ArgumentNullException`, "Item 1499 of the collection is null.".  The message gives the position of the item, counted from 0.  A [list parameter](list-parameters.md#list-limit) of an item throws as the list parameter of the query method does.
 - **The items run 1,000 at a time.**  The method reads and checks up to 1,000 items, and runs them.  Only then does it read the next 1,000.
 - **The method finds a bad item only after every round trip before its own has run.**  In the method's own transaction, those items are rolled back.  Under `transaction=off`, or in the caller's transaction, they stay.  So in those two cases, to refuse the whole collection for one bad item, check the items before the call.
 - **`commandTimeout` is the timeout of each 1,000 items, not of the whole method.**  Otherwise it is the `commandTimeout` of the query method.
 - **`cancellationToken` cancels opening the connection, running the items and reading their rows.**  The method's own transaction is then rolled back.  What each driver throws is on the pages of [PostgreSQL](databases/postgresql/query-methods.md#collection-methods) and [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
 - **Nothing cancels a synchronous collection method.**  It has no `cancellationToken`.
 - **A collection method gets its connection as its query method does.**  At the output `methods`, it opens a closed connection, and closes it again before it returns or throws.  If the connection was not closed, the method leaves it as it was.  See [the connection](connection-methods.md#method-connection).
-- **A collection method of a repository gets a connection from its [connection source](repositories.md#repository-connection) for the call.**
+- **A collection method of a repository gets a connection from its [connection source](repository-connections.md#repository-connection) for the call.**
 
 <a id="collection-transactions"></a>
 

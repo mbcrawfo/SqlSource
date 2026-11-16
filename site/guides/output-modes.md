@@ -67,7 +67,7 @@ For the `.sql` files of a folder and of its subfolders, write `output` in a `sql
 
 - If the output is set in several places, the nearest place to the query wins.  See [Which place wins](../reference/settings.md#precedence).
 - One file can hold queries of several outputs.  See [Output](../reference/settings.md#setting-output).
-- A constant is in a private class `Sql` nested in your class, so only your class's own code can use it.  See [Where the members go](../reference/members.md#locations).
+- A constant is in a private class `Sql` nested in your class, so only your class's own code can use it.  See [Where the members go](../reference/member-placement.md#locations).
 
 <a id="which-need-a-database"></a>
 

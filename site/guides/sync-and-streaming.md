@@ -48,7 +48,7 @@ A repository gets the same methods, and its interface a member for each, so `use
 
 **The rules you need.**
 
-- **`method-type=sync` gives the query the synchronous method alone.**  See [synchronous methods](../reference/query-methods.md#synchronous-methods).
+- **`method-type=sync` gives the query the synchronous method alone.**  See [synchronous methods](../reference/synchronous-methods.md#synchronous-methods).
 - **A query with [`collection-method`](../reference/collection-methods.md#collection-methods) gets its collection method the same way**: synchronous, asynchronous or both.
 - **The line can reach more than one query.**  See [generator parameters](../reference/generator-parameters.md#setting-generator-parameters) for where to write it.
 - **On PostgreSQL, run a synchronous method on a data source without `Multiplexing=true`.**  See [what a method reads and throws](../reference/databases/postgresql/query-methods.md#method-results).

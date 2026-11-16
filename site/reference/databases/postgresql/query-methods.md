@@ -22,7 +22,7 @@ AddEventDto added = await events.AddEvent(
 
 Each described query whose output is `repository` or `methods` gets a method that runs it through Npgsql: see [query methods](../../query-methods.md#query-methods).  In the sample, `kind` is an enum `event_kind`, `payload` is a `jsonb` and `happened_at` is a `timestamptz`.  So the method sends the `string` of `@kind` as an `event_kind` and the `string` of `@payload` as a `jsonb`.  It sends the `DateTime` of `@happenedAt` as a `timestamptz`.  The SQL needs no cast.
 
-- **A repository method runs on a connection from its [connection source](../../repositories.md#repository-connection).**  The best source is an `NpgsqlDataSource`, as in the sample.  The data source that your application builds has its plugins and mappings, and it gives each method a connection that has them.
+- **A repository method runs on a connection from its [connection source](../../repository-connections.md#repository-connection).**  The best source is an `NpgsqlDataSource`, as in the sample.  The data source that your application builds has its plugins and mappings, and it gives each method a connection that has them.
 - **A connection string makes a bare `NpgsqlConnection`**, which has none of these plugins and mappings: see [the limit](#limit-connection-string-repository).
 - **A method of the output `methods` runs on the `DbConnection` that you give it**, such as an `NpgsqlConnection`, or the connection that an `NpgsqlDataSource` gives.
 - **The project must reference Npgsql 8.0 or later.**  With no Npgsql, the query is [SQLSRC273](../../../diagnostics.md#sqlsrc273).  An older Npgsql is [SQLSRC247](../../../diagnostics.md#sqlsrc247).  See [supported versions](../index.md#supported-versions).
@@ -48,7 +48,7 @@ A null is sent as a `NULL` of the type of the parameter.  So `@p IS NULL` works 
 - **The server refuses a `string` that is longer than the `varchar(n)` column it is written to.**  The error is `22001`.  The server never cuts the value to fit.
 - **A parameter that has a [converter](../../converters.md#converters) is converted to the type that [the table](types.md#type-table) gives.**  For a domain, that is the type of the base type of the domain.  Then the parameter is sent as its database type too.
 - **An array parameter takes any sequence of its element type**: see [array parameters](#array-parameters).
-- **A [list parameter](../../parameters.md#list-parameters) sends each value as a parameter of the type of the values.**  It sends the label of an enum as that enum.  It sends its test for null, `@ids IS NULL`, as a `boolean` parameter that has the name of the list.  A query takes at most 65,535 parameters in all, as [the limit](../../parameters.md#list-limit) counts them.
+- **A [list parameter](../../list-parameters.md#list-parameters) sends each value as a parameter of the type of the values.**  It sends the label of an enum as that enum.  It sends its test for null, `@ids IS NULL`, as a `boolean` parameter that has the name of the list.  A query takes at most 65,535 parameters in all, as [the limit](../../list-parameters.md#list-limit) counts them.
 - **A parameter of a [JSON](libraries.md#json) type, or of a class of yours in one, is sent as its `json` or `jsonb`.**  Npgsql sends a `JsonElement` and a `JsonDocument`, and on Npgsql 10 a `JsonNode`, a `JsonObject` or a `JsonArray`.  On Npgsql 8 and 9 those three are sent as the text of their JSON.  A class is sent as the text of its JSON on every version.
 - **A class by [the JSON opt-in](../../library-types-and-json.md#json-opt-in) is sent as the text of its JSON, as the own type of the parameter.**  For example, a `text` parameter is sent as a `text`.
 
@@ -95,7 +95,7 @@ The same holds for an array of a library's type, such as NodaTime's or NetTopolo
 - **An input model of a query with a method holds an `IEnumerable<T>` where the query has an array.**  So a caller that reads the array back from the model, such as `ids.Length`, gets an `IEnumerable<T>`.  Code that constructs the model with an array still compiles.  Where you need an array, copy the sequence into one, `ids.ToArray()`.
 - **`= ANY(@ids)` sends one array, and `IN @ids` sends a list.**  Tell the forms apart by these rules:
   - `id = ANY(@ids)` sends the sequence as one array.  So the query has one form whatever the count of values, and no limit of parameters applies to it.
-  - `id IN @ids`, with no parentheses, is a [list parameter](../../parameters.md#list-parameters).  It sends one parameter for each value, [padded](../../parameters.md#list-padding) to a few sizes, up to 65,535 parameters in all.  It is written as on SQL Server, so the text of one query runs on both.  Its property is an `IEnumerable<T>` in the output `models` too, where the property of an array is a `T[]`.
+  - `id IN @ids`, with no parentheses, is a [list parameter](../../list-parameters.md#list-parameters).  It sends one parameter for each value, [padded](../../list-parameters.md#list-padding) to a few sizes, up to 65,535 parameters in all.  It is written as on SQL Server, so the text of one query runs on both.  Its property is an `IEnumerable<T>` in the output `models` too, where the property of an array is a `T[]`.
   - `IN (@ids)` compares with one array, and is not what you want.
 
 <a id="method-results"></a>
@@ -104,7 +104,7 @@ The same holds for an array of a library's type, such as NodaTime's or NetTopolo
 
 - **Give each `methods` method the transaction of a connection that has one.**  Npgsql runs a command in the transaction of its connection even when the method is not given the transaction.  Still pass it, so that the same code runs on every database: see [the connection](../../connection-methods.md#method-connection).
 - **A repository method takes no transaction**: see [transactions and timeouts](../../repositories.md#repository-transactions).  It runs in no transaction of yours, except in one of these cases:
-  - On a [borrowed connection](../../repositories.md#repository-connection) in which your code began a transaction, Npgsql runs the method in that transaction.
+  - On a [borrowed connection](../../repository-connections.md#repository-connection) in which your code began a transaction, Npgsql runs the method in that transaction.
   - Inside a `TransactionScope`, a connection opened inside the scope takes part in the transaction of the scope, so the method runs in it.  This is not so for a connection whose connection string turns enlisting off.
 - **A column is read as the C# type of its property**, which [the types](types.md#type-map) give it.  Npgsql reads some types only once it is taught them, such as an enum mapped to a C# enum, or the type of a plugin.  Such a type needs the teaching on the data source, such as `MapEnum<T>()`.
 - **A type of yours that Npgsql never reads takes [converters](../../converters.md#converters) instead.**  The column is read as the type that [the table](types.md#type-table) gives, a domain as its base type, and then converted.
@@ -136,7 +136,7 @@ The same holds for an array of a library's type, such as NodaTime's or NetTopolo
 - **`rowcount` is `-1` for a `SELECT`**, and for a `WITH` whose last statement is a `SELECT`, even when its `WITH` updates rows.  See [what each shape returns](../../return-types.md#method-shapes).
 - **When the `commandTimeout` of a `methods` method passes, the method throws Npgsql's `NpgsqlException`.**  Its inner exception is a `TimeoutException`.
 - **A synchronous method needs a data source without multiplexing.**  Multiplexing is on when the connection string of the data source has `Multiplexing=true`.  On such a data source:
-  - A [synchronous method](../../query-methods.md#synchronous-methods) given a connection that has no transaction open throws `NotSupportedException`, and runs nothing.
+  - A [synchronous method](../../synchronous-methods.md#synchronous-methods) given a connection that has no transaction open throws `NotSupportedException`, and runs nothing.
   - A synchronous method given a connection in a transaction that the caller has begun on it runs.
   - A synchronous [collection method](../../collection-methods.md#collection-methods) runs in the transaction that it begins of its own.  So it runs on such a data source too, except where it begins no transaction.  It begins none under `transaction=off`, or when a `System.Transactions` transaction is open, as inside a `TransactionScope`.
   - A [synchronous repository method](../../repositories.md#synchronous-repository-methods) runs on a connection with no transaction open, so it throws too.
@@ -192,7 +192,7 @@ A query's [collection method](../../collection-methods.md#collection-methods) ru
 
 So the repository reads and sends no type that needs a plugin or a mapping, as [what a method reads and throws](#method-results) says.  A SQL Server repository is not affected: see [what `on` needs](../../library-types-and-json.md#setting-library-types).
 
-**What to do.**  Give the repository a connection source that has the plugins and mappings: see [the connection](../../repositories.md#repository-connection).  Npgsql itself recommends a data source over a connection string.  Use one of these:
+**What to do.**  Give the repository a connection source that has the plugins and mappings: see [the connection](../../repository-connections.md#repository-connection).  Npgsql itself recommends a data source over a connection string.  Use one of these:
 
 - the `NpgsqlDataSource` that your application builds, with the plugins and mappings;
 - a factory method that opens a connection from that data source.

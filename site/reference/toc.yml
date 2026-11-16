@@ -2,8 +2,10 @@
   items:
     - name: .sql files and markers
       href: sql-files.md
-    - name: "Query parameters (@name, -- param:, IN lists)"
+    - name: "Query parameters (@name, -- param:)"
       href: parameters.md
+    - name: List parameters (IN lists)
+      href: list-parameters.md
     - name: "Tokens ({{name}})"
       href: tokens.md
     - name: Dialects
@@ -20,20 +22,32 @@
       href: attributes.md
     - name: MSBuild properties and the build
       href: msbuild.md
+    - name: Running the tool in the build (online build)
+      href: online-build.md
 - name: Generated code
   items:
-    - name: What is generated and where it goes
+    - name: What is generated
       href: members.md
+    - name: Where the members go (location, visibility, nested class)
+      href: member-placement.md
     - name: Models
       href: models.md
+    - name: Table models and shared models
+      href: shared-models.md
     - name: "Model properties: names, column types, nullable"
       href: model-properties.md
-    - name: Query methods
-      href: query-methods.md
     - name: What a method returns (arrays, lists, streaming)
       href: return-types.md
+- name: Generated methods
+  items:
+    - name: Query methods
+      href: query-methods.md
+    - name: Synchronous methods
+      href: synchronous-methods.md
     - name: Repositories
       href: repositories.md
+    - name: Where a repository gets its connection
+      href: repository-connections.md
     - name: Methods that take a connection (transaction, timeout)
       href: connection-methods.md
     - name: Collection methods (many items in one call)

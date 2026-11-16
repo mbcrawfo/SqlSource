@@ -48,9 +48,9 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- input-model-type:`, `-- output-model-type:` | The shape of a model | yes | yes | [Shape of a model](models.md#setting-model-type) |
 | `-- input-model:`, `-- output-model:` | The name of one query's model | no | yes | [Name of one query's model](models.md#setting-model-name) |
 | `-- collection-type:` | The type that a query's method returns many rows in | yes | yes | [Collection type](return-types.md#setting-collection-type) |
-| `-- member-location:` | Where a query's members go: in a class nested in the type (`nested-class`), on the type (`class`), or, for a `methods` query's method, in the extension class (`extension-class`) | yes | yes | [Where the members go](members.md#setting-member-location) |
-| `-- visibility:` | How visible a query's members are, or its nested class: `public`, `internal`, `protected` or `private` | yes | yes | [Visibility](members.md#setting-visibility) |
-| `-- nested-class:` | The name of the class nested in the type that holds a query's members | yes | yes | [Name of the nested class](members.md#setting-nested-class) |
+| `-- member-location:` | Where a query's members go: in a class nested in the type (`nested-class`), on the type (`class`), or, for a `methods` query's method, in the extension class (`extension-class`) | yes | yes | [Where the members go](member-placement.md#setting-member-location) |
+| `-- visibility:` | How visible a query's members are, or its nested class: `public`, `internal`, `protected` or `private` | yes | yes | [Visibility](member-placement.md#setting-visibility) |
+| `-- nested-class:` | The name of the class nested in the type that holds a query's members | yes | yes | [Name of the nested class](member-placement.md#setting-nested-class) |
 | `-- type-override:` | Gives a database type the C# type of your choice, one entry for each line | yes | yes | [Type overrides](type-mapping.md#setting-type-overrides) |
 | `-- column:` | Inside a query, says whether one column of the query's result can be null, `-- column: total not null`, or gives it a C# type after `->`, `-- column: total -> PostCount`, for its property in the output model, and leaves the column's name alone.  In the file header, gives a column of a table or view a C# type in every query of the file, `-- column: users.id -> UserId`, one entry for each line.  `-> json OrderMetadata` gives a column of a string type that holds JSON a class of yours | yes | yes | [Setting a column's nullability or type with a marker](model-properties.md#column-marker), [column types](model-properties.md#setting-column-types), [the JSON opt-in](library-types-and-json.md#json-opt-in) |
 | `-- library-types:` | Turns a library's types, such as NodaTime's or System.Text.Json's, on or off for the query methods, `-- library-types: nodatime=off`, one entry or more for each line | yes | yes | [Library types](library-types-and-json.md#setting-library-types) |
@@ -76,9 +76,9 @@ A query is the SQL that follows a `-- name:` line, up to the next `-- name:` lin
 - **A file uses each name once.**  A name that a file uses twice is [SQLSRC104](../diagnostics.md#sqlsrc104).
 - **The files of one type use each name once.**  A name that two files of one type use is [SQLSRC008](../diagnostics.md#sqlsrc008).
 - **The name of a query is not the name of the class that holds its members** ([SQLSRC009](../diagnostics.md#sqlsrc009)).  That class is one of these:
-  - for a query of any output, its nested class: `Sql`, unless [you name it otherwise](members.md#setting-nested-class);
+  - for a query of any output, its nested class: `Sql`, unless [you name it otherwise](member-placement.md#setting-nested-class);
   - the type itself, when the constant or token method of a query whose output is `models` or `sql` goes on it.
-- **A query method cannot have some other names.**  They are listed with [a repository method's signature](repositories.md#repository-signature), and with where [the `methods` methods go](connection-methods.md#method-location).  See [where the members go](members.md#locations).
+- **A query method cannot have some other names.**  They are listed with [a repository method's signature](repositories.md#repository-signature), and with where [the `methods` methods go](connection-methods.md#method-location).  See [where the members go](member-placement.md#locations).
 - **A query has SQL in it.**  A query that holds only comments and markers is [SQLSRC113](../diagnostics.md#sqlsrc113).
 
 A `-- name:` marker can be followed by `->` and a result shape: see [result shapes](#result-shapes).  The name ends at the `->`.
@@ -191,7 +191,7 @@ Hover over a generated member to see the SQL that it holds.  It is the SQL you w
 - **Every line ending becomes `\n`.**  So the SQL does not depend on how the file was checked out.
 - **A query parameter such as `@id` stays as written.**
 - **A token such as `{{table}}` is replaced** when your code asks for the SQL, or when the query's method runs it.
-- **A [list](parameters.md#list-parameters), `IN @ids`, is written as one parameter for each value** when the query's method runs it.  See [list parameters](parameters.md#list-parameters).
+- **A [list](list-parameters.md#list-parameters), `IN @ids`, is written as one parameter for each value** when the query's method runs it.  See [list parameters](list-parameters.md#list-parameters).
 
 <a id="markers-in-the-wrong-place"></a>
 

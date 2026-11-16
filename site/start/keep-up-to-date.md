@@ -97,6 +97,6 @@ The sidecars in git, a build that describes what you change, and a check in CI.
 
 To describe each query as you save it, see [Describe queries as you save (watch)](../guides/describe-on-save.md).  For a whole CI job, see [Check the sidecars in CI](../guides/ci.md).
 
-Rules: [sidecars in git](../reference/sidecars.md#sidecars-in-git), [sidecar files](../reference/sidecars.md#sidecar-files), [running in the build](../reference/msbuild.md#running-in-the-build), [after a schema change](../reference/describing.md#after-a-schema-change), [describing again](../reference/sidecars.md#describing-again), [check in CI](../reference/describing.md#check-in-ci).
+Rules: [sidecars in git](../reference/sidecars.md#sidecars-in-git), [sidecar files](../reference/sidecars.md#sidecar-files), [running in the build](../reference/online-build.md#running-in-the-build), [after a schema change](../reference/describing.md#after-a-schema-change), [describing again](../reference/sidecars.md#describing-again), [check in CI](../reference/describing.md#check-in-ci).
 
 Next: [When something goes wrong](errors.md)

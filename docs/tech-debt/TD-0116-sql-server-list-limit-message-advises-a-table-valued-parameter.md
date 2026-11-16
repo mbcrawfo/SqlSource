@@ -8,7 +8,7 @@ A SQL Server query method whose query would send more than 2,098 parameters thro
 System.ArgumentException: The query 'ListOrdersByIds' would send 2101 parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter. (Parameter 'parameters')
 ```
 
-A query method cannot send a table-valued parameter.  The manual says so at [Lists on SQL Server](../../site/reference/databases/sqlserver/query-methods.md#list-parameters): such a query needs the output `sql` and the user's own code.  The way a query method can send that many values is one JSON array in an `nvarchar(max)` parameter, read with `OPENJSON`, which the same section and [the limit of parameters](../../site/reference/parameters.md#list-limit) give.  PostgreSQL's advice, `send them as an array with = ANY`, is one that a query method can follow.
+A query method cannot send a table-valued parameter.  The manual says so at [Lists on SQL Server](../../site/reference/databases/sqlserver/query-methods.md#list-parameters): such a query needs the output `sql` and the user's own code.  The way a query method can send that many values is one JSON array in an `nvarchar(max)` parameter, read with `OPENJSON`, which the same section and [the limit of parameters](../../site/reference/list-parameters.md#list-limit) give.  PostgreSQL's advice, `send them as an array with = ANY`, is one that a query method can follow.
 
 ## Why it exists
 

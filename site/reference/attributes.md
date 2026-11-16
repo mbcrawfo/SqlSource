@@ -10,7 +10,7 @@ SqlSource has three attributes that you write on your code.  This table gives ea
 |----|----|----|
 | `[SqlSourceGenerate]` | `Source` | [The attribute](#attribute), [`Source`](#setting-source) |
 | `[SqlSourceGenerate]` | `GenerateInterface`, `InterfaceName` | [Repository interfaces](repositories.md#repository-interfaces) |
-| `[SqlSourceConnection]` | `Database` | [The connection](repositories.md#repository-connection) |
+| `[SqlSourceConnection]` | `Database` | [The connection](repository-connections.md#repository-connection) |
 | `[SqlSourceConverter]` | No property | [Converters](converters.md#converters) |
 
 <a id="attribute"></a>
@@ -38,7 +38,7 @@ The attribute has three properties:
 | `GenerateInterface` | Whether a repository gets its interface, over the project's choice: [repository interfaces](repositories.md#repository-interfaces) |
 | `InterfaceName` | The name of a repository's interface, `IUserRepository` by default: [repository interfaces](repositories.md#repository-interfaces) |
 
-Every other setting of a query comes from its `.sql` file, through its markers and the [settings files](settings-file.md#settings-files) of its folder.  It does not come from the type that claims the query.  This is true of the [output](settings.md#setting-output) of the query and of [where its members go](members.md#locations).
+Every other setting of a query comes from its `.sql` file, through its markers and the [settings files](settings-file.md#settings-files) of its folder.  It does not come from the type that claims the query.  This is true of the [output](settings.md#setting-output) of the query and of [where its members go](member-placement.md#locations).
 
 <a id="files-of-a-type"></a>
 
@@ -58,7 +58,7 @@ A type claims the file named for it, beside the C# file that carries the attribu
 - **The files of a type are one set.**  A query name can be used only once across all of them.  A second use is [SQLSRC008](../diagnostics.md#sqlsrc008).  The file with the second use then gets no members and no models for that type.
 - **Two types can claim one file.**  Each type gets its own members from it.  Two types of one namespace can give one method twice: see [where the methods go](connection-methods.md#method-location).
 - **Two types that claim one file take the same settings from it.**  Every setting of a query comes from the file and its settings files.  So both types get one output, one member location, one suffix and one shape of model.  A type that needs other settings needs a file of its own.
-- **Two types in one namespace share the models of the queries of the file.**  Two types in two namespaces get a model each, unless the [namespace of the models](models.md#setting-model-namespace) gives them one ([shared models](models.md#shared-models)).
+- **Two types in one namespace share the models of the queries of the file.**  Two types in two namespaces get a model each, unless the [namespace of the models](models.md#setting-model-namespace) gives them one ([shared models](shared-models.md#shared-models)).
 - **A `.sql` file that no type claims is ignored**: see [Source](#setting-source).
 - **A file with an error in how it is written produces no members until you fix it**: see [`.sql` files](errors.md#what-an-error-costs).  The other files of the type are unaffected.
 - **An error about describing a query, or about its sidecar, leaves the query without models until you fix it.**  [SQLSRC241](../diagnostics.md#sqlsrc241) is such an error.
@@ -111,7 +111,7 @@ A type can claim only a file that the project includes.  [Which files the compil
 - **Only what the generator writes is compiled into your project.**  That is the code it generates for your queries, and the types in this list.
 - **Three attributes**, as internal types in the namespace `SqlSource`:
   - [`[SqlSourceGenerate]`](#attribute), which you mark your types with;
-  - [`[SqlSourceConnection]`](repositories.md#repository-connection), which you mark their connection sources with;
+  - [`[SqlSourceConnection]`](repository-connections.md#repository-connection), which you mark their connection sources with;
   - [`[SqlSourceConverter]`](converters.md#converters), which you mark your converters with.
 - **Three exceptions that a query method throws**, as internal types in the namespace `SqlSource`: [`UnexpectedRowCountException`](exceptions.md#unexpected-row-count), [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back) and [`CollectionItemException`](exceptions.md#collection-item-exception).
   - If your project uses the exceptions of another project, the package leaves them out.

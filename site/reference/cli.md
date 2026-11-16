@@ -1,6 +1,6 @@
 # The sqlsource command
 
-This page says how to install the `sqlsource` tool, and lists its commands, options, environment variables and exit codes.  See also [what `describe` does](describing.md), [how a build runs it](msbuild.md#running-in-the-build), [the bundles of `diagnose` and `replay`](bundles.md) and [how the tool reports errors](errors.md#the-tools-errors).
+This page says how to install the `sqlsource` tool, and lists its commands, options, environment variables and exit codes.  See also [what `describe` does](describing.md), [how a build runs it](online-build.md#running-in-the-build), [the bundles of `diagnose` and `replay`](bundles.md) and [how the tool reports errors](errors.md#the-tools-errors).
 
 The tool's `diagnose` command makes a bug-report bundle of one query, which you can attach to an issue.  Its `replay` command checks a bundle with no database.  See [reporting a wrong model](../guides/report-a-bug.md#report-a-bug) and [checking a bundle with `replay`](bundles.md#replay).
 
@@ -17,7 +17,7 @@ The tool is the `sqlsource` command of the `SqlSource.Tool` package.  It asks yo
 
 - **The `describe` command connects to your database.**  It asks the database what the parameters and the columns of each of your queries are.
 - **You commit the sidecars with the project.**  Then a build needs no database.
-- **On a machine that has a connection, the build [runs `describe` itself](msbuild.md#running-in-the-build)** before it compiles.
+- **On a machine that has a connection, the build [runs `describe` itself](online-build.md#running-in-the-build)** before it compiles.
 
 The tool describes the queries whose [output](settings.md#setting-output) is `repository`, `methods` or `models`, and the build checks each of them against its sidecar.  From the sidecars, the generator builds the [models](models.md#models) of these queries, and the [method](query-methods.md#query-methods) of a query whose output is `repository` or `methods`.  See [which queries are described](describing.md#which-queries).
 
@@ -33,7 +33,7 @@ $ dotnet tool install SqlSource.Tool
 Install the tool once, as a local tool of your repository.  Run the two commands in the folder at the root of the repository.  If the repository already has a tool manifest, skip the first command.
 
 - **The first command creates the tool manifest, a `dotnet-tools.json` file.**  The manifest records the tool and its version.  Commit that file.
-- **Anyone who clones the repository, and a build server, get the same version with `dotnet tool restore`.**  A build that [runs the tool](msbuild.md#running-in-the-build) starts this version too.
+- **Anyone who clones the repository, and a build server, get the same version with `dotnet tool restore`.**  A build that [runs the tool](online-build.md#running-in-the-build) starts this version too.
 - **Keep the tool at the version of the `SqlSource` package that your projects use.**  The two are released together, under one version number.  When you update the package, update the tool with `dotnet tool update SqlSource.Tool`.
 - **A package and a tool of different versions can stop the tool from reading your project** ([SQLSRC206](../diagnostics.md#sqlsrc206)).
 - **A project whose queries all have the output `sql` needs no tool.**  That is a project that uses SqlSource only to keep its SQL out of its code files.
@@ -93,8 +93,8 @@ $ dotnet sqlsource describe src/App/Queries/Users.sql src/App/Queries/Orders.sql
 | `--check` | Describes every query of the run, compares with the sidecars, writes nothing: see [check in CI](describing.md#check-in-ci).  With `--force` too, it is `--check` |
 | `--verbose` | Prints what the run decides as it goes: see [`--verbose`](#verbose) |
 | `--log <path>` | Writes a record of the run to a file; a path that holds `=` or `;` is refused: see [logs](#logs) |
-| `--manifest <path>` | For the build's use: describes the project that the build's record of it names, without reading the project again.  It takes no project or solution, `.sql` path, `--project`, `--database` or `--watch`.  See [running in the build](msbuild.md#running-in-the-build) |
-| `--online <auto\|true>` | For the build's use, with `--manifest`: takes a `--manifest`, `--log` or `--env-file` path that holds `=` or `;`, as the build's own may, and prints and logs it in full, writes each error on one line, writes no log for `SQLSOURCE_LOG`, and under `auto` says it is offline, and exits with `0`, when no database with a query to describe has a connection.  See [running in the build](msbuild.md#running-in-the-build) |
+| `--manifest <path>` | For the build's use: describes the project that the build's record of it names, without reading the project again.  It takes no project or solution, `.sql` path, `--project`, `--database` or `--watch`.  See [running in the build](online-build.md#running-in-the-build) |
+| `--online <auto\|true>` | For the build's use, with `--manifest`: takes a `--manifest`, `--log` or `--env-file` path that holds `=` or `;`, as the build's own may, and prints and logs it in full, writes each error on one line, writes no log for `SQLSOURCE_LOG`, and under `auto` says it is offline, and exits with `0`, when no database with a query to describe has a connection.  See [running in the build](online-build.md#running-in-the-build) |
 | `--watch` | Describes once, then again each time a file of the run changes, until stopped: see [describe on save](describing.md#describe-on-save).  Not with `--check` or `--manifest` |
 
 If a run has `--project`, `--database` or a `.sql` path, it writes only the sidecars of the files whose queries it selected.  It deletes no sidecar.
@@ -118,7 +118,7 @@ The tool has six more options: `--help` and `--version`, and four that `diagnose
 |----|----|
 | `SQLSOURCE_CONNECTION_<NAME>` | The connection of the database `<name>`: see [connections](connections.md#connections) |
 | `SQLSOURCE_CONNECTION` | The connection of a run with exactly one database |
-| `SQLSOURCE_LOG` | The path of the log, when `--log` is not given.  In a build, any value writes a log of each project's run: see [running in the build](msbuild.md#running-in-the-build) |
+| `SQLSOURCE_LOG` | The path of the log, when `--log` is not given.  In a build, any value writes a log of each project's run: see [running in the build](online-build.md#running-in-the-build) |
 | `SQLSOURCE_DEBUG` | Any value that is not empty adds the stack trace to [SQLSRC200](../diagnostics.md#sqlsrc200), for a bug report |
 | `DOTNET_USE_POLLING_FILE_WATCHER` | `true` or `1`, in any case, makes `--watch` look at the folders every second instead of asking the system: see [describe on save](describing.md#describe-on-save) |
 
@@ -183,7 +183,7 @@ The log is your own record of what the run did.  It holds your names, your SQL a
   - a `--watch`;
   - `diagnose` and `replay`;
   - a run that is stopped with Ctrl+C, `SIGTERM` or `SIGHUP`;
-  - the run of a build, which is given no `--log`.  For the logs of a build, see [running in the build](msbuild.md#running-in-the-build).
+  - the run of a build, which is given no `--log`.  For the logs of a build, see [running in the build](online-build.md#running-in-the-build).
 
 **Read a log before you send it.**  The tool writes each connection value as `***` wherever it finds the value whole:
 
