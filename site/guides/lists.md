@@ -26,7 +26,7 @@ Its class, in `Methods/OrderQueries.cs`, passes an array:
 ```csharp
     // A method of your own that passes a list: ListOrdersByStatusesParams.Statuses is an IEnumerable<string>?, which
     // takes this array, a List<string> or any other sequence, and the method sends one parameter for each value.  See
-    // site/reference/parameters.md#list-parameters.
+    // site/reference/list-parameters.md#list-parameters.
     public static Task<ListOrdersByStatusesDto[]> ListOrdersNotCancelledAsync(
         DbConnection connection,
         CancellationToken cancellationToken = default
@@ -45,8 +45,8 @@ Its class, in `Methods/OrderQueries.cs`, passes an array:
 
 **The rules you need.**
 
-- **Write the parameter directly after `IN`, with no parentheses: `WHERE id IN @ids`.**  See [list parameters](../reference/parameters.md#list-parameters).
-- **The property of a list in the input model is an `IEnumerable<T>`**, such as an `IEnumerable<int>` for `int` values.  See [list parameters](../reference/parameters.md#list-parameters).
+- **Write the parameter directly after `IN`, with no parentheses: `WHERE id IN @ids`.**  See [list parameters](../reference/list-parameters.md#list-parameters).
+- **The property of a list in the input model is an `IEnumerable<T>`**, such as an `IEnumerable<int>` for `int` values.  See [list parameters](../reference/list-parameters.md#list-parameters).
 
 <a id="filter-by-a-list"></a>
 
@@ -70,7 +70,7 @@ var everyOrder = await orders.ListOrdersByStatuses(new ListOrdersByStatusesParam
 
 **The rules you need.**
 
-- **`(@ids IS NULL OR id IN @ids)` makes the filter optional, and a null list then keeps every row.**  See [Large and empty lists](#large-and-empty-lists) and [list parameters](../reference/parameters.md#list-parameters).
+- **`(@ids IS NULL OR id IN @ids)` makes the filter optional, and a null list then keeps every row.**  See [Large and empty lists](#large-and-empty-lists) and [list parameters](../reference/list-parameters.md#list-parameters).
 - **The same query runs on SQL Server as it is.**  See [Lists on SQL Server](../reference/databases/sqlserver/query-methods.md#list-parameters).
 - **To send the list as one array on PostgreSQL**, see [On PostgreSQL: one array with ANY](#postgresql-arrays) and [array parameters](../reference/databases/postgresql/query-methods.md#array-parameters).
 
@@ -96,7 +96,7 @@ FindUsersByIdsDto[] found = await users.FindUsersByIds(new FindUsersByIdsParams(
 
 - An array parameter is not a list.  `id = ANY(@ids)` sends one parameter, whatever the count of values, so no limit of parameters applies to it.  `id IN @ids` sends one parameter for each value.  See [Array parameters](../reference/databases/postgresql/query-methods.md#array-parameters).
 - If one query must run on PostgreSQL and on SQL Server, which has no arrays, use `IN @ids`.  See [Array parameters](../reference/databases/postgresql/query-methods.md#array-parameters) and [Lists on SQL Server](../reference/databases/sqlserver/query-methods.md#list-parameters).
-- If Dapper runs the query, use `= ANY(@ids)`.  Dapper sends a list to PostgreSQL as one array, which `IN @ids` cannot take.  See [List parameters](../reference/parameters.md#list-parameters).
+- If Dapper runs the query, use `= ANY(@ids)`.  Dapper sends a list to PostgreSQL as one array, which `IN @ids` cannot take.  See [List parameters](../reference/list-parameters.md#list-parameters).
 - Do not write `IN (@ids)`, with parentheses.  It compares with one array.  See [Array parameters](../reference/databases/postgresql/query-methods.md#array-parameters).
 - Under the output `models`, the property of an array is a `T[]`, and the property of a list an `IEnumerable<T>`.  See [Array parameters](../reference/databases/postgresql/query-methods.md#array-parameters).
 
@@ -130,12 +130,12 @@ ListUsersExceptDto[] others = await users.ListUsersExcept(new ListUsersExceptPar
 
 **The rules you need.**
 
-- An empty list matches no row after `IN`, and every row after `NOT IN`.  A null list does the same.  But `@ids IS NULL` is true for a null list, and false for an empty one.  See [List parameters](../reference/parameters.md#list-parameters).
-- Keep nulls out of a list after `NOT IN`.  A null value there makes the condition match no row.  See [List parameters](../reference/parameters.md#list-parameters).
-- The method pads each list to one of a few sizes with its last value, so it sends 3 values as 4.  The result does not change, and the database keeps one plan for each size.  To send each list at its own count, write `-- generator: list-padding=off`.  See [Padding](../reference/parameters.md#list-padding).
-- Each value of a list counts toward the limit of parameters of the database, and so does every other parameter.  PostgreSQL takes 65,535, and SQL Server 2,098.  If a call would send more, the method throws `ArgumentException` before it sends anything.  Padding alone never makes it throw.  See [The limit of parameters](../reference/parameters.md#list-limit).
+- An empty list matches no row after `IN`, and every row after `NOT IN`.  A null list does the same.  But `@ids IS NULL` is true for a null list, and false for an empty one.  See [List parameters](../reference/list-parameters.md#list-parameters).
+- Keep nulls out of a list after `NOT IN`.  A null value there makes the condition match no row.  See [List parameters](../reference/list-parameters.md#list-parameters).
+- The method pads each list to one of a few sizes with its last value, so it sends 3 values as 4.  The result does not change, and the database keeps one plan for each size.  To send each list at its own count, write `-- generator: list-padding=off`.  See [Padding](../reference/list-parameters.md#list-padding).
+- Each value of a list counts toward the limit of parameters of the database, and so does every other parameter.  PostgreSQL takes 65,535, and SQL Server 2,098.  If a call would send more, the method throws `ArgumentException` before it sends anything.  Padding alone never makes it throw.  See [The limit of parameters](../reference/list-parameters.md#list-limit).
 
-For more values than the limit, send them as one parameter.  On SQL Server, send a JSON array in an `nvarchar(max)` parameter, and read it with `OPENJSON`.  This needs a database whose compatibility level is 130 or later, and the `-- param:` line.  See [The limit of parameters](../reference/parameters.md#list-limit) and [Lists on SQL Server](../reference/databases/sqlserver/query-methods.md#list-parameters).
+For more values than the limit, send them as one parameter.  On SQL Server, send a JSON array in an `nvarchar(max)` parameter, and read it with `OPENJSON`.  This needs a database whose compatibility level is 130 or later, and the `-- param:` line.  See [The limit of parameters](../reference/list-parameters.md#list-limit) and [Lists on SQL Server](../reference/databases/sqlserver/query-methods.md#list-parameters).
 
 # [PostgreSQL](#tab/postgresql)
 
@@ -158,7 +158,7 @@ var found = await orders.ListOrdersByIdArray(new ListOrdersByIdArrayParams(JsonS
 
 ## If it does not work
 
-- **`ArgumentException`, "The query 'ListUsersByIds' would send ... parameters".**  The lists hold more values than the database takes.  Send the values as one parameter.  See [The limit of parameters](../reference/parameters.md#list-limit).
+- **`ArgumentException`, "The query 'ListUsersByIds' would send ... parameters".**  The lists hold more values than the database takes.  Send the values as one parameter.  See [The limit of parameters](../reference/list-parameters.md#list-limit).
 - **SQLSRC127 on SQL Server.**  A list after a `NOT` stands inside an aggregate, a `GROUP BY` or an `OUTPUT` clause, where SQL Server refuses an empty list.  Test the list in a `WITH` query, and use its result there.  See [SQLSRC127](../diagnostics.md#sqlsrc127).
 - **`SqlException` 130 on SQL Server, for an empty or null list.**  A list after a `NOT` stands inside an aggregate of your own.  Test the list in a `WITH` query, and aggregate its result.  See [the limit](../reference/databases/sqlserver/query-methods.md#limit-list-in-an-aggregate).
 - **An empty list matches the rows whose value is null, on SQL Server.**  The connection turned `ANSI_NULLS` off.  Leave it on.  See [the limit](../reference/databases/sqlserver/query-methods.md#limit-ansi-nulls-off).

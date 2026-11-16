@@ -6,7 +6,7 @@
 
 A query's [result shape](sql-files.md#result-shapes) says what its method does with the rows.  That section lists the five shapes, the shape of a query that has none, and their errors.
 
-Under the output `repository` or `methods`, what a query method returns depends on the result shape of the query.  A [synchronous method](query-methods.md#synchronous-methods) returns what the task holds, with no `Task`.  For `none`, it returns nothing, `void`.
+Under the output `repository` or `methods`, what a query method returns depends on the result shape of the query.  A [synchronous method](synchronous-methods.md#synchronous-methods) returns what the task holds, with no `Task`.  For `none`, it returns nothing, `void`.
 
 | Shape | Returns |
 |----|----|
@@ -96,7 +96,7 @@ The method of a `many` query whose collection type is `IAsyncEnumerable` returns
 
 The method takes the arguments that every [query method](connection-methods.md#method-signature) takes.  Under `async-method-suffix`, its name ends with `Async`, as the name of every method does.  Under `method-type=both`, its name ends with `Async` too.  A stream has no synchronous method:
 
-- Under [`method-type=sync`](query-methods.md#synchronous-methods), such a query is [SQLSRC298](../diagnostics.md#sqlsrc298).
+- Under [`method-type=sync`](synchronous-methods.md#synchronous-methods), such a query is [SQLSRC298](../diagnostics.md#sqlsrc298).
 - Under `method-type=both`, the query gets its stream alone.  When the query has a [collection method](collection-methods.md#collection-methods), it also gets a synchronous collection method, which returns an array.
 
 The rules of the call:

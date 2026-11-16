@@ -34,7 +34,7 @@ To keep the sidecars current, run the command of each case:
 
 | When | Run |
 |----|----|
-| You add, change, rename or remove a query, the database type or the nullability of a `-- param:` marker (not its C# type after `->`), or a token's default | `dotnet sqlsource describe`, or a build that [runs the tool](msbuild.md#running-in-the-build) |
+| You add, change, rename or remove a query, the database type or the nullability of a `-- param:` marker (not its C# type after `->`), or a token's default | `dotnet sqlsource describe`, or a build that [runs the tool](online-build.md#running-in-the-build) |
 | The schema of the database changes | `dotnet sqlsource describe --force`: see [after a schema change](describing.md#after-a-schema-change) |
 | While you work on your queries, to describe each one as you save it | `dotnet sqlsource describe --watch`: see [describe on save](describing.md#describe-on-save) |
 | You update the tool | `dotnet sqlsource describe`, or a build that runs the tool, which describes every query again |
@@ -73,7 +73,7 @@ This line in the `.gitattributes` file at the root of your repository marks the 
 **After a merge that brings together a tool update and work described with the older tool:**
 
 1. Bring your database to the schema of the merged code.
-2. Run `dotnet sqlsource describe`, or a build that [runs the tool](msbuild.md#running-in-the-build).
+2. Run `dotnet sqlsource describe`, or a build that [runs the tool](online-build.md#running-in-the-build).
 3. Commit what it writes.
 
 Each entry of a sidecar keeps the version of the tool that wrote it.  So the build warns of an entry that the older tool wrote, [SQLSRC240](../diagnostics.md#sqlsrc240), and `describe` describes its query again.  If one branch updated the tool and the other changed a query or its logical database, git reports a conflict in the sidecar.
@@ -124,7 +124,7 @@ If the run described any query of that file, [SQLSRC217](../diagnostics.md#sqlsr
 - the run reported no error;
 - the run does not say that it is offline.
 
-So a run over part of the project never removes what another part needs.  When no database with a query to describe has a connection, a run of the tool by the build says that it is offline.  See [running in the build](msbuild.md#running-in-the-build).
+So a run over part of the project never removes what another part needs.  When no database with a query to describe has a connection, a run of the tool by the build says that it is offline.  See [running in the build](online-build.md#running-in-the-build).
 
 **A run that is stopped while it writes a sidecar leaves the old file or the new one**, never part of either.  The run can leave a temporary file beside the sidecar, with a name like `Users.sql.json.<id>.tmp`.  The next `describe` of the whole project removes that file once it is a minute old.
 

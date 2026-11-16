@@ -50,7 +50,7 @@ If the connection was open, the method leaves it as it was.
 
 By default, the method `GetUser` of `UserRepository` is an `internal` extension method of `DbConnection`, in the class `UserRepositoryExtensions`.  You call it on the connection: `connection.GetUser(...)`.
 
-A method that takes a connection goes where the [member location](members.md#setting-member-location) of its query says.  It has the [visibility](members.md#setting-visibility) of its query.  If the query sets neither, the method is an `internal` extension method of `DbConnection`.  It is in a generated `static partial class` with the name of the type and `Extensions` after it.
+A method that takes a connection goes where the [member location](member-placement.md#setting-member-location) of its query says.  It has the [visibility](member-placement.md#setting-visibility) of its query.  If the query sets neither, the method is an `internal` extension method of `DbConnection`.  It is in a generated `static partial class` with the name of the type and `Extensions` after it.
 
 - **The extension class is in the namespace of the type.**  It is not nested in the types around the type.  Code in another namespace calls the methods with a `using` of that namespace.
 - **The extension class is named after the name of the type alone.**  `Outer.Queries<T>` gives `QueriesExtensions`.
@@ -92,7 +92,7 @@ internal static async Task<ListFromDto[]> ListFrom(
     CancellationToken cancellationToken = default)
 ```
 
-A method that takes a connection has the name of its query: `ListFrom`.  Under the [generator parameter](generator-parameters.md#setting-generator-parameters) `async-method-suffix`, the name has `Async` after it: `ListFromAsync`.  A [synchronous method](query-methods.md#synchronous-methods) has the name of the query alone.  Under `method-type=both`, the asynchronous method beside it always has `Async` after its name.  The method takes these arguments, in this order:
+A method that takes a connection has the name of its query: `ListFrom`.  Under the [generator parameter](generator-parameters.md#setting-generator-parameters) `async-method-suffix`, the name has `Async` after it: `ListFromAsync`.  A [synchronous method](synchronous-methods.md#synchronous-methods) has the name of the query alone.  Under `method-type=both`, the asynchronous method beside it always has `Async` after its name.  The method takes these arguments, in this order:
 
 | Argument | What it is |
 |----|----|
@@ -104,10 +104,10 @@ A method that takes a connection has the name of its query: `ListFrom`.  Under t
 | `cancellationToken` | Cancels opening the connection, running the query and reading its rows.  What each driver throws then is on the pages of [PostgreSQL](databases/postgresql/query-methods.md#method-results) and [SQL Server](databases/sqlserver/query-methods.md#method-results) |
 
 - **The method of a query with tokens raises no CA2100 ("Review SQL queries for security vulnerabilities") in your build.**  The method runs SQL made with the text of the tokens.  That text is the choice of your own code, never of a user, as [tokens](tokens.md#tokens) says.
-- **The method of a query with a [list parameter](parameters.md#list-parameters) raises no CA2100 either.**  Its SQL is the SQL of the query, with a parameter for each value.
+- **The method of a query with a [list parameter](list-parameters.md#list-parameters) raises no CA2100 either.**  Its SQL is the SQL of the query, with a parameter for each value.
 - **If `connection` or `parameters` is null, the method throws `ArgumentNullException`.**
-- **If its query would send more parameters than its database takes, a method with a list parameter throws `ArgumentException`.**  See [list parameters](parameters.md#list-limit).
-- **If a list changed after the method counted it, a method with a list parameter throws `InvalidOperationException`.**  See [list parameters](parameters.md#list-limit).
+- **If its query would send more parameters than its database takes, a method with a list parameter throws `ArgumentException`.**  See [list parameters](list-parameters.md#list-limit).
+- **If a list changed after the method counted it, a method with a list parameter throws `InvalidOperationException`.**  See [list parameters](list-parameters.md#list-limit).
 - **A token cannot have the name of an argument that a query method can have** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  These names are `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`.
 
 What the method returns depends on the result shape of the query: see [what each shape returns](return-types.md#method-shapes).

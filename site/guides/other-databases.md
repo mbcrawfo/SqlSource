@@ -116,7 +116,7 @@ public sealed partial class UserQueries(SqliteConnection connection)
 
 **The rules you need.**
 
-- `Sql` is a private class nested in `UserQueries`, so only its own code can use it.  See [Where the members go](../reference/members.md#locations).
+- `Sql` is a private class nested in `UserQueries`, so only its own code can use it.  See [Where the members go](../reference/member-placement.md#locations).
 - The SQL is as you wrote it, without its markers and comments.  A query parameter such as `@id` stays in it: give the database its value yourself.  See [Constants](../reference/members.md#constants) and [What reaches the generated SQL](../reference/sql-files.md#generated-sql).
 - Nothing in a token is escaped.  Pass only text that your own code chooses.  See [Token methods](../reference/members.md#token-methods).
 

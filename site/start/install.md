@@ -86,6 +86,6 @@ If the tool and the package have different versions, the tool can report [SQLSRC
 
 A project that references `SqlSource` and your driver, and a repository whose tool manifest has the `sqlsource` tool.
 
-Rules: [what the build needs](../reference/msbuild.md#build-requirements), [supported versions](../reference/databases/index.md#supported-versions), [install the tool](../reference/cli.md#install-the-tool), [what the tool needs](../reference/cli.md#requirements), [what the package adds](../reference/attributes.md#what-the-package-adds), [the connection](../reference/repositories.md#repository-connection), [SQLSRC267 with EF Core](../reference/databases/sqlserver/types.md#limit-ef-core-sqlclient).
+Rules: [what the build needs](../reference/msbuild.md#build-requirements), [supported versions](../reference/databases/index.md#supported-versions), [install the tool](../reference/cli.md#install-the-tool), [what the tool needs](../reference/cli.md#requirements), [what the package adds](../reference/attributes.md#what-the-package-adds), [the connection](../reference/repository-connections.md#repository-connection), [SQLSRC267 with EF Core](../reference/databases/sqlserver/types.md#limit-ef-core-sqlclient).
 
 Next: [Your first query](first-query.md)

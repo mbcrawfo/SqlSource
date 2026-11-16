@@ -42,7 +42,7 @@ var sql = Sql.ListFrom("users", "name DESC");
 // SELECT id, name FROM users ORDER BY name DESC;
 ```
 
-[What is generated and where it goes](members.md#token-methods) says where the method goes.  Under the output `repository` or `methods`, the query's [method](query-methods.md#query-methods) takes the same `string` arguments, after its input model.  It fills in the tokens the same way, and runs the query: `await users.ListFrom("users", "name DESC")` for a repository, or `await connection.ListFrom("users", "name DESC")` at the output `methods`.
+[Where the members go](member-placement.md#locations) says where the method goes.  Under the output `repository` or `methods`, the query's [method](query-methods.md#query-methods) takes the same `string` arguments, after its input model.  It fills in the tokens the same way, and runs the query: `await users.ListFrom("users", "name DESC")` for a repository, or `await connection.ListFrom("users", "name DESC")` at the output `methods`.
 
 - **A token's name is a C# identifier that is not a reserved keyword.**  A keyword is [SQLSRC114](../diagnostics.md#sqlsrc114).
 - **Spaces and tabs inside the braces are ignored.**

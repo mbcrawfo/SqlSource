@@ -69,7 +69,7 @@ PostgreSQL gives each [query parameter](../../parameters.md#query-parameters) a 
 
 - **If no use of a parameter says what its type is, the query is [SQLSRC226](../../../diagnostics.md#sqlsrc226).**  For example, `SELECT @p IS NULL` holds for a value of any type.  Cast the parameter where it is used, `@p::int`, or declare its type.
 - **PostgreSQL takes the type from the first use.**  In the optional filter of the sample, the first `@name` says nothing of the type.  So without the marker, the query is [SQLSRC227](../../../diagnostics.md#sqlsrc227).  Declare the type, as the sample does, or put first the use that gives the type: `(name = @name OR @name IS NULL)`.
-- **A [list parameter](../../parameters.md#list-parameters) takes the type of its values from its use after `IN`.**  Its test for null gives no type.  So the optional filter `(@ids IS NULL OR id IN @ids)` needs no marker: each value of `@ids` has the type of `id`.
+- **A [list parameter](../../list-parameters.md#list-parameters) takes the type of its values from its use after `IN`.**  Its test for null gives no type.  So the optional filter `(@ids IS NULL OR id IN @ids)` needs no marker: each value of `@ids` has the type of `id`.
 - **A list in the index predicate of `ON CONFLICT` fails when it is empty or null.**  An example is `INSERT ... ON CONFLICT (sku) WHERE (@kinds IS NULL OR kind IN @kinds) DO NOTHING`.  For an empty or a null list, the query method throws `PostgresException` with "cannot use subquery in index predicate".  A list that holds a value runs.  A list there does nothing anyway.  The index predicate only chooses the unique index that finds a conflict, and a predicate that holds a parameter cannot choose a partial index.  So:
   1. Leave the list out of the index predicate.
   2. If the partial index has a predicate of its own, write that predicate there.
@@ -136,10 +136,10 @@ A described PostgreSQL query gets the same [models](../../models.md#models) as e
 - **A column's property can be null by the rules of [which columns can be null](nullability.md#nullability).**  In the sample, `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  The alias of a column can say otherwise, with `!` or `?`.  So can a [`-- column:` marker](../../model-properties.md#column-marker).
 - **A parameter's property can be null only in one of these cases**, since PostgreSQL does not say whether a parameter can be null:
   - its `-- param:` marker says `null`, as the marker of `@status` does;
-  - it is a [list parameter](../../parameters.md#list-parameters), and the query tests the list for null, as `@ids IS NULL` does.
+  - it is a [list parameter](../../list-parameters.md#list-parameters), and the query tests the list for null, as `@ids IS NULL` does.
 - **An array parameter's property is an `IEnumerable<T>`** in the input model of a query whose output is `repository` or `methods`.  In the input model of a query whose output is `models`, it is a `T[]`.  See [array parameters](query-methods.md#array-parameters).  A column's property is a `T[]` in both cases.
 - **A column with no name is [SQLSRC253](../../../diagnostics.md#sqlsrc253).**  PostgreSQL calls such a column `?column?`: an expression or a literal without an alias.  The build reports the error, and the query gets no models until you fix it.  Give the column an alias.
-- **A query whose rows are a whole table gets a model named after the table.**  The name has the schema of the table before it, unless the schema is `public`: `users` gives `UsersDto`, and `billing.invoices` gives `BillingInvoicesDto`.  See [table models](../../models.md#table-models).
+- **A query whose rows are a whole table gets a model named after the table.**  The name has the schema of the table before it, unless the schema is `public`: `users` gives `UsersDto`, and `billing.invoices` gives `BillingInvoicesDto`.  See [table models](../../shared-models.md#table-models).
 - **Updating Npgsql from 9 to 10 changes the models.**  It changes the types of the properties for `date`, `time`, `cidr`, `daterange` and `datemultirange`, as [which version of Npgsql](types.md#which-npgsql) says.
 
 <a id="limits"></a>

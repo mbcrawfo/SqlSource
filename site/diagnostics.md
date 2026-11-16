@@ -119,7 +119,7 @@ See: [Source](reference/attributes.md#setting-source)
 
 Reported by: the build.
 
-A query whose [member location](reference/members.md#locations) is `nested-class` puts its members in a class nested in the type.  That class is named `Sql`, unless [the nested class](reference/members.md#setting-nested-class) is named otherwise.  The type already has a member with that name, and the message names it.
+A query whose [member location](reference/member-placement.md#locations) is `nested-class` puts its members in a class nested in the type.  That class is named `Sql`, unless [the nested class](reference/member-placement.md#setting-nested-class) is named otherwise.  The type already has a member with that name, and the message names it.
 
 The build reports the same error when the type itself, or one of its type parameters, has that name.  A nested class cannot share either name.
 
@@ -143,7 +143,7 @@ public partial class UserRepository
 - Give the nested class another name, with `-- nested-class:` in the file or `nestedClass` in a settings file.
 - Write `-- member-location: class`, so that the queries become members of the type itself.
 
-See: [Where the members go](reference/members.md#locations)
+See: [Where the members go](reference/member-placement.md#locations)
 
 ## SQLSRC008
 
@@ -176,9 +176,9 @@ The rule applies to two kinds of query:
 - A query whose output is `models` or `sql`, whose constant or token method is a member of that type.
 - A query whose output is `methods`, whose method is in a nested class.
 
-The type that contains the member depends on the [member location](reference/members.md#locations):
+The type that contains the member depends on the [member location](reference/member-placement.md#locations):
 
-- **Under `nested-class`, it is the generated class.**  No query there can have the name of that class: `Sql`, unless [the nested class](reference/members.md#setting-nested-class) is named otherwise.  No query method there can have that name either.
+- **Under `nested-class`, it is the generated class.**  No query there can have the name of that class: `Sql`, unless [the nested class](reference/member-placement.md#setting-nested-class) is named otherwise.  No query method there can have that name either.
 - **Under `class`, it is the attributed type.**  No query whose output is `models` or `sql` can have the name of that type.
 
 A query method takes its name from the query:
@@ -202,7 +202,7 @@ SELECT 1;
 - Write `-- nested-class:` on the query.
 - Write `-- member-location:` on the query.
 
-See: [Where the members go](reference/members.md#locations)
+See: [Where the members go](reference/member-placement.md#locations)
 
 ## SQLSRC012
 
@@ -644,7 +644,7 @@ The property can come from the project file or from a `Directory.Build.props` ab
 
 - **The case of the value and the white space around it do not matter.**  So ` True ` is `true`, and an empty value is `auto`.
 
-See: [Running the tool in the build](reference/msbuild.md#online-build)
+See: [Running the tool in the build](reference/online-build.md#online-build)
 
 ## SQLSRC025
 
@@ -671,7 +671,7 @@ The cause is one of these:
 - If the tool manifest names the tool already, run `dotnet tool restore`.
 - To build from the sidecars that you committed, without the tool, set `SqlSourceOnline` to `false`.
 
-See: [Running in the build](reference/msbuild.md#running-in-the-build)
+See: [Running in the build](reference/online-build.md#running-in-the-build)
 
 ## SQLSRC026
 
@@ -683,7 +683,7 @@ The warning is at the project file.  A project can list `SQLSRC026` in the MSBui
 
 `SqlSourceOnline` is `auto`, or not set, and the build found a connection.  So it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool.
 
-The connection that the build found is the variable `SQLSOURCE_CONNECTION` or the build's `.env` file.  That file is the one in the folder of the project, or the one that [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file) names.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too.
+The connection that the build found is the variable `SQLSOURCE_CONNECTION` or the build's `.env` file.  That file is the one in the folder of the project, or the one that [`SqlSourceEnvFile`](reference/online-build.md#setting-env-file) names.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too.
 
 The cause is one of these:
 
@@ -702,7 +702,7 @@ The cause is one of these:
 
 This is a warning: the build goes on with the sidecars that it has, as a build with no connection does.  The next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
 
-See: [Running in the build](reference/msbuild.md#running-in-the-build)
+See: [Running in the build](reference/online-build.md#running-in-the-build)
 
 ## SQLSRC027
 
@@ -725,7 +725,7 @@ The build cannot tell whether the sidecars are current, so it stops.  The usual 
 1. Bring the tool to the version of the `SqlSource` package that the project uses, with `dotnet tool update SqlSource.Tool --version <version>`.  The two are released together under one version number.
 2. If the versions are the same, run `dotnet sqlsource describe` in the folder of the project to see what the tool says.
 
-See: [Running in the build](reference/msbuild.md#running-in-the-build)
+See: [Running in the build](reference/online-build.md#running-in-the-build)
 
 ## SQLSRC028
 
@@ -766,7 +766,7 @@ public partial class UserRepository
 - **When the repository queries of the type use more than one database, no member is found by its name or type.**  Nothing says which database the member is for.  Mark one member for each database, as `[SqlSourceConnection(Database = "reports")]`.
 - Set the [output](reference/settings.md#setting-output) of the queries to `methods`.  Their methods take the connection as an argument.
 
-See: [The connection](reference/repositories.md#repository-connection)
+See: [The connection](reference/repository-connections.md#repository-connection)
 
 ## SQLSRC029
 
@@ -818,7 +818,7 @@ public partial class UserRepository
 
 - **A primary-constructor parameter is found by its name or type only when no field or property of the type or of a base type is.**  So a parameter that the type stores in a field of its own gives one connection, the field.
 
-See: [The connection](reference/repositories.md#repository-connection)
+See: [The connection](reference/repository-connections.md#repository-connection)
 
 ## SQLSRC030
 
@@ -850,7 +850,7 @@ public partial class UserRepository
 1. Set the `Database` of the member, as `[SqlSourceConnection(Database = "main")]`.
 2. Mark a member for each other database.
 
-See: [The connection](reference/repositories.md#repository-connection)
+See: [The connection](reference/repository-connections.md#repository-connection)
 
 ## SQLSRC031
 
@@ -899,7 +899,7 @@ This is a warning, since a type that keeps a member for queries whose output is 
 </PropertyGroup>
 ```
 
-See: [The connection](reference/repositories.md#repository-connection)
+See: [The connection](reference/repository-connections.md#repository-connection)
 
 ## SQLSRC032
 
@@ -937,7 +937,7 @@ public partial class UserRepository
 
 1. Mark a member of one of the shapes above.
 
-See: [The connection](reference/repositories.md#repository-connection)
+See: [The connection](reference/repository-connections.md#repository-connection)
 
 ## SQLSRC033
 
@@ -969,7 +969,7 @@ public partial class OrderRepository(NpgsqlDataSource dataSource);
 2. If the member is a connection, mark it `[SqlSourceConnection]`.
 3. If the type uses several databases, mark the member for its database, as `[SqlSourceConnection(Database = "mssql")]`.
 
-See: [The connection](reference/repositories.md#repository-connection)
+See: [The connection](reference/repository-connections.md#repository-connection)
 
 ## SQLSRC034
 
@@ -1064,7 +1064,7 @@ public partial class UserRepository(NpgsqlDataSource parameters);
 - Rename the parameter.
 - Store the parameter in a field or property of the type, which is then the connection.  Mark that member `[SqlSourceConnection]` when it is not found by its name or type.
 
-See: [The connection](reference/repositories.md#repository-connection)
+See: [The connection](reference/repository-connections.md#repository-connection)
 
 ## SQLSRC037
 
@@ -1810,7 +1810,7 @@ See: [Parameters](reference/parameters.md#query-parameters)
 
 Reported by: the build.
 
-The [member location](reference/members.md#locations) of a query does not fit its output.  The value was written on the query, in the file's header or in a settings file.  The message names the query, the type that claims the file and where the value was written.  If two types claim one file, each type reports the error.
+The [member location](reference/member-placement.md#locations) of a query does not fit its output.  The value was written on the query, in the file's header or in a settings file.  The message names the query, the type that claims the file and where the value was written.  If two types claim one file, each type reports the error.
 
 The member location does not fit in these cases:
 
@@ -1842,7 +1842,7 @@ For a query whose output is `repository`, the message names the location that do
 - Write `-- member-location: class` or `-- member-location: nested-class` on the query.  A `repository` query takes only `class`.
 - Keep `extension-class` to the files and folders whose queries are all `methods`.
 
-See: [Where the members go](reference/members.md#locations)
+See: [Where the members go](reference/member-placement.md#locations)
 
 ## SQLSRC123
 
@@ -1850,7 +1850,7 @@ See: [Where the members go](reference/members.md#locations)
 
 Reported by: the build.
 
-The visibility of a query and its [member location](reference/members.md#locations) together are something C# cannot write.  The message names these:
+The visibility of a query and its [member location](reference/member-placement.md#locations) together are something C# cannot write.  The message names these:
 
 - the query, and the type that claims the file;
 - the visibility, and where it was written, or that it is the default of the `repository` output;
@@ -1951,7 +1951,7 @@ The error is at the query that writes the second visibility: at its `-- visibili
 
 Two nested classes of one type, each of its own visibility, are fine.
 
-See: [Name of the nested class](reference/members.md#setting-nested-class)
+See: [Name of the nested class](reference/member-placement.md#setting-nested-class)
 
 ## SQLSRC125
 
@@ -1959,7 +1959,7 @@ See: [Name of the nested class](reference/members.md#setting-nested-class)
 
 Reported by: the build.
 
-A query whose output is `models` or `sql` has its constant or token method on the type, since its [member location](reference/members.md#locations) is `class`.  The name of that member is taken.  The message names the query, the type and what has the name, one of these:
+A query whose output is `models` or `sql` has its constant or token method on the type, since its [member location](reference/member-placement.md#locations) is `class`.  The name of that member is taken.  The message names the query, the type and what has the name, one of these:
 
 - a member, a nested type or a type parameter that the type declares;
 - a nested class of that name, in which another query of the type puts its members.
@@ -2008,7 +2008,7 @@ Two other errors are about the name of a query:
 - **A query named like the type itself is [SQLSRC009](#sqlsrc009).**
 - **A query method on the type that would take a name the type has is [SQLSRC274](#sqlsrc274).**
 
-See: [Where the members go](reference/members.md#locations)
+See: [Where the members go](reference/member-placement.md#locations)
 
 ## SQLSRC126
 
@@ -2038,7 +2038,7 @@ WHERE category IN @categories OR parent_category = @categories;
 - **In the default of a token:** move the list out of the token.  Or give the default a query parameter that is no list.
 - **With the JSON opt-in:** remove `json` from the marker: `-- param: @categories -> Category`.
 
-See: [List parameters](reference/parameters.md#list-parameters)
+See: [List parameters](reference/list-parameters.md#list-parameters)
 
 ## SQLSRC127
 
@@ -2046,7 +2046,7 @@ See: [List parameters](reference/parameters.md#list-parameters)
 
 Reported by: the build.
 
-A [list](reference/parameters.md#list-parameters) of a SQL Server query stands after a `NOT`, in a place where SQL Server refuses an empty list.  The output of the query is `repository` or `methods`.  The message names the list and where it stands.
+A [list](reference/list-parameters.md#list-parameters) of a SQL Server query stands after a `NOT`, in a place where SQL Server refuses an empty list.  The output of the query is `repository` or `methods`.  The message names the list and where it stands.
 
 The `NOT` can be `category NOT IN @categories` or `NOT (category IN @categories)`.  The places are these:
 
@@ -2090,7 +2090,7 @@ FROM tested;
 - **A `NOT` reaches only the condition it stands in.**  One in a `WHERE` reaches no list in the `HAVING` after it.  One before a `CASE` or an `IIF` reaches no list in its `WHEN` or its condition.  A list that no `NOT` reaches runs empty everywhere.
 - **Under the outputs `models` and `sql` it is no error**, since your own code sends the list.
 
-See: [List parameters](reference/parameters.md#list-parameters)
+See: [List parameters](reference/list-parameters.md#list-parameters)
 
 ## SQLSRC200
 
@@ -2471,12 +2471,12 @@ The error is reported once for a database, at its first query that must be descr
 **A run on a solution reads the `.env` file beside the solution, and not one in the folder of a project.**  A project of the database can have a `.env` file in its folder, or in a folder between it and the folder of the solution.  Then the `help:` line names each such file, in the place of the sentence above, as `The run did not read /work/App/.env: it reads /work/.env alone, and --env-file, or SqlSourceEnvFile in a build, names another`.  Do one of these:
 
 - Move the file, or its connection variables, to the folder of the solution.
-- Name the file with [`--env-file`](reference/connections.md#env-file), or for a build with [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file).
+- Name the file with [`--env-file`](reference/connections.md#env-file), or for a build with [`SqlSourceEnvFile`](reference/online-build.md#setting-env-file).
 
 **`--connection` can be given for a name that no database of the run has.**  Then the `help:` line lists the names that are close to a database of the run, so that you see a misspelt one.  It counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`.  A name that is far from every database of the run is not printed, such as the start of a connection string typed without its `name=`.
 
 - **A database whose queries all have a current entry needs no connection.**  Its summary line says `no connection`.  Under `--force` every query is described, so every database of the run needs one.
-- **A build that [runs the tool](reference/msbuild.md#running-in-the-build) because it found a connection reports this error only when another database with a query to describe has one.**  When none has, the build goes on with the committed sidecars, unless one of these is true:
+- **A build that [runs the tool](reference/online-build.md#running-in-the-build) because it found a connection reports this error only when another database with a query to describe has one.**  When none has, the build goes on with the committed sidecars, unless one of these is true:
   - `SQLSOURCE_CONNECTION` is set for several databases: [SQLSRC215](#sqlsrc215).
   - A variable that two databases share is set: [SQLSRC214](#sqlsrc214).
 - **Under `SqlSourceOnline` `true`, the build reports this error for every database without a connection.**
@@ -2505,7 +2505,7 @@ The error is reported once for each of the two databases that has a query to des
 This error also follows these rules:
 
 - **A connection on the command line for one of the two is not enough.**  The variable would then be read for the other alone, and a reader of the command could not tell.
-- **A build that [runs the tool](reference/msbuild.md#running-in-the-build) reports this error too when the variable is set**, in the environment or in the `.env` file.  It does not go on with the committed sidecars.
+- **A build that [runs the tool](reference/online-build.md#running-in-the-build) reports this error too when the variable is set**, in the environment or in the `.env` file.  It does not go on with the committed sidecars.
 
 See: [Connections](reference/connections.md#connections)
 
@@ -2804,7 +2804,7 @@ The error is reported once, at the first query of the database that the run woul
 - Correct the connection string that `--connection` or the variable of the database gives.
 - Do what the row of the `server:` line in the tables below says.
 
-In a build that [runs the tool](reference/msbuild.md#running-in-the-build), the error fails the build.  The `help:` line then also says how to build without the database: `To build without the database, remove its connection or set SqlSourceOnline to false`.
+In a build that [runs the tool](reference/online-build.md#running-in-the-build), the error fails the build.  The `help:` line then also says how to build without the database: `To build without the database, remove its connection or set SqlSourceOnline to false`.
 
 **On PostgreSQL.**  The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the error, listed in [PostgreSQL's error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html).
 
@@ -4157,7 +4157,7 @@ SELECT id, name, email FROM users WHERE id = @id;
 SELECT id, name FROM users;
 ```
 
-See: [Shared models](reference/models.md#shared-models)
+See: [Shared models](reference/shared-models.md#shared-models)
 
 ## SQLSRC258
 
@@ -4726,7 +4726,7 @@ Each name of the methods of a query is checked, and the message names the one th
 
 The name is taken in each of these cases:
 
-- **Under the [member location](reference/members.md#locations) `extension-class`, it is the name of the extension class that holds the method.**  It is also taken by a member of `DbConnection` or of `object`, such as `Open` or `ToString`.  A call on a connection would find that member before the extension method.  `extension-class` is the default of the output `methods`.
+- **Under the [member location](reference/member-placement.md#locations) `extension-class`, it is the name of the extension class that holds the method.**  It is also taken by a member of `DbConnection` or of `object`, such as `Open` or `ToString`.  A call on a connection would find that member before the extension method.  `extension-class` is the default of the output `methods`.
 - **Under `class`, it is the name of a member of the type, of the type itself, or of one of its type parameters.**  It is also taken by the constant or token method of another query of the type, when that method is on the type too.  A nested class that the queries of the type put members in also takes it.
 - **For a `repository` query, it is also the name of the member that its method gets its connection from.**  That is the member of a base type, or the primary-constructor parameter, which the method would hide.
 - **For a synchronous method of a `repository` query that takes no argument, it is also the name `Finalize`.**  Such a method has no parameters and no tokens.  A method of that name and no argument would be taken for the finalizer of the type, and the compiler warns of it.  The asynchronous method of the query, which takes a cancellation token, is not refused.  Nor is a synchronous method that takes a parameter or a token.
@@ -4794,7 +4794,7 @@ See: [Query methods](reference/query-methods.md#query-methods)
 
 Reported by: the build.
 
-Under the [member location](reference/members.md#locations) `extension-class`, the default of the output `methods`, the methods of a type go into a `static partial class`.  The class has the name of the type with `Extensions` after it, `SampleExtensions` for `Sample`, and is in the namespace of the type.  Here the class cannot be generated, so the type gets none of its methods.  The message names the type, the class and what stops it.
+Under the [member location](reference/member-placement.md#locations) `extension-class`, the default of the output `methods`, the methods of a type go into a `static partial class`.  The class has the name of the type with `Extensions` after it, `SampleExtensions` for `Sample`, and is in the namespace of the type.  Here the class cannot be generated, so the type gets none of its methods.  The message names the type, the class and what stops it.
 
 The class cannot be generated in each of these cases:
 
@@ -5109,7 +5109,7 @@ $ dotnet sqlsource describe /work/App
 
 - Give yourself the right to read the file.
 - Remove the file.
-- Give the connections another way, with `--connection` or in the variables of the environment.  Then make the run read no file, with `--env-file none`, or in a build with [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file) `none`.
+- Give the connections another way, with `--connection` or in the variables of the environment.  Then make the run read no file, with `--env-file none`, or in a build with [`SqlSourceEnvFile`](reference/online-build.md#setting-env-file) `none`.
 
 See: [A `.env` file](reference/connections.md#env-file)
 
@@ -5467,7 +5467,7 @@ Reported by: the build.
 
 The error is at the query's name, once for the query, beside its other errors.  A query that has no entry in its sidecar yet gets [SQLSRC241](#sqlsrc241), not this error.  It gets this error once it is described, as it gets the other errors about its method.  Its models are still generated.
 
-A query whose output is `repository` would have a [synchronous method](reference/query-methods.md#synchronous-methods), under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) `sync` or `both`.  But the one member that gives the connection of its database is a method that returns a `Task` or `ValueTask` of a connection.  A synchronous method cannot call it.  The message names the query, the database, the type and the member.
+A query whose output is `repository` would have a [synchronous method](reference/synchronous-methods.md#synchronous-methods), under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) `sync` or `both`.  But the one member that gives the connection of its database is a method that returns a `Task` or `ValueTask` of a connection.  A synchronous method cannot call it.  The message names the query, the database, the type and the member.
 
 Under `method-type=both`, the query keeps its asynchronous method, and its asynchronous [collection method](reference/collection-methods.md#collection-methods) when it has one, on the type and in its interface.  Only the synchronous ones are not generated until the error is fixed.  Under `sync`, the query gets no method.
 

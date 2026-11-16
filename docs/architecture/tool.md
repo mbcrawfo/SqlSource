@@ -340,7 +340,7 @@ A write that the system refuses keeps its exception as `RunLogFile.Failure`, and
 
 ## Build integration options
 
-The options that a build gives `describe`.  What a user sees of them is in the manual's [running in the build](../../site/reference/msbuild.md#running-in-the-build).
+The options that a build gives `describe`.  What a user sees of them is in the manual's [running in the build](../../site/reference/online-build.md#running-in-the-build).
 
 ### `--manifest` and `--online`
 

@@ -53,6 +53,6 @@ The build reads the sidecar, so it needs no database.  By default, every query m
 
 The six words that the next pages use, and the reason the sidecars go into git.
 
-Rules: [the generator](../reference/members.md#generator), [the tool](../reference/cli.md#tool), [sidecar files](../reference/sidecars.md#sidecar-files), [running in the build](../reference/msbuild.md#running-in-the-build), what describing does on [PostgreSQL](../reference/databases/postgresql/index.md#what-describing-does) and [SQL Server](../reference/databases/sqlserver/index.md#what-describing-does).
+Rules: [the generator](../reference/members.md#generator), [the tool](../reference/cli.md#tool), [sidecar files](../reference/sidecars.md#sidecar-files), [running in the build](../reference/online-build.md#running-in-the-build), what describing does on [PostgreSQL](../reference/databases/postgresql/index.md#what-describing-does) and [SQL Server](../reference/databases/sqlserver/index.md#what-describing-does).
 
 Next: [Write queries](write-queries.md)

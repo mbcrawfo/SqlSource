@@ -28,7 +28,7 @@ GetUserDto? user = await users.GetUserAsync(new GetUserParams(1));
 **The rules you need.**
 
 - `async-method-suffix` is a generator parameter.  For a whole project, write `"generatorParameters": ["async-method-suffix"]` in `sqlsource.json`.  See [`async-method-suffix`](../reference/generator-parameters.md#gp-async-method-suffix).
-- The name of a synchronous method never ends with `Async`.  Under `method-type=both`, the name of the asynchronous method always does.  See [Synchronous methods](../reference/query-methods.md#synchronous-methods).
+- The name of a synchronous method never ends with `Async`.  Under `method-type=both`, the name of the asynchronous method always does.  See [Synchronous methods](../reference/synchronous-methods.md#synchronous-methods).
 
 <a id="model-names"></a>
 
@@ -158,11 +158,11 @@ ListOrdersOfUserDto[] orders = await OrderQueries.ListOrdersOfUser(connection, n
 
 **The rules you need.**
 
-- Remove the `-- member-location:` and `-- visibility:` lines of `ListOrdersOfUser`, and it is an `internal` extension method of `DbConnection`, in the class `OrderQueriesExtensions`.  In a repository, a query's method is a public instance method of your class.  See [Where the members go](../reference/members.md#locations).
-- Only a `methods` method can go in the extension class.  See [Where the members go](../reference/members.md#setting-member-location).
-- `-- visibility: internal` makes a repository method internal, and its interface leaves it out.  See [Visibility](../reference/members.md#setting-visibility).
-- The models do not follow the visibility.  They are `public` or `internal` as your class is.  See [Where the members go](../reference/members.md#locations).
-- To give the nested class another name, write `-- nested-class: Counts`.  A constant is then `Counts.CountUsers`.  See [Name of the nested class](../reference/members.md#setting-nested-class).
+- Remove the `-- member-location:` and `-- visibility:` lines of `ListOrdersOfUser`, and it is an `internal` extension method of `DbConnection`, in the class `OrderQueriesExtensions`.  In a repository, a query's method is a public instance method of your class.  See [Where the members go](../reference/member-placement.md#locations).
+- Only a `methods` method can go in the extension class.  See [Where the members go](../reference/member-placement.md#setting-member-location).
+- `-- visibility: internal` makes a repository method internal, and its interface leaves it out.  See [Visibility](../reference/member-placement.md#setting-visibility).
+- The models do not follow the visibility.  They are `public` or `internal` as your class is.  See [Where the members go](../reference/member-placement.md#locations).
+- To give the nested class another name, write `-- nested-class: Counts`.  A constant is then `Counts.CountUsers`.  See [Name of the nested class](../reference/member-placement.md#setting-nested-class).
 
 ## If it does not work
 

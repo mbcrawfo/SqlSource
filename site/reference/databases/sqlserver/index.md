@@ -130,10 +130,10 @@ A described SQL Server query gets the [models](../../models.md#models) that ever
 - **The property of a column can be null** by [which columns can be null](nullability.md#nullability).  `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  A [`-- column:` marker](../../model-properties.md#column-marker) can say otherwise, and so can an alias of the column with `!` or `?`.
 - **The property of a parameter can be null only in one of these cases**, since SQL Server does not say whether a parameter can be null:
   - its `-- param:` marker says `null`, as for `@status`;
-  - it is a [list parameter](../../parameters.md#list-parameters), and the query tests the list for null, as `@ids IS NULL` does.
+  - it is a [list parameter](../../list-parameters.md#list-parameters), and the query tests the list for null, as `@ids IS NULL` does.
 - **A marker with `null` and no type leaves the type to SQL Server.**
 - **A column with no name**, such as an expression or a literal without an alias, is [SQLSRC266](../../../diagnostics.md#sqlsrc266) when the tool describes the query.  Give it an alias.
-- **A query whose rows are a whole table gets a model named after the table.**  The schema of the table comes before its name, unless the schema is `dbo`: `dbo.customers` gives `CustomersDto`, and `billing.invoices` gives `BillingInvoicesDto`.  See [table models](../../models.md#table-models).
+- **A query whose rows are a whole table gets a model named after the table.**  The schema of the table comes before its name, unless the schema is `dbo`: `dbo.customers` gives `CustomersDto`, and `billing.invoices` gives `BillingInvoicesDto`.  See [table models](../../shared-models.md#table-models).
 - **A query that returns several result sets gets an output model of the first alone**: see [what can be described](#what-can-be-described).
 
 <a id="limits"></a>

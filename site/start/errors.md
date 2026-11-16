@@ -53,6 +53,6 @@ Some problems show only when a method runs, such as an `InvalidCastException`, o
 
 A way to read any SQLSRC error, and the fixes of the errors you meet first.
 
-Rules: [where an error is reported](../reference/errors.md#where-an-error-is-reported), [what an error costs](../reference/errors.md#what-an-error-costs), [running in the build](../reference/msbuild.md#running-in-the-build), [the list of errors](../diagnostics.md).
+Rules: [where an error is reported](../reference/errors.md#where-an-error-is-reported), [what an error costs](../reference/errors.md#what-an-error-costs), [running in the build](../reference/online-build.md#running-in-the-build), [the list of errors](../diagnostics.md).
 
 Next: [What do you want to do?](../index.md#find-what-you-need)

@@ -107,11 +107,14 @@ site/
     Workflow:             describe-on-save.md  ci.md  report-a-bug.md  troubleshooting.md
     Other ways to use your SQL:  output-modes.md  dapper.md  other-databases.md
   reference/          look-up; one page for each thing
-    .sql files:           sql-files.md  parameters.md  tokens.md  dialects.md
+    .sql files:           sql-files.md  parameters.md  list-parameters.md  tokens.md
+                          dialects.md
     Settings:             settings.md  settings-file.md  generator-parameters.md
-                          attributes.md  msbuild.md
-    Generated code:       members.md  models.md  model-properties.md  query-methods.md
-                          return-types.md  repositories.md  connection-methods.md
+                          attributes.md  msbuild.md  online-build.md
+    Generated code:       members.md  member-placement.md  models.md  shared-models.md
+                          model-properties.md  return-types.md
+    Generated methods:    query-methods.md  synchronous-methods.md  repositories.md
+                          repository-connections.md  connection-methods.md
                           collection-methods.md  exceptions.md
     Types:                type-mapping.md  library-types-and-json.md  converters.md
     The sqlsource tool:   cli.md  describing.md  connections.md  sidecars.md  bundles.md
@@ -122,7 +125,7 @@ site/
     Errors:               errors.md  ../diagnostics.md
 ```
 
-That is 70 pages in place of 12: 2 at the root, 9 in `start/`, 20 in `guides/` and 39 in `reference/`.
+That is 76 pages in place of 12: 2 at the root, 9 in `start/`, 20 in `guides/` and 45 in `reference/`.  The content map planned 70, with 39 in `reference/`; phase 25 split six pages (see [Resize](#resize)).
 
 The content map is the authority on sidebar titles, each page's headings and anchors, and where each part of today's text goes.  It gives the reason for each page that splits one of today's.  Its sizes are counted at the density of today's text.  Plain language makes pages longer, so each rewrite phase recounts its pages and reports the count, and the `resize` phase splits a page that is then over 3,500 words.
 
@@ -354,3 +357,155 @@ The owner has not ruled on these.  Each is what I chose and why.
 - **The example projects do not grow in this epic.**  A new page takes its sample from an example or a test where one has it, and otherwise the accuracy reviewer compiles it.  Root rule 4 asks for an example when a feature is delivered, and this epic delivers none.
 - **27 pull requests.**  The reviewer of this outline found text that no phase wrote, the new guides, and pages that may need a split after the rewrite; each is a phase of its own.
 - **The baseline is commit `28e20e3c`**, the head of `main` when the content map was made.
+
+## Resize
+
+Phase 25, 2026-11-16.  The counts are `wc -w` over each whole page, as the content map counts.  "At the base" is `main` at `4cc1c24a`, after phases 12 to 24 merged.  "Now" is after the splits and the facts placed below.
+
+### The table of counts
+
+| Page | Words in the map | At the base | Now | Decision |
+|----|----|----|----|----|
+| `index.md` | 550 | 639 | 639 | - |
+| `diagnostics.md` | 43,400 | 49,774 | 49,774 | Stays: decision 7 |
+| `guides/ci.md` | 800 | 861 | 861 | - |
+| `guides/custom-types.md` | 1,400 | 1,984 | 1,984 | - |
+| `guides/dapper.md` | 2,300 | 3,420 | 3,420 | - |
+| `guides/describe-on-save.md` | 1,000 | 1,092 | 1,092 | - |
+| `guides/dynamic-sql.md` | 700 | 629 | 629 | - |
+| `guides/folders-and-files.md` | 900 | 905 | 905 | - |
+| `guides/json.md` | 1,100 | 1,409 | 1,409 | - |
+| `guides/lists.md` | 1,100 | 1,230 | 1,230 | - |
+| `guides/many-rows.md` | 800 | 853 | 853 | - |
+| `guides/naming-and-placement.md` | 1,100 | 1,195 | 1,195 | - |
+| `guides/nodatime-and-spatial.md` | 900 | 2,134 | 2,134 | - |
+| `guides/nullability.md` | 1,000 | 1,033 | 1,033 | - |
+| `guides/other-databases.md` | 700 | 736 | 736 | - |
+| `guides/output-modes.md` | 800 | 726 | 726 | - |
+| `guides/report-a-bug.md` | 1,300 | 1,638 | 1,638 | - |
+| `guides/repository-connection.md` | 1,000 | 873 | 873 | - |
+| `guides/several-databases.md` | 900 | 975 | 975 | - |
+| `guides/several-projects.md` | 800 | 1,000 | 1,000 | - |
+| `guides/sync-and-streaming.md` | 1,000 | 905 | 905 | - |
+| `guides/troubleshooting.md` | 1,900 | 2,328 | 2,328 | - |
+| `reference/attributes.md` | 1,600 | 1,742 | 1,742 | - |
+| `reference/bundles.md` | 1,650 | 2,041 | 2,041 | - |
+| `reference/cli.md` | 2,600 | 3,032 | 3,032 | - |
+| `reference/collection-methods.md` | 1,800 | 2,235 | 2,224 | - |
+| `reference/connection-methods.md` | 1,250 | 1,568 | 1,568 | - |
+| `reference/connections.md` | 1,900 | 2,569 | 2,569 | - |
+| `reference/converters.md` | 2,050 | 2,151 | 2,151 | - |
+| `reference/databases/index.md` | 700 | 474 | 474 | Stays: a page of the databases folder |
+| `reference/databases/other.md` | 600 | 300 | 300 | Stays: allowed by the map |
+| `reference/databases/postgresql/index.md` | 1,900 | 2,131 | 2,131 | - |
+| `reference/databases/postgresql/libraries.md` | 2,000 | 2,323 | 2,323 | - |
+| `reference/databases/postgresql/nullability.md` | 2,450 | 2,959 | 2,959 | - |
+| `reference/databases/postgresql/query-methods.md` | 2,800 | 3,307 | 3,307 | - |
+| `reference/databases/postgresql/types.md` | 1,900 | 2,152 | 2,152 | - |
+| `reference/databases/sqlserver/index.md` | 2,100 | 2,204 | 2,204 | - |
+| `reference/databases/sqlserver/libraries.md` | 2,400 | 2,529 | 2,529 | - |
+| `reference/databases/sqlserver/nullability.md` | 1,700 | 1,791 | 1,791 | - |
+| `reference/databases/sqlserver/query-methods.md` | 4,450 | 4,442 | 4,442 | Stays: the map's one listed exception |
+| `reference/databases/sqlserver/types.md` | 1,150 | 1,233 | 1,233 | - |
+| `reference/describing.md` | 2,450 | 2,915 | 2,915 | - |
+| `reference/dialects.md` | 1,450 | 1,515 | 1,515 | - |
+| `reference/errors.md` | 2,000 | 2,402 | 2,402 | - |
+| `reference/exceptions.md` | 1,950 | 2,150 | 2,150 | - |
+| `reference/generator-parameters.md` | 1,500 | 1,895 | 1,939 | - |
+| `reference/library-types-and-json.md` | 2,500 | 2,870 | 2,870 | - |
+| `reference/list-parameters.md` | - | - | 1,535 | New, from parameters.md |
+| `reference/member-placement.md` | - | - | 3,000 | New, from members.md |
+| `reference/members.md` | 3,850 | 4,266 | 1,304 | Split |
+| `reference/model-properties.md` | 2,700 | 2,945 | 2,945 | - |
+| `reference/models.md` | 3,350 | 3,659 | 2,493 | Split |
+| `reference/msbuild.md` | 3,200 | 3,507 | 912 | Split |
+| `reference/online-build.md` | - | - | 2,678 | New, from msbuild.md |
+| `reference/parameters.md` | 3,350 | 3,710 | 2,270 | Split |
+| `reference/query-methods.md` | 3,000 | 3,561 | 2,487 | Split |
+| `reference/repositories.md` | 3,150 | 3,794 | 2,386 | Split |
+| `reference/repository-connections.md` | - | - | 1,445 | New, from repositories.md |
+| `reference/return-types.md` | 1,750 | 1,976 | 1,976 | - |
+| `reference/settings-file.md` | 1,500 | 1,842 | 1,859 | - |
+| `reference/settings.md` | 2,600 | 3,598 | 3,598 | Stays: no clean cut, as the outline keeps all four parts on this page |
+| `reference/shared-models.md` | - | - | 1,212 | New, from models.md |
+| `reference/sidecars.md` | 1,750 | 2,037 | 2,037 | - |
+| `reference/sql-files.md` | 2,500 | 2,685 | 2,685 | - |
+| `reference/synchronous-methods.md` | - | - | 1,103 | New, from query-methods.md |
+| `reference/tokens.md` | 1,450 | 1,519 | 1,519 | - |
+| `reference/type-mapping.md` | 3,400 | 3,722 | 3,740 | Stays: no clean cut |
+| `start/call-queries.md` | 1,300 | 586 | 586 | Stays: a page of Get started |
+| `start/errors.md` | 800 | 607 | 607 | - |
+| `start/first-query.md` | 1,500 | 1,290 | 1,290 | - |
+| `start/how-it-works.md` | 700 | 484 | 484 | Stays: a page of Get started |
+| `start/install.md` | 700 | 568 | 568 | Stays: a page of Get started |
+| `start/keep-up-to-date.md` | 900 | 660 | 660 | - |
+| `start/testing.md` | 600 | 546 | 546 | Stays: allowed by the map |
+| `start/transactions.md` | 800 | 799 | 799 | - |
+| `start/write-queries.md` | 1,200 | 990 | 990 | - |
+
+### The splits
+
+Each split moved whole `##` sections, with their `<a id>` lines, to a new page beside the old one, in the same sidebar group, directly under the old page.  The old page has one pointer where the sections stood.  No anchor changed its name.
+
+| Old page | Sections that moved | New page, sidebar title |
+|----|----|----|
+| `reference/members.md` | `#locations` (with `#setting-member-location` and `#placement-for-a-file`), `#setting-visibility`, `#setting-nested-class` | `reference/member-placement.md`, "Where the members go (location, visibility, nested class)".  The old title is now "What is generated" |
+| `reference/repositories.md` | `#repository-connection` | `reference/repository-connections.md`, "Where a repository gets its connection" |
+| `reference/parameters.md` | `#list-parameters` (with `#list-padding` and `#list-limit`) | `reference/list-parameters.md`, "List parameters (IN lists)".  The old title is now "Query parameters (`@name`, `-- param:`)" |
+| `reference/models.md` | `#table-models`, `#shared-models` | `reference/shared-models.md`, "Table models and shared models" |
+| `reference/query-methods.md` | `#synchronous-methods` | `reference/synchronous-methods.md`, "Synchronous methods" |
+| `reference/msbuild.md` | `#running-in-the-build`, `#online-build`, `#setting-env-file` | `reference/online-build.md`, "Running the tool in the build (online build)".  `## Limits` stays on `msbuild.md`: its one limit is about the files that the build includes |
+
+The group "Generated code" would have held 13 entries.  It is now two groups in `reference/toc.yml`:
+
+- "Generated code": what is generated (members, member placement, models, shared models, model properties, return types).
+- "Generated methods": the methods (query methods, synchronous methods, repositories, repository connections, connection methods, collection methods, exceptions).
+
+No page was merged.
+
+### Pages that stay outside 600 to 3,500 words
+
+- **`diagnostics.md`**, 49,774: decision 7.  Every help link names the page.
+- **`reference/databases/sqlserver/query-methods.md`**, 4,442: the map's one listed exception.  It has no clean cut, and no sixth file name is added for it.
+- **`reference/type-mapping.md`**, 3,740: no clean cut.  `#property-types` is 519 words and the page's top 10, so a page made of the part above the one possible cut is under 600.  `#setting-type-overrides` is one setting's section of 2,995 words and cannot be divided, and `## Limits` (216) is about type overrides.
+- **`reference/settings.md`**, 3,598: no clean cut: the outline keeps all four parts on this page (owner, phase 25 Q1).  "Where rules live" names them: the places (`#places`, 396), the matrix that `SettingsReferenceTests` reads (`#all-settings`, 729), which place wins (`#precedence`, 901), and the output, database and dialect settings (641, 357 and 422).  A cut of `#precedence` alone would meet the size rule, but it would move one of the four.
+- **`reference/databases/other.md`**, 300, and **`start/testing.md`**, 546: allowed by the map.
+- **`reference/databases/index.md`**, 474: a page of the databases folder, which no merge touches.  It is the one home of the supported versions, which `SupportedVersionsTests` reads, and the door of the group.
+- **`start/how-it-works.md`** (484), **`start/install.md`** (568) and **`start/call-queries.md`** (586): pages of Get started, which are never merged.  The path is the nine pages of the outline.
+
+### Facts with no owner
+
+The rewrites reported 36 `no owner:` notes: 1 of phase 13, 1 of phase 15, 2 of phase 16, 4 of phase 17 and 28 of phase 21.  Each was read against its owner's section as it is now.  A placed fact has a row in `ledger/phase-25.tsv`.  A fact that does not fit the owner's section word for word stays where it is, and nothing is lost.
+
+Placed:
+
+- phase 13, `parameters.md#param-marker`: "a column type never reaches a query parameter" moved to `type-mapping.md#property-types`.  The rest of the bullet stays on `parameters.md`, under a new bold first sentence that links the owner.
+- phase 16, `members.md#generator`, both notes: the sentence on SQLSRC003 and SQLSRC012 moved to `msbuild.md#build-requirements`.  `members.md` keeps the sentence that links it.
+- phase 17, `collection-methods.md#collection-transactions`: the two bullets of each database's levels moved to `generator-parameters.md#gp-transaction`, and a bullet that links them stands in their place.
+- phase 21, SQLSRC003: the several-frameworks sentence copied to `msbuild.md#build-requirements`.
+- phase 21, SQLSRC018: the sentence on an array that sets nothing copied to `settings-file.md#file-contents`.  The rest stays in the error.
+- phase 21, SQLSRC109: the sentence that a dialect is not a generator parameter copied to `generator-parameters.md#setting-generator-parameters`.  The words of earlier previews stay in the error: they are not part of the reference.
+- phase 21, SQLSRC121: the database collation and a marker's spelling copied to `parameters.md#query-parameters`.  The sentence on `SERVERPROPERTY` stays in the error, since it leads a list.
+
+Held by now, so nothing moved:
+
+- SQLSRC004: `msbuild.md#included-files`, which the owner links.
+- SQLSRC019: `settings.md#all-settings` and the sections its rows link.
+- SQLSRC022, its second half: `guides/several-projects.md#share-the-exceptions`, which the owner links.
+- SQLSRC111: the sections that each row of `sql-files.md#marker-index` links.
+
+The owner named is not the one that holds the fact, and the holder has it:
+
+- SQLSRC017, and the first half of SQLSRC018: `settings.md#a-value-that-is-wrong`.
+- SQLSRC020: the cases of each key, in `type-mapping.md#setting-type-overrides`, `model-properties.md#setting-column-types` and `library-types-and-json.md#setting-library-types`.
+- SQLSRC102: `dialects.md#still-read-differently`.
+- SQLSRC119: `parameters.md#declared-variables`.
+
+Do not fit word for word, so they stay where they stand:
+
+- phase 15, `type-mapping.md#property-types`: "Its values get their C# type as a parameter does".  It leans on the sentences before it.
+- phase 17, `collection-methods.md#collection-transactions`: what `on`, a level and `off` do.  These are cells of the table of `transaction`, and a cell cannot move.
+- phase 17, `query-methods.md#reading-rows`: the message "Data is Null.".  It is a sub-bullet, and in the owner it would repeat the bullet above it.
+- phase 21, where each sentence leans on its section ("this error", "the same error", a list's lead):
+  - SQLSRC009, 013, 015, 021, 023, 026, 027, 031, 032, 034, 035, 037, 038, 112, 113, 117;
+  - the first half of SQLSRC022.

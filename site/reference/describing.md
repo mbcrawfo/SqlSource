@@ -178,7 +178,7 @@ billing (postgres): 15 same, 1 differ, 0 failed
 
 - **A sidecar that is missing or out of date is [SQLSRC219](../diagnostics.md#sqlsrc219).**  The error names the query and what differs.  Its `help:` line names the command that fixes it.
 - **`--check` also finds an entry that a change to the schema made wrong.**  The build already reports an entry that is missing or older than its query.  The build cannot see an entry that a change to the schema made wrong.
-- **A build in CI never [runs the tool](msbuild.md#running-in-the-build) itself.**  So this step is how a job describes.  For a whole GitHub Actions job, see [the recipe](../guides/ci.md#check-sidecars-in-ci).
+- **A build in CI never [runs the tool](online-build.md#running-in-the-build) itself.**  So this step is how a job describes.  For a whole GitHub Actions job, see [the recipe](../guides/ci.md#check-sidecars-in-ci).
 - **It needs a database with your schema**, such as one that the job creates and migrates.  It also needs a connection for every database of the run.
 - **It compares what changes generated code**:
   - the queries;
