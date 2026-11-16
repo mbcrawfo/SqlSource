@@ -1,4 +1,4 @@
-# base c338a501de2b1557d9a32d4c6650fa3c9ac15845
+# base b8bbc9493fea6bf2ff9f159ac243e5429bc69876
 # Words of SQLSRC001 to SQLSRC121, from each heading to the next: 11,466 at the base, 12,903 after (55 sections).
 unit	disposition	to	arg	words	note
 site/diagnostics.md:1056-1065	move	site/diagnostics.md#sqlsrc104	-	-	In the one shape: the fix as a numbered step
