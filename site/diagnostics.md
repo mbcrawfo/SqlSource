@@ -2396,7 +2396,11 @@ Reported by: the tool.
 
 Database: PostgreSQL and SQL Server.
 
-The server gives each parameter a type from the way the query uses it, and nothing in this query says what the parameter is: on PostgreSQL, `SELECT @p IS NULL` holds for a value of any type.
+The tool could not determine the type of a parameter of the query.
+
+The server gives each parameter a type from the way the query uses it.  Nothing in this query says what the parameter is.
+
+**On PostgreSQL.**  A use such as `SELECT @p IS NULL` says nothing of the type: it holds for a value of any type.
 
 ```console
 /work/App/Queries/Checks.sql(1,10): error SQLSRC226: The type of the parameter '@p' of the query 'IsNull' could not be determined
@@ -2406,9 +2410,17 @@ The server gives each parameter a type from the way the query uses it, and nothi
     help: cast the parameter where it is used, @p::int, or declare its type with -- param: @p int
 ```
 
-Cast the parameter where it is used, or declare its type with a `-- param:` marker.  The same error, at the step `resolve type` and with no `server:` line, says that the server did give the parameter a type and that the type is a pseudo-type, which no value has: `row_to_json(@p)` makes `@p` a `record`.  Its `help:` line names the pseudo-type, and the fix is the same.
+The same error can come at the step `resolve type`, with no `server:` line.  Then the server did give the parameter a type, but that type is a pseudo-type, which no value has.  For example, `row_to_json(@p)` makes `@p` a `record`.  The `help:` line names the pseudo-type.
 
-SQL Server gives the error for a parameter whose uses fix no type, `SELECT @p AS x` or `COALESCE(@p, name)`, for two parameters in one expression with nothing else, `@a + @b`, and for a parameter that no type would make the query valid.  The `server:` line is SQL Server's error, which names the parameter:
+**On SQL Server.**  SQL Server cannot type a parameter in each of these cases:
+
+- The uses of the parameter fix no type: `SELECT @p AS x` or `COALESCE(@p, name)`.
+- Two parameters stand in one expression with nothing else: `@a + @b`.
+- No type would make the query valid.
+
+A parameter whose every use is like `@p IS NULL` is not this error: SQL Server gives it the type `int`.
+
+The `server:` line is the error of SQL Server, which names the parameter:
 
 ```console
 /work/App/Queries/Checks.sql(1,10): error SQLSRC226: The type of the parameter '@p' of the query 'Echo' could not be determined
@@ -2418,9 +2430,18 @@ SQL Server gives the error for a parameter whose uses fix no type, `SELECT @p AS
     help: add a CAST around a use of the parameter, or declare its type with -- param:
 ```
 
-Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter whose every use is like `@p IS NULL` is not this error: SQL Server gives it the type `int`.
+The same error with no `server:` line is for a parameter that the query uses more than once:
 
-The same error with no `server:` line is for a parameter used more than once whose uses SQL Server gives different types, or gives one of its uses no type.  The uses that say nothing of the type, such as `@p IS NULL`, are then left out, as [SQLSRC262](#sqlsrc262) says, and this error is given when every use is left out that way, or when a use that is left has no type.  When the uses that are left have two types, the error is [SQLSRC262](#sqlsrc262) instead, and when every use gets the same type, the parameter has that type and no error is given.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
+- If every use gets the same type, the parameter has that type, and the tool reports no error.
+- Otherwise SQL Server gives its uses different types, or gives one of its uses no type.  Each use that says nothing of the type, such as `@p IS NULL`, is then left out, as [SQLSRC262](#sqlsrc262) says.
+- If every use is left out that way, or a use that is left has no type, the tool reports this error.
+- If the uses that are left have two types, the error is [SQLSRC262](#sqlsrc262) instead.
+- If the uses that are left all get one type, the parameter has that type, and the tool reports no error.
+
+**Fix:** do one of these, on either database.
+
+- Cast the parameter where it is used.  On SQL Server, write a `CAST` at a use: `CAST(@p AS int)`.
+- Declare the type of the parameter with a `-- param:` marker: `-- param: @p int`.
 
 See: [Parameters](reference/databases/postgresql/index.md#parameters), [SQL Server parameters](reference/databases/sqlserver/index.md#parameters)
 
@@ -2432,7 +2453,9 @@ Reported by: the tool.
 
 Database: PostgreSQL.
 
-PostgreSQL takes a parameter's type from its first use.  Here the first use says nothing of the type and a later one does, which the server refuses.  The pattern of an optional filter does it: in `(@name IS NULL OR name = @name)` the first `@name` could be anything.
+The first use of a parameter says nothing of its type, and a later use does.  The server refuses this.
+
+PostgreSQL takes the type of a parameter from its first use.  The pattern of an optional filter does this: in `(@name IS NULL OR name = @name)`, the first `@name` could be anything.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC227: The first use of the parameter '@name' of the query 'FindUsers' does not fix its type
@@ -2443,7 +2466,10 @@ PostgreSQL takes a parameter's type from its first use.  Here the first use says
     help: declare the type with -- param:, or write the use that fixes the type before the one that does not: (name = @name OR @name IS NULL)
 ```
 
-Declare the parameter's type with `-- param: @name text`, or turn the condition round so that the use that fixes the type comes first.
+**Fix:** do one of these.
+
+- Declare the type of the parameter: `-- param: @name text`.
+- Turn the condition round, so that the use that fixes the type comes first.
 
 See: [Parameters](reference/databases/postgresql/index.md#parameters)
 
@@ -2455,11 +2481,21 @@ Reported by: the tool.
 
 Database: PostgreSQL and SQL Server.
 
-A `-- param:` marker gives a parameter a type, and the tool asks the server to resolve that type and to check it against every use of the parameter.  This type cannot be used, for the reason the message ends with:
+A `-- param:` marker gives a parameter a type, and that type cannot be used.  The message ends with the reason.
 
-- `it is not written as a type name`: the text is not a type name as a column definition writes one, with at most one modifier in parentheses and `[]`.  When nothing of the query has been sent, the reason goes on with what was found where the text stops being a type name: a `;`, a comment, a line break, a name of more than two parts, a quote or a parenthesis left open, a modifier that holds more than numbers and plain words, or anything else as the shape of a type name.  On PostgreSQL the modifier holds numbers and plain words separated by commas, as in PostGIS's `geometry(Point,4326)`, and the server checks the words: one it does not know, such as `geometry(Nonsense,4326)`, gets this reason too, with a `server:` line and nothing after the reason.  The server can give the same reason for a type it cannot use, such as `numeric(2,-3)` on PostgreSQL 14, which has no negative scale; the `server:` line then says what the server made of the type.
-- `the database has no such type`: the server knows no type of that name on the session's search path.
-- `it is a pseudo-type`: the server knows the name, and no value has that type, `record` and `anyelement` for two, or it is an array of such a type, `cstring[]`.
+The tool asks the server to resolve the type, and to check it against every use of the parameter.
+
+**On PostgreSQL.**  The reason is one of these:
+
+- **`it is not written as a type name`.**  The text is not a type name as a column definition writes one: a name, with at most one modifier in parentheses, and `[]`.
+  - When nothing of the query has been sent, the reason goes on with what the tool found where the text stops being a type name.
+  - That is a `;`, a comment, a line break, a name of more than two parts, or a quote or a parenthesis left open.
+  - It is also a modifier that holds more than numbers and plain words.  For anything else, the reason gives the shape of a type name.
+  - On PostgreSQL the modifier holds numbers and plain words, separated by commas, as in PostGIS's `geometry(Point,4326)`.  The server checks the words.
+  - A word that the server does not know, such as `geometry(Nonsense,4326)`, gets this reason too, with a `server:` line and nothing after the reason.
+  - The server can give the same reason for a type that it cannot use, such as `numeric(2,-3)` on PostgreSQL 14, which has no negative scale.  The `server:` line then says what the server made of the type.
+- **`the database has no such type`.**  The server knows no type of that name on the search path of the session.
+- **`it is a pseudo-type`.**  The server knows the name, and no value has that type: `record` and `anyelement` are two.  An array of such a type, `cstring[]`, is one too.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC228: The type 'user_state' declared for the parameter '@status' of the query 'ListUsers' is not valid: the database has no such type
@@ -2469,13 +2505,22 @@ A `-- param:` marker gives a parameter a type, and the tool asks the server to r
     help: write a type the database has, schema-qualified if it is not on the search path
 ```
 
-Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `timestamp(3) without time zone`, `public.user_status`, `"My Schema"."Status"[]`.  A type in a schema that is not on the search path of the connection needs its schema.  A marker's type runs to the end of its line, but for a `null` or `not null` that ends it, so nothing else may follow it there.
+**Fix:**
 
-For SQL Server the error is at the step `resolve type`, and its reasons are these:
+1. Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `timestamp(3) without time zone`, `public.user_status`, `"My Schema"."Status"[]`.
+2. If the type is in a schema that is not on the search path of the connection, write its schema.
+3. After the type, write only a `null` or `not null`, and `->` with a C# type, where you need them.
 
-- `it is not written as a type name`, followed by what was found: the text is not a type name as T-SQL writes one, a name of one or two parts, each plain, `[bracketed]` or `"quoted"`, with any spaces around the dot, then `(max)`, one or two numbers, or an XML schema collection in parentheses, as in `xml(CONTENT dbo.Schemas)`.  A `;`, a comment, a second `(` and a line break are refused.  Nothing of the query is sent.
-- `the database has no such type`: the database has no type of that name, `Msg 2715`, or no XML schema collection of that name, `Msg 6314`.
-- `it is not a type`: SQL Server did not accept the text as a type, such as `nvarchar(9000)`, longer than the most it allows, `Msg 131`.
+The type of a marker runs to the end of its line, or to a `null`, a `not null` or a `->` that ends it.
+
+**On SQL Server.**  The error is at the step `resolve type`, and the reason is one of these:
+
+- **`it is not written as a type name`, followed by what the tool found.**  The text is not a type name as T-SQL writes one.
+  - A type name of T-SQL is a name of one or two parts, each plain, `[bracketed]` or `"quoted"`, with any spaces around the dot.
+  - Then it can have `(max)`, one or two numbers, or an XML schema collection in parentheses, as in `xml(CONTENT dbo.Schemas)`.
+  - A `;`, a comment, a second `(` and a line break are refused.  Nothing of the query is sent.
+- **`the database has no such type`.**  The database has no type of that name, `Msg 2715`, or no XML schema collection of that name, `Msg 6314`.
+- **`it is not a type`.**  SQL Server did not accept the text as a type.  An example is `nvarchar(9000)`, which is longer than the most it allows, `Msg 131`.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC228: The type 'dbo.Nope' declared for the parameter '@email' of the query 'FindUser' is not valid: the database has no such type
@@ -2487,7 +2532,10 @@ For SQL Server the error is at the step `resolve type`, and its reasons are thes
     help: write a type the database has, with its schema when it is not a built-in type: dbo.Email
 ```
 
-Write the type as a column definition would: `int`, `nvarchar(50)`, `varchar(max)`, `decimal(18,2)`, `dbo.Email`, `[billing].[Amount]`, `xml(dbo.Schemas)`.  An alias type needs its schema unless it is in `dbo` or in the default schema of the login.
+**Fix:**
+
+1. Write the type as a column definition would: `int`, `nvarchar(50)`, `varchar(max)`, `decimal(18,2)`, `dbo.Email`, `[billing].[Amount]`, `xml(dbo.Schemas)`.
+2. For an alias type, write its schema, unless the type is in `dbo` or in the default schema of the login.
 
 See: [Parameters](reference/databases/postgresql/index.md#parameters), [SQL Server parameters](reference/databases/sqlserver/index.md#parameters)
 
@@ -2499,7 +2547,11 @@ Reported by: the tool.
 
 Database: PostgreSQL.
 
-A column of the query has a pseudo-type, a type that the server knows by name and that no value read from a column can be given.  `record` is the one a query meets: a row that is built in the select list and not taken apart again, `ROW(a, b)`, or the alias of a subquery selected whole.  An array of one, `record[]`, is another.  The tool cannot say what such a column holds, so the query is not described.
+A column of the query has a pseudo-type, so the tool does not describe the query.
+
+A pseudo-type is a type that the server knows by name, and that no value read from a column can have.  The tool cannot say what such a column holds.
+
+`record` is the pseudo-type that a query meets.  It comes from a row that is built in the select list and not taken apart again, `ROW(a, b)`.  It also comes from the alias of a subquery that is selected whole.  An array of one, `record[]`, is another pseudo-type.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC229: The column 'row' of the query 'ListPairs' has the type 'record', which cannot be described
@@ -2508,7 +2560,13 @@ A column of the query has a pseudo-type, a type that the server knows by name an
     help: cast the column to a concrete type, or give the expression an alias and a cast
 ```
 
-Select the fields of the row as columns of their own, or cast the expression to a type the database has: `ROW(a, b)::pair`, with `pair` a composite type, or `to_jsonb(s)` for a whole row.  A parameter of a pseudo-type that the query returns is reported for the parameter, as [SQLSRC226](#sqlsrc226) or [SQLSRC228](#sqlsrc228).
+**Fix:** do one of these.
+
+- Select the fields of the row as columns of their own.
+- Cast the expression to a type that the database has: `ROW(a, b)::pair`, with `pair` a composite type.
+- For a whole row, select `to_jsonb(s)`.
+
+A parameter of a pseudo-type that the query returns is reported for the parameter, as [SQLSRC226](#sqlsrc226) or [SQLSRC228](#sqlsrc228).
 
 See: [What can be described](reference/databases/postgresql/index.md#what-can-be-described)
 
@@ -2520,7 +2578,9 @@ Reported by: the tool.
 
 Database: PostgreSQL.
 
-On PostgreSQL a query is one statement.  The tool prepares it on the server to describe it, and it found a second statement in the text.  Nothing of such a query is sent.  A SQL Server query can hold several statements: see [what SQL Server can describe](reference/databases/sqlserver/index.md#what-can-be-described).
+The tool found a second statement in the text of the query.  Nothing of such a query is sent.
+
+On PostgreSQL a query is one statement.  The tool prepares it on the server to describe it.  A SQL Server query can hold several statements: see [what SQL Server can describe](reference/databases/sqlserver/index.md#what-can-be-described).
 
 ```console
 /work/App/Queries/Cleanup.sql(1,10): error SQLSRC230: The query 'Cleanup' holds more than one statement
@@ -2529,9 +2589,14 @@ On PostgreSQL a query is one statement.  The tool prepares it on the server to d
     help: one statement for each query; a ; is allowed at the end alone
 ```
 
-Give each statement a `-- name:` of its own.  A `;` at the end of the statement is allowed, with white space and comments after it; a `;` inside a string, a dollar-quoted string or a comment does not count.  A `;` inside parentheses counts as the end of a statement, since the tool does not read the structure of the SQL; no statement that can be prepared holds one.
+**Fix:**
 
-A text that the tool reads as one statement and the server as two is [SQLSRC225](#sqlsrc225) with the server's `42601: cannot insert multiple commands into a prepared statement`.  Nothing of it is run either.
+1. Give each statement a `-- name:` of its own.
+
+- **A `;` at the end of the statement is allowed.**  White space and comments can follow it.
+- **A `;` inside a string, a dollar-quoted string or a comment does not count.**
+- **A `;` inside parentheses counts as the end of a statement.**  The tool does not read the structure of the SQL.  No statement that can be prepared holds one.
+- **A text that the tool reads as one statement and the server reads as two is [SQLSRC225](#sqlsrc225).**  Its `server:` line is `42601: cannot insert multiple commands into a prepared statement`.  Nothing of it is run either.
 
 See: [What can be described](reference/databases/postgresql/index.md#what-can-be-described)
 
@@ -2543,9 +2608,15 @@ Reported by: the tool.
 
 Database: PostgreSQL and SQL Server.
 
-SqlSource finds the parameters of a query with its own reading of the SQL, and describes the query that way.  The tool checks that reading against the database's own, and the two differ, so what was described is not what would run.  The message starts with what reads the parameters differently: Npgsql for PostgreSQL, SQL Server for SQL Server.
+Two readings of the parameters of the query differ, so what the tool described is not what would run.  The message starts with what reads the parameters differently: Npgsql for PostgreSQL, SQL Server for SQL Server.
 
-For PostgreSQL, a generated query method sends the SQL as you wrote it and lets Npgsql find the `@name` parameters, so the tool also asks Npgsql to describe the SQL that way, and compares the two results: the columns, and where each parameter stands.  The message ends with what differs: where the two texts part, the number of columns, the name or the type of one, or what the server said of the SQL as Npgsql sent it.
+SqlSource finds the parameters of a query with its own reading of the SQL, and describes the query that way.  The tool checks that reading against the database's own.
+
+**On PostgreSQL.**  A generated query method sends the SQL as you wrote it, and lets Npgsql find the `@name` parameters.  So the tool also asks Npgsql to describe the SQL that way, and compares the two results.  It compares the columns, and where each parameter stands.
+
+The message ends with what differs.  That is where the two texts part, the number of columns, the name or the type of one column, or what the server said of the SQL as Npgsql sent it.  The cases are these:
+
+**A `@` that only one of the two reads as a parameter.**  It stands inside an unusual string or an identifier, or directly after another character of a name.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC231: Npgsql reads the parameters of the query 'ListUsers' differently from SqlSource: syntax error at or near "@"
@@ -2555,11 +2626,15 @@ For PostgreSQL, a generated query method sends the SQL as you wrote it and lets 
     help: a @ that one of the two reads as a parameter and the other as text; the server's lines say where; a type that another session changed during the run shows the same way, so run describe again
 ```
 
-**Fix:** look for a `@` that stands where only one of the two would read a parameter: inside an unusual string or an identifier, or directly after another character of a name.  Put a space before the parameter, or write the text so that the `@` is plainly inside a string.
+**Npgsql refuses the text.**  This error then has no SQLSTATE, and the `server:` line is the message of Npgsql.  An example is a `;` followed by more text: Npgsql reads it as the end of a statement, where SqlSource read no end.
 
-Npgsql's own refusal of the text is this error too.  It has no SQLSTATE, and the `server:` line is Npgsql's message: a `;` followed by more text, which Npgsql reads as the end of a statement where SqlSource read no end, is one.
+**A `:name` that only the comparison of the two texts sees.**  A difference can leave the columns the same, and then the server accepts both readings.
 
-A difference may leave the columns the same, and then the server accepts both readings.  Npgsql also reads `:name` as a parameter, so `tags[:id]` in a query with a parameter `@id` and a column `id` is a subscript for Npgsql, which sends `tags[$1]`, and the name of a column for SqlSource.  The query still returns the same columns, and only the comparison of the two texts sees it:
+- Npgsql also reads `:name` as a parameter.
+- Take a query with a parameter `@id` and a column `id`.  Then `tags[:id]` is a subscript for Npgsql, which sends `tags[$1]`, and the name of a column for SqlSource.
+- The query still returns the same columns.  Only the comparison of the two texts sees the difference.
+
+The query is `SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL`:
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC231: Npgsql reads the parameters of the query 'ListUsers' differently from SqlSource: the SQL with $n parts at character 45: '$1] IS NOT' for Npgsql and ':id] IS NO' for SqlSource
@@ -2568,15 +2643,31 @@ A difference may leave the columns the same, and then the server accepts both re
     help: a @ or a : that one of the two reads as a parameter and the other as text; the message says where the two texts part
 ```
 
-The query is `SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL`.  The position counts the characters of the SQL as the tool sent it, with `$1` in the place of each parameter and without the query's comments: it is not a position in the file.  Rename the parameter so that it is not the name of a column that a slice reads.  Where the `:` follows a bound, `tags[1:id]`, Npgsql sends `tags[1$1]` and the server answers a `42601` like the first example's.
+- The position counts the characters of the SQL as the tool sent it, with `$1` in the place of each parameter, and without the comments of the query.  It is not a position in the file.
+- If the `:` follows a bound, as in `tags[1:id]`, Npgsql sends `tags[1$1]`.  The server then answers a `42601` like the first example's.
 
-The error also follows a schema that changed while the tool ran: a type that another session dropped between two of the tool's questions gives an error of class `42` at this step, which cannot be told from a misread `@`.  A table or a column that the query reads cannot be dropped or changed then: a `DROP TABLE`, or an `ALTER TABLE` that drops or changes a column, waits until the tool has described the query.  Run `describe` again.
+**A schema that changed while the tool ran.**  Another session dropped a type between two questions of the tool.  This gives an error of class `42` at this step, which cannot be told from a misread `@`.  A table or a column that the query reads cannot be dropped or changed then: a `DROP TABLE`, or an `ALTER TABLE` that drops or changes a column, waits until the tool has described the query.
 
-One difference has no `@` in it: a parameter that is an array of a domain, `-- param: @p email_t[]`, and is returned as a column.  Npgsql sends it as an array of the domain's base type, so the column is `character varying[]` for Npgsql and `email_t[]` for SqlSource, and the help is `Npgsql sends a parameter that is an array of a domain as an array of the domain's base type, so the column it is returned as has another type; cast the column, @p::varchar[] for an array of a domain over varchar` in place of the first example's help.  Cast the column to the type you want, `@p::varchar[]`.
+**A parameter that is an array of a domain, and that the query returns as a column.**  This difference has no `@` in it.  An example is `-- param: @p email_t[]`.  Npgsql sends it as an array of the base type of the domain.  So the column is `character varying[]` for Npgsql, and `email_t[]` for SqlSource.  The help is then `Npgsql sends a parameter that is an array of a domain as an array of the domain's base type, so the column it is returned as has another type; cast the column, @p::varchar[] for an array of a domain over varchar` in place of the first example's help.
 
-An error of the check that says nothing of how Npgsql reads the SQL, such as a lost connection, is [SQLSRC225](#sqlsrc225) at the same step.  If the SQL is plain and the two still differ, report it.
+- **An error of the check that says nothing of how Npgsql reads the SQL is [SQLSRC225](#sqlsrc225), at the same step.**  A lost connection is one.
+- **If the SQL is plain and the two readings still differ, report it.**
 
-For SQL Server, the tool compares the parameters that SqlSource reads in the query with those that SQL Server reports, ignoring case, and the message names each one that only one of them reads.  Under `mssql`, SqlSource reads a name as a [variable declared with `DECLARE`](reference/parameters.md#declared-variables) when it stands after a comma of a list of declarations, and that list ends at a `;` or at a word that starts a statement, such as `SELECT` or `SET`.  A label is no such word, and neither is a word of the statements of Service Broker, such as `RECEIVE`.  So in this query SqlSource reads `@p` as a variable, and SQL Server as a parameter:
+**Fix:** on PostgreSQL, the fix depends on the case.
+
+- For a misread `@`, put a space before the parameter, or write the text so that the `@` is plainly inside a string.
+- For a misread `:name`, rename the parameter, so that it is not the name of a column that a slice reads.
+- For a schema that changed, run `describe` again.
+- For an array of a domain, cast the column to the type you want: `@p::varchar[]`.
+
+**On SQL Server.**  The tool compares the parameters that SqlSource reads in the query with those that SQL Server reports, ignoring case.  The message names each one that only one of them reads.
+
+Under `mssql`, SqlSource reads a name as a [variable declared with `DECLARE`](reference/parameters.md#declared-variables) when it stands after a comma of a list of declarations.
+
+- That list ends at a `;`, or at a word that starts a statement, such as `SELECT` or `SET`.
+- A label is no such word.  Neither is a word of the statements of Service Broker, such as `RECEIVE`.
+
+So in this query SqlSource reads `@p` as a variable, and SQL Server reads it as a parameter:
 
 ```sql mssql
 -- name: NextMessage
@@ -2590,7 +2681,10 @@ DECLARE @x int = @n next_message: RECEIVE TOP (1) message_body, @p + 1 AS q FROM
     help: rewrite the query so that SqlSource and SQL Server read the same parameters, or give a parameter that SqlSource reads as a variable a -- param: marker with its type
 ```
 
-**Fix:** end the list of declarations with a `;`, or give the parameter a `-- param:` marker with its type, `-- param: @p int`, which makes it a parameter for SqlSource too.
+**Fix:** on SQL Server, do one of these.
+
+- End the list of declarations with a `;`.
+- Give the parameter a `-- param:` marker with its type, `-- param: @p int`.  This makes it a parameter for SqlSource too.
 
 See: [What can be described](reference/databases/postgresql/index.md#what-can-be-described), [what SQL Server can describe](reference/databases/sqlserver/index.md#what-can-be-described)
 
@@ -2602,15 +2696,28 @@ Reported by: the tool.
 
 Database: PostgreSQL.
 
-The tool checks that Npgsql can send each parameter's type, given by its name, before it writes the sidecar.  Here Npgsql refused the type before it sent anything, or the type has no name that Npgsql could be given without ambiguity, so the query is not described.  Nothing is wrong with the SQL itself, but the query gets no entry, so it has no models and no method until it is fixed.  The `server:` line is Npgsql's own message, or, for a type with no name, the tool's own.  This is a known limit and not a fault of the query: Npgsql cannot send a value of these kinds of type, and the tool never rewrites your SQL to make a parameter sendable.  They are refused:
+The type of a parameter cannot be bound by Npgsql, so the tool does not describe the query.  The `server:` line is the message of Npgsql, or, for a type with no name, the tool's own text.
+
+Before the tool writes the sidecar, it checks that Npgsql can send the type of each parameter, given by its name.  Here Npgsql refused the type before it sent anything, or the type has no name that Npgsql can be given without ambiguity.
+
+Nothing is wrong with the SQL itself.  But the query gets no entry, so it has no models and no method until it is fixed.
+
+This is a known limit, and not a fault of the query.  Npgsql cannot send a value of these kinds of type, and the tool never rewrites your SQL to make a parameter sendable.  These are refused:
 
 - a composite type, `public.pair`, and an array of one;
-- a table's row type, and an array of one;
+- the row type of a table, and an array of one;
 - `regclass`, which `WHERE c.oid = @t::regclass` gives a parameter, and the other types of the system catalogs that Npgsql does not load, such as `aclitem`, `txid_snapshot` and `pg_node_tree`;
 - a type whose schema or whose name holds a `.`, which cannot be written to Npgsql without ambiguity, since `a.b.c` could name more than one type;
 - a type of an extension that Npgsql cannot send, such as `seg`.
 
-A type whose name or whose schema's name needs quotes (`"My Schema"."Status"`), `"char"`, the one-byte type of the system catalogs, a domain over another domain, the bit string type without a length, an array of a type whose name is 63 characters long, and PostGIS's `geometry` and `geography`, their arrays and domains over them, are bound.
+These are bound:
+
+- a type whose name or whose schema's name needs quotes (`"My Schema"."Status"`);
+- `"char"`, the one-byte type of the system catalogs;
+- a domain over another domain;
+- the bit string type without a length;
+- an array of a type whose name is 63 characters long;
+- PostGIS's `geometry` and `geography`, their arrays, and domains over them.
 
 ```console
 /work/App/Queries/Pairs.sql(1,10): error SQLSRC232: Npgsql cannot bind the type 'public.pair' of the parameter '@pair' of the query 'ListPairs'
@@ -2620,7 +2727,14 @@ A type whose name or whose schema's name needs quotes (`"My Schema"."Status"`), 
     help: Npgsql cannot send a value of this type; declare the parameter as text with -- param: and cast it to the type where it is used
 ```
 
-**Fix:** declare the parameter as `text` and cast it where it is used, `-- param: @pair text` with `@pair::public.pair` in the SQL; or give the query `-- output: sql`, and the tool leaves it out.  For a type with no name the help is `the type has no name that Npgsql can be given without ambiguity; rename the schema or the type, or declare the parameter as text with -- param: and cast it to the type where it is used`.  The error is also given for a parameter that only a `-- param:` marker declares: Npgsql resolves the type of every parameter it is handed.
+For a type with no name, the help is `the type has no name that Npgsql can be given without ambiguity; rename the schema or the type, or declare the parameter as text with -- param: and cast it to the type where it is used`.
+
+**Fix:** do one of these.
+
+- Declare the parameter as `text`, and cast it where it is used: `-- param: @pair text`, with `@pair::public.pair` in the SQL.
+- Give the query `-- output: sql`.  The tool then leaves it out.
+
+A parameter that only a `-- param:` marker declares gets this error too: Npgsql resolves the type of every parameter that it is handed.
 
 See: [What can be described](reference/databases/postgresql/index.md#what-can-be-described)
 
@@ -2632,7 +2746,11 @@ Reported by: the tool.
 
 Database: PostgreSQL.
 
-The tool describes a PostgreSQL query by asking the server to prepare it, and PostgreSQL prepares only `SELECT` (without `INTO`), `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `VALUES` and `TABLE`, with `WITH` around any of them.  This query starts with a statement of another kind: `CALL`, `CREATE`, `EXPLAIN`, `SHOW`, `SET` and the rest of the commands the server refuses to prepare.  The tool reads the first word of the statement before it sends anything, so the message names that word and the server is not asked.  On SQL Server, a statement whose result the server cannot work out, such as `CREATE PROCEDURE`, is [SQLSRC225](#sqlsrc225), `Msg 11527`.
+The query starts with a kind of statement that the tool does not describe.
+
+The tool describes a PostgreSQL query by asking the server to prepare it.  The tool describes only `SELECT` (without `INTO`), `INSERT`, `UPDATE`, `DELETE`, `MERGE` (PostgreSQL 15 and later), `VALUES` and `TABLE`, with `WITH` around any of them.  This query starts with a statement of another kind: `CALL`, `CREATE`, `EXPLAIN`, `SHOW`, `SET` and the rest of the commands that the server refuses to prepare.
+
+The tool reads the first word of the statement before it sends anything.  So the message names that word, and the server is not asked.
 
 ```console
 /work/App/Queries/Archive.sql(1,10): error SQLSRC233: The query 'Archive' is a CALL statement, which the tool cannot describe
@@ -2641,11 +2759,18 @@ The tool describes a PostgreSQL query by asking the server to prepare it, and Po
     help: give the query -- output: sql; the tool describes SELECT without INTO, INSERT, UPDATE, DELETE, MERGE, VALUES and TABLE
 ```
 
-Give the query `-- output: sql`: its SQL is still a string constant, or a method where the query has tokens, with no types, so the tool does not describe it.  The error still fails the query, so the file's sidecar is held back until the query is mended or given the marker: the tool does not decide on its own that such a query needs no entry, since that would override what you wrote.
+**Fix:**
 
-`SELECT ... INTO` is refused as `SELECT INTO` on every version of the server.  PostgreSQL 15 and later prepare it and 14 does not, but it creates a table, as `CREATE TABLE AS` does, and a sidecar must not depend on the server it was described against.  Write `CREATE TABLE ... AS` with `-- output: sql`, or select the rows and insert them in a second query.  A statement that the tool's check misses and that the server names as one it cannot prepare, `42P14: utility statements cannot be prepared`, is this error too, and the message then reads "is a utility statement".
+1. Give the query `-- output: sql`.  The tool then does not describe it.
 
-A word that the tool does not know stays [SQLSRC225](#sqlsrc225): `SELEC 1` is a typo and the server says so.
+Its SQL is still a string constant, or a method where the query has tokens, with no types.
+
+The error still fails the query, so the tool holds back the sidecar of the file until the query is mended or given the marker.  The tool does not decide on its own that such a query needs no entry, since that would override what you wrote.
+
+- **`SELECT ... INTO` is refused as `SELECT INTO` on every version of the server.**  PostgreSQL 15 and later prepare it, and 14 does not.  But it creates a table, as `CREATE TABLE AS` does, and a sidecar must not depend on the server that it was described against.  Write `CREATE TABLE ... AS` with `-- output: sql`, or select the rows and insert them in a second query.
+- **A statement that the check of the tool misses is this error too, when the server names it as one that it cannot prepare.**  The server answers `42P14: utility statements cannot be prepared`, and the message then reads "is a utility statement".
+- **A word that the tool does not know stays [SQLSRC225](#sqlsrc225).**  `SELEC 1` is a typo, and the server says so.
+- **On SQL Server, a statement whose result the server cannot work out is [SQLSRC225](#sqlsrc225), `Msg 11527`.**  `CREATE PROCEDURE` is one.
 
 See: [What can be described](reference/databases/postgresql/index.md#what-can-be-described)
 
@@ -2657,7 +2782,9 @@ Reported by: the tool.
 
 Database: PostgreSQL.
 
-The tool finds a query's parameters by their `@name` and sends the SQL with `$1`, `$2` in their places.  A `$n` that the SQL writes itself would be taken for one of those, so the types the server gave would not be the parameters' own, and the query's method, which sends parameters by name, could not fill it.  Nothing of such a query is sent.  The message names the `$n` as it is written.
+The SQL of the query writes a `$n` itself.  Nothing of such a query is sent.  The message names the `$n` as it is written.
+
+The tool finds the parameters of a query by their `@name`, and sends the SQL with `$1`, `$2` in their places.  A `$n` that the SQL writes itself would be taken for one of those.  Then the types that the server gave would not be the parameters' own.  And the method of the query, which sends parameters by name, could not fill it.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC234: The query 'GetUser' writes the parameter '$1' itself
@@ -2666,7 +2793,11 @@ The tool finds a query's parameters by their `@name` and sends the SQL with `$1`
     help: write the parameter as @name; generated code binds parameters by name
 ```
 
-Write the parameter as `@name`.  A `$` followed by a digit that is part of a name (`a$1`), or that stands in a string, a dollar-quoted string, a quoted identifier or a comment, is text and not a parameter.
+**Fix:**
+
+1. Write the parameter as `@name`.
+
+- **A `$` followed by a digit is text, and not a parameter, when it is part of a name (`a$1`).**  It is text too when it stands in a string, a dollar-quoted string, a quoted identifier or a comment.
 
 See: [What can be described](reference/databases/postgresql/index.md#what-can-be-described)
 
@@ -2678,7 +2809,13 @@ Reported by: the tool.
 
 Database: PostgreSQL and SQL Server.
 
-The server that the database's connection string reaches is older than the oldest version the tool supports: PostgreSQL 14, or SQL Server 2017, which reports version 14.  An Azure SQL Database or Azure SQL Managed Instance is accepted whatever version it reports.  The version is read when the session is opened, before any query is sent, and it is the one the server reports.
+The server that the connection string of the database reaches is older than the oldest version that the tool supports.  That is PostgreSQL 14, or SQL Server 2017, which reports version 14.
+
+- The version is the one that the server reports.  The tool reads it when it opens the session, before it sends any query.
+- An Azure SQL Database or Azure SQL Managed Instance is accepted, whatever version it reports.
+- A version that does not start with a number is not refused, since the tool cannot tell what it is.
+
+The error is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is.  Each query of the database counts as failed.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC235: The database 'app' runs PostgreSQL 13.12, and the tool supports 14 and later
@@ -2686,9 +2823,12 @@ The server that the database's connection string reaches is older than the oldes
     help: upgrade the server, or describe against a database of PostgreSQL 14 or later
 ```
 
-Upgrade the server, or point the tool at a database of a supported version, a copy of the schema on a newer server for one.  The error is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed.  A version that does not start with a number is not refused, since the tool cannot tell what it is.
+**Fix:** do one of these.
 
-See: [Connecting](reference/databases/postgresql/index.md#connecting), [connecting to SQL Server](reference/databases/sqlserver/index.md#connecting)
+- Upgrade the server.
+- Point the tool at a database of a supported version.  A copy of the schema on a newer server is one.
+
+See: [Supported versions](reference/databases/index.md#supported-versions), [Connecting](reference/databases/postgresql/index.md#connecting), [connecting to SQL Server](reference/databases/sqlserver/index.md#connecting)
 
 ## SQLSRC236
 
@@ -2698,14 +2838,26 @@ Reported by: the tool.
 
 Database: PostgreSQL.
 
-The tool prepares a statement on the server and asks about it in later steps, in one transaction, which only works when every step reaches the same session.  This connection does not keep one.  There are two causes:
+The connection to the database does not keep one session.
 
-- The connection string sets `Multiplexing=true`, which shares physical connections between commands.  It is found when the database is opened, before the tool connects.
-- A pooler in statement mode, such as PgBouncer with `pool_mode = statement`, sits between the tool and the server.  It refuses the transaction and closes the connection, so the first query of the database reports this error and every query after it reports [SQLSRC225](#sqlsrc225) with `the connection to the server was lost`.
+The tool prepares a statement on the server and asks about it in later steps, in one transaction.  That works only when every step reaches the same session.
 
-The tool also reports this error at a query when a step finds that it reached another session: the server does not list the statement it just prepared, or answers `26000` (it does not exist) or `42P05` (it already exists).
+The cause is one of these:
 
-For `Multiplexing=true` the tool refuses before it connects, so no query has been sent and the server is not yet known; the `server:` line is the tool's own text:
+- **The connection string sets `Multiplexing=true`.**  That setting shares physical connections between commands.
+  - The tool finds it when it opens the database, and refuses before it connects.  No query has been sent, and the server is not yet known.
+  - The `server:` line is the tool's own text.
+  - The error is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is.  Each query of the database counts as failed.
+- **A pooler in statement mode stands between the tool and the server.**  PgBouncer with `pool_mode = statement` is one.
+  - The pooler refuses the transaction and closes the connection.
+  - The first query of the database reports this error.  Every query after it reports [SQLSRC225](#sqlsrc225) with `the connection to the server was lost`.
+  - The session has opened, so the query line names the server and the driver.  The error is at the first step.
+  - The `server:` line is the tool's own text, after the SQLSTATE of the pooler.
+- **A step reached another session.**  The server does not list the statement that the tool just prepared.  Or it answers `26000` (it does not exist) or `42P05` (it already exists).
+  - The error is reported at that query.
+  - For `26000` and `42P05`, the `server:` line is the server's text.
+
+The error for `Multiplexing=true`:
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC236: The connection to the database 'app' does not keep one session
@@ -2714,7 +2866,7 @@ For `Multiplexing=true` the tool refuses before it connects, so no query has bee
     help: connect directly to the server or through a pooler in session or transaction mode, and without Multiplexing=true
 ```
 
-Behind a pooler in statement mode the session has opened, so the query line names the server and the driver, and the error is at the first step.  The `server:` line is the tool's own text, after the pooler's SQLSTATE; for `26000` and `42P05` it is the server's:
+The error behind a pooler in statement mode:
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC236: The connection to the database 'app' does not keep one session
@@ -2724,7 +2876,12 @@ Behind a pooler in statement mode the session has opened, so the query line name
     help: connect directly to the server or through a pooler in session or transaction mode, and without Multiplexing=true
 ```
 
-Connect directly to the server, or through a pooler in session or transaction mode, and without `Multiplexing=true`.  With PgBouncer, give the tool a database entry or a user whose `pool_mode` is `session` or `transaction`.  Only the tool needs this: your application can keep its own connection.  The error for `Multiplexing=true` is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed; one found at a query is reported at that query.
+**Fix:**
+
+1. Remove `Multiplexing=true` from the connection string that the tool uses.
+2. Connect directly to the server, or through a pooler in session or transaction mode.  With PgBouncer, give the tool a database entry or a user whose `pool_mode` is `session` or `transaction`.
+
+Only the tool needs this connection.  Your application can keep its own connection.
 
 See: [Connecting](reference/databases/postgresql/index.md#connecting)
 
@@ -2734,13 +2891,23 @@ See: [Connecting](reference/databases/postgresql/index.md#connecting)
 
 Reported by: the build.
 
-The sidecar of a `.sql` file, the `.sql.json` file beside it, is not a file that `dotnet sqlsource describe` wrote.  A merge conflict in it is the usual cause, and a hand edit the next.  The message says what is wrong, and the error is at the place in the sidecar where it is.
+The sidecar of a `.sql` file, the `.sql.json` file beside it, is not a file that `dotnet sqlsource describe` wrote.  The message says what is wrong.  The error is at the place in the sidecar where the problem is.
+
+A merge conflict in the sidecar is the usual cause, and a hand edit the next.
 
 ```console
 /work/App/Queries/Users.sql.json(7,1): error SQLSRC237: The sidecar cannot be read, because it is not one JSON object.  Run 'sqlsource describe' to write it again.
 ```
 
-Run `dotnet sqlsource describe`, which writes the whole file again, and commit it.  After a merge conflict, leave the conflict in the file: the tool cannot read it, so it describes every query of the file again.  If you have already taken one side, run `dotnet sqlsource describe --force` on the `.sql` file instead, since the side you took may hold entries written before a schema change.  Either way, first bring your database to the schema of the merged code, such as by applying the other branch's migrations: the tool writes what your database says.  While the sidecar cannot be read, no query of the file gets an error about its entry.
+**Fix:**
+
+1. After a merge, first bring your database to the schema of the merged code.  Applying the migrations of the other branch is one way.  The tool writes what your database says.
+2. Write the sidecar again, in one of these ways:
+   - Run `dotnet sqlsource describe`, which writes the whole file again.  After a merge conflict, leave the conflict in the file.  The tool cannot read it, so it describes every query of the file again.
+   - If you have already taken one side of the conflict, run `dotnet sqlsource describe --force` on the `.sql` file instead.  The side you took can hold entries written before a schema change.
+3. Commit the sidecar.
+
+- **While the sidecar cannot be read, no query of the file gets an error about its entry.**
 
 See: [Sidecars in git](reference/sidecars.md#sidecars-in-git)
 
@@ -2750,13 +2917,18 @@ See: [Sidecars in git](reference/sidecars.md#sidecars-in-git)
 
 Reported by: the build.
 
-The sidecar was written by a newer version of the `sqlsource` tool, in a format that this version of the `SqlSource` package does not read.  The message names the sidecar's format and the one this package reads.
+The sidecar was written by a newer version of the `sqlsource` tool, in a format that this version of the `SqlSource` package does not read.  The message names the format of the sidecar, and the one that this package reads.
 
 ```console
 /work/App/Queries/Users.sql.json(1,1): error SQLSRC238: The sidecar has format 2, and this version of SqlSource reads format 1.  Update the SqlSource package.
 ```
 
-Update the `SqlSource` package to the version of the tool that wrote the sidecar.  The package and the tool share a version, and a project should use the same one for both.  Until then, no query of the file gets an error about its entry.
+**Fix:**
+
+1. Update the `SqlSource` package to the version of the tool that wrote the sidecar.
+
+- **The package and the tool share a version.**  A project should use the same one for both.
+- **Until you update the package, no query of the file gets an error about its entry.**
 
 See: [Sidecar files](reference/sidecars.md#sidecar-files)
 
@@ -2766,13 +2938,18 @@ See: [Sidecar files](reference/sidecars.md#sidecar-files)
 
 Reported by: the build.
 
-The sidecar was written by an older version of the `sqlsource` tool, in a format that this version of the `SqlSource` package no longer reads.  The message names the sidecar's format and the one this package reads.
+The sidecar was written by an older version of the `sqlsource` tool, in a format that this version of the `SqlSource` package no longer reads.  The message names the format of the sidecar, and the one that this package reads.
 
 ```console
 /work/App/Queries/Users.sql.json(1,1): error SQLSRC239: The sidecar has format 0, and this version of SqlSource reads format 1.  Run 'sqlsource describe' to write it again.
 ```
 
-Run `dotnet sqlsource describe` with the tool of the package's version, and commit the sidecar it writes.  Until then, no query of the file gets an error about its entry.
+**Fix:**
+
+1. Run `dotnet sqlsource describe` with the tool of the version of the package.
+2. Commit the sidecar that it writes.
+
+- **Until then, no query of the file gets an error about its entry.**
 
 See: [Sidecar files](reference/sidecars.md#sidecar-files)
 
@@ -2782,17 +2959,28 @@ See: [Sidecar files](reference/sidecars.md#sidecar-files)
 
 Reported by: the build.
 
-The sidecar, or an entry of it, was written by a version of the `sqlsource` tool other than the version of the `SqlSource` package the project uses.  The package and the tool share a version, so this means that the tool and the package reference are out of step, or that the package was updated and the sidecars were not written again.  The sidecar is read and used all the same, since its format is the one this package reads.  A version's suffix, such as `-dev` in `0.1.0-dev`, is not compared.
+The sidecar, or an entry of it, was written by a version of the `sqlsource` tool other than the version of the `SqlSource` package that the project uses.  The sidecar is read and used all the same, since its format is the one that this package reads.
+
+The package and the tool share a version.  So the tool and the package reference are out of step, or the package was updated and the sidecars were not written again.  The suffix of a version, such as `-dev` in `0.1.0-dev`, is not compared.
+
+Each entry of a sidecar records the version that wrote it.  So a git merge can bring an entry of an older version into a sidecar that this version wrote.  The warning for such an entry is at the key of its query, with the version of the entry in the message.
+
+A sidecar gets one warning, however many of its entries are of another version:
+
+- at its start, when the sidecar itself was written by another version;
+- otherwise, at the first such entry.
 
 ```console
 /work/App/Queries/Users.sql.json(1,1): warning SQLSRC240: The sidecar was written by sqlsource 0.1.0, and this project uses SqlSource 0.2.0.  Bring the tool and the package to one version, and run 'sqlsource describe'.
 ```
 
-Each entry of a sidecar records the version that wrote it, so a git merge can bring an entry of an older version into a sidecar that this version wrote.  Such an entry is warned at its query's key, with the entry's version in the message.  A sidecar gets one warning however many of its entries are of another version: at its start when the sidecar itself was written by another version, and otherwise at the first such entry.
+**Fix:**
 
-Update the tool or the package so that both have one version, run `dotnet sqlsource describe`, and commit the sidecars.  The tool describes again every entry that another version wrote.
+1. Update the tool or the package, so that both have one version.
+2. Run `dotnet sqlsource describe`.  The tool describes again every entry that another version wrote.
+3. Commit the sidecars.
 
-This is a warning, so that a build goes on while the sidecars are written again.  A project can list it in `NoWarn` to hide it, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
+This is a warning, so that a build goes on while the sidecars are written again.  A project can list it in `NoWarn` to hide it.  A project that sets `TreatWarningsAsErrors` can list it in `WarningsNotAsErrors` to keep it a warning:
 
 ```xml
 <PropertyGroup>
@@ -2810,13 +2998,27 @@ Reported by: the build.
 
 If the file's dialect cannot be described, or a token has no default, the query gets [SQLSRC209](#sqlsrc209) or [SQLSRC210](#sqlsrc210) instead of this error.
 
-The query's output is `models`, `methods` or `repository`, which needs a description of the query in its file's sidecar, and the sidecar has none: the file has no sidecar, or its sidecar has no entry of the query's name.  A query that was added or renamed since the tool last ran is the usual cause.  Names are compared as C# compares them, so `getuser` is not `GetUser`.  The message names the query and its output.
+The query has no entry in the sidecar of its file.  The message names the query and its output.
+
+The output of the query is `repository`, `methods` or `models`, which needs a description of the query in the sidecar of its file.  The file has no sidecar, or its sidecar has no entry of the name of the query.
+
+- A query that was added or renamed after the tool last ran is the usual cause.
+- Names are compared as C# compares them, so `getuser` is not `GetUser`.
+
+The error is reported once for a query, however many types claim its file.  Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC241: The query 'GetUser' has no entry in the sidecar of its file, and its output 'methods' needs one.  Run 'sqlsource describe'.
 ```
 
-Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `repository`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `"output": "sql"` in the [settings file](reference/settings-file.md#settings-files) of the project's folder, or `-- output: sql` in the file.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 and describing again is the fix.  When the sidecar exists and has the entry, the build does not see it: a project that sets `SqlSourceIncludeFiles` to `false`, or lists a `.sql` file from outside its folder, lists the sidecar as an `AdditionalFiles` item too, as [included files](reference/msbuild.md#included-files) says.  The error is reported once for a query, however many types use its file, and under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+**Fix:** do the one of these that fits.
+
+- If the query needs its entry:
+  1. Run `dotnet sqlsource describe`.
+  2. Commit the sidecar that it writes.
+- If the project only wants the SQL of each query as a constant, set the output to `sql`.  The default output is `repository`.  Write `"output": "sql"` in the [settings file](reference/settings-file.md#settings-files) of the project's folder, or `-- output: sql` in the file.
+- If the tool reports [SQLSRC271](#sqlsrc271) for the file, save the file as UTF-8, and describe it again.
+- If the sidecar exists and has the entry, the build does not see it.  List the sidecar as an `AdditionalFiles` item too, as [included files](reference/msbuild.md#included-files) says.  A project needs this when it sets `SqlSourceIncludeFiles` to `false`, or lists a `.sql` file from outside its folder.
 
 See: [Output](reference/settings.md#setting-output)
 
@@ -2826,13 +3028,22 @@ See: [Output](reference/settings.md#setting-output)
 
 Reported by: the build.
 
-The query's entry in the sidecar was described against a kind of database that is not the dialect of its file: the file's dialect was changed since the tool last ran, or the sidecar was copied from another file.  The message names the query, the kind of database of the entry and the file's dialect.
+The entry of the query in the sidecar was described against a kind of database that is not the dialect of its file.  The message names the query, the kind of database of the entry, and the dialect of the file.
+
+The cause is one of these:
+
+- The dialect of the file was changed after the tool last ran.
+- The sidecar was copied from another file.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC242: The entry of the query 'GetUser' was described for 'mssql', and the dialect of this file is 'postgres'.  Run 'sqlsource describe'.
 ```
 
-Check that the file's dialect is the right one, then run `dotnet sqlsource describe` and commit the sidecar it writes.
+**Fix:**
+
+1. Check that the dialect of the file is the right one.
+2. Run `dotnet sqlsource describe`.
+3. Commit the sidecar that it writes.
 
 See: [Dialect](reference/settings.md#setting-dialect)
 
@@ -2842,7 +3053,9 @@ See: [Dialect](reference/settings.md#setting-dialect)
 
 Reported by: the build.
 
-No dialect of this release gets this error: `postgres` and `mssql` are both typed.  It is kept for a database that SqlSource can describe before it can give types for it, where it would be reported once for the file, at its first query that needs types, with no other error about the entries of the file's queries.
+No dialect of this release gets this error: `postgres` and `mssql` are both typed.
+
+The error is kept for a database that SqlSource can describe before it can give types for it.  For such a database, it would be reported once for the file, at its first query that needs types.  The queries of the file would then get no other error about their entries.
 
 See: [Database support](reference/databases/index.md#database-support)
 
@@ -2852,13 +3065,26 @@ See: [Database support](reference/databases/index.md#database-support)
 
 Reported by: the build.
 
-The query has changed since its entry in the sidecar was written: its SQL, the type or the nullability of a `-- param:` marker, or the default of one of its tokens.  A change to a comment alone does not count, and neither does a C# type after `->`.  An entry that describes another version of the query could give it the wrong types, so it is not used.
+The entry of the query in the sidecar is out of date: the query changed after its entry was written.  A change to one of these counts:
+
+- the SQL of the query;
+- the type or the nullability of a `-- param:` marker;
+- the default of one of its tokens.
+
+A change to a comment alone does not count, and neither does a C# type after `->`.
+
+An entry that describes another version of the query could give it the wrong types, so it is not used.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC244: The query 'GetUser' has changed since its entry was written.  Run 'sqlsource describe'.
 ```
 
-Run `dotnet sqlsource describe` and commit the sidecar it writes.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 is the fix.
+**Fix:**
+
+1. Run `dotnet sqlsource describe`.
+2. Commit the sidecar that it writes.
+
+- **When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving the file as UTF-8 is the fix.**
 
 See: [Describing again](reference/sidecars.md#describing-again)
 
@@ -2868,17 +3094,28 @@ See: [Describing again](reference/sidecars.md#describing-again)
 
 Reported by: the build.
 
-The sidecar has an entry for a query that does not need one: a query that was removed or renamed, or one whose output is now `sql` for every type that uses its file.  The entry is not used.  The warning is at the entry's name in the sidecar.
+The sidecar has an entry for a query that does not need one.  The entry is not used.  The warning is at the name of the entry in the sidecar.
+
+The query was removed or renamed, or its output is now `sql` for every type that claims its file.
 
 ```console
 /work/App/Queries/Users.sql.json(15,5): warning SQLSRC245: The entry 'GetUsers' names no query of the file that needs one.  Run 'sqlsource describe', which removes it.
 ```
 
-Run `dotnet sqlsource describe` and commit the sidecar it writes, which has no such entry.  When no query of the file needs an entry any more, a run of `describe` over the whole project deletes the sidecar.
+**Fix:**
 
-A `.sql` file that two projects include is the exception when one of them misses a settings file of its folder that the other finds, such as one a build target of your own adds, or one named in another case, such as `SqlSource.json`, that one project lists itself.  The query's output can then be `sql` in one project and not in the other.  A run of `describe` over both projects keeps the entry that the other project needs, so the warning stays.  A run over only the project that warns removes the entry, and the other project's build then reports [SQLSRC241](#sqlsrc241).  For such a file the warning clears when both projects find the same settings files, or when the project lists `SQLSRC245` in `NoWarn`.  See [a file in two projects](reference/sidecars.md#limit-file-in-two-projects).
+1. Run `dotnet sqlsource describe`.  The sidecar that it writes has no such entry.
+2. Commit the sidecar.
 
-This is a warning, since an entry that nothing uses changes no generated code.  A project can list it in `NoWarn` to hide it, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`.
+When no query of the file needs an entry any more, a run of `describe` over the whole project deletes the sidecar.
+
+**A `.sql` file that two projects include is the exception.**  One of the projects can miss a settings file of its folder that the other finds.  That is a settings file that a build target of your own adds, or one named in another case, such as `SqlSource.json`, that one project lists itself.  The output of the query can then be `sql` in one project and not in the other.
+
+- A run of `describe` over both projects keeps the entry that the other project needs, so the warning stays.
+- A run over only the project that warns removes the entry.  The build of the other project then reports [SQLSRC241](#sqlsrc241).
+- For such a file, the warning clears when both projects find the same settings files, or when the project lists `SQLSRC245` in `NoWarn`.  See [a file in two projects](reference/sidecars.md#limit-file-in-two-projects).
+
+This is a warning, since an entry that nothing uses changes no generated code.  A project can list it in `NoWarn` to hide it.  A project that sets `TreatWarningsAsErrors` can list it in `WarningsNotAsErrors` to keep it a warning.
 
 See: [Sidecar files](reference/sidecars.md#sidecar-files)
 
@@ -2890,26 +3127,45 @@ Reported by: the build.
 
 A query gets this error only while its entry in the sidecar is current.  The error is at the query's name, once for the query: for its first column or parameter that has no C# type.  Parameters come before columns.
 
-A column or a parameter of the query has a database type that Npgsql, or Microsoft.Data.SqlClient for a query of the `mssql` dialect, cannot read as a C# value, so SqlSource can give it no C# type.  The message names the column or parameter, its type, and what to do.
+A column or a parameter of the query has a database type that the driver cannot read as a C# value, so SqlSource can give it no C# type.  The driver is Npgsql, or Microsoft.Data.SqlClient for a query of the `mssql` dialect.  The message names the column or parameter, its type, and what to do.
+
+Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC246: The column 'relation' has the type 'regclass', which SqlSource cannot give a C# type.  Cast it to oid in the query.
 ```
 
-What to do depends on the type:
+**Fix:** what to do depends on the type.
 
-- **`regclass`, `regproc`, `regprocedure`, `regoper`, `regoperator`, `regrole`, `regnamespace`, `regcollation` and `regdictionary`.**  Cast the column to `oid` in the query, `SELECT 'users'::regclass::oid AS relation`, which Npgsql reads as a `uint`.  Cast an array of one to `oid[]`, as the message says.
-- **A composite type, which includes a table's row type, and a base type of an extension that SqlSource does not know.**  Map it with the [type override](reference/type-mapping.md#setting-type-overrides) to the C# type that your application reads it as, `public.address=MyApp.Address` for a type that the data source maps, or select its fields as columns of their own.
-- **A range of a subtype that SqlSource does not know, and a multirange of one.**  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, `public.floatrange=NpgsqlTypes.NpgsqlRange<double>`, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.  A project that does not reference Npgsql cannot name `NpgsqlTypes.NpgsqlRange<T>`, so the message tells it to reference Npgsql first.
-- **`cube` on Npgsql 8 or 9**, which cannot read it.  Update Npgsql to 10, which reads it as `NpgsqlTypes.NpgsqlCube`, or cast the column to `text` in the query, as the message says.
-- **`pg_snapshot`, `txid_snapshot`, `pg_node_tree`, and any other base type of `pg_catalog` that SqlSource does not know, such as `aclitem`.**  No version of Npgsql reads them, so a type override would build and fail when the query runs.  Cast the column to `text` in the query, and an array of one to `text[]`, as the message says.
-- **PostGIS's `geometry` and `geography`**, in any schema, and an array of one or a domain over one.  Reference `Npgsql.NetTopologySuite`, and a query whose output is `methods` or `repository` reads them as NetTopologySuite's `Geometry`, as the message says: see [NetTopologySuite on PostgreSQL](reference/databases/postgresql/libraries.md#nettopologysuite).  A query whose output is `models` gets this error with the plugin too, and so does one where the [library types](reference/library-types-and-json.md#setting-library-types) turn NetTopologySuite off, since only the query methods where it is on get its types: give the query the output `methods` or `repository`, or map the type with the type override to the C# type your code reads it as, by the key the message names, `public.geometry`.
-- **`geography` and `geometry` of SQL Server.**  Reference `NetTopologySuite.IO.SqlServerBytes` and NetTopologySuite 2.5.0 or later, and turn NetTopologySuite on with the [library types](reference/library-types-and-json.md#setting-library-types), and a query whose output is `methods` or `repository` reads them as NetTopologySuite's `Geometry`: see [NetTopologySuite on SQL Server](reference/databases/sqlserver/libraries.md#nettopologysuite).  A query whose output is `models` gets this error with NetTopologySuite on.  Or reference the package `Microsoft.SqlServer.Types`, which Microsoft.Data.SqlClient needs to read them, and map the type with the type override to that package's type for it, as the message says: `geography=Microsoft.SqlServer.Types.SqlGeography` or `geometry=Microsoft.SqlServer.Types.SqlGeometry`.
-- **`hierarchyid` of SQL Server.**  Microsoft.Data.SqlClient reads it only when the application references the package `Microsoft.SqlServer.Types`.  Reference it, and map the type with the type override to that package's type, as the message says: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`.
-- **A SQL Server type that this version of SqlSource does not know, and a CLR type of your own assembly.**  Map it with the type override to the C# type that your application reads it as, as the message says: `sys.newtype=MyApp.NewType` for a type of a newer SQL Server, or `dbo."Money"=MyApp.Money` for a CLR type of the schema `dbo`.
-- **A parameter with no type, `record`, `unknown`, `void`, a kind of type that this version of SqlSource does not know, or a SQL Server type with no name.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand or written by a newer tool.  Run `dotnet sqlsource describe`.
+- **`regclass`, `regproc`, `regprocedure`, `regoper`, `regoperator`, `regrole`, `regnamespace`, `regcollation` and `regdictionary`.**  Cast the column to `oid` in the query, `SELECT 'users'::regclass::oid AS relation`.  Npgsql reads it as a `uint`.  Cast an array of one to `oid[]`, as the message says.
+- **A composite type, which includes the row type of a table, and a base type of an extension that SqlSource does not know.**  Do one of these:
+  - Map it with the [type override](reference/type-mapping.md#setting-type-overrides) to the C# type that your application reads it as: `public.address=MyApp.Address` for a type that the data source maps.
+  - Select its fields as columns of their own.
+- **A range of a subtype that SqlSource does not know, and a multirange of one.**  Do both of these:
+  1. Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of the C# type of its subtype: `public.floatrange=NpgsqlTypes.NpgsqlRange<double>`.
+  2. Call `EnableUnmappedTypes()` on the data source builder.  Without it, Npgsql cannot read the type.
 
-When the message says to map the type, it names the key of the type with its schema: `public.address`, or `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server, since a key without a schema must be a type that SqlSource knows.  A schema or a name that needs quotes is in them, `"my schema"."Order Item"`, and one with a line break, a tab or any other control character is written with escapes, `"my schema".U&"Order\000AItem"`, so that the key can be written in a marker, which is one line.  A name with a capital letter is quoted too, `public."Status"`, so an entry for it maps that type alone, and not one whose name differs only by case.  For an array or a domain, the key is of the element or base that has no C# type, and an entry for it maps the array or domain too.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+  A project that does not reference Npgsql cannot name `NpgsqlTypes.NpgsqlRange<T>`, so the message tells it to reference Npgsql first.
+- **`cube` on Npgsql 8 or 9**, which cannot read it.  Update Npgsql to 10, which reads it as `NpgsqlTypes.NpgsqlCube`.  Or cast the column to `text` in the query, as the message says.
+- **`pg_snapshot`, `txid_snapshot`, `pg_node_tree`, and any other base type of `pg_catalog` that SqlSource does not know, such as `aclitem`.**  No version of Npgsql reads them, so a type override would build, and then fail when the query runs.  Cast the column to `text` in the query, and an array of one to `text[]`, as the message says.
+- **PostGIS's `geometry` and `geography`, in any schema, and an array of one or a domain over one.**
+  - Reference `Npgsql.NetTopologySuite`.  A query whose output is `repository` or `methods` then reads them as NetTopologySuite's `Geometry`, as the message says: see [NetTopologySuite on PostgreSQL](reference/databases/postgresql/libraries.md#nettopologysuite).
+  - A query whose output is `models` gets this error with the plugin too.  So does a query where the [library types](reference/library-types-and-json.md#setting-library-types) turn NetTopologySuite off, since only the query methods where it is on get its types.
+  - For a query whose output is `models`, give it the output `repository` or `methods`.  For a query where the library types turn NetTopologySuite off, turn it on.  Or, for either, map the type with the type override to the C# type that your code reads it as, by the key that the message names, `public.geometry`.
+- **`geography` and `geometry` of SQL Server.**  Do one of these:
+  - Reference `NetTopologySuite.IO.SqlServerBytes` and NetTopologySuite 2.5.0 or later, and turn NetTopologySuite on with the [library types](reference/library-types-and-json.md#setting-library-types).  A query whose output is `repository` or `methods` then reads them as NetTopologySuite's `Geometry`: see [NetTopologySuite on SQL Server](reference/databases/sqlserver/libraries.md#nettopologysuite).  A query whose output is `models` gets this error with NetTopologySuite on.
+  - Reference the package `Microsoft.SqlServer.Types`, which Microsoft.Data.SqlClient needs to read them.  Map the type with the type override to the type of that package for it, as the message says: `geography=Microsoft.SqlServer.Types.SqlGeography` or `geometry=Microsoft.SqlServer.Types.SqlGeometry`.
+- **`hierarchyid` of SQL Server.**  Microsoft.Data.SqlClient reads it only when the application references the package `Microsoft.SqlServer.Types`.  Reference the package, and map the type with the type override to the type of that package, as the message says: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`.
+- **A SQL Server type that this version of SqlSource does not know, and a CLR type of your own assembly.**  Map it with the type override to the C# type that your application reads it as, as the message says.  Write `sys.newtype=MyApp.NewType` for a type of a newer SQL Server, or `dbo."Money"=MyApp.Money` for a CLR type of the schema `dbo`.
+- **A parameter with no type, `record`, `unknown`, `void`, a kind of type that this version of SqlSource does not know, or a SQL Server type with no name.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand, or written by a newer tool.  Run `dotnet sqlsource describe`.
+
+When the message says to map the type, it names the key of the type by these rules:
+
+- **The key has the schema of the type.**  It is `public.address`, `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server.  A key without a schema must be a type that SqlSource knows.
+- **A schema or a name that needs quotes is in them**, as in `"my schema"."Order Item"`.
+- **A schema or a name with a line break, a tab or any other control character is written with escapes**, as in `"my schema".U&"Order\000AItem"`.  So the key can be written in a marker, which is one line.
+- **A name with a capital letter is quoted too**, as in `public."Status"`.  So an entry for it maps that type alone, and not one whose name differs only by case.
+- **For an array or a domain, the key is of the element or base that has no C# type.**  An entry for it maps the array or domain too.
 
 See: [PostgreSQL types](reference/databases/postgresql/types.md#type-map), [SQL Server types](reference/databases/sqlserver/types.md#types)
 
@@ -2919,15 +3175,22 @@ See: [PostgreSQL types](reference/databases/postgresql/types.md#type-map), [SQL 
 
 Reported by: the build.
 
-The project references a version of Npgsql older than 8.0, and SqlSource gives the queries of the `postgres` dialect the C# types of Npgsql 8.0 and later.  The message names the version the project references.
+The project references a version of Npgsql older than 8.0.  The message names the version that the project references.
+
+SqlSource gives the queries of the `postgres` dialect the C# types of Npgsql 8.0 and later.  Until the package is updated, no query of the `postgres` dialect gets its method.  Its models are still generated.
+
+The error has no file and line, because it is about the references of the project.  It is reported once for the project, and only while a query under the `postgres` dialect has the output `repository`, `methods` or `models`.
 
 ```console
 CSC : error SQLSRC247: This project references Npgsql 7.0.4, and SqlSource needs Npgsql 8.0 or later, so no query method is generated.  Update the package.
 ```
 
-Until the package is updated, no query of the `postgres` dialect gets its method; its models are still generated.  Update the `Npgsql` package to 8.0 or later.  When another package brings the older version, reference `Npgsql` from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models`, `methods` or `repository` under the `postgres` dialect.
+**Fix:**
 
-See: [Which version of Npgsql](reference/databases/postgresql/types.md#which-npgsql)
+1. Update the `Npgsql` package to 8.0 or later.
+2. If another package brings the older version, reference `Npgsql` from the project itself, at the version you want.
+
+See: [Supported versions](reference/databases/index.md#supported-versions), [Which version of Npgsql](reference/databases/postgresql/types.md#which-npgsql)
 
 ## SQLSRC248
 
@@ -2935,13 +3198,21 @@ See: [Which version of Npgsql](reference/databases/postgresql/types.md#which-npg
 
 Reported by: the build.
 
-The project references Npgsql 11 or later, and this version of SqlSource knows the C# types of Npgsql up to version 10.  It gives the queries of the `postgres` dialect the types that Npgsql 10 reads, which are right unless the newer driver reads one of them as another type.  The message names the version the project references.
+The project references Npgsql 11 or later, and this version of SqlSource knows the C# types of Npgsql up to version 10.  The message names the version that the project references.
+
+SqlSource gives the queries of the `postgres` dialect the types that Npgsql 10 reads.  These are right, unless the newer driver reads one of them as another type.
+
+This message has no file and line.  It is reported once for the project, and only while a query under the `postgres` dialect has the output `repository`, `methods` or `models`.
 
 ```console
 info SQLSRC248: This project references Npgsql 11.0.0, which is newer than this version of SqlSource knows.  Its models use the types of Npgsql 10.
 ```
 
-Update the `SqlSource` package when a version that knows the driver is released.  This is information, not a warning, so that a project that sets `TreatWarningsAsErrors` still builds on the day it updates Npgsql.  A project can list it in `NoWarn` to hide it:
+**Fix:**
+
+1. Update the `SqlSource` package when a version that knows the driver is released.
+
+This is information, not a warning, so that a project that sets `TreatWarningsAsErrors` still builds on the day it updates Npgsql.  A project can list it in `NoWarn` to hide it:
 
 ```xml
 <PropertyGroup>
@@ -2949,7 +3220,11 @@ Update the `SqlSource` package when a version that knows the driver is released.
 </PropertyGroup>
 ```
 
-It has no file and line, and is reported once for the project, only while a query's output is `models`, `methods` or `repository` under the `postgres` dialect.  As information, it is not in the output of `dotnet build`.  An IDE that lists information shows it with the errors and warnings.  A build log has it at the detailed verbosity, `dotnet build -v:detailed -tl:off`, as the sample shows it, since the terminal logger leaves information out at any verbosity.  A binary log, `dotnet build -bl`, has it too.
+As information, it is not in the output of `dotnet build`.  These show it:
+
+- An IDE that lists information shows it with the errors and warnings.
+- A build log has it at the detailed verbosity, `dotnet build -v:detailed -tl:off`, as the sample shows it.  The terminal logger leaves information out at any verbosity.
+- A binary log, `dotnet build -bl`, has it too.
 
 See: [Which version of Npgsql](reference/databases/postgresql/types.md#which-npgsql)
 
@@ -2961,13 +3236,29 @@ Reported by: the build.
 
 A query of the `postgres` dialect gets this error only while its entry in the sidecar is current.  The error is at the query's name, once for the query: for its first column or parameter that has no C# type.  Parameters come before columns.
 
-The project does not reference Npgsql, and a column or a parameter of the query has a type whose C# type depends on it.  It is either a type that Npgsql reads as a type of its own `NpgsqlTypes` namespace, such as `point`, `tsvector` or `int4range`, or a type that Npgsql 8 and 9 read as one C# type and Npgsql 10 as another: `date`, `time`, `cidr`, `daterange` and `datemultirange`, and an array or a domain of one of them.  Without a reference, SqlSource cannot tell which Npgsql the application runs on.  The message names the column or parameter and its type.
+The project does not reference Npgsql, and a column or a parameter of the query has a type whose C# type depends on Npgsql.  The message names the column or parameter, and its type.
+
+The type is one of these:
+
+- a type that Npgsql reads as a type of its own `NpgsqlTypes` namespace, such as `point`, `tsvector` or `int4range`;
+- a type that Npgsql 8 and 9 read as one C# type, and Npgsql 10 as another: `date`, `time`, `cidr`, `daterange` and `datemultirange`, and an array or a domain of one of them.
+
+Without a reference, SqlSource cannot tell which Npgsql the application runs on.  Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC249: The column 'born' has the type 'date', whose C# type depends on Npgsql, and this project does not reference it.  Reference Npgsql, or map it with the type override for the Npgsql the application runs on: date=System.DateTime on Npgsql 8 and 9, date=System.DateOnly on Npgsql 10.
 ```
 
-Reference the `Npgsql` package from the project, at the version the application runs on: every type then gets the C# type of that version.  A project that keeps its queries apart from the driver can map each type that differs with the [type override](reference/type-mapping.md#setting-type-overrides) instead, for the version the application runs on, as the message says: `"typeOverrides": { "date": "System.DateOnly", "time": "System.TimeOnly" }` in the [settings file](reference/settings-file.md#settings-files) of the project's folder for Npgsql 10.  An entry for `date` maps an array or a domain of `date` too.  The message offers only C# types that a project without Npgsql can name: for `cidr`, `System.Net.IPNetwork` on Npgsql 10, since Npgsql 8 and 9 read it as a type of `NpgsqlTypes`.  `daterange` and `datemultirange` are read as a type of `NpgsqlTypes` on every version, so for them, as for every other type of the `NpgsqlTypes` namespace, the message says to reference Npgsql, which they need.  Every other type has the same C# type on every version of Npgsql, and needs neither.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+**Fix:** do one of these.
+
+- Reference the `Npgsql` package from the project, at the version that the application runs on.  Every type then gets the C# type of that version.
+- Map each type that differs with the [type override](reference/type-mapping.md#setting-type-overrides), for the version that the application runs on, as the message says.  A project that keeps its queries apart from the driver can do this instead.  For Npgsql 10, write `"typeOverrides": { "date": "System.DateOnly", "time": "System.TimeOnly" }` in the [settings file](reference/settings-file.md#settings-files) of the project's folder.
+
+An entry for `date` maps an array or a domain of `date` too.
+
+- **The message offers only C# types that a project without Npgsql can name.**  For `cidr`, that is `System.Net.IPNetwork` on Npgsql 10, since Npgsql 8 and 9 read it as a type of `NpgsqlTypes`.
+- **`daterange` and `datemultirange` are read as a type of `NpgsqlTypes` on every version.**  So for them, as for every other type of the `NpgsqlTypes` namespace, the message says to reference Npgsql, which they need.
+- **Every other type has the same C# type on every version of Npgsql, and needs neither.**
 
 See: [Which version of Npgsql](reference/databases/postgresql/types.md#which-npgsql)
 
@@ -2979,14 +3270,43 @@ Reported by: the build.
 
 The error is at the name of each query that has a column or a parameter the type is chosen for.  A query gets it once: for its first column or parameter that has no C# type.  Parameters come before columns.
 
-A C# type that you chose cannot be found.  It is a type that the [type override](reference/type-mapping.md#setting-type-overrides) gives a database type, that the [column types](reference/model-properties.md#setting-column-types) give a column, or that a `-- param:` or `-- column:` marker gives after `->`, and either no type of that name and number of type arguments is in the project or its references; or the name is a short name, of one part, and more than one type of it, in different namespaces, is one that the project can see; or more than one reference has a type of the full name that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter; what is mapped: the type override's key, the column types' key, the name of a `-- column:` marker of the query, or the parameter of a `-- param:` marker; the C# type; and the place that chose it: the `typeOverrides` or the `columnTypes` of a settings file, which it names by its full path, a `-- type-override:` or `-- column:` marker in the file header or one of the query, or the `-- param:` marker of the parameter.  For a short name that several types have, it names their full names, the first three and a count of the rest.
+A C# type that you chose cannot be found.  You chose it in one of these places:
+
+- the [type override](reference/type-mapping.md#setting-type-overrides), which gives a database type a C# type;
+- the [column types](reference/model-properties.md#setting-column-types), which give a column a C# type;
+- a `-- param:` or `-- column:` marker, after `->`.
+
+The type is not found in one of these cases:
+
+- No type of that name and number of type arguments is in the project or its references.
+- The name is a short name, of one part, and the project can see more than one type of it, in different namespaces.
+- More than one reference has a type of the full name that the project can see, and the project has none.
+
+A type of a reference that the project cannot see does not count.  So if one reference has a name as `public` and another as `internal`, the name is the public one.
+
+The message names these:
+
+- the column or parameter;
+- what is mapped: the key of the type override, the key of the column types, the name of a `-- column:` marker of the query, or the parameter of a `-- param:` marker;
+- the C# type;
+- the place that chose it: the `typeOverrides` or the `columnTypes` of a settings file, which it names by its full path, a `-- type-override:` or `-- column:` marker in the file header or one of the query, or the `-- param:` marker of the parameter.
+
+For a short name that several types have, the message names their full names: the first three, and a count of the rest.
+
+Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC250: 'uuid' is mapped to 'MyApp.UserKey' for column 'id', in the typeOverrides of the settings file /work/App/sqlsource.json, and no type of that name is found, or more than one that this project can see.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
 /work/App/Queries/Posts.sql(1,10): error SQLSRC250: 'users.id' is mapped to 'UserId' for column 'author_id', in the columnTypes of the settings file /work/App/sqlsource.json, and no type of that name is found, or more than one that this project can see, and it could be MyApp.UserId or Legacy.UserId.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
 ```
 
-Write the name of a type that the project has, with its type arguments: `UserKey`, `MyApp.Ids.UserKey`, or `System.Collections.Generic.List<int>`.  For a short name that several types have, write the full name, from its namespace, of the one you mean: `MyApp.UserId`.  A nested type is written with its full name, with a `.` before its name, as in C#: `MyApp.Outer.Inner`.  When two references have a type of the full name that the project can see, map to a type of the project's own, which is always chosen first.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+**Fix:** what to do depends on the case.
+
+- If no type of the name is found, write the name of a type that the project has, with its type arguments: `UserKey`, `MyApp.Ids.UserKey`, or `System.Collections.Generic.List<int>`.
+- If several types have the short name, write the full name, from its namespace, of the one you mean: `MyApp.UserId`.
+- If two references have a type of the full name that the project can see, map to a type of the project's own.  A type of the project is always chosen first.
+
+Write a nested type with its full name, with a `.` before its name, as in C#: `MyApp.Outer.Inner`.
 
 See: [Type overrides](reference/type-mapping.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
@@ -2998,21 +3318,31 @@ Reported by: the build.
 
 If the project cannot use the type, each query with a column or a parameter of that type gets the error at its name.  A query gets it once: for its first column or parameter that has no C# type.  Parameters come before columns.  For a type that is not public in a public model, the error is at the name of each query of the model.
 
-A C# type that you chose, by the type override, the column types or a marker, cannot be used by the project: the type, or one of its type arguments, is `internal` in another assembly, or is a `private` or `protected` type nested in another, in the project itself or another assembly.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250)'s does.
+A C# type that you chose cannot be used by the project.  You chose it by the type override, the column types or a marker.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as the message of [SQLSRC250](#sqlsrc250) does.
+
+The cause is one of these two.
+
+**The project cannot see the type.**  The type, or one of its type arguments, is `internal` in another assembly.  Or it is a `private` or `protected` type nested in another, in the project itself or in another assembly.  Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC251: 'uuid' is mapped to 'Shared.UserKey' for column 'id', in a -- type-override: marker of the query, and this project cannot see that type.  Make it, and each type it is nested in, public, or internal when it is this project's own, or give this project its assembly's internals with InternalsVisibleTo.
 ```
 
-Make the type, and each type it is nested in, `public`.  A type of the project itself can be `internal` instead.  For a type of another assembly, you can also add `[assembly: InternalsVisibleTo("YourProject")]` to the assembly that declares it, which lets the project see its `internal` types.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+**Fix:** do one of these.
 
-The same error is reported when the type is not `public` and the model that would have the column or parameter as a property is: a model is `public` when a `public` type claims its query, as [accessibility](reference/models.md#model-accessibility) says, and a `public` type cannot have a property of a type that is not.  Each such property is an error of its own, and the message then also names the model.
+- Make the type, and each type that it is nested in, `public`.  A type of the project itself can be `internal` instead.
+- For a type of another assembly, add `[assembly: InternalsVisibleTo("YourProject")]` to the assembly that declares it.  This lets the project see its `internal` types.
+
+**The type is not `public`, and the model that would have the column or parameter as a property is.**  A model is `public` when a `public` type claims its query, as [accessibility](reference/models.md#model-accessibility) says.  A `public` type cannot have a property of a type that is not.  Each such property is an error of its own, and the message then also names the model.  The model is not generated until the error is fixed.  Under the output `models`, the constant or token method of the query still is.  Under `repository` or `methods`, the query gets no method.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC251: 'uuid' is mapped to 'App.UserKey' for column 'id', in the typeOverrides of the settings file /work/App/sqlsource.json, and that type is not public, and the model 'App.Queries.GetUserDto' is.  Make the type public, or make each type that claims the query's file internal.
 ```
 
-Make the type `public`, or make each type that claims the query's file `internal`, which makes its models `internal`.  The model is not generated until then.  Under the output `models` the query's constant or token method still is; under `methods` or `repository` the query gets no method.
+**Fix:** do one of these.
+
+- Make the type `public`.
+- Make each type that claims the file of the query `internal`, which makes its models `internal`.
 
 See: [Type overrides](reference/type-mapping.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
@@ -3024,13 +3354,35 @@ Reported by: the build.
 
 The error is at the name of each query that has a column or a parameter the type is chosen for.  A query gets it once: for its first column or parameter that has no C# type.  Parameters come before columns.
 
-A C# type that you chose, by the type override, the column types or a marker, is one that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, as is a type argument that is an interface with a `static abstract` member, such as `System.Numerics.INumber<int>`, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  So is a type when it, a type it is nested in or one of its type arguments is marked `[Obsolete]` as an error, as `[Obsolete("Use UserKey.", true)]`, since no code can use it without an error; and so is one marked `[Obsolete]` or `[Experimental]` under a diagnostic id that is not an identifier, such as `MY-001` or `1234`, since a model could not turn off the warning, or the error of `[Experimental]`, that its use gives.  `[Experimental]` on the assembly or module that declares the type counts as on the type.  So is a generic type with a type argument that breaks a constraint of its type parameter, as `System.Collections.Generic.List<System.Nullable<string>>`, whose `System.Nullable<T>` takes only a value type, or `MyApp.Box<string>` where `Box<T>` requires `where T : struct`.  A type argument written with a `?` breaks a constraint that forbids null: `notnull`, `class` without a `?`, or a base type or interface written without a `?`, as `System.Collections.Generic.Dictionary<string?, int>` does, whose key is `notnull`.  A type marked `[Obsolete]` or `[Experimental]` otherwise is accepted, and its model compiles without a warning.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250)'s does.
+A C# type that you chose is one that no property of a model can have.  You chose it by the type override, the column types or a marker.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as the message of [SQLSRC250](#sqlsrc250) does.
+
+A type is refused in each of these cases:
+
+- It is a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.
+- A type argument or the element of an array is a `static` class, a `ref struct` or `System.Void`.
+- A type argument is an interface with a `static abstract` member, such as `System.Numerics.INumber<int>`.
+- A type argument or the element of an array is `System.Nullable<T>` with a `?` after it: `System.Nullable<int>?[]`.
+- The type, a type it is nested in, or one of its type arguments is marked `[Obsolete]` as an error, as `[Obsolete("Use UserKey.", true)]`.  No code can use such a type without an error.
+- A type is marked `[Obsolete]` or `[Experimental]` under a diagnostic id that is not an identifier, such as `MY-001` or `1234`.  A model could not turn off the warning, or the error of `[Experimental]`, that its use gives.
+- It is a generic type with a type argument that breaks a constraint of its type parameter.  An example is `System.Collections.Generic.List<System.Nullable<string>>`, whose `System.Nullable<T>` takes only a value type.  Another is `MyApp.Box<string>` where `Box<T>` requires `where T : struct`.
+
+Some rules decide these cases:
+
+- **`[Experimental]` on the assembly or module that declares the type counts as on the type.**
+- **A type argument written with a `?` breaks a constraint that forbids null.**  Such a constraint is `notnull`, `class` without a `?`, or a base type or interface written without a `?`.  `System.Collections.Generic.Dictionary<string?, int>` breaks one, since its key is `notnull`.
+- **A type marked `[Obsolete]` or `[Experimental]` otherwise is accepted.**  Its model compiles without a warning.
+
+Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC252: 'int4' is mapped to 'System.Nullable<int>' for column 'id', in the typeOverrides of the settings file /work/App/Queries/sqlsource.json, and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its property nullable.
 ```
 
-Choose another C# type.  For `System.Nullable<T>`, choose `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  For a type marked `[Obsolete]` as an error, map it to the type that replaces it.  For a generic type, give it type arguments that meet the constraints of its declaration.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+**Fix:** choose another C# type.
+
+- For `System.Nullable<T>`, choose `T`.  A column that can be null already gets a nullable property, and one that cannot gets `T`.
+- For a type marked `[Obsolete]` as an error, map it to the type that replaces it.
+- For a generic type, give it type arguments that meet the constraints of its declaration.
 
 See: [Type overrides](reference/type-mapping.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
@@ -3042,7 +3394,11 @@ Reported by: the build.
 
 The error is at the query's name.  If several types claim the query's file, the query still gets this error only once.  The query gets no models until it is fixed.
 
-A column of the query has no name, so its property in the output model would have none.  PostgreSQL names a column `?column?` when the query gives it no alias and it is no column of a table or call of a function: an expression such as `price * quantity`, or a literal.  On SQL Server such a column is [SQLSRC266](#sqlsrc266), which the tool reports when it describes the query.  The message gives the column's position, from 1, and the query.
+A column of the query has no name, so its property in the output model would have none.  The message gives the position of the column, from 1, and the query.
+
+PostgreSQL names a column `?column?` when the query gives it no alias and it is no column of a table or call of a function.  An expression such as `price * quantity` is one, and so is a literal.
+
+Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC253: The column at position 2 of the query 'GetLines' has no name.  Give it an alias.
@@ -3053,14 +3409,19 @@ A column of the query has no name, so its property in the output model would hav
 SELECT id, price * quantity FROM order_lines;
 ```
 
-Give the column an alias, which names its property, then run `dotnet sqlsource describe`:
+**Fix:**
+
+1. Give the column an alias, which names its property.
+2. Run `dotnet sqlsource describe`.
+
+The query with the alias:
 
 ```sql postgres
 -- name: GetLines
 SELECT id, price * quantity AS total FROM order_lines;
 ```
 
-Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+- **On SQL Server, such a column is [SQLSRC266](#sqlsrc266).**  The tool reports it when it describes the query.
 
 See: [Property names](reference/model-properties.md#property-names)
 
@@ -3072,7 +3433,15 @@ Reported by: the build.
 
 The error is at the query's name.  If several types claim the query's file, the query still gets this error only once.  The query gets no models until it is fixed.
 
-The PascalCase of a column's or a parameter's name, which names its property, is not a C# identifier: it is empty, as for a name of underscores alone, it starts with a digit, as `_1st` gives `1st`, or it holds a character that an identifier cannot, as `unit-price` does.  The message names the column or parameter and the property name it gives.
+The PascalCase of the name of a column or a parameter names its property, and here it is not a C# identifier.  The message names the column or parameter, and the property name that it gives.
+
+The PascalCase is not an identifier in one of these cases:
+
+- It is empty, as for a name of underscores alone.
+- It starts with a digit, as `_1st` gives `1st`.
+- It holds a character that an identifier cannot hold, as `unit-price` does.
+
+Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC254: The column 'unit-price' gives the property name 'Unit-price', which is not a C# identifier.  Give it an alias.
@@ -3083,14 +3452,17 @@ The PascalCase of a column's or a parameter's name, which names its property, is
 SELECT id, "unit-price" FROM order_lines;
 ```
 
-Give the column an alias that is a name a C# property can have, or rename the parameter, then run `dotnet sqlsource describe`:
+**Fix:**
+
+1. Give the column an alias that a C# property can have as its name, or rename the parameter.
+2. Run `dotnet sqlsource describe`.
+
+The query with the alias:
 
 ```sql postgres
 -- name: GetLines
 SELECT id, "unit-price" AS unit_price FROM order_lines;
 ```
-
-Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
 See: [Property names](reference/model-properties.md#property-names)
 
@@ -3102,7 +3474,14 @@ Reported by: the build.
 
 The error is at the query's name.  If several types claim the query's file, the query still gets this error only once.  The query gets no models until it is fixed.
 
-Two columns, or two parameters, of the query give their model one property name, ignoring case: the same column selected from two tables, as `SELECT u.id, o.id`, or two spellings of a name, as `user_id` beside `userId`.  Names are compared ignoring case, since Dapper matches a column to a property ignoring case, and would fill both properties from one column.  The message names both, with their positions from 1, and the property name.
+Two columns, or two parameters, of the query give their model one property name, ignoring case.  The message names both, with their positions from 1, and the property name.
+
+- The same column selected from two tables does this, as in `SELECT u.id, o.id`.
+- Two spellings of a name do this, as `user_id` beside `userId`.
+
+Names are compared ignoring case, since Dapper matches a column to a property ignoring case.  Dapper would fill both properties from one column.
+
+Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC255: The column 'id' at position 1 and the column 'id' at position 2 give one property name, 'Id', ignoring case.  Give one of them an alias.
@@ -3113,14 +3492,17 @@ Two columns, or two parameters, of the query give their model one property name,
 SELECT u.id, o.id FROM users u JOIN orders o ON o.user_id = u.id;
 ```
 
-Give one of the columns an alias, or rename one of the parameters, then run `dotnet sqlsource describe`:
+**Fix:**
+
+1. Give one of the columns an alias, or rename one of the parameters.
+2. Run `dotnet sqlsource describe`.
+
+The query with an alias for each column:
 
 ```sql postgres
 -- name: GetUserOrders
 SELECT u.id AS user_id, o.id AS order_id FROM users u JOIN orders o ON o.user_id = u.id;
 ```
-
-Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
 See: [Property names](reference/model-properties.md#property-names)
 
@@ -3132,7 +3514,12 @@ Reported by: the build.
 
 For a name that a record or `object` has, the error is at the query's name.  If several types claim the query's file, the query still gets it only once, and gets no models until it is fixed.  For a property named as its model, the error is at the name of each query of the model.  The model is not generated until it is fixed.
 
-A column or a parameter gives a property name that a record or `object` already has a member of: `EqualityContract`, `Equals`, `GetHashCode`, `ToString`, `GetType`, `MemberwiseClone`, `Finalize`, `ReferenceEquals`, `PrintMembers`, `Deconstruct` or `Clone`.  A column named `equals` or `to_string` is one.  So is a property name that is the name of its model, which C# does not allow a member to have: a column `total` of a query whose `-- output-model:` marker names its model `Total`.  The message names the column or parameter and the property name.
+A column or a parameter gives a property name that cannot be used.  The message names the column or parameter, and the property name.  The property name is one of these:
+
+- **The name of a member that a record or `object` already has.**  These are `EqualityContract`, `Equals`, `GetHashCode`, `ToString`, `GetType`, `MemberwiseClone`, `Finalize`, `ReferenceEquals`, `PrintMembers`, `Deconstruct` and `Clone`.  A column named `equals` or `to_string` is one.
+- **The name of its model.**  C# does not allow a member to have that name.  A column `total` of a query whose `-- output-model:` marker names its model `Total` is one.
+
+Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC256: The column 'to_string' gives the property name 'ToString', which a record or object already has.  Give it an alias.
@@ -3144,14 +3531,19 @@ A column or a parameter gives a property name that a record or `object` already 
 SELECT id, to_string FROM users;
 ```
 
-Give the column an alias, or rename the parameter, then run `dotnet sqlsource describe`:
+**Fix:**
+
+1. Give the column an alias, or rename the parameter.
+2. Run `dotnet sqlsource describe`.
+
+The query with the alias:
 
 ```sql postgres
 -- name: GetUsers
 SELECT id, to_string AS display_name FROM users;
 ```
 
-For a property named as its model, you can instead give the model [another name](reference/models.md#setting-model-name).  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+- **For a property named as its model, you can give the model [another name](reference/models.md#setting-model-name) instead.**
 
 See: [Property names](reference/model-properties.md#property-names)
 
@@ -3161,7 +3553,23 @@ See: [Property names](reference/model-properties.md#property-names)
 
 Reported by: the build.
 
-Two queries give their models one full name, by an `-- input-model:` or `-- output-model:` marker, or by the suffixes and the namespace, and the two models are not the same.  Two queries share a model when the two agree on the properties' names, C# types and nullability, in the same order, on the model type, `record`, `sealed record`, `class` or `sealed class`, and on whether the properties are sorted: one model is generated, and its documentation names each query.  An input model and an output model of one name are never the same.  Two types that claim one file and give its query's model one name are two queries here too, so their settings must agree.  The queries are taken in the order of their files' paths, then of their order in a file, then of the types' names, and the error is at the later of the two, at its marker when it has one and at its name otherwise.  The message names the model, the earlier query, with the type when the two are one query, and the first difference.
+Two queries give their models one full name, and the two models are not the same.  The message names the model, the earlier query, with the type when the two are one query, and the first difference.
+
+The name comes from an `-- input-model:` or `-- output-model:` marker, or from the suffixes and the namespace.
+
+Two queries share a model when they agree on all of these:
+
+- the names, C# types and nullability of the properties, in the same order;
+- the model type: `record`, `sealed record`, `class` or `sealed class`;
+- whether the properties are sorted.
+
+Then one model is generated, and its documentation names each query.  An input model and an output model of one name are never the same.
+
+Two types that claim one file, and give the model of its query one name, are two queries here too.  So their settings must agree.
+
+The queries are taken in the order of the paths of their files, then of their order in a file, then of the names of the types.  The error is at the later of the two, at its marker when it has one, and at its name otherwise.
+
+The model of the earlier query is still generated, and the later query has no model of that kind until the two agree.  Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(6,1): error SQLSRC257: The output model 'App.Queries.UserRow' of the query 'GetUsers' is not the same as the output model of that name of the query 'GetUser' in Users.sql: it has 2 properties here and 3 there.  Give one of the two queries another model name, or make the two the same.
@@ -3177,7 +3585,12 @@ SELECT id, name, email FROM users WHERE id = @id;
 SELECT id, name FROM users;
 ```
 
-Give one of the two queries [another model name](reference/models.md#setting-model-name), or make the two models the same, then run `dotnet sqlsource describe` if you changed a query:
+**Fix:**
+
+1. Give one of the two queries [another model name](reference/models.md#setting-model-name), or make the two models the same.
+2. If you changed a query, run `dotnet sqlsource describe`.
+
+The queries with a model name for each:
 
 ```sql postgres
 -- name: GetUser
@@ -3189,8 +3602,6 @@ SELECT id, name, email FROM users WHERE id = @id;
 SELECT id, name FROM users;
 ```
 
-The earlier query's model is still generated, and the later query has no model of that kind until the two agree.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
-
 See: [Shared models](reference/models.md#shared-models)
 
 ## SQLSRC258
@@ -3201,14 +3612,16 @@ Reported by: the build.
 
 The error is at the name of each query that would have the model.
 
-A model's full name is one that a generated type cannot have, because the code would not compile or would be warned on:
+The full name of a model is one that a generated type cannot have, since the code would not compile, or would be warned on.  The model is not generated.  The message names the model, the query and the reason.
 
-- a type of the project has the full name, the type that carries `[SqlSourceGenerate]` among them;
-- it is a namespace of the project, or a part of the model's namespace is a type of the project, as a [model namespace](reference/models.md#setting-model-namespace) of `App.Queries` beside a class `App.Queries`;
-- it is the namespace of another model, or a part of its namespace is another model, as `App.Data` beside `App.Data.Row`, which reports both;
-- its name is lower-case ASCII letters alone, as `usersdto`, which the compiler warns on, since such a name could become a keyword.
+The name is one of these:
 
-The model is not generated, and each query that would have it is told.  The message names the model, the query and the reason.
+- A type of the project has the full name.  The type that carries `[SqlSourceGenerate]` is among them.
+- It is a namespace of the project, or a part of the namespace of the model is a type of the project.  An example is a [model namespace](reference/models.md#setting-model-namespace) of `App.Queries` beside a class `App.Queries`.
+- It is the namespace of another model, or a part of its namespace is another model.  An example is `App.Data` beside `App.Data.Row`, which reports both.
+- Its name, without the namespace, is lower-case ASCII letters alone, as `usersdto`.  The compiler warns on such a name, since it could become a keyword.
+
+Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC258: The model 'App.Queries.usersdto' of the query 'GetUsers' cannot be generated: the compiler warns on a type name of lower-case ASCII letters alone.  Give the query another model name, or set another model namespace.
@@ -3220,15 +3633,18 @@ The model is not generated, and each query that would have it is told.  The mess
 SELECT id, name FROM users;
 ```
 
-Give the query [another model name](reference/models.md#setting-model-name), or set another [model namespace](reference/models.md#setting-model-namespace):
+**Fix:** do one of these.
+
+- Give the query [another model name](reference/models.md#setting-model-name).
+- Set another [model namespace](reference/models.md#setting-model-namespace).
+
+The query with another model name:
 
 ```sql postgres
 -- name: GetUsers
 -- output-model: UserDto
 SELECT id, name FROM users;
 ```
-
-Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
 See: [Names that cannot be used](reference/models.md#unusable-model-names)
 
@@ -3240,7 +3656,14 @@ Reported by: the build.
 
 If several types claim the query's file, the query still gets this error only once.  The query gets no models until it is fixed.
 
-The query has an `-- output-model:` marker, which names the type of its rows, and its statement returns none, as an `INSERT`, `UPDATE` or `DELETE` without `RETURNING` does, or on SQL Server one without `OUTPUT`, or whose `OUTPUT` goes `INTO` a table.  The error is at the marker.
+The query has an `-- output-model:` marker, which names the type of its rows, and its statement returns no rows.  The error is at the marker.
+
+These statements return no rows:
+
+- an `INSERT`, `UPDATE` or `DELETE` without `RETURNING`;
+- on SQL Server, one without `OUTPUT`, or one whose `OUTPUT` goes `INTO` a table.
+
+Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Users.sql(2,1): error SQLSRC259: The query 'DeleteUser' names an output model, and its statement returns no rows.  Remove the -- output-model: marker.
@@ -3252,7 +3675,10 @@ The query has an `-- output-model:` marker, which names the type of its rows, an
 DELETE FROM users WHERE id = @id;
 ```
 
-Remove the marker.  To read the rows the statement changes instead, add a `RETURNING` clause, or on SQL Server an `OUTPUT` clause, and run `dotnet sqlsource describe`.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+**Fix:** do one of these.
+
+- Remove the marker.
+- To read the rows that the statement changes instead, add a `RETURNING` clause, or on SQL Server an `OUTPUT` clause.  Then run `dotnet sqlsource describe`.
 
 See: [Which queries get models](reference/models.md#which-models)
 
@@ -3264,7 +3690,14 @@ Reported by: the build.
 
 If several types claim the query's file, the query still gets this error only once.  The query gets no models until it is fixed.
 
-A `-- column:` marker, which sets the nullability or the C# type of one column of its query's result, cannot be used.  Either it names no column of the result, its name compared ignoring case, or the query returns no rows; or it says `null` or `not null` of a column whose alias already ends in `!` or `?`, which says the column's nullability too.  A marker that gives only a C# type may name such a column.  The error is at the marker, and the message says which it is.
+A `-- column:` marker cannot be used.  Such a marker sets the nullability or the C# type of one column of the result of its query.  The error is at the marker, and the message says which case it is.
+
+The case is one of these:
+
+- **The marker names no column of the result.**  Its name is compared ignoring case.  A query that returns no rows is this case too.
+- **The marker says `null` or `not null` of a column whose alias already ends in `!` or `?`.**  That mark says the nullability of the column too.  A marker that gives only a C# type can name such a column.
+
+Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
 
 ```console
 /work/App/Queries/Payments.sql(2,1): error SQLSRC260: The -- column: marker for 'totl' names no column of the query's result.  Name a column as the query returns it.
@@ -3278,7 +3711,12 @@ A `-- column:` marker, which sets the nullability or the C# type of one column o
 SELECT sum(amount) AS total, max(note) AS "note?" FROM payments;
 ```
 
-Name the column as the query returns it: its alias, or its own name when it has none.  For a column whose alias ends in a mark, keep one of the two: remove the marker's `null` or `not null`, or remove the mark from the alias, which changes the query, and run `dotnet sqlsource describe`.  Where the rows are read by the names of their columns, as Dapper reads them, keep the marker:
+**Fix:** what to do depends on the case.
+
+- For a marker that names no column, name the column as the query returns it: its alias, or its own name when it has none.
+- For a column whose alias ends in a mark, keep one of the two.  Remove the `null` or `not null` of the marker, or remove the mark from the alias.  Removing the mark changes the query, so then run `dotnet sqlsource describe`.
+
+Where the rows are read by the names of their columns, as Dapper reads them, keep the marker:
 
 ```sql postgres
 -- name: GetTotals
@@ -3286,8 +3724,6 @@ Name the column as the query returns it: its alias, or its own name when it has 
 -- column: note null
 SELECT sum(amount) AS total, max(note) AS note FROM payments;
 ```
-
-Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
 See: [Setting a column's nullability or type with a marker](reference/model-properties.md#column-marker)
 
