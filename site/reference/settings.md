@@ -110,6 +110,8 @@ SqlSource ignores case, hyphens and spaces when it matches a value from a list. 
 - `SealedRecord` and `sealed record`
 - `NestedClass` and `nested-class`
 
+A dialect's name and options, and a generator parameter's name and value, are the exception: SqlSource ignores only their case.  So `sql-server` is not `sqlserver`.
+
 <a id="precedence"></a>
 
 ## Which place wins
