@@ -47,6 +47,7 @@ A parameter has the C# type that its [`-- param:` marker](parameters.md#param-ma
 // sqlsource.json, in the project's folder
 {
     "root": true,
+    "dialect": "postgres",
     "typeOverrides": {
         "timestamptz": "System.DateTimeOffset",
         "public.user_status": "MyApp.UserStatus",
