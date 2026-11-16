@@ -19,7 +19,7 @@ Low.  A reader who opens an example beside the pages sees other method names tha
 
 In both `examples/PostgresExamples/Repository` and `examples/SqlServerExamples/Repository`:
 
-1. Remove `-- generator: method-type=both` and its comment from `GetUser` in `UserRepository.sql`, call `GetUser` in `UserGreeter.cs` as the pages do, and show the synchronous method in another example if one is still wanted.
+1. Remove `-- generator: method-type=both` and its comment from `GetUser` in `UserRepository.sql`, call `GetUser` in `UserGreeter.cs` as the pages do, and the `Repository/` sample of each example's `README.md`, whose `greeter.Greet(1)` calls the synchronous `GetUser`; show the synchronous method in another example if one is still wanted.
 2. Add the queries `FindUsers`, `ListUsersByIds` and `ListDisplayNames` to `UserRepository.sql`, in the words of `site/start/write-queries.md`.
 3. Write the sidecars again with `tools/describe-end-to-end.sh`, and check that each Get started page reads true against the files.
 

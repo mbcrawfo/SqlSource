@@ -14,7 +14,7 @@ Use this page when the build succeeds but something is wrong: an exception at ru
 - **`InvalidCastException` from a query method with parameters, on a connection that wraps the driver's.**  The method works only on a connection whose commands take the driver's own parameters.  See [a connection that wraps the driver's](../reference/query-methods.md#limit-wrapped-connection).
 - **`NotSupportedException` from a collection method, on a connection that wraps the driver's.**  Most such connections cannot run a batch of commands.  See [a collection method on a connection that wraps the driver's](../reference/collection-methods.md#limit-wrapped-connection).
 - **`InvalidCastException` for an id type made by Vogen or StronglyTypedId.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and such a type has no method marked so.  See [Vogen and StronglyTypedId](../reference/converters.md#limit-vogen-and-stronglytypedid).
-- **"Column 'name' is null." on PostgreSQL, or `SqlNullValueException`, "Data is Null.", on SQL Server.**  A null reached a property that cannot be null.  See [Say that a column can be null](nullability.md#nullable).
+- **"Column 'name' is null.", or on SQL Server Microsoft.Data.SqlClient's `SqlNullValueException`, "Data is Null.".**  A null reached a property that cannot be null.  See [Say that a column can be null](nullability.md#nullable).
 
 <a id="invalidcastexception"></a>
 

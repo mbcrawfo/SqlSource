@@ -152,6 +152,6 @@ To fix one, [say that the column is never null](#not-null).  See [Which columns 
 
 ## If it does not work
 
-- **"Column 'name' is null." on PostgreSQL, or `SqlNullValueException`, "Data is Null.", on SQL Server.**  A null reached a property that cannot be null: [say that the column can be null](#nullable).  See [How a row is read](../reference/query-methods.md#reading-rows).  On SQL Server, do not run `SET ANSI_WARNINGS OFF` on the connection: see [the limit](../reference/databases/sqlserver/nullability.md#limit-ansi-warnings-off).
+- **"Column 'name' is null.", or on SQL Server Microsoft.Data.SqlClient's `SqlNullValueException`, "Data is Null.".**  A null reached a property that cannot be null: [say that the column can be null](#nullable).  See [How a row is read](../reference/query-methods.md#reading-rows).  On SQL Server, do not run `SET ANSI_WARNINGS OFF` on the connection: see [the limit](../reference/databases/sqlserver/nullability.md#limit-ansi-warnings-off).
 - **SQLSRC260.**  The `-- column:` line names no column of the result, or the alias already ends in `!` or `?`.  Keep the mark or the line's `null` or `not null`, not both.  See [SQLSRC260](../diagnostics.md#sqlsrc260).
 - **SQLSRC227 on PostgreSQL.**  `@name IS NULL` does not fix the type of `@name`.  Give the type in its `-- param:` line.  See [SQLSRC227](../diagnostics.md#sqlsrc227).

@@ -1,6 +1,6 @@
 # Call your queries
 
-At the end of this page, your application gets the repository by dependency injection, calls its methods with a cancellation token, and reads their models.
+At the end of this page, your application gets the repository by dependency injection, calls its methods with a cancellation token, and reads their models (DTOs).
 
 <a id="repository"></a>
 

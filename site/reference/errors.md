@@ -59,14 +59,14 @@ Most errors cost part of what SqlSource generates, until you fix them.  What an 
 
 - **How a `.sql` file is written.**  An error from [SQLSRC101](../diagnostics.md#sqlsrc101) to [SQLSRC120](../diagnostics.md#sqlsrc120), or [SQLSRC126](../diagnostics.md#sqlsrc126), costs the file all its members and models.  The other files of the type keep theirs.  The section of [SQLSRC120](../diagnostics.md#sqlsrc120) says when it costs only a type that keeps comments.
 - **Where a query's members go.**  An error from [SQLSRC122](../diagnostics.md#sqlsrc122) to [SQLSRC125](../diagnostics.md#sqlsrc125) costs the file its members and models for the type that the error is reported for.  Another type that claims the file keeps them.  The section of [SQLSRC123](../diagnostics.md#sqlsrc123) says when it costs one method alone.
-- **An empty list.**  [SQLSRC127](../diagnostics.md#sqlsrc127) is reported only for a query whose output is `methods` or `repository`.  It costs that query its method, and nothing else.
+- **An empty list.**  [SQLSRC127](../diagnostics.md#sqlsrc127) is reported only for a query whose output is `repository` or `methods`.  It costs that query its method, and nothing else.
 - **Describing a query, or its sidecar.**  An error such as [SQLSRC241](../diagnostics.md#sqlsrc241) costs the query that it is about its models.  [SQLSRC209](../diagnostics.md#sqlsrc209) costs its models to each query of the file that needs an entry.  The other members of the file stay in place.
 - **A repository.**  Each of [SQLSRC028](../diagnostics.md#sqlsrc028) to [SQLSRC034](../diagnostics.md#sqlsrc034), and [SQLSRC036](../diagnostics.md#sqlsrc036), costs a method to each repository query of the logical databases that it is about.  The warning [SQLSRC031](../diagnostics.md#sqlsrc031) is not one of them.  The models of those queries are still generated.
 
 A query can get several errors at once.  If a query has an error about describing it, its sidecar, its models or its method, the query's output decides what it keeps:
 
 - If the output is `models`, the query keeps its constant or its token method.
-- If the output is `methods` or `repository`, the query gets no method until you fix every error.
+- If the output is `repository` or `methods`, the query gets no method until you fix every error.
 
 The section of an error says when it costs less.  [SQLSRC297](../diagnostics.md#sqlsrc297) costs only the collection method, [SQLSRC299](../diagnostics.md#sqlsrc299) only the synchronous methods, and [SQLSRC281](../diagnostics.md#sqlsrc281) costs nothing.
 
