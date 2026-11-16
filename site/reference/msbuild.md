@@ -83,7 +83,7 @@ $ dotnet build -tl:off
 
 With a [`.env` file](connections.md#env-file) like the one above, `dotnet build` runs `dotnet sqlsource describe` on the project before it compiles.  So you do not run `describe` after you change a query.  The build describes the query, and compiles the models and methods from what your database says.  If the database rejects a query, the build reports a build error at the query.  In the sample, the query names a table `user`, and the schema has `users`.
 
-Some builds do not run the tool: a build with no connection, a build in CI, and a build of a project that turns the tool off.  These builds use the committed sidecars, as a build without the tool does.  Commit the sidecars that a build writes, as you commit the sidecars that `describe` writes.
+Some builds use the committed sidecars, as a build without the tool does.  These are a build that finds no connection, a build in CI, and a build of a project that turns the tool off.  Commit the sidecars that a build writes, as you commit the sidecars that `describe` writes.
 
 - **What turns it on.**  By default, a build runs the tool when it finds `SQLSOURCE_CONNECTION` in the environment, or its `.env` file.  [`SqlSourceOnline`](#online-build) gives the rules: what the build looks for, the builds in CI, and how to turn the tool on or off.
 - **Which builds.**  `dotnet build`, `dotnet run`, `dotnet publish`, a rebuild, and the build command of an IDE run the tool.  An IDE that loads the project, or reads it again after you save a file, does not run the tool.  A build of the `Compile` target alone does not run it either.  This was checked in Rider on macOS.  Visual Studio, Visual Studio Code, and Rider on another system have not been checked, and can differ.
@@ -93,12 +93,12 @@ Some builds do not run the tool: a build with no connection, a build in CI, and 
   - the tool manifest, which an update of the tool rewrites;
   - the version of the `SqlSource` package;
   - the value of `SqlSourceOnline`;
-  - the file that [`SqlSourceEnvFile`](#setting-env-file) names.
+  - which file [`SqlSourceEnvFile`](#setting-env-file) names.
 
   If nothing changed after the last run, the build does not start the tool.  A change to the schema changes none of these: run `describe --force`, as [after a schema change](describing.md#after-a-schema-change) says.
 - **The tool describes the whole project**, as `describe` with no path does.  It writes the sidecar of each file whose queries changed, and deletes a sidecar that no query needs any more.  The same build compiles with what the tool wrote, and this includes a sidecar that the tool wrote for the first time.
 - **Apart from a sidecar written for the first time, a build compiles only the sidecars that your project lists.**  A build offline or in CI does the same.  So a project that [lists its own files](#included-files) must list their sidecars too, and so must a project with a `.sql` file from outside its folder.  If the project leaves out a sidecar, the next build reports [SQLSRC241](../diagnostics.md#sqlsrc241) for the queries of that sidecar, as CI would.
-- **The tool reads the `.env` in the project's folder, or the one that `SqlSourceEnvFile` names.**  This is true in a build of a solution too.  The tool never reads a `.env` in a folder above the project's folder.
+- **The tool reads the `.env` in the project's folder, or the one that `SqlSourceEnvFile` names.**  This is true in a build of a solution too.  Unless `SqlSourceEnvFile` names one, the tool never reads a `.env` in a folder above the project's folder.
 - **The tool gets the environment of the build.**  So a connection variable that your IDE sets reaches the tool.
 - **The tool must be installed** in the tool manifest of the repository and restored, at the version of the `SqlSource` package.  [Install the tool](cli.md#install-the-tool) says how.
 - **If the build cannot start the tool, it reports [SQLSRC026](../diagnostics.md#sqlsrc026), a warning.**  The build goes on with the committed sidecars.  Under `SqlSourceOnline` `true`, it reports the error [SQLSRC025](../diagnostics.md#sqlsrc025) instead.
@@ -159,18 +159,18 @@ Some builds do not run the tool: a build with no connection, a build in CI, and 
 | `false` | Never |
 
 - **The build ignores case and the white space around the value.**  So ` True ` is `true`.
-- **Under `auto`, the build does not find a connection in a variable of a database's name alone.**  An example is `SQLSOURCE_CONNECTION_BILLING` with no `.env` file.  To run the tool with such a variable, set `SqlSourceOnline` to `true` in your own environment, and not in the project.  MSBuild reads a variable of the environment as a property of every project.  So a machine with no database still builds.
+- **Under `auto`, the build does not find a connection in a variable of a database's name alone.**  An example is `SQLSOURCE_CONNECTION_BILLING` with no `.env` file.  To run the tool with such a variable, set `SqlSourceOnline` to `true` in your own environment.  Do not set it in the project, so that a machine with no database still builds.  MSBuild reads a variable of the environment as a property of every project.
 - **The build's `.env` file turns `auto` on whatever it holds.**  The build looks only at whether the file is there.  So a file that holds only the settings of your application turns `auto` on too.  The tool then finds no connection and the build goes on offline, and each build starts the tool again while it finds none.  To stop that, set `SqlSourceOnline` to `false`, or `SqlSourceEnvFile` to `none`.
 - **A symbolic link that leads to no file turns `auto` on too.**  The build counts it as there, as [the build's `.env` file](#setting-env-file) says.
 - **A `.env` above the project's folder does not turn `auto` on.**  This is true of a `.env` at the root of your solution or repository, or in your home folder.  The build says nothing of such a file, and builds from the committed sidecars.  To use such a file, name it with [`SqlSourceEnvFile`](#setting-env-file).
 - **Where it is written.**  You can write `SqlSourceOnline` in the project file, or in a `Directory.Build.props` above it for every project there.  You can also give it on the command line as `-p:SqlSourceOnline=false`, or as a variable of the environment.  It is a property of the build, not a key of a settings file.
-- **A build in CI never runs the tool**, whatever the value.  So a job in CI builds from the sidecars that were committed, and does not write its own.  A build is in CI when one of these is true:
-  - the variable `CI` is `true`, ignoring case;
-  - `TF_BUILD` is `True`;
-  - `TEAMCITY_VERSION` is set;
-  - `JENKINS_URL` is set.
+- **A build in CI never runs the tool**, whatever the value.  So a job in CI builds from and checks the sidecars that were committed, and does not write its own.  A build is in CI when one of these is true:
+  - `CI` is `true`, `yes` or `on`, ignoring case;
+  - `TF_BUILD` is `true`, `yes` or `on`, ignoring case;
+  - `TEAMCITY_VERSION` is set and not empty;
+  - `JENKINS_URL` is set and not empty.
 
-  GitHub Actions, GitLab, Buildkite, Azure Pipelines, TeamCity and Jenkins each set one of them.  `CI=1` is not recognised.
+  MSBuild reads `!false`, `!off` and `!no` as `true` too.  It reads each of the four as a property, so a property of that name counts as the variable does, such as `-p:CI=true`.  GitHub Actions, GitLab, Buildkite, Azure Pipelines, TeamCity and Jenkins each set one of them.  `CI=1` is not recognised.
 - **Any value that the table does not list, such as `yes`, is [SQLSRC024](../diagnostics.md#sqlsrc024)**, and the build stops.
 
 <a id="setting-env-file"></a>
@@ -212,7 +212,7 @@ Some builds do not run the tool: a build with no connection, a build in CI, and 
 
 **What you see.**  A target in your project adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as a target that writes the file or copies it in.  The build compiles the file, but it reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each query of the file that must be described.
 
-**Why.**  `sqlsource` leaves out the queries of such a file, so it describes none of them.  A build that [runs the tool](#running-in-the-build) still describes the file in a project with one target framework.  In a project with several, the build leaves the file out, as `sqlsource` does.  A project that is not of the .NET SDK can have one more effect, and so can a project that sets `AfterMicrosoftNETSdkTargets` without keeping its value.  There, a target that runs later also leaves the file without the settings of a `sqlsource.json` that only the file reaches, such as the one beside it.  No error says so.
+**Why.**  `sqlsource` leaves out the queries of such a file, so it describes none of them.  In a project with one target framework, a build that [runs the tool](#running-in-the-build) describes the file even without the `BeforeTargets` line.  In a project with several, the run of the tool leaves the file out, as `sqlsource` does.  A project that is not of the .NET SDK can have one more effect, and so can a project that sets `AfterMicrosoftNETSdkTargets` without keeping its value.  There, a target that runs later also leaves the file without some settings.  These are the settings of a `sqlsource.json` that only the file reaches, such as the one beside it.  No error says so.
 
 **What to do.**  Tell your target to run before the package lists the files of the project.  This works wherever the target is declared:
 

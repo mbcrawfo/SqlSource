@@ -93,7 +93,7 @@ public partial class SharedQueries;
 - **An empty `Source`, `Source = ""`, is the same as no `Source`.**
 - **A `Source` of white space is not the same as no `Source`.**  SqlSource reads it as the name of a folder, like any other `Source`, so it matches nothing.
 - **`Source` is relative to the folder of the C# file, never to the project.**  Both `/` and `\` separate folders.
-- **SqlSource ignores case when it compares paths**, so that a project builds the same on every operating system.  Two `.sql` files of a type whose paths differ only by case are [SQLSRC013](../diagnostics.md#sqlsrc013).
+- **SqlSource ignores case when it compares paths**, so that a project builds the same on every operating system.  Two `.sql` files of the project whose paths differ only by case are [SQLSRC013](../diagnostics.md#sqlsrc013).
 - **A `Source` that matches nothing is [SQLSRC004](../diagnostics.md#sqlsrc004).**
 - **If there is no `Source`, and no file is named for the type, that is [SQLSRC005](../diagnostics.md#sqlsrc005).**
 - **Two types can claim one file**: see [which files belong to a type](#files-of-a-type).

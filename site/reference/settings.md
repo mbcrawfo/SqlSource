@@ -162,7 +162,7 @@ There are three exceptions to these rules:
 | A marker | [SQLSRC111](../diagnostics.md#sqlsrc111), a dialect included.  A generator parameter that does not exist is [SQLSRC109](../diagnostics.md#sqlsrc109); a value that contradicts another in the same place is [SQLSRC112](../diagnostics.md#sqlsrc112) | The file produces no members until you fix it |
 | A settings file | [SQLSRC015](../diagnostics.md#sqlsrc015) to [SQLSRC020](../diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](settings-file.md#settings-files) | See the rules under the table |
 
-- **The build and the tool both report each of these errors, with two exceptions.**  The build alone reports [SQLSRC020](../diagnostics.md#sqlsrc020).  The tool alone reports a `database` value of a settings file that is not valid: see [database](#setting-database).
+- **The build and the tool both report the errors of a marker, and [SQLSRC015](../diagnostics.md#sqlsrc015) to [SQLSRC018](../diagnostics.md#sqlsrc018).**  The build reports [SQLSRC019](../diagnostics.md#sqlsrc019) for a value of every key but `database`.  The tool reports SQLSRC019 only for a value of `dialect`, `output` or `database`: see [database](#setting-database).  The build alone reports [SQLSRC020](../diagnostics.md#sqlsrc020).  [Which settings files the build checks](settings-file.md#which-files-are-checked) says more.
 - **A settings file does not set a value that is wrong.**  So a farther settings file or the default gives the value, for a dialect too.
 - **The rest of the settings file still applies.**  So do the other words of `generatorParameters`, and the other entries of `typeOverrides`, `columnTypes` or `libraryTypes`.
 - **Of a key, or an entry, written twice, the first applies.**  So does the first of two values of one generator parameter.
@@ -183,7 +183,7 @@ SELECT id, name FROM users;
 TRUNCATE TABLE audit_log;
 ```
 
-The output is the setting that says what SqlSource produces for a query.  It produces its models and a [query method](query-methods.md#query-methods), its SQL and its [models](models.md#models), or its SQL alone.  By default the query method is a method of a [repository](repositories.md#repository-methods).  The output also decides which queries must be described: the queries that the tool describes, and the queries that the build checks against their sidecar.  The values are `repository`, `methods`, `models` and `sql`, and the default is `repository`.  In the sample, `ResetAuditLog` has the output `sql`, and every other query of the file has `models`.
+The output is the setting that says what SqlSource produces for a query.  SqlSource produces its models and a [query method](query-methods.md#query-methods), its SQL and its [models](models.md#models), or its SQL alone.  By default the query method is a method of a [repository](repositories.md#repository-methods).  The output also decides which queries must be described: the queries that the tool describes, and the queries that the build checks against their sidecar.  The values are `repository`, `methods`, `models` and `sql`, and the default is `repository`.  In the sample, `ResetAuditLog` has the output `sql`, and every other query of the file has `models`.
 
 | Value | A query gets |
 |----|----|
@@ -211,9 +211,9 @@ You can write the output as a `-- output:` marker in the file header, for every 
 
 If two types claim a file, or two projects list it, the tool describes the file once, and the build of a project checks its entries once for the file.
 
-The tool can describe only some dialects: see [the database support table](databases/index.md#database-support).  The default output is `repository` and the default dialect is `ansi`.  So a project that sets neither gets [SQLSRC209](../diagnostics.md#sqlsrc209) for each file that a class reads.  The build and the tool both report it.  To correct it, do one of these:
+The tool can describe only some dialects: see [the database support table](databases/index.md#database-support).  The default output is `repository` and the default dialect is `ansi`.  So a project that sets neither gets [SQLSRC209](../diagnostics.md#sqlsrc209) for each file that a type claims.  The build and the tool both report it.  To correct it, do one of these:
 
-- Set the dialect, and describe the queries.
+- Set the dialect to `postgres` or `mssql`, and describe the queries.
 - Set the output to `sql` for the queries that need only their SQL.
 
 <a id="setting-database"></a>
@@ -273,7 +273,7 @@ SELECT id FROM notes WHERE body = 'it\'s here'; # MySQL reads this as a comment
 
 Set it to your database: `postgres` or `mssql`.
 
-The dialect is the set of rules by which SqlSource reads a `.sql` file: where a comment or a string starts and ends, which differs from one database to the next.  Each dialect is named after a database.  A dialect connects to nothing.  You can set it for a project, for some of its files, or for one file.  The default is `ansi`.  Every other dialect name, the options of `mysql` and `mariadb`, and what each dialect changes are on [the dialects page](dialects.md).
+The dialect is the set of rules by which SqlSource reads a `.sql` file: where a comment or a string starts and ends, which differs from one database to the next.  Each dialect but `ansi` is named after a database.  A dialect connects to nothing.  You can set it for a project, for some of its files, or for one file.  The default is `ansi`.  Every other dialect name, the options of `mysql` and `mariadb`, and what each dialect changes are on [the dialects page](dialects.md).
 
 - **The dialect has three places.**  SqlSource takes the first of these that gives one:
   1. A `-- dialect:` marker in the file.
