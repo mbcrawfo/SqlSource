@@ -470,7 +470,7 @@ These keys take a name or a word:
 In `generatorParameters`, each of these gets this error:
 
 - a name that is not a generator parameter, `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews among them;
-- a value that is not one of the values of the generator parameter, or `default`;
+- a value that is neither one of the values of the generator parameter nor `default`;
 - `default` followed by `=`.
 
 `[]` names no generator parameter and changes nothing.  `["default"]` gives every generator parameter its default.  The rules are in [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
@@ -696,8 +696,9 @@ The cause is one of these:
 
 **Fix:** do one of these.
 
-- Run `dotnet tool restore`, or install the tool as [install the tool](reference/cli.md#install-the-tool) says.  The next build then describes the queries.
-- Set `SqlSourceOnline` to `false` in a project that should build from its committed sidecars.  That also stops the warning.
+- Run `dotnet tool restore`.  The next build then describes the queries.
+- Install the tool as [install the tool](reference/cli.md#install-the-tool) says.  The next build then describes the queries.
+- To build the project from its committed sidecars, set `SqlSourceOnline` to `false`.  That also stops the warning.
 
 This is a warning: the build goes on with the sidecars that it has, as a build with no connection does.  The next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
 
@@ -758,8 +759,9 @@ public partial class UserRepository
 
 **Fix:** do one of these.
 
-- Give the type a member that the build finds by its name or type, such as a primary-constructor parameter `NpgsqlDataSource dataSource`.  Or mark the member that gives the connection `[SqlSourceConnection]`.
-- **When a member is marked, no other is found by its name or type.**  Mark the member for this database too.
+- Give the type a member that the build finds by its name or type, such as a primary-constructor parameter `NpgsqlDataSource dataSource`.
+- Mark the member that gives the connection `[SqlSourceConnection]`.
+- **When a member is marked, no other is found by its name or type.**  Also mark the member that gives this database its connection.
 - **The type passes a primary-constructor parameter to its base type, or uses it to initialize a field or property.**  Then the parameter is not found by its name or type, and the message names it.  Keep the value in a field or property named `connectionString` or of a `DbDataSource` type.  Or mark the parameter `[SqlSourceConnection]`.
 - **When the repository queries of the type use more than one database, no member is found by its name or type.**  Nothing says which database the member is for.  Mark one member for each database, as `[SqlSourceConnection(Database = "reports")]`.
 - Set the [output](reference/settings.md#setting-output) of the queries to `methods`.  Their methods take the connection as an argument.
@@ -914,7 +916,7 @@ The repository queries of the database of the member get no method.  When the me
 A connection comes from one of these members:
 
 - a field, property or primary-constructor parameter of a `string`, of a type that derives from `DbDataSource`, or of a type that derives from `DbConnection`;
-- a method that is not generic, takes nothing or one `CancellationToken`, and returns a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of such a type.
+- a method that is not generic and takes nothing or one `CancellationToken`.  It must return a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of such a type.
 
 An indexer, a property without a getter, an accessor, an operator and an explicit implementation of an interface's member are none of these either.
 
@@ -964,7 +966,8 @@ public partial class OrderRepository(NpgsqlDataSource dataSource);
 **Fix:**
 
 1. Give the database a member of its own engine's driver, or of `DbDataSource` or `DbConnection`.
-2. If the type uses several databases, mark the member for the database.
+2. If the member is a connection, mark it `[SqlSourceConnection]`.
+3. If the type uses several databases, mark the member for its database, as `[SqlSourceConnection(Database = "mssql")]`.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -1009,7 +1012,7 @@ The interface is named `I` and the type's name, unless `InterfaceName` names it.
 - a type of the project, other than an interface whose every declaration is `partial`, or a type of a referenced assembly;
 - a type parameter of the type, or of a type it is nested in;
 - for a nested type, the type it is nested in, or a member of it;
-- something else that SqlSource writes beside it: a model, the extension class of a type's `methods` queries, a namespace that holds models, or the interface of another type.  When it is the interface of another type, each of the two types gets the error.
+- something else that SqlSource writes beside it.  That is a model, the extension class of a type's `methods` queries, a namespace that holds models, or the interface of another type.  When it is the interface of another type, each of the two types gets the error.
 
 ```csharp
 public class IUserRepository { }
@@ -1097,7 +1100,7 @@ See: [The interface](reference/repositories.md#repository-interface), [repositor
 
 Reported by: the build.
 
-A project on .NET 6 or later uses SqlSource, and takes its exceptions from a project that it references.  That project targets a framework before .NET 6, such as `netstandard2.0` or `netstandard2.1`.  An example is the [shared project](guides/several-projects.md#share-the-exceptions) of the recipe.  The message names the project.  The error has no file and line, because it is about the project's references.
+A project on .NET 6 or later uses SqlSource.  It takes its exceptions from a project that it references, such as the [shared project](guides/several-projects.md#share-the-exceptions) of the recipe.  That project targets a framework before .NET 6, such as `netstandard2.0` or `netstandard2.1`.  The message names the project.  The error has no file and line, because it is about the project's references.
 
 The `CollectionItemException` of that project was built without the `SqlState`, `IsTransient` and `BatchCommand` that .NET 6 added to `DbException`.  So it cannot pass on those of the database's error: a retry policy that tests `IsTransient` would never retry a deadlock.  This project still uses the exceptions of that project, so the error is the only one.
 
@@ -1151,7 +1154,7 @@ SELECT 1;
 - Close the comment.
 - If the SQL is valid for your database, set the dialect of the file.
 
-Whether a `/*` inside a comment needs its own `*/` depends on the dialect.  It does in the default dialect, in SQL Server and in PostgreSQL.  It does not in MySQL, MariaDB, SQLite and Oracle.
+Whether a `/*` inside a comment needs its own `*/` depends on the dialect.  It does in the default dialect, in SQL Server, in PostgreSQL and in CockroachDB.  It does not in MySQL, MariaDB, SQLite and Oracle.
 
 - **SQLite accepts a comment that is still open at the end of the file.**  SqlSource does not, in any dialect, because the comment would take every later query of the file with it.
 
@@ -1211,8 +1214,8 @@ get-user.sql
 
 - Add a `-- name:` marker at the top of the file.
 - Rename the file.
-- If the file is not meant to be a query of this type, move it out of the folder of the type.
-- If the file is not meant to be a query of this type, point the `Source` of the type somewhere else.
+- If the file is not meant to be a query of this type, move it out of the type's folder.
+- If the file is not meant to be a query of this type, point the type's `Source` elsewhere.
 
 See: [A file with no `-- name:`](reference/sql-files.md#a-file-with-no-name)
 
@@ -1224,7 +1227,7 @@ Reported by: the build and the tool.
 
 SQL stands before the first `-- name:` marker of the file.  There it would belong to no query.
 
-In a file that has these markers, only comments and the markers that describe the whole file can come before the first one.  The table of [SQLSRC116](#sqlsrc116) lists those markers.
+In a file that has `-- name:` markers, only comments and the markers that describe the whole file can come before the first one.  The table of [SQLSRC116](#sqlsrc116) lists those markers.
 
 ```sql error
 SET search_path TO app;
@@ -1366,7 +1369,7 @@ Each line of this sample is this error:
 -- dialect: mysql keep-comments
 ```
 
-The other markers that hold a setting take these values:
+The other markers that hold a setting take these values.  `-- output:`, `-- input-model-type:`, `-- output-model-type:`, `-- collection-type:`, `-- member-location:` and `-- visibility:` match their values in any case, and with or without hyphens and spaces.
 
 - `-- output:` takes `repository`, `methods`, `models` or `sql`.
 - `-- database:` takes one word of letters, digits, `-`, `_` and `.`.
@@ -1376,9 +1379,8 @@ The other markers that hold a setting take these values:
 - **`-- model-namespace:` takes a namespace such as `App.Models`.**  None of its parts can be a reserved keyword or `file`, `required`, `scoped` or `extension`.  C# does not take these as the name of a type.
 - **`-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace.**  Examples are `UserRow` and `App.Models.UserRow`.  No part of the name can be a reserved keyword or `file`, `required`, `scoped` or `extension`.  The marker cannot name a generic type.
 - **`-- nested-class:` takes one identifier.**  It cannot be one of those words, and it cannot be `var`, with which the query methods of the type would not compile.  So `Queries` is valid, and `class`, `file` or `App.Sql` is not.
-- **`-- member-location:` and `-- visibility:` take their values in any case, and with or without hyphens and spaces.**
-  - `-- member-location:` takes `extension-class`, `class` or `nested-class`.
-  - `-- visibility:` takes `public`, `internal`, `protected` or `private`.
+- `-- member-location:` takes `extension-class`, `class` or `nested-class`.
+- `-- visibility:` takes `public`, `internal`, `protected` or `private`.
 - **`-- type-override:` takes one entry, `key = type` or `key = default`.**  See [type overrides](reference/type-mapping.md#setting-type-overrides).
   - The key is the one-word name of a type: `timestamptz` and not `timestamp with time zone`.
   - A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema: `public.user_status` or `dbo.Email`.
@@ -1549,7 +1551,9 @@ SELECT 1;
 
 **Fix:**
 
-1. Move the marker to the top of the file.  In a file with no `-- name:` marker, which is one query, put it above the SQL of the query.
+1. Move the marker to the top of the file.
+
+In a file with no `-- name:` marker, which is one query, the top of the file is above the SQL of the query.
 
 Comments can come before the marker, such as a licence header.  In this sample, the marker stands at the top of the file:
 
@@ -1560,7 +1564,7 @@ Comments can come before the marker, such as a licence header.  In this sample, 
 SELECT 1;
 ```
 
-- **A marker after the last SQL of its query gets two errors.**  They are this error and [SQLSRC108](#sqlsrc108).
+- **A `-- dialect:` marker after the last SQL of its query gets two errors.**  They are this error and [SQLSRC108](#sqlsrc108).
 - **A file cannot mix dialects.**  Put the queries for another database in a file of their own.
 
 See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place)
@@ -1783,7 +1787,7 @@ The build checks a parameter written in the default of a token as it checks the 
 
 - **A parameter that only a token's default writes, and that a `-- param:` marker declares, is bound as the marker spells it.**  The spellings in the defaults are compared against that spelling.
 
-This is a warning, since a query runs as written when the server collation ignores case, and a project that uses only such servers may want no warning.  A project can list it in `NoWarn` to turn it off.  A project that sets `TreatWarningsAsErrors` can list it in `WarningsNotAsErrors` to keep it a warning:
+This is a warning, since a query runs as written when the server collation ignores case.  So a project that uses only such servers can do without it.  A project can list it in `NoWarn` to turn it off.  A project that sets `TreatWarningsAsErrors` can list it in `WarningsNotAsErrors` to keep it a warning:
 
 ```xml
 <PropertyGroup>
