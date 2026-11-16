@@ -54,7 +54,7 @@ internal static class RepositoryShapeReader
                         ),
                     symbol is null || type.IsStatic
                         ? EquatableArray<ConnectionCandidate>.Empty
-                        : ConnectionCandidateReader.ReadHeld(symbol, compilation, type.AttributeLocation, token),
+                        : HeldFactoryReader.Read(symbol, compilation, type.AttributeLocation, token),
                     EquatableArray<ConnectionCandidate>.Empty,
                     heldParameters,
                     interfaceOn,

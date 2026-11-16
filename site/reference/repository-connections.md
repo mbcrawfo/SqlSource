@@ -85,3 +85,17 @@ A [synchronous method](repositories.md#synchronous-repository-methods) gets its 
 - **On PostgreSQL, a connection string makes a bare connection.**  The connection knows none of the plugins and mappings of your data source: see [limits](databases/postgresql/query-methods.md#limit-connection-string-repository).  Give a PostgreSQL repository a data source.
 
 The attribute is `SqlSource.SqlSourceConnectionAttribute`.  SqlSource generates it into your project beside `[SqlSourceGenerate]`.  Its one property, `Database`, names the [logical database](settings.md#setting-database) as the `database` setting does.
+
+<a id="limits"></a>
+
+## Limits
+
+<a id="limit-member-of-the-same-name"></a>
+
+### A marked member of a base type is not found
+
+**What you see.**  A repository does not use a member of its base type that you marked `[SqlSourceConnection]`.  The build reports [SQLSRC028](../diagnostics.md#sqlsrc028), or the repository's methods use another member as their source.
+
+**Why.**  The build skips a member of a base type when the repository, or a base type between them, has a member of the same name.  It skips it even when that member is a method with other parameters, or one that the repository cannot reach, such as a `private` member of a base type between them.  So a method `Open(int retries)` of the repository hides a marked `Open()` of its base type.
+
+**What to do.**  Give the member of the repository, or of the base type between them, another name.

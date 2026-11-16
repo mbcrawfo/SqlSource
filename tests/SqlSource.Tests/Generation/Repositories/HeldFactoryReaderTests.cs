@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Shouldly;
 using SqlSource.Generation.Repositories;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Repositories;
@@ -11,7 +12,7 @@ namespace SqlSource.Tests.Generation.Repositories;
 public sealed class HeldFactoryReaderTests
 {
     [Fact]
-    public void ReadHeld_InterfaceMethodMarked_IsAHeldFactory()
+    public void Read_InterfaceMethodMarked_IsAHeldFactory()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -48,7 +49,7 @@ public sealed class HeldFactoryReaderTests
     [InlineData("NpgsqlDataSource Source { get; }", "Source", "DataSource")]
     [InlineData("DbConnection Connection { get; }", "Connection", "Connection")]
     [InlineData("DbConnection Open();", "Open", "Factory")]
-    public void ReadHeld_EachKindOfMember_IsRead(string member, string name, string type)
+    public void Read_EachKindOfMember_IsRead(string member, string name, string type)
     {
         var shape = RepositoryShapes.Of(
             $$"""
@@ -72,7 +73,7 @@ public sealed class HeldFactoryReaderTests
     }
 
     [Fact]
-    public void ReadHeld_MarkOnBaseInterface_IsFound()
+    public void Read_MarkOnBaseInterface_IsFound()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -100,7 +101,7 @@ public sealed class HeldFactoryReaderTests
     // An implementation of a marked interface member is marked as it is, as an override of a marked member is, and the
     // two are one candidate.
     [Fact]
-    public void ReadHeld_ClassImplementingMarkedInterface_IsMarked()
+    public void Read_ClassImplementingMarkedInterface_IsMarked()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -133,7 +134,7 @@ public sealed class HeldFactoryReaderTests
     // As with a source, the field the parameter is stored in is the holder, so the generated code never captures the
     // parameter as well.
     [Fact]
-    public void ReadHeld_ParameterStoredInField_HoldsTheFieldAlone()
+    public void Read_ParameterStoredInField_HoldsTheFieldAlone()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -160,7 +161,7 @@ public sealed class HeldFactoryReaderTests
     }
 
     [Fact]
-    public void ReadHeld_ParameterPassedToBase_HoldsTheBaseMember()
+    public void Read_ParameterPassedToBase_HoldsTheBaseMember()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -193,7 +194,7 @@ public sealed class HeldFactoryReaderTests
     // Only a member whose type has candidates is a holder, so a field of another service leaves the parameters to be
     // holders.
     [Fact]
-    public void ReadHeld_FieldOfATypeWithoutMarks_DoesNotHideTheParameter()
+    public void Read_FieldOfATypeWithoutMarks_DoesNotHideTheParameter()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -220,7 +221,7 @@ public sealed class HeldFactoryReaderTests
     }
 
     [Fact]
-    public void ReadHeld_TwoHolders_AreTwoCandidates()
+    public void Read_TwoHolders_AreTwoCandidates()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -248,7 +249,7 @@ public sealed class HeldFactoryReaderTests
 
     // A static member of a factory type is a global, so it is never found twice.
     [Fact]
-    public void ReadHeld_StaticFactoryMember_IsNotHeld()
+    public void Read_StaticFactoryMember_IsNotHeld()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -273,7 +274,7 @@ public sealed class HeldFactoryReaderTests
     [Theory]
     [InlineData("NpgsqlDataSource")]
     [InlineData("IDatabaseFactory")]
-    public void ReadHeld_MarkedHolder_IsNotAHolder(string type)
+    public void Read_MarkedHolder_IsNotAHolder(string type)
     {
         var shape = RepositoryShapes.Of(
             $$"""
@@ -301,7 +302,7 @@ public sealed class HeldFactoryReaderTests
 
     // The attribute stays in the metadata of a library that a factory comes from.
     [Fact]
-    public void ReadHeld_FactoryInReferencedAssembly_IsFound()
+    public void Read_FactoryInReferencedAssembly_IsFound()
     {
         var library = RepositoryShapes.Library(
             """
@@ -337,7 +338,7 @@ public sealed class HeldFactoryReaderTests
     }
 
     [Fact]
-    public void ReadHeld_UnreachableMember_IsNotACandidate()
+    public void Read_UnreachableMember_IsNotACandidate()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -359,7 +360,7 @@ public sealed class HeldFactoryReaderTests
     }
 
     [Fact]
-    public void ReadHeld_UnsupportedMember_IsAnUnsupportedCandidate()
+    public void Read_UnsupportedMember_IsAnUnsupportedCandidate()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -385,7 +386,7 @@ public sealed class HeldFactoryReaderTests
     // Only a factory's members follow the marks of the interfaces they implement: the repository's own keep the rule of
     // its own tier.
     [Fact]
-    public void ReadHeld_RepositoryImplementingMarkedInterface_GainsNoMark()
+    public void Read_RepositoryImplementingMarkedInterface_GainsNoMark()
     {
         var shape = RepositoryShapes.Of(
             """
@@ -411,5 +412,273 @@ public sealed class HeldFactoryReaderTests
         var candidate = shape.Candidates.ShouldHaveSingleItem();
         candidate.Name.ShouldBe("connectionString");
         candidate.IsMarked.ShouldBeFalse();
+    }
+
+    // A method hides only a method of its signature, so a sync factory and an async one of one name are a pair.
+    [Fact]
+    public void Read_SyncAndAsyncAcrossInterfaces_AreBothCandidates()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IConnectionOpener
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public interface IDatabaseFactory : IConnectionOpener
+                {
+                    [SqlSourceConnection]
+                    Task<DbConnection> Open(CancellationToken ct);
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(IDatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.Select(static candidate => candidate.IsAsync).ShouldBe([true, false]);
+    }
+
+    // A member the repository cannot reach is not the one its call would bind to, so it hides nothing.
+    [Fact]
+    public void Read_UnreachableDerivedMember_HidesNothing()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public class FactoryBase
+                {
+                    [SqlSourceConnection]
+                    public DbConnection Open() => null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    private new DbConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.IsMarked.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Read_NullableStructHolder_ReadsItsValuesType()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public struct DatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    public DbConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory? dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.Holder.ShouldNotBeNull().TypeName.ShouldBe("DatabaseFactory");
+    }
+
+    [Fact]
+    public void Read_TypeParameterHolder_ReadsItsConstraint()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                            public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    Task<DbConnection> Open(CancellationToken ct);
+                }
+                [SqlSourceGenerate]
+                public partial class UserRepository<TFactory>(TFactory dbf)
+                    where TFactory : IDatabaseFactory;
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.Holder.ShouldNotBeNull().TypeName.ShouldBe("TFactory");
+    }
+
+    // The implementation that a factory inherits from its base class and the interface member it implements are one
+    // candidate, marked as the interface member is.
+    [Fact]
+    public void Read_ImplementationInheritedFromTheFactorysBase_IsFoundOnce()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                            public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    Task<DbConnection> Open(CancellationToken ct);
+                }
+                public class FactoryBase
+                {
+                    public Task<DbConnection> Open(CancellationToken ct) => null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase, IDatabaseFactory;
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.IsMarked.ShouldBeTrue();
+    }
+
+    // A call through a holder of the class cannot name an explicit implementation.
+    [Fact]
+    public void Read_ExplicitImplementationOnAClassHolder_IsNotACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                            public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    Task<DbConnection> Open(CancellationToken ct);
+                }
+                public sealed class DatabaseFactory : IDatabaseFactory
+                {
+                    Task<DbConnection> IDatabaseFactory.Open(CancellationToken ct) => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Read_ProtectedFactoryMember_IsNotACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public class DatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    protected DbConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Read_StaticHolder_IsAHolder()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                            public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    Task<DbConnection> Open(CancellationToken ct);
+                }
+                [SqlSourceGenerate]
+                public partial class UserRepository
+                {
+                    private static readonly IDatabaseFactory Factory = null!;
+                }
+            }
+            """
+        );
+
+        var holder = shape.HeldCandidates.ShouldHaveSingleItem().Holder.ShouldNotBeNull();
+        holder.Name.ShouldBe("Factory");
+        holder.IsStatic.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Read_OwnAndBaseHolders_AreOwnFirstAndInheritedAfter()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                            public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    Task<DbConnection> Open(CancellationToken ct);
+                }
+                public abstract class RepositoryBase
+                {
+                    protected IDatabaseFactory Shared { get; } = null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    private readonly IDatabaseFactory _own = null!;
+                }
+            }
+            """
+        );
+
+        shape.HeldCandidates.Select(static candidate => candidate.DisplayName).ShouldBe(["_own.Open", "Shared.Open"]);
+        shape.HeldCandidates.Select(static candidate => candidate.IsInherited).ShouldBe([false, true]);
+    }
+
+    // A factory's member in source is located at itself; only one in metadata takes its holder's location.
+    [Fact]
+    public void Read_FactoryMemberInSource_IsLocatedAtItself()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                            public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    Task<DbConnection> Open(CancellationToken ct);
+                }
+                [SqlSourceGenerate]
+                public partial class UserRepository(IDatabaseFactory dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Location.Path.ShouldBe(GeneratorHarness.SourcePath);
+        candidate.Location.ShouldNotBe(candidate.Holder.ShouldNotBeNull().Location);
     }
 }

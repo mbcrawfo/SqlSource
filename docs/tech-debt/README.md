@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0118`
+Next id: `TD-0119`
 
 ## Active items
 
@@ -42,6 +42,7 @@ Next id: `TD-0118`
 | [TD-0115](TD-0115-tool-code-its-own-tests-do-not-check.md) | Open | 2026-11-13 | Low | 1,881 mutants of `src/SqlSource.Tool` fail no test of their own folder or are run by none, most in `WatchSession.cs`, `SqlServerLive.cs` and `DiagnoseRun.cs`, though the command tests and the database projects may reach them |
 | [TD-0116](TD-0116-sql-server-list-limit-message-advises-a-table-valued-parameter.md) | Open | 2026-11-14 | Low | The `ArgumentException` that a SQL Server query method throws past 2,098 parameters advises a table-valued parameter, which a query method cannot send; the advice should point to one JSON array read with `OPENJSON` |
 | [TD-0117](TD-0117-get-started-running-example-differs-from-the-examples.md) | Open | 2026-11-16 | Low | The Get started pages call `GetUser` and add three queries, while their running example in `examples/*/Repository` has `method-type=both`, so its asynchronous method is `GetUserAsync`, and lacks the three queries |
+| [TD-0118](TD-0118-own-candidates-hide-base-members-by-name.md) | Open | 2026-11-16 | Low | A repository's own connection candidates, and its field and property holders, skip a base type's member that any more derived member has the name of, even a method of another signature or a member the repository cannot reach |
 
 ## Columns
 
