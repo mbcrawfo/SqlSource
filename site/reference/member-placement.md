@@ -215,6 +215,7 @@ This is [SQLSRC123](../diagnostics.md#sqlsrc123), which leaves out that method a
 // sqlsource.json, in the project's folder
 {
     "root": true,
+    "dialect": "postgres",
     "nestedClass": "Queries",
 }
 ```

@@ -78,7 +78,7 @@ In a project of your own, copy [`.env.example`](.env.example) to `.env` in the p
 dotnet sqlsource describe --watch
 ```
 
-It describes again each time you save a query, as [describe on save](../../site/reference/describing.md#describe-on-save) says, and your editor can start it for you: see [the recipe](../../site/guides/describe-on-save.md#start-the-watcher-with-your-editor).  A build of your project also describes before it compiles, as [running in the build](../../site/reference/online-build.md#running-in-the-build) says, so a query that the database rejects is an error of the build, and you need not run `describe` after a change.
+It describes again each time you save a query, as [describe on save](../../site/reference/describing.md#describe-on-save) says, and your editor can start it for you: see [the guide](../../site/guides/describe-on-save.md#start-the-watcher-with-your-editor).  A build of your project also describes before it compiles, as [running in the build](../../site/reference/online-build.md#running-in-the-build) says, so a query that the database rejects is an error of the build, and you need not run `describe` after a change.
 
 This example differs in two ways.  The watch runs from the source, as the commands above do, from the repository's root.  It reads the `.env` of this folder when it runs on the project, so the `export` above is not needed:
 
@@ -104,7 +104,7 @@ Your IDE shows the generated code among the project's dependencies, under its an
 dotnet build -p:EmitCompilerGeneratedFiles=true
 ```
 
-The files are under `obj/Debug/net10.0/generated/`: one for each class, with the SQL of its queries whose output is `sql` or `models`, one with the methods of each class of `Methods/`, in the classes `UserQueriesExtensions`, `OrderLineQueriesExtensions` and `DeliveryQueriesExtensions`, and in `OrderQueries` and its nested class `Sql`, one with the methods of `UserRepository` and its interface `IUserRepository`, one for each model, and one with the attributes, and one with the exceptions a method throws.  `GetOrderDto`, for instance, is a record with the properties `Id`, `Status`, `PlacedAt`, `ShippedOn` and `CustomerName`.  See [the generator](../../site/reference/members.md).
+The files are under `obj/Debug/net10.0/generated/`: one for each class, with the SQL of its queries whose output is `sql` or `models`, one with the methods of each class of `Methods/`, in the classes `UserQueriesExtensions`, `OrderLineQueriesExtensions` and `DeliveryQueriesExtensions`, and in `OrderQueries` and its nested class `Sql`, one with the methods of `UserRepository` and its interface `IUserRepository`, one for each model, and one with the attributes, and one with the exceptions a method throws.  `GetOrderDto`, for instance, is a record with the properties `Id`, `Status`, `PlacedAt`, `ShippedOn` and `CustomerName`.  See [what is generated](../../site/reference/members.md#generator).
 
 ## Call the methods
 

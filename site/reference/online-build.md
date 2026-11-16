@@ -13,7 +13,7 @@ SQLSOURCE_CONNECTION_POSTGRES="Host=localhost;Database=app;Username=app;Password
 ```console
 $ dotnet build -tl:off
 /work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'GetUser': relation "user" does not exist; query: GetUser, database postgres, postgres 18.6, Npgsql 10.0.3; step: describe parameters; server: 42P01: relation "user" does not exist; server: at character 15; see: https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc225 [/work/App/App.csproj]
-/work/App/Queries/Users.sql(1,10): error SQLSRC241: The query 'GetUser' has no entry in the sidecar of its file, and its output 'methods' needs one.  Run 'sqlsource describe'. [/work/App/App.csproj]
+/work/App/Queries/Users.sql(1,10): error SQLSRC241: The query 'GetUser' has no entry in the sidecar of its file, and its output 'methods' needs one.  Run 'sqlsource describe'. (https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc241) [/work/App/App.csproj]
 ```
 
 With a [`.env` file](connections.md#env-file) like the one above, `dotnet build` runs `dotnet sqlsource describe` on the project before it compiles.  So you do not run `describe` after you change a query.  The build describes the query, and compiles the models and methods from what your database says.  If the database rejects a query, the build reports a build error at the query.  In the sample, the query names a table `user`, and the schema has `users`.

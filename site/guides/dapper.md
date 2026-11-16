@@ -265,6 +265,8 @@ DefaultTypeMap.MatchNamesWithUnderscores = true;
   // sqlsource.json, in the project's folder
   {
       "root": true,
+      "dialect": "postgres",
+      "output": "models",
       "generatorParameters": ["sort-output"],
       "outputModelType": "class",
   }

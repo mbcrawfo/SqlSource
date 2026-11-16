@@ -182,7 +182,7 @@ After:
 > - the tool manifest, which an update of the tool rewrites;
 > - the version of the `SqlSource` package;
 > - the value of `SqlSourceOnline`;
-> - the file that `SqlSourceEnvFile` names.
+> - which file `SqlSourceEnvFile` names.
 
 The word "only" stays.  It is the rule.
 

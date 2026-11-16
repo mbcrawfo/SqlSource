@@ -21,7 +21,7 @@ The watcher of sub-phase 9.3, and the manual's recipes and "what each IDE shows"
 
 ## Proposed fix
 
-Run the procedure below in each IDE and on each system that its tables leave blank, write the answers into the tables of [the spike's checklist](../superpowers/specs/2026-11-02-query-generation-phase-9-spike.md#the-owners-checklist), and correct the design, the recipes and the manual where an answer differs.  Then delete this item.
+Run the procedure below in each IDE and on each system that its tables leave blank, write the answers into the tables of [the spike's checklist](../superpowers/specs/2026-11-02-query-generation-phase-9-spike.md#the-owners-checklist), and correct the design and the manual where an answer differs.  Then delete this item.
 
 The procedure needs no database but for the VS Code task, which runs the manual's recipe in a project of your own: the sample's sidecars are written in advance, and a tool of the sample writes them from a process of its own, as the watcher does.
 

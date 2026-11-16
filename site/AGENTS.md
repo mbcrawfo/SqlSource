@@ -25,15 +25,15 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 - **A fact has one home.**  A rule, a value, a default or a limit is stated in one reference section; every other page restates it in a sentence or two and links there.
 - **A new page** gets an entry in the `toc.yml` of its folder, under its group.  Aim at 600 to 3,500 words for a page and at most nine entries for a group; a reviewer holds both.
 - **The two packed readmes.**  `README.md` holds the outline of root rule 4, and neither readme states anything that a page of this folder does not own.
-- **The site.**  docfx publishes every page here but each `AGENTS.md`.  `tools/build-site.sh` builds it and fails on any docfx warning.  The tests are in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/`; none checks whether a page is true and free of internals.
+- **The site.**  `tools/build-site.sh` builds it and fails on any docfx warning.  The tests are in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/`; none checks whether a page is true and free of internals.
 
 ## Write effects, never internals
 
-- Never name the describer, a plan or a plan walk, `EXPLAIN`, a heuristic, a provenance value, a capture file, a type of the library, or a field of the sidecar (`reference/sidecars.md` links `schemas/sidecar-v1.schema.json` once, for the curious).
+- Never name the describer, a plan or a plan walk, `EXPLAIN`, a heuristic, a provenance value, a capture file, a type of the library, or a field of the sidecar (`reference/sidecars.md` links the sidecar's schema once).
 - Never link into the project's notes or source, and never cite an item's id.
 - Say what makes a column possibly null, not what the sidecar records, and what the user's database experiences.
 - A type map is the database type and the C# type a user gets, with the driver version where that changes it; not how the driver is detected or what is set on a `DbParameter`.  A generated method is its signature and what it returns and throws; not how it reads a row.
-- Before a commit, grep the pages you changed and rewrite every hit but text the user sees anyway: a diagnostic's own title (`SQLSRC216`'s) or a SQL command a user writes (`EXPLAIN` in `SQLSRC233`'s list).
+- Before a commit, grep the pages you changed and rewrite every hit but text the user sees anyway, such as a diagnostic's own title or a SQL command a user writes (`EXPLAIN`).
 
 ```console
 $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|tech-debt|superpowers|TD-0|D-0" <pages>
@@ -45,6 +45,8 @@ $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|t
 - **Plain language**, by ASD-STE100 as a guideline, for text you write or change; a reviewer holds it.  One instruction in a sentence.  At most 20 words in a step and 25 in a description.  A paragraph has one topic and at most six sentences.
 - Active voice and present tense, not "will".  A condition comes first: "If the column can be null, ...".  "Must" for what is required and "can" for what is allowed.  A list for conditions and alternatives.
 - **Terms.**  One term for one thing.  Say *query parameter*, *generator parameter* or *logical database* where "parameter" or "database" alone is unclear, *inside a query*, and *folder*, never "directory" in prose.  A term is defined once, in the reference section that documents the thing.
+- **The outputs are listed with the default first**: `repository`, `methods`, `models`, `sql`, in a part of the list too.  Text that the tool prints keeps its order.  A reader sets the dialect to their database; no text says "choose a dialect".
+- **One word for each of these**: a type *claims* a `.sql` file; a column *can be null* or is *never null*; a sidecar entry is *current* or *out of date*; the tool *describes* a query; `sqlsource.json` is a *settings file*.
 - **Tabs.**  A docfx tab holds a sample or a few sentences, never a heading or an `<a id>`: an anchor in a tab that is not selected is a dead link target.  A long difference between databases is two anchored sections.  A tab group that names one described database names them all.
 - **Anchors.**  A heading of this folder linked from anywhere gets an `<a id>` anchor on the line above, kept when the heading is reworded.
 - **Links.**  Pages of this folder link to each other relatively, and to any other file of the repository by `https://github.com/mbcrawfo/SqlSource/blob/main/<path>`: only this folder is published.
@@ -55,8 +57,8 @@ $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|t
 
 - **Limits.**  A page that owns behaviour ends with `## Limits`, under `<a id="limits"></a>`: what a user can plausibly hit from the open items of `docs/tech-debt` and `docs/deferred`.  Each is an h3 under its own anchor, `limit-<name>`: what the user sees, why, and what to do.  Leave out what a user cannot see, such as a test gap or duplicated code.
 - Add a limit in the PR that opens its item, with its row in `guides/troubleshooting.md`.  Remove both in the PR that closes it, found by its effect, as a limit names no id.
-- **`diagnostics.md` stays at the root, and a `## SQLSRCnnn` heading never gets another anchor**: every error's help link is `diagnostics.html#sqlsrcnnn`, compiled into the packages.  Nothing but the title and one paragraph stands before `## SQLSRC001`.
-- A new diagnostic gets a section whose first bold line is its descriptor's title, then its "Reported by" line, a "Database" line when it is an error of describing a query against its database, and, where a manual section documents the rule, a closing `See: [section](page.md#anchor)` line.  Its id joins its area's row in `reference/errors.md#errors-by-area`.
-- A new diagnostic's id also joins the lists of `reference/errors.md` that it belongs in: its row of `#who-reports`, the warnings and information of `#severity`, and the ids with no file and line of `#where-an-error-is-reported`.  No test checks these.
+- **`diagnostics.md` stays at the root, and a `## SQLSRCnnn` heading never changes and never gets another anchor**: every error's help link is `diagnostics.html#sqlsrcnnn`, compiled into the packages.  Nothing but the title and one paragraph stands before `## SQLSRC001`.
+- A new diagnostic gets a section in one shape: its descriptor's title in bold, its "Reported by" line, a "Database" line where a database gives the error, what happened, why, `**Fix:**` with its steps or a `Fix:` under each cause, and a closing `See:` line whose first link is a section of `reference/`.  It has no heading and stands alone, with its own lists of values.  After a bulleted fix, a note is a paragraph that opens in bold.
+- A new diagnostic also gets its place on `reference/errors.md`: its area under `#errors-by-area`, its row of `#who-reports`, `#severity` when it is a warning or information, and `#where-an-error-is-reported` when it has no file and line.  No test checks the last three.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

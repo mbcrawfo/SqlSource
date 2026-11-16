@@ -113,6 +113,7 @@ If a library reads the rows by the names of their columns, as Dapper does, set t
 // sqlsource.json, in the project's folder
 {
     "root": true,
+    "dialect": "postgres",
     "columnTypes": {
         "users.id": "UserId",
         "posts.created_by_user_id": "UserId",
