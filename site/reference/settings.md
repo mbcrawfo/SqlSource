@@ -1,6 +1,8 @@
 # Settings: every setting, and where you write it
 
-A setting is a named choice that changes what SqlSource generates or does, such as which dialect the SQL is written in, which comments to keep or which database the tool asks about a query, and that you write in one of five places.  A setting can apply to a whole project, to some of its files, to one type or to one query.  This page shows the five places, lists every setting with the places that can hold it, and says which place wins when a setting is written in several.  The output, the database and the dialect are defined below.  Every other setting is defined on the page of the thing it changes.
+A setting is a named choice that changes what SqlSource generates or does, and that you write in one of five places.  For example, a setting says which dialect the SQL is written in, which comments to keep, or which database the tool asks about a query.  A setting can apply to a whole project, to some of its files, to one type or to one query.
+
+This page shows the five places and lists every setting with the places that can hold it.  It says which place wins when a setting is written in several places.  It also defines three settings: the output, the database and the dialect.  Every other setting is defined on the page of the thing it changes.
 
 The settings file, `sqlsource.json`, has [a page of its own](settings-file.md): its name, what it holds, and which `.sql` files it reaches.
 
@@ -37,6 +39,13 @@ internal partial class Reports(NpgsqlDataSource dataSource);
 </PropertyGroup>
 ```
 
+The four samples write settings in all five places:
+
+- The first sample writes markers in a `.sql` file: in the file header, and inside a query.
+- The second writes a [settings file](settings-file.md#settings-files), `sqlsource.json`.  A settings file applies to the `.sql` files of its folder and of every folder below it.
+- The third writes a property of the attribute.
+- The fourth writes an MSBuild property of the project.
+
 | Place | Written as | Applies to |
 |----|----|----|
 | A marker inside a query | A `-- word:` line under a `-- name:` line | That query |
@@ -45,9 +54,9 @@ internal partial class Reports(NpgsqlDataSource dataSource);
 | A property of an attribute | `[SqlSourceGenerate(Source = "...")]` | The type, or the member, that carries the attribute |
 | An MSBuild property of the project | An element of the project file or of a `Directory.Build.props` above it, `-p:` on the command line, or a variable of the environment | The whole project |
 
-A file with no `-- name:` line is one query, and takes the markers of the file header and those of a query.
+A file with no `-- name:` line is one query.  It takes the markers of the file header and the markers of a query.
 
-The first block writes settings as markers in a `.sql` file, the second in a [settings file](settings-file.md#settings-files), `sqlsource.json`, which applies to the `.sql` files of its folder and of every folder below it, the third as a property of the attribute, and the fourth as an MSBuild property of the project.  Which of the five places a setting accepts is in [the table](#all-settings).  To read one folder of a project differently from the rest, see [configure one folder differently](../guides/folders-and-files.md#configure-a-folder).
+[The table of all settings](#all-settings) says which of the five places each setting accepts.  To read one folder of a project differently from the rest, see [configure one folder differently](../guides/folders-and-files.md#configure-a-folder).
 
 These are not settings, and have no row in [the table of all settings](#all-settings):
 
@@ -61,7 +70,14 @@ These are not settings, and have no row in [the table of all settings](#all-sett
 
 ## All settings
 
-Each name links to its section, which gives its values and its rules.  The other columns give every place the setting can be written: a key of a [settings file](settings-file.md#settings-files); a marker, and whether it can stand in the **file header** (the part of a `.sql` file before its first `-- name:` line) and **inside a query** (under a `-- name:` line), as [the marker index](sql-files.md#marker-index) shows; a property of an attribute; and a property of the project, one of `SqlSourceRepositoryInterfaces`, `SqlSourceOnline`, `SqlSourceEnvFile`, `SqlSourceIncludeFiles` and `SqlSourcePublicExceptions`.  A place it does not list cannot hold it.  **Default** is the value when no place gives one.
+Each name links to the section of its setting, which gives its values and its rules.  The other columns give every place where you can write the setting:
+
+- A key of a [settings file](settings-file.md#settings-files).
+- A marker, as [the marker index](sql-files.md#marker-index) shows.  Two columns say whether the marker can stand in each of two places.  The **file header** is the part of a `.sql` file before its first `-- name:` line.  **Inside a query** means under a `-- name:` line.
+- A property of an attribute.
+- A property of the project: one of `SqlSourceRepositoryInterfaces`, `SqlSourceOnline`, `SqlSourceEnvFile`, `SqlSourceIncludeFiles` and `SqlSourcePublicExceptions`.
+
+A place that a row does not list cannot hold that setting.  **Default** is the value when no place gives one.
 
 | Setting | `sqlsource.json` key | Marker | In the file header | Inside a query | Attribute property | MSBuild property | Default |
 |----|----|----|----|----|----|----|----|
@@ -77,7 +93,7 @@ Each name links to its section, which gives its values and its rules.  The other
 | [Type overrides](type-mapping.md#setting-type-overrides) | `typeOverrides` | `-- type-override:` | yes | yes | | | None |
 | [Column types](model-properties.md#setting-column-types) | `columnTypes` | `-- column:` | yes | yes, for a column of the query's result | | | None |
 | [Library types](library-types-and-json.md#setting-library-types) | `libraryTypes` | `-- library-types:` | yes | yes | | | On for PostgreSQL where the project references the library's plugin, `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, and off otherwise; `json` off |
-| [Member location](members.md#setting-member-location) | `memberLocation` | `-- member-location:` | yes | yes | | | `nested-class` for the output `sql` or `models`, `extension-class` for `methods`, and `class` for `repository` |
+| [Member location](members.md#setting-member-location) | `memberLocation` | `-- member-location:` | yes | yes | | | `class` for the output `repository`, `extension-class` for `methods`, and `nested-class` for `models` or `sql` |
 | [Visibility](members.md#setting-visibility) | `visibility` | `-- visibility:` | yes | yes | | | `public` for `repository`, and otherwise by the member location, as [its section](members.md#setting-visibility) says |
 | [Nested class](members.md#setting-nested-class) | `nestedClass` | `-- nested-class:` | yes | yes | | | `Sql` |
 | [`Source`](attributes.md#setting-source) | | | no | no | `Source` | | The file named for the type in the folder of the C# file |
@@ -88,7 +104,13 @@ Each name links to its section, which gives its values and its rules.  The other
 | [Which `.sql` files are included](msbuild.md#included-files) | | | no | no | | `SqlSourceIncludeFiles` | On: every `.sql` file under the project's folder |
 | [Public exceptions](exceptions.md#public-exceptions) | | | no | no | | `SqlSourcePublicExceptions` | Off: the exceptions are `internal` |
 
-A value from a list is matched ignoring case, hyphens and spaces, so `Methods`, `methods` and `me-thods` are one value, and so are `SealedRecord` and `sealed record`, and `NestedClass` and `nested-class`.
+SqlSource ignores case, hyphens and spaces when it matches a value from a list.  So each of these lines is one value:
+
+- `Methods`, `methods` and `me-thods`
+- `SealedRecord` and `sealed record`
+- `NestedClass` and `nested-class`
+
+A dialect's name and options, and a generator parameter's name and value, are the exception.  SqlSource ignores their case, but not a hyphen or a space inside them.  So `sql-server` is not `sqlserver`.
 
 <a id="precedence"></a>
 
@@ -104,20 +126,34 @@ A setting written in several places has the value of the most specific place tha
 | 4 | Each farther settings file, nearest first | `"output": "sql"` in the `sqlsource.json` of the project's folder |
 | 5 | The default | `repository` |
 
-A query with `-- output: sql` has the output `sql`, whatever the other four say.  A query without it takes the file header's `models`, and so on down the table.  The settings files of a `.sql` file are the `sqlsource.json` of its folder and those of the folders above it, nearest first, up to the first that says `"root": true`: see [settings files](settings-file.md#settings-files).  To give the files of one folder their own values, see [configure one folder differently](../guides/folders-and-files.md#configure-a-folder).
+A query with `-- output: sql` has the output `sql`, whatever the other four places say.  A query without that marker takes `models` from the file header, and so on down the table.
+
+The settings files of a `.sql` file are the `sqlsource.json` of its folder and the `sqlsource.json` of each folder above it, nearest first.  The list ends at the first settings file that says `"root": true`, and includes it: see [settings files](settings-file.md#settings-files).  To give the files of one folder their own values, see [configure one folder differently](../guides/folders-and-files.md#configure-a-folder).
 
 The rules:
 
-- **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
-- **A place that gives no value is skipped.**  A settings file that does not name the setting gives none, and so does a string of a settings file that is empty or white space.  `Source`, on the attribute, is the exception: see [Source](attributes.md#setting-source).
-- **A setting has only the places its row of [the table](#all-settings) lists.**  A key of a settings file that is not in it, nor `root` or `$schema`, is [SQLSRC016](../diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](../diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](../diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
-- **Every type that claims a file gets the same settings for its queries.**  The places of a query's settings are the query, its file and the settings files of the file's folder, so two types that claim one file take the same settings from it: one output, one suffix, one shape of model, one [member location](members.md#setting-member-location).  Only what follows from the type itself can differ: the namespace of the models, which is the type's own unless the [model namespace](models.md#setting-model-namespace) is set, and the default [visibility](members.md#setting-visibility) of the members of `sql`, `models` and `methods` queries on the type, which follows the type's own accessibility.  A type that needs other settings needs a file of its own.
+- **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes the `-- database:` of its file header.
+- **A place that gives no value is skipped.**  A settings file that does not name the setting gives no value.  A string of a settings file that is empty or white space gives no value either.  `Source`, on the attribute, is the exception: see [Source](attributes.md#setting-source).
+- **A setting has only the places that its row of [the table of all settings](#all-settings) lists.**  Its errors:
+  - A key of a settings file that is not in the table, and is not `root` or `$schema`, is [SQLSRC016](../diagnostics.md#sqlsrc016).
+  - A marker where its row says that it cannot stand is [SQLSRC116](../diagnostics.md#sqlsrc116).
+  - A `-- dialect:` marker inside a query or after SQL is the exception: it is [SQLSRC115](../diagnostics.md#sqlsrc115).  See [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
+- **Every type that claims a file gets the same settings for the queries of the file.**  The places of the settings of a query are the query, its file and the settings files of the folder of the file.  So two types that claim one file take the same settings from it: one output, one suffix, one shape of model, one [member location](members.md#setting-member-location).
 
-Three exceptions, stated plainly:
+  Only two things can differ, because they follow from the type itself:
 
-- **A dialect value replaces the one below it whole**, options included.  The dialect has no in-query level: a file has one dialect, which is the marker in its file header, else the nearest of its settings files that sets one, else `ansi`.  See [dialect](#setting-dialect).
-- **`Source` exists only on the attribute.**  It has nothing to choose between.
-- **A type override, a column type, a library of the library types, or a generator parameter, replaces only what it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type, a column, a library or a generator parameter, replaces the entry below it for that key, and `default` takes the key out.  The generator parameters also take `default` alone, which takes every parameter out, back to its default.  See [type overrides](type-mapping.md#setting-type-overrides), [column types](model-properties.md#setting-column-types), [library types](library-types-and-json.md#setting-library-types) and [generator parameters](generator-parameters.md#setting-generator-parameters).
+  - The namespace of the models.  It is the namespace of the type, unless the [model namespace](models.md#setting-model-namespace) is set.
+  - The default [visibility](members.md#setting-visibility) of the members of `methods`, `models` and `sql` queries on the type.  It follows the accessibility of the type.
+
+  If a type needs other settings, give it a file of its own.
+
+There are three exceptions to these rules:
+
+- **A dialect value replaces the one below it whole**, options included.  The dialect has no place inside a query, because a file has one dialect.  The dialect of a file is the marker in its file header, else the nearest of its settings files that sets one, else `ansi`.  See [dialect](#setting-dialect).
+- **`Source` exists only on the attribute.**  So it has no other place to choose between.
+- **A type override, a column type, a library of the library types, or a generator parameter, replaces only what it names.**  Each place adds its entries to the entries of the places below it.  Each settings file is a place of its own.  So the settings file of a folder adds to the entries of the settings files above it.
+
+  An entry replaces the entry below it that has the same key: a database type, a column, a library or a generator parameter.  An entry whose value is `default` takes its key out.  The generator parameters also take `default` alone, which takes every parameter out, back to its default.  See [type overrides](type-mapping.md#setting-type-overrides), [column types](model-properties.md#setting-column-types), [library types](library-types-and-json.md#setting-library-types) and [generator parameters](generator-parameters.md#setting-generator-parameters).
 
 <a id="a-value-that-is-wrong"></a>
 
@@ -125,14 +161,18 @@ Three exceptions, stated plainly:
 
 | Written as | Reported as | What happens |
 |----|----|----|
-| A marker | [SQLSRC111](../diagnostics.md#sqlsrc111), a dialect included.  A generator parameter that does not exist is [SQLSRC109](../diagnostics.md#sqlsrc109); a value that contradicts another in the same place is [SQLSRC112](../diagnostics.md#sqlsrc112) | The file produces no members until it is fixed |
-| A settings file | [SQLSRC015](../diagnostics.md#sqlsrc015) to [SQLSRC020](../diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](settings-file.md#settings-files) | A value that is wrong is not set by that file, so a farther settings file or the default gives it, for a dialect too.  The rest of the file still applies, and so do the other words of `generatorParameters` and the other entries of `typeOverrides`, `columnTypes` or `libraryTypes`.  Of a key, or an entry, written twice, the first applies, and so does the first of two values of one generator parameter.  A file that is not a JSON object gives nothing |
+| A marker | [SQLSRC111](../diagnostics.md#sqlsrc111), a dialect included.  A generator parameter that does not exist is [SQLSRC109](../diagnostics.md#sqlsrc109); a value that contradicts another in the same place is [SQLSRC112](../diagnostics.md#sqlsrc112) | The file produces no members until you fix it |
+| A settings file | [SQLSRC015](../diagnostics.md#sqlsrc015) to [SQLSRC020](../diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](settings-file.md#settings-files) | See the rules under the table |
+
+- **The build and the tool both report the errors of a marker, and [SQLSRC015](../diagnostics.md#sqlsrc015) to [SQLSRC018](../diagnostics.md#sqlsrc018).**  The build reports [SQLSRC019](../diagnostics.md#sqlsrc019) for a value of every key but `database`.  The tool reports SQLSRC019 only for a value of `dialect`, `output` or `database`: see [database](#setting-database).  The build alone reports [SQLSRC020](../diagnostics.md#sqlsrc020).  [Which settings files the build checks](settings-file.md#which-files-are-checked) says more.
+- **A settings file does not set a value that is wrong.**  So a farther settings file or the default gives the value, for a dialect too.
+- **The rest of the settings file still applies.**  So do the other words of `generatorParameters`, and the other entries of `typeOverrides`, `columnTypes` or `libraryTypes`.
+- **Of a key, or an entry, written twice, the first applies.**  So does the first of two values of one generator parameter.
+- **A settings file that is not a JSON object gives nothing.**
 
 <a id="setting-output"></a>
 
 ## Output
-
-The setting that says what SqlSource produces for a query: its SQL alone, its SQL and its [models](models.md#models), or its models and a [query method](query-methods.md#query-methods), which by default is a [repository](repositories.md#repository-methods)'s.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](#setting-output).
 
 ```sql
 -- output: models
@@ -145,30 +185,46 @@ SELECT id, name FROM users;
 TRUNCATE TABLE audit_log;
 ```
 
-`Output` says how much SqlSource produces for a query.  The default is `repository`.
+The output is the setting that says what SqlSource produces for a query.  SqlSource produces its models and a [query method](query-methods.md#query-methods), its SQL and its [models](models.md#models), or its SQL alone.  By default the query method is a method of a [repository](repositories.md#repository-methods).  The output also decides which queries must be described: the queries that the tool describes, and the queries that the build checks against their sidecar.  The values are `repository`, `methods`, `models` and `sql`, and the default is `repository`.  In the sample, `ResetAuditLog` has the output `sql`, and every other query of the file has `models`.
 
 | Value | A query gets |
 |----|----|
-| `sql` | Its SQL: a constant, or a method where the query has tokens |
-| `models` | Its SQL, and its [models](models.md#models): types for its parameters and for a row of its result |
-| `methods` | Its models, and a [method that takes a connection](connection-methods.md#methods-that-take-a-connection) and runs the query, which holds its SQL in place of a constant |
-| `repository` | Its models, and a [repository method](repositories.md#repository-methods): an instance method of the type that gets its own connection and runs the query, which holds its SQL in place of a constant |
+| `repository` | Its [models](models.md#models), and a [repository method](repositories.md#repository-methods): an instance method of the type that gets its own connection and runs the query.  The method holds the SQL of the query, in place of a constant |
+| `methods` | Its [models](models.md#models), and a [method that takes a connection](connection-methods.md#methods-that-take-a-connection) and runs the query.  The method holds the SQL of the query, in place of a constant |
+| `models` | Its SQL, as a constant or as a method where the query has tokens, and its [models](models.md#models): types for its parameters and for a row of its result |
+| `sql` | Its SQL alone: a constant, or a method where the query has tokens |
 
-As a marker it stands in the file header, for every query of the file, and inside a query.  It can also be `output` in a settings file.
+The type of a `repository` query needs a connection for it, as [the connection](repositories.md#repository-connection) says.  Set one of the other three outputs in these cases:
 
-**`Output` decides which queries must be described.**  `sqlsource describe` asks a database about the queries whose output is `models`, `methods` or `repository`, and the build checks that each of them has a current entry in its file's [sidecar](sidecars.md#sidecar-files): a query that has none is [SQLSRC241](../diagnostics.md#sqlsrc241), and one that changed since it was described is [SQLSRC244](../diagnostics.md#sqlsrc244).  A query whose output is `sql` needs no description, no entry, no connection, and belongs to no [logical database](#setting-database).  A file claimed by two types, or listed by two projects, is described once, and the build of a project checks its entries once for the file.
+- **Set `methods` for a query that your own code runs on a connection, in a transaction that it manages, or with a command timeout.**  The method of a `methods` query takes the connection.
+- **Set `models` for a project that runs the SQL itself.**
+- **Set `sql` for a query that needs only its SQL.**
 
-The tool can describe only some dialects: see [the database support table](databases/index.md#database-support).  The default output is `repository` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](../diagnostics.md#sqlsrc209) for every file, in its build and from the tool.  Set the dialect and describe the queries, or set the output to `sql` for queries that want only their SQL.
+`models` and `sql` are fallbacks, mainly for a project where Dapper or your own ADO.NET code runs the SQL.
 
-A query whose output is `sql` or `models` gets its constant or token method.  A query whose output is `models`, `methods` or `repository`, and whose entry in its sidecar is current, also gets its [models](models.md#models); one whose output is `sql` gets none.  A query whose output is `methods` or `repository` gets no constant and no token method: its [method](query-methods.md#query-methods) holds its SQL and runs it, when the query meets the conditions of [which queries get a method](query-methods.md#which-methods).  A `repository` query's type needs a connection for it, as [the connection](repositories.md#repository-connection) says, and a `methods` query's method takes one, so set `methods` for a query that your own code runs on a connection or in a transaction that it manages.  A project that runs the SQL itself, through Dapper or its own ADO.NET code, sets `models`.
+Two rules complete the table:
+
+- **A query whose output is `repository`, `methods` or `models` gets its [models](models.md#models) when its entry in its sidecar is current.**  A query whose output is `sql` gets no models.
+- **A query whose output is `repository` or `methods` gets no constant and no token method.**  Its [method](query-methods.md#query-methods) holds its SQL and runs it, when the query meets the conditions of [which queries get a method](query-methods.md#which-methods).
+
+You can write the output in these places:
+
+- a `-- output:` marker in the file header, for every query of the file;
+- the same marker inside a query;
+- `output` in a settings file.
+
+**`Output` decides which queries must be described.**  `sqlsource describe` asks a database about each query whose output is `repository`, `methods` or `models`.  The build checks that each of these queries has a current entry in the [sidecar](sidecars.md#sidecar-files) of its file.  A query that has no entry is [SQLSRC241](../diagnostics.md#sqlsrc241).  A query that changed after it was described is [SQLSRC244](../diagnostics.md#sqlsrc244).  A query whose output is `sql` needs no description, no entry and no connection, and belongs to no [logical database](#setting-database).
+
+If two types claim a file, or two projects list it, the tool describes the file once.  The build of a project also checks the entries of the file once.
+
+The tool can describe only some dialects: see [the database support table](databases/index.md#database-support).  The default output is `repository` and the default dialect is `ansi`.  So a project that sets neither gets [SQLSRC209](../diagnostics.md#sqlsrc209) for each file that a type claims.  The build and the tool both report it.  To correct it, do one of these:
+
+- Set the dialect to `postgres` or `mssql`, and describe the queries.
+- Set the output to `sql` for the queries that need only their SQL.
 
 <a id="setting-database"></a>
 
 ## Database
-
-A name for one particular database your queries run against, such as `billing`.  The tool uses it to choose which connection to describe a query through, a sidecar records it, and a [repository](repositories.md#repository-methods) that uses several marks a connection source for each.  A query belongs to the logical database its markers or settings name, and to the one named after its dialect when they name none.  See [the database setting](#setting-database).
-
-The dialect and the logical database answer different questions.  The dialect is *which kind of SQL* a file is written in; the logical database is *which database* the tool asks about it.  Several logical databases can share a dialect: `billing` and `reports` can both be `postgres`.
 
 ```sql
 -- database: billing
@@ -181,21 +237,23 @@ SELECT id, total FROM invoices;
 SELECT id, kind FROM events;
 ```
 
-`Database` names the [logical database](#setting-database) a query belongs to: the one the `sqlsource` tool asks about it, through a connection you give it by that name.  It is not the dialect.  Two logical databases can share a dialect.
+A logical database is a name for one particular database that your queries run against, such as `billing`.  The `database` setting names the logical database that a query belongs to.  In the sample, `ListEvents` belongs to `events`, and every other query of the file to `billing`.  The setting has two uses:
 
-- The value is one word of letters, digits, `-`, `_` and `.`.  The rule is narrow because the tool makes the name of an environment variable of it: `billing` is read from `SQLSOURCE_CONNECTION_BILLING`.  Names are compared ignoring case, so `Billing` and `billing` are one database, spelled as the tool first meets it.
-- Without a value, a query belongs to the database named after its file's dialect: `postgres` for a PostgreSQL file, `mssql` for a SQL Server file.
-- It can be a marker in the file header or inside a query, or `database` in a settings file.
-- One name is one database for a whole run, with one connection and one dialect.  Two files that give one name two dialects are [SQLSRC211](../diagnostics.md#sqlsrc211).
-- The tool reads the setting to choose the connection it describes a query through.  The build reads it to choose the connection source of a [repository method](repositories.md#repository-connection).  A `database` value that is not valid in a settings file is reported by the tool alone.
+- **The tool reads it to choose the connection that it describes a query through.**  The tool asks that database about the query, through a connection that you give the tool by that name: see [connections](connections.md#connections).  The [sidecar](sidecars.md#sidecar-files) of the file records the name.
+- **The build reads it to choose the connection source of a [repository method](repositories.md#repository-connection).**  A [repository](repositories.md#repository-methods) that uses several logical databases marks a connection source for each.
 
-To give the tool a connection for a name, see [connections](connections.md#connections).
+The dialect and the logical database answer different questions.  The dialect is *which kind of SQL* a file is written in; the logical database is *which database* the tool asks about it.  Several logical databases can share a dialect: `billing` and `reports` can both be `postgres`.
+
+- **The value is one word of letters, digits, `-`, `_` and `.`.**  The rule is narrow because the tool makes the name of an environment variable from it: `billing` is read from `SQLSOURCE_CONNECTION_BILLING`.
+- **SqlSource ignores case when it compares names.**  So `Billing` and `billing` are one database, spelled as the tool first meets it.
+- **Without a value, a query belongs to the database named after the dialect of its file**: `postgres` for a PostgreSQL file, `mssql` for a SQL Server file.  This is the default.
+- **You can write it as a `-- database:` marker in the file header or inside a query, or as `database` in a settings file.**
+- **One name is one database for a whole run, with one connection and one dialect.**  Two files that give one name two dialects are [SQLSRC211](../diagnostics.md#sqlsrc211).
+- **The tool alone reports a `database` value of a settings file that is not valid.**  The build does not report it.
 
 <a id="setting-dialect"></a>
 
 ## Dialect
-
-The set of rules by which SqlSource reads a `.sql` file: where a comment or a string starts and ends, which differs from one database to the next.  It is named after a database, such as `postgres` or `mssql`, and it is set for a project, for some of its files, or for one file.  A dialect connects to nothing.  See [dialects](dialects.md) and [the dialect setting](#setting-dialect).
 
 ```jsonc
 // sqlsource.json, in the project's folder
@@ -219,10 +277,18 @@ The set of rules by which SqlSource reads a `.sql` file: where a comment or a st
 SELECT id FROM notes WHERE body = 'it\'s here'; # MySQL reads this as a comment
 ```
 
-The [dialect](#setting-dialect) is the set of rules by which SqlSource reads a `.sql` file.  It does not connect to anything.  The default is `ansi`.  The dialect names, the options of `mysql` and `mariadb`, and what each dialect changes are on [the dialects page](dialects.md).
+Set it to your database: `postgres` or `mssql`.
 
-- **Three places.**  A `-- dialect:` marker in the file, else the `dialect` of the nearest settings file of the file's folder, or of a folder above it, that sets one, else `ansi`.  Above, the files under `Reporting/` are read as `mssql`, and every other file of the project as `postgres`.
-- **A file has one dialect.**  The marker goes in the file header, before the first SQL, and not inside a query: anywhere else it is [SQLSRC115](../diagnostics.md#sqlsrc115).  It takes effect on the line after it, so comments above it are read by the dialect that the settings files give.
-- **A value replaces the one below it whole.**  A file with `-- dialect: mysql` under a settings file that sets `"mysql,ansi-quotes"` is read as plain `mysql`, and so is a folder whose settings file sets `"mysql"` under one that sets `"mysql,ansi-quotes"`.
-- **A value that is not a dialect** is [SQLSRC111](../diagnostics.md#sqlsrc111) in a marker and [SQLSRC019](../diagnostics.md#sqlsrc019) in a settings file.  The files under a settings file whose `dialect` is wrong are read meanwhile by the dialect of a farther settings file, or as `ansi` when none sets one.
-- **The tool reads the dialect too.**  It decides which kind of database the tool asks about a query, and whether there is one to ask: `postgres` and `mssql` can be described.  See [database support](databases/index.md#database-support).
+The dialect is the set of rules by which SqlSource reads a `.sql` file: where a comment or a string starts and ends, which differs from one database to the next.  Each dialect but `ansi` is named after a database.  A dialect connects to nothing.  You can set it for a project, for some of its files, or for one file.  The default is `ansi`.  Every other dialect name, the options of `mysql` and `mariadb`, and what each dialect changes are on [the dialects page](dialects.md).
+
+- **The dialect has three places.**  SqlSource takes the first of these that gives one:
+  1. A `-- dialect:` marker in the file.
+  2. The `dialect` of the nearest settings file that sets one, in the folder of the file or in a folder above it.
+  3. The default, `ansi`.
+
+  In the sample, the files under `Reporting/` are read as `mssql`, and every other file of the project as `postgres`.
+- **A file has one dialect.**  The marker must stand in the file header, before the first SQL, and not inside a query.  Anywhere else it is [SQLSRC115](../diagnostics.md#sqlsrc115).
+- **The marker takes effect on the line after it.**  So SqlSource reads the comments above the marker by the dialect that the settings files give.
+- **A value replaces the one below it whole.**  A file with `-- dialect: mysql` under a settings file that sets `"mysql,ansi-quotes"` is read as plain `mysql`.  A folder whose settings file sets `"mysql"`, under a settings file that sets `"mysql,ansi-quotes"`, is read as plain `mysql` too.
+- **A value that is not a dialect is [SQLSRC111](../diagnostics.md#sqlsrc111) in a marker and [SQLSRC019](../diagnostics.md#sqlsrc019) in a settings file.**  The build and the tool both report each of them.  While the `dialect` of a settings file is wrong, the files under it are read by the dialect of a farther settings file.  If no farther settings file sets one, they are read as `ansi`.
+- **The tool reads the dialect too.**  The dialect decides which kind of database the tool asks about a query, and whether there is a database to ask.  The tool can describe a file whose dialect is `postgres` or `mssql`.  See [database support](databases/index.md#database-support).
