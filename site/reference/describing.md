@@ -83,8 +83,8 @@ sqlsource: watching for changes; press Ctrl+C to stop
   - a new `.sql`, C# or `sqlsource.json` file, or a new folder, in the folder of a project or a folder below it, or in a folder that a project lists a file from;
   - a new `sqlsource.json` in a folder above a file that the tool reads, up to the root of your repository;
   - a `.sql` file, a C# file or a settings file that the tool reads renamed, or deleted and still gone when the pass starts;
-  - a project file or a solution file saved or deleted;
-  - a `Directory.Build.props`, `Directory.Build.targets` or `Directory.Packages.props` saved or deleted in the folder of a project or of the solution, in a folder below it, or in a folder above it up to the root of your repository;
+  - a project file or a solution file created, saved, renamed or deleted;
+  - a `Directory.Build.props`, `Directory.Build.targets` or `Directory.Packages.props` created, saved, renamed or deleted in the folder of a project or of the solution, in a folder below it, or in a folder above it up to the root of your repository;
   - a `dotnet restore`, into the `obj` folder of the project or into the `artifacts` folder of `UseArtifactsOutput`.
 
   The pass then reads your projects again before it describes.  So the pass describes a new file, or a new project of the solution.
@@ -201,7 +201,7 @@ billing (postgres): 15 same, 1 differ, 0 failed
 
 ### SQLSRC241 for a query that only another target framework includes
 
-**What you see.**  The build for one target framework reports [SQLSRC241](../diagnostics.md#sqlsrc241) for a query that must be described, after you ran `describe`.  A project that references SqlSource for a later framework only is left out of a solution's run, and the tool says nothing.  If you name that project, the tool reports [SQLSRC204](../diagnostics.md#sqlsrc204).  The build of that project reports SQLSRC241 in the same way.
+**What you see.**  The build for a target framework other than the first reports [SQLSRC241](../diagnostics.md#sqlsrc241) for a query that must be described, after you ran `describe`.  Only that framework includes the query.  A project that references SqlSource for a later framework only is left out of a solution's run, and the tool says nothing.  If you name that project, the tool reports [SQLSRC204](../diagnostics.md#sqlsrc204).  The build of that project reports SQLSRC241 in the same way.
 
 **Why.**  `describe`, and a build that runs the tool, read a project with several target frameworks for its first framework alone.  So they do not see these, and do not describe their queries:
 
@@ -230,7 +230,7 @@ The watch then finds a save within a second or two.
 
 ### In Visual Studio or VS Code, the models do not change after the watch writes a sidecar
 
-**What you see.**  In Visual Studio or VS Code, the models and methods do not change after the watch writes a sidecar.
+**What you see.**  In Visual Studio or VS Code, the models and methods can stay as they were after the watch writes a sidecar.
 
 **Why.**  In Visual Studio and VS Code, the recipes that start `describe --watch`, and what the editor shows after a pass, have not been checked.
 
@@ -255,7 +255,4 @@ Outside a git repository, a project or solution file saved in the folder above a
 
 **Why.**  The watch does not see these changes, as they are in folders where it was not looking.  Outside a git repository, the watch also looks at the folder one level above each folder that it covers.  An example is the folder above the folder of your project.
 
-**What to do.**  Do one of these:
-
-- After such a change, stop the watch and start it again.
-- Work inside a git repository.
+**What to do.**  After such a change, stop the watch and start it again.  If you work outside a git repository, you can also work inside one instead.

@@ -82,7 +82,7 @@ A `.env` file keeps the connections of your machine in one place.  Then you do n
 - **The tool reads one file, and never combines two.**
 - **If there is no file of that name, or only a folder, the run reads no file, and says nothing.**
 - **A run on a solution reads the `.env` beside the solution**, and not one in the folder of a project below it.
-- **If a run on a solution has no connection for a database, [SQLSRC213](../diagnostics.md#sqlsrc213) names each `.env` that the run did not read.**  Its `help:` line names each `.env` in the folder of a project that has a query of that database to describe.  It also names each `.env` in a folder between that folder and the folder of the solution.  If there is no such file, the line says that the run reads the one file alone.  The line then also says that `--env-file`, or `SqlSourceEnvFile` in a build, names another.
+- **If a run on a solution has no connection for a database, [SQLSRC213](../diagnostics.md#sqlsrc213) names the `.env` files that the run did not read in the projects of that database.**  Its `help:` line names each `.env` in the folder of a project that has a query of that database to describe.  It also names each `.env` in a folder between that folder and the folder of the solution.  If there is no such file, the line says that the run reads the one file alone.  The line then also says that `--env-file`, or `SqlSourceEnvFile` in a build, names another.
 - **`--env-file <path>` names another file**, for `describe`, `describe --watch` and `diagnose`.  For example, `dotnet sqlsource describe src/App/App.csproj --env-file .env`, run at the root of your repository, reads the `.env` of the root.
 - **A relative path of `--env-file` is from the current folder.**
 - **`--env-file none` reads no file.**  `none` can be in upper or lower case.  Then the connections come from the command line and the environment alone.  To name a file called `none`, write `--env-file ./none`.
@@ -127,7 +127,7 @@ If a line of a connection variable cannot be read, the tool reports [SQLSRC286](
 - a password that is the name of its logical database or of its dialect, such as `postgres`;
 - the password of a PostgreSQL password file that is a pipe, such as `PGPASSFILE=<(...)` in a shell;
 - the login, in an error of SQL Server about a query, such as an error for a database that the login may not open;
-- a secret that holds neither `=` nor `;`, typed alone where a path goes, or as the value of `--log`, `--env-file` or `--out`.  The tool prints it as a path, and logs it as typed.  A path goes in these places: the path of `describe` or `diagnose`, a `.sql` path, and a value of `--project`, `--query` or `--scrub`.
+- a secret that holds neither `=` nor `;`, typed alone where a path goes, or as the value of `--log`, `--env-file` or `--out`.  The tool prints it as a path, and logs it as typed.  A path goes in these places: the path of `describe` or `diagnose`, a `.sql` path, a value of `--project`, `--query` or `--scrub`, and the bundle of `replay`.
 
 You can also see `***` in the place of a word that is not a secret, such as the name of a column.  That word equals a password that the tool hides.
 

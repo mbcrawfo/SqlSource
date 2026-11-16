@@ -194,7 +194,7 @@ It finds the value as written, with the spaces at its ends trimmed, or as the dr
 - each password of a connection string, where it stands apart from other letters, digits and underscores, and is at least four characters long;
 - in the same way, the password that the PostgreSQL driver reads from `PGPASSWORD` or a password file, when the connection string gives none;
 - in the record of your command line, every value of `--database` and `--connection`;
-- a value typed where a path goes, when it holds `=` or `;`, as a connection string does.  A path goes in these places: the path of `describe` or `diagnose`, a `.sql` path, a value of `--project`, and a value of `--query` or `--scrub` of `diagnose`.
+- a value typed where a path goes, when it holds `=` or `;`, as a connection string does.  A path goes in these places: the path of `describe` or `diagnose`, a `.sql` path, a value of `--project`, a value of `--query` or `--scrub` of `diagnose`, and the bundle of `replay`.
 
 These can appear in the log as written ([a limit](connections.md#limit-short-password)):
 
@@ -209,7 +209,7 @@ Search the log for your password before you share it.  The log also holds:
 - the version of the tool, of .NET and of the operating system, and the rest of your command line;
 - the paths of your projects and files, and the names of your queries and databases;
 - the SQL of your queries as the tool sent it to the database, and what the server answered, its errors and warnings included;
-- for a database that could not be opened, what went wrong, in the tool's own words.  With it is the SQLSTATE of the server, or the error number of SQL Server, which names neither the host nor the user;
+- for a database that could not be opened, what went wrong, in the tool's own words, which name neither the host nor the user.  With it is the SQLSTATE of the server, or the error number of SQL Server;
 - each error, and how the run ended, with its exit code.
 
 If the tool cannot finish the log, as when the disk is full, it reports [SQLSRC218](../diagnostics.md#sqlsrc218) after the run has ended.  The tool then exits with `1`.  The last line of the log can still hold the exit code that the run had before.
