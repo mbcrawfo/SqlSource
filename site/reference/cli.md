@@ -198,9 +198,11 @@ It finds the value as written, with the spaces at its ends trimmed, or as the dr
 
 These can appear in the log as written ([a limit](connections.md#limit-short-password)):
 
-- a value typed where a path goes, or after `--log` or `--env-file`, that holds neither `=` nor `;`, such as a password typed alone;
+- a value typed where a path goes, or after `--log`, `--env-file` or `--out`, that holds neither `=` nor `;`, such as a password typed alone;
 - a password shorter than four characters;
-- a password that is the name of its logical database or of its dialect, such as `postgres`.
+- a password that is the name of its logical database or of its dialect, such as `postgres`;
+- the password of a PostgreSQL password file that is a pipe, such as `PGPASSFILE=<(...)` in a shell;
+- the login, in an error of SQL Server about a query, such as an error for a database that the login may not open.
 
 Search the log for your password before you share it.  The log also holds:
 
