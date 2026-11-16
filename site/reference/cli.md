@@ -182,6 +182,7 @@ The log is your own record of what the run did.  It holds your names, your SQL a
   - a `--check` whose only errors are sidecars out of date;
   - a `--watch`;
   - `diagnose` and `replay`;
+  - a run that is stopped with Ctrl+C, `SIGTERM` or `SIGHUP`;
   - the run of a build, which is given no `--log`.  For the logs of a build, see [running in the build](msbuild.md#running-in-the-build).
 
 **Read a log before you send it.**  The tool writes each connection value as `***` wherever it finds the value whole:
