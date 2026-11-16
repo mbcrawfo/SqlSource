@@ -1255,7 +1255,18 @@ See: [Parameters](reference/parameters.md#query-parameters)
 
 Reported by: the build.
 
-A query whose output is `sql` or `models` has a constant or a token method, which cannot go in the extension class, since only a query method extends the connection, and its [member location](reference/members.md#locations) is `extension-class`.  A query whose output is `repository` has an instance method of the type, which cannot go in the extension class or in a nested class, and its member location is `extension-class` or `nested-class`; its default, `class`, fits.  The value was written on the query, in the file's header or in a settings file.  A header or a settings file's `memberLocation` reaches every query below it, whatever its output, so a folder-wide `"memberLocation": "ExtensionClass"` is this error at each query of the folder whose output is `sql`, `models` or `repository`.  The message names the query, the type that claims the file and where the value was written; two types that claim one file each report the error.
+The [member location](reference/members.md#locations) of a query does not fit its output.  The value was written on the query, in the file's header or in a settings file.  The message names the query, the type that claims the file and where the value was written.  If two types claim one file, each type reports the error.
+
+The member location does not fit in these cases:
+
+- **The output is `models` or `sql`, and the member location is `extension-class`.**  The query has a constant or a token method.  That member cannot go in the extension class, since only a query method extends the connection.
+- **The output is `repository`, and the member location is `extension-class` or `nested-class`.**  The query has an instance method of the type, which cannot go in the extension class or in a nested class.  Its default member location, `class`, fits.
+
+A `memberLocation` in a header or a settings file reaches every query below it, whatever its output.  So a folder-wide `"memberLocation": "ExtensionClass"` is this error at each query of the folder whose output is `repository`, `models` or `sql`.
+
+The error is at the `-- member-location:` marker of the query.  If the query has no such marker, the error is at its name.  Until the error is fixed, the file produces no members and no models for the type.
+
+A file header that sets `extension-class` for a query whose output is `sql`:
 
 ```sql
 -- member-location: extension-class
@@ -1269,9 +1280,12 @@ SELECT count(*) FROM users;
 /work/App/Queries/Users.sql(3,10): error SQLSRC122: The query 'CountUsers' of 'App.UserRepository' cannot go in the extension class, which the file header sets, because its output is sql.  Only a query method extends the connection.  Use class or nested-class.  Write -- visibility: or -- member-location: on the query.
 ```
 
-For a query whose output is `repository`, the message names the location that does not fit, `extension class` or `nested class`, and ends with "A repository method is an instance method of the type.  Use class."
+For a query whose output is `repository`, the message names the location that does not fit, `extension class` or `nested class`.  It ends with "A repository method is an instance method of the type.  Use class."
 
-The error is at the query's `-- member-location:` marker when it has one, and at its name otherwise, and the file produces no members and no models for the type until it is fixed.  Write `-- member-location: class` or `-- member-location: nested-class` on the query, or keep `extension-class` to the files and folders whose queries are all `methods`; a `repository` query takes only `class`.
+**Fix:** do one of these.
+
+- Write `-- member-location: class` or `-- member-location: nested-class` on the query.  A `repository` query takes only `class`.
+- Keep `extension-class` to the files and folders whose queries are all `methods`.
 
 See: [Where the members go](reference/members.md#locations)
 
@@ -1281,14 +1295,34 @@ See: [Where the members go](reference/members.md#locations)
 
 Reported by: the build.
 
-A query's visibility and its [member location](reference/members.md#locations) together are something C# cannot write.  The message names the query, the type that claims the file, the visibility, where it was written, or that it is the default of the `repository` output, the member location and the reason, one of these:
+The visibility of a query and its [member location](reference/members.md#locations) together are something C# cannot write.  The message names these:
 
-- the member location is `extension-class` and the visibility `private` or `protected`: the extension class is a class of the namespace, and its methods are public or internal;
-- the member location is `extension-class` and the visibility `public`, the type is not public, or a type around it is not, and the query's method takes or returns a model, as one with parameters or rows does: the type's models are internal then, and a public method cannot take them.  A query method with no parameters and no rows takes no models and fits, and so does one whose models the type shares with a public type, which makes them public;
-- the visibility is `protected`, and the member location `class` on a static class, or `class` or `nested-class` on a struct or a record struct, which cannot have protected members;
-- the query's output is `methods` or `repository`, the member location `class` or `nested-class` and the visibility `public` or `protected`, the type, or a type around it, is `protected` or `protected internal`, none of them is `internal`, `private` or `private protected`, and the query's method takes or returns a model that is internal: a class derived from the type in another assembly could call the method, which cannot take or return such a model.  An `internal` or `private` method or nested class fits, and so does a constant or token method of any visibility, or a query method with no parameters and no rows, which take no models.
+- the query, and the type that claims the file;
+- the visibility, and where it was written, or that it is the default of the `repository` output;
+- the member location;
+- the reason.
 
-A header or a settings file's `visibility` reaches every query below it, whatever its member location.  A file of queries at `sql` and at `methods` whose header says `-- visibility: private` puts the constants in a private nested class, and gets this error at each query at `methods`, whose method goes in the extension class, where a repository method, on the type, could be private:
+The reason is one of these four:
+
+- **The member location is `extension-class`, and the visibility is `private` or `protected`.**  The extension class is a class of the namespace, and its methods are public or internal.
+- **The member location is `extension-class`, the visibility is `public`, and the type, or a type around it, is not public.**  This is an error only when the method of the query takes or returns a model, as a method with parameters or rows does.  The models of the type are then internal, and a public method cannot take them.
+  - A query method with no parameters and no rows takes no models, and fits.
+  - A method whose models the type shares with a public type fits too, since that makes the models public.
+- **The visibility is `protected`, on a class that cannot have protected members.**  That is the member location `class` on a static class, or `class` or `nested-class` on a struct or a record struct.
+- **The output is `repository` or `methods`, and the method takes or returns a model that is internal, on a type reachable as protected.**  All of these are true:
+  - The member location is `class` or `nested-class`, and the visibility is `public` or `protected`.
+  - The type, or a type around it, is `protected` or `protected internal`.
+  - None of those types is `internal`, `private` or `private protected`.
+  - The method of the query takes or returns a model that is internal.
+
+  A class derived from the type in another assembly could call the method, and such a method cannot take or return an internal model.  These fit: an `internal` or `private` method or nested class, a constant or token method of any visibility, and a query method with no parameters and no rows, which takes no models.
+
+The error is at the `-- visibility:` marker of the query.  If the query has none, the error is at its `-- member-location:` marker, and else at its name.  What the error costs depends on the reason:
+
+- **The first and third reasons cost the whole file.**  Until the error is fixed, the file produces no members and no models for the type.
+- **The second and fourth reasons are about the models of the method, so they leave out that method alone.**  The other members of the file, and the models of the query, are still generated.  The error comes once the query has its entry, which is where its models come from.
+
+**A `visibility` in a header or a settings file reaches every query below it**, whatever its member location.  Here a file has queries of the outputs `methods` and `sql`, and its header says `-- visibility: private`.  The constants go in a private nested class.  The method of each query at `methods` goes in the extension class, so each such query gets this error.  A repository method, on the type, could be private.
 
 ```sql
 -- visibility: private
@@ -1306,23 +1340,34 @@ SELECT id, name FROM users WHERE id = @id;
 /work/App/Queries/Users.sql(8,10): error SQLSRC123: The query 'GetUser' of 'App.UserRepository' cannot be private, which the file header sets, at the member location extension-class, because an extension method is public or internal.  Write -- visibility: or -- member-location: on the query.
 ```
 
-The error is at the query's `-- visibility:` marker when it has one, else at its `-- member-location:` marker, else at its name.  For the first and third reasons the file produces no members and no models for the type until it is fixed.  The second and fourth are about the method's models, so they leave out that method alone: the file's other members, and the query's models, are still generated, and the error comes once the query has its entry, which is where its models come from.  Write `-- visibility:` on the query, as `-- visibility: internal` on `GetUser` above, or write `-- member-location: class` or `-- member-location: nested-class` on it, where a member can be private.  `protected` is allowed on a sealed class or record, and in a nested class of a static class.
+**A query method that writes no visibility takes the visibility of its nested class.**  Another query of the type, in any of its files, can write that visibility.  If that visibility does not fit the models that the method takes or returns:
 
-A query method that writes no visibility takes its nested class's, which another query of the type, in any of its files, may write.  When that visibility does not fit the models the method takes or returns, the error is at the method's query, at its `-- member-location:` marker, else at its name, and names the query that wrote the visibility; only that method is left out, and both files keep their other members and their models.  Here `Constants.sql` makes the class `Sql` of `App.Outer.Sample`, a `protected` class nested in a public one, public, which its constant can be and the method of `GetUser` cannot:
+- The error is at the query of the method: at its `-- member-location:` marker, else at its name.
+- The message names the query that wrote the visibility.
+- Only that method is left out.  Both files keep their other members and their models.
+
+Here `Constants.sql` makes the class `Sql` of `App.Outer.Sample` public.  `App.Outer.Sample` is a `protected` class nested in a public one.  The constant of `Constants.sql` can be public, and the method of `GetUser` cannot:
 
 ```console
 /work/App/Queries/Users.sql(3,10): error SQLSRC123: The query 'GetUser' of 'App.Outer.Sample' cannot be public, which the file header for the query 'GetName' sets, at the member location nested-class, because 'App.Outer.Sample' is reachable as protected, so its models are internal, which a method reachable from another assembly cannot take or return.  Write -- visibility: or -- member-location: on the query.
 ```
 
-Give the method a class of its own with `-- nested-class:`, or put it on the type or in the extension class with `-- member-location:`: `-- visibility: internal` on it would give the class two visibilities, [SQLSRC124](#sqlsrc124).
-
-A repository method that writes no visibility is `public`, the default of the `repository` output, which does not fit its models on a type reachable as protected, the fourth reason.  The error is at the query's `-- member-location:` marker, else at its name, and leaves out that method alone.  Here `App.Outer.UserRepository` is a `protected` class nested in a public one:
+**A repository method that writes no visibility is `public`**, the default of the `repository` output.  On a type reachable as protected, `public` does not fit the models of the method: the fourth reason.  The error is at the `-- member-location:` marker of the query, else at its name.  It leaves out that method alone.  Here `App.Outer.UserRepository` is a `protected` class nested in a public one:
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC123: The query 'GetUser' of 'App.Outer.UserRepository' cannot be public, the default of the repository output, at the member location class, because 'App.Outer.UserRepository' is reachable as protected, so its models are internal, which a method reachable from another assembly cannot take or return.  Write -- visibility: on the query.
 ```
 
-Write `-- visibility: internal` on the query, or in the file header for every query of the file.  A repository method is always on the type, so the message of a repository query says to write `-- visibility:` alone.
+**Fix:** do the one of these that fits the case.
+
+- **A visibility written for the query, as in the first example.**  Write `-- visibility:` on the query, as `-- visibility: internal` on `GetUser`.  Or write `-- member-location: class` or `-- member-location: nested-class` on it, where a member can be private.
+- **A visibility that the method takes from its nested class, as in the second example.**  Give the method a class of its own with `-- nested-class:`.  Or put it on the type or in the extension class with `-- member-location:`.  Do not write `-- visibility: internal` on it: that gives the class two visibilities, [SQLSRC124](#sqlsrc124).
+- **The default visibility of a repository method, as in the third example.**  Write `-- visibility: internal` on the query, or in the file header for every query of the file.
+
+Notes:
+
+- **`protected` is allowed on a sealed class or record, and in a nested class of a static class.**
+- **The message of a repository query says to write `-- visibility:` alone.**  A repository method is always on the type.
 
 See: [Where the methods go](reference/connection-methods.md#method-location)
 
@@ -1332,13 +1377,24 @@ See: [Where the methods go](reference/connection-methods.md#method-location)
 
 Reported by: the build.
 
-Queries of one type, in one file or in two, put their members in one nested class, and two of them write different visibilities for it, on the query, in a file's header or in a settings file.  A class has one accessibility.  A query whose visibility is only the default takes the visibility that another query writes for its class, without an error; two written visibilities that differ are this error.  The message names the class, both visibilities, where each was written and the query of each.
+Queries of one type put their members in one nested class, and two of them write different visibilities for that class.  The queries can be in one file or in two.  Each visibility can be written on the query, in a file's header or in a settings file.  The message names the class, both visibilities, where each was written and the query of each.
+
+A class has one accessibility.  If the visibility of a query is only the default, the query takes the visibility that another query writes for its class, with no error.  Two written visibilities that differ are this error.
 
 ```console
 /work/App/Queries/Orders.sql(3,10): error SQLSRC124: The nested class 'Sql' of 'App.UserRepository' cannot be internal, which the file header sets for the query 'GetOrder', since the file header sets it public for the query 'GetUser'.  Write one visibility for the queries of the class, or write -- nested-class: or -- member-location: on the query.
 ```
 
-The error is at the query that writes the second visibility, at its `-- visibility:` marker when it has one, else at its name.  Every file of the type with a query in that class produces no members and no models for the type until it is fixed, since neither visibility is more right than the other; two nested classes of one type, each of its own visibility, are fine.  Write one visibility for the class, or write it for one query and leave it to the others, or give the queries of the other visibility a class of their own with `-- nested-class:`, or put them on the type with `-- member-location: class`.
+The error is at the query that writes the second visibility: at its `-- visibility:` marker, else at its name.  Until it is fixed, every file of the type with a query in that class produces no members and no models for the type.  Neither visibility is more right than the other.
+
+**Fix:** do one of these.
+
+- Write one visibility for the class.
+- Write the visibility for one query, and leave it to the others.
+- Give the queries of the other visibility a class of their own with `-- nested-class:`.
+- Put the queries of the other visibility on the type with `-- member-location: class`.
+
+Two nested classes of one type, each of its own visibility, are fine.
 
 See: [Name of the nested class](reference/members.md#setting-nested-class)
 
@@ -1348,7 +1404,12 @@ See: [Name of the nested class](reference/members.md#setting-nested-class)
 
 Reported by: the build.
 
-A query whose output is `sql` or `models` and whose [member location](reference/members.md#locations) is `class` has its constant or token method on the type, and its name is taken: the type declares a member, a nested type or a type parameter of that name, or another query of the type puts its members in a nested class of that name.  A type cannot have two members of one name, and a token method cannot overload a method of yours of the same name, even with other parameters.  The message names the query, the type and what has the name.
+A query whose output is `models` or `sql` has its constant or token method on the type, since its [member location](reference/members.md#locations) is `class`.  The name of that member is taken.  The message names the query, the type and what has the name, one of these:
+
+- a member, a nested type or a type parameter that the type declares;
+- a nested class of that name, in which another query of the type puts its members.
+
+A type cannot have two members of one name.  A token method cannot overload a method of yours of the same name, even with other parameters.
 
 ```sql
 -- name: Sql
@@ -1379,7 +1440,18 @@ public partial class UserRepository
 /work/App/Queries/Users.sql(6,10): error SQLSRC125: The member of the query 'Get' cannot go on 'App.UserRepository', because the type declares a member, a nested type or a type parameter of that name.  Rename the query, or write -- member-location: on it.
 ```
 
-The error is at the query's name, and its file produces no members and no models for the type until it is fixed.  Rename the query, or write `-- member-location: nested-class` on it; for a nested class of the type's queries you can also give that class another name with `-- nested-class:`.  A query named like the type itself is [SQLSRC009](#sqlsrc009), and a query method on the type that would take a name the type has is [SQLSRC274](#sqlsrc274).
+The error is at the name of the query.  Until it is fixed, its file produces no members and no models for the type.
+
+**Fix:** do one of these.
+
+- Rename the query.
+- Write `-- member-location: nested-class` on the query.
+- If the name is that of a nested class of the type's queries, give that class another name with `-- nested-class:`.
+
+Notes:
+
+- **A query named like the type itself is [SQLSRC009](#sqlsrc009).**
+- **A query method on the type that would take a name the type has is [SQLSRC274](#sqlsrc274).**
 
 See: [Where the members go](reference/members.md#locations)
 
@@ -1389,11 +1461,11 @@ See: [Where the members go](reference/members.md#locations)
 
 Reported by: the build and the tool.
 
-A parameter written directly after `IN` or `NOT IN`, without parentheses, is a list of values: `category IN @categories`.  A list can stand only there, or before `IS NULL` or `IS NOT NULL`, as in `(@categories IS NULL OR category IN @categories)`.  Every other use of it is this error, at that use:
+A query parameter written directly after `IN` or `NOT IN`, without parentheses, is a list of values: `category IN @categories`.  A list can stand only there, or before `IS NULL` or `IS NOT NULL`, as in `(@categories IS NULL OR category IN @categories)`.  Every other use of the list is this error, at that use.  The other uses are these:
 
 - **As one value**, such as `parent_category = @categories`, or `IN (@categories)`, which SQL reads as a list of one value.  A parameter is a list in every spelling of its name, so `IN @Categories` makes `@categories` one too.
 - **In the default of a token**, in the SQL or in a `-- token:` marker.  The text of a token is yours when the method runs, so the list cannot be expanded there.  A parameter written directly after `IN` in a default is this error too, even when it is no list elsewhere in the query.
-- **With the JSON opt-in**, `-- param: @categories -> json Category`.  A list holds values, not JSON, and the error is at the marker's value.
+- **With the JSON opt-in**, `-- param: @categories -> json Category`.  A list holds values, not JSON.  The error is at the value of the marker.
 
 ```sql error
 -- name: ListProducts
@@ -1405,7 +1477,11 @@ WHERE category IN @categories OR parent_category = @categories;
 /work/App/Queries/Products.sql(3,52): error SQLSRC126: The parameter '@categories' is a list, written after IN, and is used here as one value.  A list can stand after IN or NOT IN, or before IS NULL or IS NOT NULL.
 ```
 
-Write the list after `IN` at each place, `parent_category IN @categories`, or give the single value a parameter of its own.  In a token's default, move the list out of the token, or give the default a parameter that is no list.  Remove `json` from the marker: `-- param: @categories -> Category`.
+**Fix:** do the one of these that fits the use.
+
+- **As one value:** write the list after `IN` at each place, `parent_category IN @categories`.  Or give the single value a query parameter of its own.
+- **In the default of a token:** move the list out of the token.  Or give the default a query parameter that is no list.
+- **With the JSON opt-in:** remove `json` from the marker: `-- param: @categories -> Category`.
 
 See: [List parameters](reference/parameters.md#list-parameters)
 
@@ -1415,7 +1491,15 @@ See: [List parameters](reference/parameters.md#list-parameters)
 
 Reported by: the build.
 
-A [list](reference/parameters.md#list-parameters) of a SQL Server query whose output is `methods` or `repository` stands after a `NOT`, as in `category NOT IN @categories` or `NOT (category IN @categories)`, and inside an aggregate such as `COUNT` or `SUM`, in a `GROUP BY`, or in an `OUTPUT` clause.  SQL Server refuses the form that the query method sends an empty list in there, so the method would fail whenever the list is empty or null.  The aggregates of `geometry` and `geography`, such as `geometry::UnionAggregate`, are aggregates too, and an aggregate that `OVER` follows is not one of these places.  A `NOT` reaches only the condition it stands in: one in a `WHERE` reaches no list in the `HAVING` after it, and one before a `CASE` or an `IIF` no list in its `WHEN` or its condition.  A list that no `NOT` reaches runs empty everywhere.  The message names the list and where it stands.
+A [list](reference/parameters.md#list-parameters) of a SQL Server query stands after a `NOT`, in a place where SQL Server refuses an empty list.  The output of the query is `repository` or `methods`.  The message names the list and where it stands.
+
+The `NOT` can be `category NOT IN @categories` or `NOT (category IN @categories)`.  The places are these:
+
+- inside an aggregate, such as `COUNT` or `SUM`;
+- in a `GROUP BY`;
+- in an `OUTPUT` clause.
+
+SQL Server refuses the form in which the query method sends an empty list there.  So the method would fail whenever the list is empty or null.
 
 ```sql error
 -- name: CountOtherProducts
@@ -1427,7 +1511,14 @@ FROM products;
 /work/App/Queries/Products.sql(2,34): error SQLSRC127: The list '@categories' stands after a NOT inside an aggregate, where SQL Server refuses the form an empty list is sent in.  Test the list in a WITH query, or a subquery in FROM, and use its result here.
 ```
 
-The error is at the list, and the query gets no method until it is fixed; the other queries of its file keep theirs.  Under the outputs `sql` and `models` it is no error, since your own code sends the list.  Test the list in a `WITH` query, or in a subquery in `FROM`, and use its result in the aggregate, the `GROUP BY` or the `OUTPUT` clause:
+The error is at the list.  The query gets no method until the error is fixed.  The other queries of its file keep theirs.
+
+**Fix:**
+
+1. Test the list in a `WITH` query, or in a subquery in `FROM`.
+2. Use the result in the aggregate, the `GROUP BY` or the `OUTPUT` clause.
+
+The query of the sample, fixed with a `WITH` query:
 
 ```sql mssql
 -- name: CountOtherProducts
@@ -1438,6 +1529,13 @@ WITH tested AS (
 SELECT COUNT(other) AS others
 FROM tested;
 ```
+
+Notes:
+
+- **The aggregates of `geometry` and `geography`, such as `geometry::UnionAggregate`, are aggregates too.**
+- **An aggregate that `OVER` follows is not one of these places.**
+- **A `NOT` reaches only the condition it stands in.**  One in a `WHERE` reaches no list in the `HAVING` after it.  One before a `CASE` or an `IIF` reaches no list in its `WHEN` or its condition.  A list that no `NOT` reaches runs empty everywhere.
+- **Under the outputs `models` and `sql` it is no error**, since your own code sends the list.
 
 See: [List parameters](reference/parameters.md#list-parameters)
 
@@ -1454,7 +1552,13 @@ $ dotnet sqlsource describe
 sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.IO.FileNotFoundException: Unable to find the specified file.
 ```
 
-Here the current folder was deleted while a terminal was still in it.  When the message names such a condition of your machine, mend that.  Otherwise it is a bug in the tool: set the environment variable `SQLSOURCE_DEBUG` to any value, run the command again, and [report it](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
+Here the current folder was deleted while a terminal was still in it.
+
+**Fix:**
+
+1. If the message names such a condition of your machine, mend that.
+2. If it does not, the error is a bug in the tool.  Set the environment variable `SQLSOURCE_DEBUG` to any value, and run the command again.
+3. [Report the bug](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
 
 See: [Environment variables](reference/cli.md#environment-variables)
 
@@ -1464,13 +1568,20 @@ See: [Environment variables](reference/cli.md#environment-variables)
 
 Reported by: the tool.
 
-`sqlsource describe` was given a folder, or none and so the current one, that holds no `.sln`, `.slnx` or `.csproj` file.  The tool looks in that folder alone, not in the folders below it.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
+`sqlsource describe` was given a folder that holds no `.sln`, `.slnx` or `.csproj` file.  If it was given no path, that folder is the current one.  The tool looks in that folder alone, not in the folders below it.
 
-Run the command from the folder of the project or the solution, or name the one to run on:
+**Fix:** do one of these.
+
+- Run the command from the folder of the project or the solution.
+- Name the project or the solution to run on, as in this command:
 
 ```console
 $ dotnet sqlsource describe src/App/App.csproj
 ```
+
+Notes:
+
+- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -1480,13 +1591,19 @@ See: [Arguments](reference/cli.md#arguments)
 
 Reported by: the tool.
 
-`sqlsource describe` was given a folder, or none and so the current one, that holds more than one `.sln`, `.slnx` or `.csproj` file.  The tool does not choose between them, as `dotnet build` does not.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
+`sqlsource describe` was given a folder that holds more than one `.sln`, `.slnx` or `.csproj` file.  If it was given no path, that folder is the current one.  The tool does not choose between them, as `dotnet build` does not.
 
-Name the one to run on:
+**Fix:**
+
+1. Name the one to run on:
 
 ```console
 $ dotnet sqlsource describe App.slnx
 ```
+
+Notes:
+
+- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -1496,9 +1613,16 @@ See: [Arguments](reference/cli.md#arguments)
 
 Reported by: the tool.
 
-The path given to `sqlsource describe` does not exist, or is a file that is not a `.sln`, `.slnx` or `.csproj` file.  A solution filter, `.slnf`, and a project of another language are not read.  The message holds the full path the tool looked at: a relative path is resolved against the current folder.  An empty path is this error too, which is what a variable that is not set gives in a shell.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
+The path given to `sqlsource describe` does not exist, or it is a file that is not a `.sln`, `.slnx` or `.csproj` file.  An empty path is this error too: a shell gives one for a variable that is not set.  The message holds the full path that the tool looked at.  The tool resolves a relative path against the current folder.
 
-Give the path of a solution, of a C# project, or of a folder that holds exactly one of them.
+**Fix:**
+
+1. Give the path of a solution, of a C# project, or of a folder that holds exactly one of them.
+
+Notes:
+
+- **A solution filter, `.slnf`, and a project of another language are not read.**
+- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -1508,7 +1632,7 @@ See: [Arguments](reference/cli.md#arguments)
 
 Reported by: the tool.
 
-The project given to `sqlsource describe`, or named with `--project`, was restored and does not use the SqlSource package.  A project of a solution that was not named is not an error: it is left out, and nothing is said.
+The project given to `sqlsource describe`, or named with `--project`, was restored and does not use the SqlSource package.
 
 ```console
 $ dotnet sqlsource describe src/Tools/Tools.csproj
@@ -1516,7 +1640,15 @@ $ dotnet sqlsource describe src/Tools/Tools.csproj
     help: add the SqlSource package to the project
 ```
 
-Add the package with `dotnet add package SqlSource` and restore, or run the command on the project that has the queries.  A project with several target frameworks is read by the first of them: one that references SqlSource for a later framework alone is this error.
+**Fix:** do one of these.
+
+- Add the package with `dotnet add package SqlSource`, and restore.
+- Run the command on the project that has the queries.
+
+Notes:
+
+- **A project of a solution that was not named is not an error.**  The tool leaves it out, and says nothing.
+- **A project with several target frameworks is read by the first of them.**  So a project that references SqlSource for a later framework alone is this error.
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -1535,7 +1667,15 @@ $ dotnet sqlsource describe
     msbuild: /work/App/App.csproj(4,5): error MSB4019: The imported project "/work/Shared.props" was not found.
 ```
 
-Mend what MSBuild reports; `dotnet build` of the project reports the same.  When MSBuild says that the target `SqlSourceWriteManifest` does not exist, the SqlSource package of the project is older than the tool: update the package.  When the reason is that the project file does not exist, the solution lists a project that is not on the disk: restore the file, or take the project out of the solution.  When the reason is that `dotnet` could not be started, the .NET SDK is not installed or not on the path: the tool needs it, and not only the runtime it runs on.
+**Fix:**
+
+1. Mend what MSBuild reports.  `dotnet build` of the project reports the same.
+
+Some reasons have a known cause:
+
+- **MSBuild says that the target `SqlSourceWriteManifest` does not exist.**  The SqlSource package of the project is older than the tool.  Update the package.
+- **The reason is that the project file does not exist.**  The solution lists a project that is not on the disk.  Restore the file, or take the project out of the solution.
+- **The reason is that `dotnet` could not be started.**  The .NET SDK is not installed or not on the path.  The tool needs the SDK, and not only the runtime it runs on.
 
 See: [Requirements](reference/cli.md#requirements)
 
@@ -1552,11 +1692,16 @@ $ dotnet sqlsource describe
 /work/App/App.csproj : error SQLSRC206: The project manifest of '/work/App/App.csproj' cannot be read: it has version '2' of the format and this tool reads version 1.  The SqlSource package and the sqlsource tool are out of step: update the older one
 ```
 
-The SqlSource package of the project and the `sqlsource` tool are of different versions.  Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool`.  The two are released together under one version number.
+Here the SqlSource package of the project and the `sqlsource` tool are of different versions.  The two are released together under one version number.
 
-When the build runs the tool, the message names the manifest file the build wrote by its full path, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, whatever the path holds.
+**Fix:**
 
-Any other reason, one that names a line for one, means that the package wrote a file the tool does not expect of its own version.  That is a bug in SqlSource: [report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
+1. Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool`.
+
+Notes:
+
+- **When the build runs the tool, the message names the manifest file that the build wrote, by its full path**, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, whatever the path holds.
+- **Any other reason, such as one that names a line, is a bug in SqlSource.**  The package wrote a file that the tool of its own version does not expect.  [Report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
 See: [Install the tool](reference/cli.md#install-the-tool)
 
@@ -1566,14 +1711,20 @@ See: [Install the tool](reference/cli.md#install-the-tool)
 
 Reported by: the tool.
 
-A path given with `--project` is not a C# project of the solution that the run is on.  When the run is on a project, the option may name that project and no other.  The message holds the full path the tool looked at: a relative path is resolved against the current folder, not against the folder of the solution.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
+A path given with `--project` is not a C# project of the solution that the run is on.  If the run is on a project, the option can name that project and no other.  The message holds the full path that the tool looked at.  The tool resolves a relative path against the current folder, not against the folder of the solution.
 
 ```console
 $ dotnet sqlsource describe App.slnx --project Tools.csproj
 sqlsource : error SQLSRC207: '/work/Tools.csproj' is not a project of '/work/App.slnx'
 ```
 
-Give the path of a `.csproj` file that the solution lists.  `dotnet sln list` shows them.
+**Fix:**
+
+1. Give the path of a `.csproj` file that the solution lists.  `dotnet sln list` shows them.
+
+Notes:
+
+- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
 
 See: [Options](reference/cli.md#options)
 
@@ -1583,7 +1734,9 @@ See: [Options](reference/cli.md#options)
 
 Reported by: the tool.
 
-The `sqlsource` tool finds `[SqlSourceGenerate]` by reading the C# files of a project as text.  It does not compile them, so it cannot follow a name to its value.  `Source` decides which `.sql` files belong to the type, and the tool reads it alone: it must be a string literal.
+`Source` of `[SqlSourceGenerate]` is not a string literal.  A constant, `nameof`, a concatenation and an interpolated string are all this error, though the compiler accepts them.
+
+The `sqlsource` tool finds `[SqlSourceGenerate]` by reading the C# files of a project as text.  It does not compile them, so it cannot follow a name to its value.  `Source` decides which `.sql` files the type claims, and the tool reads it alone.  So it must be a string literal.
 
 ```csharp
 using SqlSource;
@@ -1596,7 +1749,11 @@ internal static partial class Queries;
 /work/App/Queries.cs(3,29): error SQLSRC208: 'Source' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here
 ```
 
-Write the value where the attribute is: `Source = "Queries"`.  A constant, `nameof`, a concatenation and an interpolated string are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended, so the build reports [SQLSRC241](#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](#sqlsrc209) instead.
+Until the error is mended, the tool describes nothing for the type.  So the build reports [SQLSRC241](#sqlsrc241) for each query of the type that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](#sqlsrc209) instead.
+
+**Fix:**
+
+1. Write the value where the attribute is: `Source = "Queries"`.
 
 See: [`Source` written as text](reference/attributes.md#limit-source-written-as-text)
 
@@ -1606,13 +1763,28 @@ See: [`Source` written as text](reference/attributes.md#limit-source-written-as-
 
 Reported by: the build and the tool.
 
-A query whose output is `models`, `methods` or `repository` is described by a database, and the dialects the tool can describe are `postgres` and `mssql`.  This file has a query with such an output and another dialect.  The build reports this error, and so does the tool.  The default output is `repository` and the default dialect is `ansi`, so a project that sets neither gets this error for every file.
+A query whose output is `repository`, `methods` or `models` is described by a database.  The dialects that the tool can describe are `postgres` and `mssql`.  This file has a query with such an output and another dialect.  The build reports this error, and so does the tool.
+
+The default output is `repository`, and the default dialect is `ansi`.  So a project that sets neither gets this error for each file that a class reads.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'methods' needs each query described by its database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
 ```
 
-For PostgreSQL or SQL Server files, set the dialect, `postgres` or `mssql`: in the [settings file](reference/settings-file.md#settings-files) of the project's folder for every file under it, in that of the files' own folder for those files alone, or with `-- dialect: postgres` or `-- dialect: mssql` at the top of the file:
+The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar.  What else the file gets depends on its output:
+
+- Under `repository` or `methods`, its queries get no method.
+- Under `models`, its constants and token methods are generated as before.
+
+**Fix:** do one of these.
+
+- **For PostgreSQL or SQL Server files**, set the dialect, `postgres` or `mssql`, in one of these places:
+  - in the [settings file](reference/settings-file.md#settings-files) of the project's folder, for every file under it;
+  - in the settings file of the files' own folder, for those files alone;
+  - with `-- dialect: postgres` or `-- dialect: mssql` at the top of the file.
+- **For any other database, and for queries that only want their SQL**, set the output to `sql`: `"output": "sql"` in a settings file, or `-- output: sql` in the file.
+
+A settings file that sets the dialect for every file of the project:
 
 ```jsonc
 // sqlsource.json, in the project's folder
@@ -1622,8 +1794,6 @@ For PostgreSQL or SQL Server files, set the dialect, `postgres` or `mssql`: in t
 }
 ```
 
-For any other database, and for queries that only want their SQL, set the output to `sql`: `"output": "sql"` in a settings file, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; under the output `models` the file's constants and token methods are generated as before, and under `methods` or `repository` its queries get no method.
-
 See: [Database support](reference/databases/index.md#database-support)
 
 ## SQLSRC210
@@ -1632,7 +1802,7 @@ See: [Database support](reference/databases/index.md#database-support)
 
 Reported by: the build and the tool.
 
-A query with a `{{token}}` cannot be sent to a database as it is written.  To describe it, the tool puts a sample in the token's place: the token's default.  This query's output is `models`, `methods` or `repository`, so it must be described, and the token the message names has none.  The build reports this error, and so does the tool, which prints the `help:` line under it.
+A query with a `{{token}}` cannot be sent to a database as it is written.  To describe the query, the tool puts a sample in the place of the token: the default of the token.  The output of this query is `repository`, `methods` or `models`, so the query must be described, and the token that the message names has no default.  The build reports this error, and so does the tool, which prints the `help:` line under it.
 
 ```sql
 -- name: FindUsers
@@ -1644,7 +1814,21 @@ SELECT id, name FROM users {{where}};
     help: write the token with a default, {{where:default}}, or give one in a marker of the query: -- token: {{where:default}}
 ```
 
-Give the token a default where it stands, `{{where:WHERE deleted_at IS NULL}}`, or once for the query with a marker, `-- token: {{where:WHERE deleted_at IS NULL}}`.  An empty default, `{{where:}}`, describes the query with nothing there.  The default is a sample for describing and nothing else: the generated method still takes the token as an argument.  A query that only wants its SQL can instead have the output `sql`, which needs no default.  The error is reported once for each token without a default, at the name of its query.  Until it is mended, the query is not described and gets no error about its entry in the sidecar; under the output `models` its constant or token method is generated as before, and under `methods` or `repository` it gets no method.
+The error is reported once for each token without a default, at the name of its query.  Until it is mended, the query is not described, and it gets no error about its entry in the sidecar.  What else the query gets depends on its output:
+
+- Under `repository` or `methods`, it gets no method.
+- Under `models`, its constant or token method is generated as before.
+
+**Fix:** do one of these.
+
+- Give the token a default where it stands: `{{where:WHERE deleted_at IS NULL}}`.
+- Give the default once for the query, with a marker: `-- token: {{where:WHERE deleted_at IS NULL}}`.
+- If the query only wants its SQL, give it the output `sql`, which needs no default.
+
+Notes:
+
+- **An empty default, `{{where:}}`, describes the query with nothing there.**
+- **The default is a sample for describing and nothing else.**  The generated method still takes the token as an argument.
 
 See: [Defaults](reference/tokens.md#token-defaults)
 
@@ -1654,13 +1838,29 @@ See: [Defaults](reference/tokens.md#token-defaults)
 
 Reported by: the tool.
 
-Each query that is described belongs to one logical database: the one its `-- database:` marker names, or else the `database` of the nearest [settings file](reference/settings-file.md#settings-files) of its file's folder, or of a folder above it, that sets one, or else the name of its file's dialect.  A name is one database across the whole run, with one connection, and the dialect picks the driver of that connection.  Here two files give one name two dialects.  Names are compared ignoring case.
+Two files give one logical database two dialects.  A name is one database across the whole run, with one connection, and the dialect picks the driver of that connection.  Names are compared ignoring case.
+
+Each query that is described belongs to one logical database, the first of these:
+
+- the database that its `-- database:` marker names;
+- the `database` of the nearest [settings file](reference/settings-file.md#settings-files) that sets one, in the folder of its file or in a folder above it;
+- the name of the dialect of its file.
 
 ```console
 /work/App/Queries/Reports.sql(1,10): error SQLSRC211: The database 'main' has the dialect 'mssql' here and 'postgres' in '/work/App/Queries/Users.sql'
 ```
 
-Give the queries of one of the two files another database, or the dialect of the other file.  The database keeps the dialect of the first file that names it, in the order of the projects and then of the files' paths.  The error is reported once for each other file, at its first query of that database, and no query of that database in that file is described until it is mended.  A query whose output is `sql` belongs to no database and is not counted, and neither is a file that already has [SQLSRC209](#sqlsrc209).
+The database keeps the dialect of the first file that names it, in the order of the projects and then of the paths of the files.  The error is reported once for each other file, at its first query of that database.  Until it is mended, no query of that database in that file is described.
+
+**Fix:** do one of these.
+
+- Give the queries of one of the two files another database.
+- Give that file the dialect of the other file.
+
+Notes:
+
+- **A query whose output is `sql` belongs to no database, and is not counted.**
+- **A file that already has [SQLSRC209](#sqlsrc209) is not counted either.**
 
 See: [Database](reference/settings.md#setting-database)
 
@@ -1670,14 +1870,26 @@ See: [Database](reference/settings.md#setting-database)
 
 Reported by: the tool.
 
-A path given to `sqlsource describe` that ends in `.sql` restricts the run to that file.  The run holds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it is on, and this path is none of them.  The message holds the full path the tool looked at: a relative path is resolved against the current folder.  On Linux and macOS, a path written with backslashes whose `..` go above the root of the file system is reported here too, with its `..` as typed.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
+A path given to `sqlsource describe` that ends in `.sql` restricts the run to that file.  The run holds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects that the run is on.  This path is none of them.  The message holds the full path that the tool looked at.  The tool resolves a relative path against the current folder.
 
 ```console
 $ dotnet sqlsource describe Queries/User.sql
 sqlsource : error SQLSRC212: '/work/App/Queries/User.sql' is not a .sql file that a type of the run claims
 ```
 
-Check the spelling of the path.  If the file exists, it is either not a file of the project, as when `SqlSourceIncludeFiles` is off and the project does not list it, or no type claims it: a type claims the `.sql` file named for it beside its own source file, or the ones its `Source` names.  With `--project`, the file must be claimed by a type of one of the projects named.  The rest of the run goes on.
+**Fix:**
+
+1. Check the spelling of the path.
+2. If the file exists, find which of these is true, and mend it:
+   - The file is not a file of the project, as when `SqlSourceIncludeFiles` is off and the project does not list it.
+   - No type claims the file.  A type claims the `.sql` file named for it beside its own source file, or the ones its `Source` names.
+   - The run has `--project`, and no type of the projects named claims the file.  With `--project`, the file must be claimed by a type of one of the projects named.
+
+Notes:
+
+- **The rest of the run goes on.**
+- **On Linux and macOS, a path written with backslashes whose `..` go above the root of the file system is reported here too**, with its `..` as typed.
+- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -1687,14 +1899,48 @@ See: [Arguments](reference/cli.md#arguments)
 
 Reported by: the tool.
 
-A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment, or in a [`.env` file](reference/connections.md#env-file), it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database that can be described: a database that is in the run only through queries with an error of their own, such as [SQLSRC209](#sqlsrc209), does not count.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`; the environment wins over the `.env` file, variable by variable.  A variable that is empty or holds only white space is not set.
+A query that must be described belongs to a database that the run has no connection for.
+
+A connection is given for the name of a database, and never in the project, since it holds credentials.  It can be given in these ways:
+
+- **On the command line**, as `--connection billing=<connection string>`.
+- **In the variable of the name**, in the environment or in a [`.env` file](reference/connections.md#env-file).  The variable is `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`.  So `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.
+- **In `SQLSOURCE_CONNECTION`, with no name.**  It serves a run that has exactly one database that can be described.  A database that is in the run only through queries with an error of their own, such as [SQLSRC209](#sqlsrc209), does not count.
+
+Which connection wins:
+
+- The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`.
+- The environment wins over the `.env` file, variable by variable.
+- A variable that is empty or holds only white space is not set.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC213: No connection is given for the database 'postgres'
     help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the environment or in /work/.env.  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another
 ```
 
-Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run reads, whether or not it is there: the one in the folder of the solution or project it runs on, or the one `--env-file` names.  It ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`, so a `.env` that sits elsewhere, such as in a folder above the project's, is seen not to be read.  Under `--env-file none` it says `The run reads no .env file` instead.  The run never reads a `.env` in a folder above its own.  A run on a solution reads the `.env` beside the solution, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads /work/.env alone, and --env-file, or SqlSourceEnvFile in a build, names another`, in the place of the sentence above.  Move the file, or its connection variables, to the solution's folder, or name the file with [`--env-file`](reference/connections.md#env-file), or for a build with [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file).  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.  A build that [runs the tool](reference/msbuild.md#running-in-the-build) because it found a connection reports it only when another database with a query to describe has one; when none has, the build goes on with the committed sidecars, unless `SQLSOURCE_CONNECTION` is set for several databases, [SQLSRC215](#sqlsrc215), or a variable that two databases share is set, [SQLSRC214](#sqlsrc214).  Under `SqlSourceOnline` `true` it reports it for every database without one.
+The error is reported once for a database, at its first query that must be described.  Those queries count as failed.
+
+**Fix:** do one of these.
+
+- Give the connection in one of the ways that the `help:` line names.
+- Leave the database out of the run with `--database`.
+
+**The `help:` line names the `.env` file that the run reads**, whether or not the file is there.  It is the one in the folder of the solution or project that the run is on, or the one that `--env-file` names.  The line ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`.  So you see that a `.env` file elsewhere, such as in a folder above the project's, is not read.  Under `--env-file none` the line says `The run reads no .env file` instead.  The run never reads a `.env` file in a folder above its own.
+
+**A run on a solution reads the `.env` file beside the solution, and not one in the folder of a project.**  A project of the database can have a `.env` file in its folder, or in a folder between it and the folder of the solution.  Then the `help:` line names each such file, in the place of the sentence above, as `The run did not read /work/App/.env: it reads /work/.env alone, and --env-file, or SqlSourceEnvFile in a build, names another`.  Do one of these:
+
+- Move the file, or its connection variables, to the folder of the solution.
+- Name the file with [`--env-file`](reference/connections.md#env-file), or for a build with [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file).
+
+**`--connection` can be given for a name that no database of the run has.**  Then the `help:` line lists the names that are close to a database of the run, so that you see a misspelt one.  It counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`.  A name that is far from every database of the run is not printed, such as the start of a connection string typed without its `name=`.
+
+Notes:
+
+- **A database whose queries all have a current entry needs no connection.**  Its summary line says `no connection`.  Under `--force` every query is described, so every database of the run needs one.
+- **A build that [runs the tool](reference/msbuild.md#running-in-the-build) because it found a connection reports this error only when another database with a query to describe has one.**  When none has, the build goes on with the committed sidecars, unless one of these is true:
+  - `SQLSOURCE_CONNECTION` is set for several databases: [SQLSRC215](#sqlsrc215).
+  - A variable that two databases share is set: [SQLSRC214](#sqlsrc214).
+- **Under `SqlSourceOnline` `true`, the build reports this error for every database without a connection.**
 
 See: [Connections](reference/connections.md#connections)
 
@@ -1704,13 +1950,23 @@ See: [Connections](reference/connections.md#connections)
 
 Reported by: the tool.
 
-The variable of a database's name is the name in upper case with every character that is not a letter or a digit written as `_`.  Two databases of this run have names that give one variable, as `app-v2` and `app_v2` do, so the variable cannot say which of them it is for.
+Two databases of this run have names that give one connection variable, as `app-v2` and `app_v2` do.  So the variable cannot say which of them it is for.  The variable of the name of a database is the name in upper case, with every character that is not a letter or a digit written as `_`.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC214: The databases 'app-v2' and 'app_v2' both read their connection from SQLSOURCE_CONNECTION_APP_V2
 ```
 
-Give both databases their connection on the command line, `--connection app-v2=<connection string> --connection app_v2=<connection string>`, or rename one of them.  A connection on the command line for one of the two is not enough: the variable would then be read for the other alone, and a reader of the command could not tell.  The error is reported once for each of the two databases that has a query to describe, at its first such query, and those queries count as failed.  A build that [runs the tool](reference/msbuild.md#running-in-the-build) reports it too when the variable is set, in the environment or in the `.env` file, rather than going on with the committed sidecars.
+The error is reported once for each of the two databases that has a query to describe, at its first such query.  Those queries count as failed.
+
+**Fix:** do one of these.
+
+- Give both databases their connection on the command line: `--connection app-v2=<connection string> --connection app_v2=<connection string>`.
+- Rename one of the two databases.
+
+Notes:
+
+- **A connection on the command line for one of the two is not enough.**  The variable would then be read for the other alone, and a reader of the command could not tell.
+- **A build that [runs the tool](reference/msbuild.md#running-in-the-build) reports this error too when the variable is set**, in the environment or in the `.env` file.  It does not go on with the committed sidecars.
 
 See: [Connections](reference/connections.md#connections)
 
@@ -1720,14 +1976,22 @@ See: [Connections](reference/connections.md#connections)
 
 Reported by: the tool.
 
-`SQLSOURCE_CONNECTION` is set, and it is the connection of a run with exactly one database.  This run has more, and the database of this query has no connection of its own, so nothing says that the variable is for it.  The message counts and names the databases that can be described: one that is in the run only through queries with an error of their own, such as [SQLSRC209](#sqlsrc209), needs no connection and is left out.
+`SQLSOURCE_CONNECTION` is set, and it is the connection of a run with exactly one database.  This run has more, and the database of this query has no connection of its own.  So nothing says that the variable is for it.
+
+The message counts and names the databases that can be described.  A database that is in the run only through queries with an error of their own, such as [SQLSRC209](#sqlsrc209), needs no connection and is left out.
 
 ```console
 /work/App/Queries/Reports.sql(1,10): error SQLSRC215: SQLSOURCE_CONNECTION is for a run with one database, and this run has 2: postgres, reports
     help: set SQLSOURCE_CONNECTION_POSTGRES for 'postgres' and SQLSOURCE_CONNECTION_REPORTS for 'reports', or pass --connection <name>=<connection string> for each
 ```
 
-Set the variable of each database, as the `help:` line names them, or give each with `--connection`, or restrict the run to one database with `--database`.  The error stands in the place of [SQLSRC213](#sqlsrc213) and is reported as that one is: once for a database, at its first query that must be described.
+The error stands in the place of [SQLSRC213](#sqlsrc213), and is reported as that one is: once for a database, at its first query that must be described.
+
+**Fix:** do one of these.
+
+- Set the variable of each database, as the `help:` line names them.
+- Give the connection of each database with `--connection`.
+- Restrict the run to one database with `--database`.
 
 See: [Connections](reference/connections.md#connections)
 
@@ -1737,7 +2001,9 @@ See: [Connections](reference/connections.md#connections)
 
 Reported by: the tool.
 
-No dialect of this release gets this error: the tool describes `postgres` and `mssql`, the two dialects that pass [SQLSRC209](#sqlsrc209).  It is kept for a database whose dialect passes that check before the tool can describe it, where it would be reported at each query that the run would have described, and each would count as failed.  A dialect that the tool does not describe at all is SQLSRC209, every row marked No in [database support](reference/databases/index.md#database-support).
+No dialect of this release gets this error.  The tool describes `postgres` and `mssql`, the two dialects that pass [SQLSRC209](#sqlsrc209).
+
+The error is kept for a database whose dialect passes that check before the tool can describe it.  The error would then be reported at each query that the run would have described, and each of those queries would count as failed.  A dialect that the tool does not describe at all is SQLSRC209: every row marked No in [database support](reference/databases/index.md#database-support).
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC216: This version of sqlsource cannot describe 'mssql'
@@ -1753,7 +2019,12 @@ See: [Database support](reference/databases/index.md#database-support)
 
 Reported by: the tool.
 
-A sidecar is written whole or not at all: when every query of its `.sql` file that needs an entry was described in this run or already has a current one.  Here the run described a query of the file and could not write the result, because another query of the file has neither.  The lines under the message name each such query and say why: it `failed`, with an error of its own above, or it is `not in this run`, because `--database` or a `.sql` path left it out and its entry is missing or out of date.
+The tool did not write the sidecar of a `.sql` file.  A sidecar is written whole or not at all: when every query of its `.sql` file that needs an entry was described in this run or already has a current entry.  Here the run described a query of the file and could not write the result, because another query of the file has neither.
+
+The lines under the message name each such query and say why:
+
+- `failed`: the query has an error of its own, above.
+- `not in this run`: `--database` or a `.sql` path left the query out, and its entry is missing or out of date.
 
 ```console
 /work/App/Queries/Users.sql : error SQLSRC217: The sidecar of '/work/App/Queries/Users.sql' was not written, because not every query of the file has an entry
@@ -1761,7 +2032,14 @@ A sidecar is written whole or not at all: when every query of its `.sql` file th
     help: describe the whole file, or fix the queries that failed
 ```
 
-Mend the queries that failed, or run `describe` without the filter that left a query out, so that every query of the file is described in one run.  The sidecar on the disk is as it was before the run.  The error is there so that a description that was not saved does not look like a success; a file that was held back with none of its queries described has only the errors of those queries.
+The sidecar on the disk is as it was before the run.  The error is there so that a description that was not saved does not look like a success.
+
+**Fix:** do the one of these that fits each query.
+
+- Mend the queries that failed.
+- Run `describe` without the filter that left a query out, so that every query of the file is described in one run.
+
+A file that was held back with none of its queries described has only the errors of those queries.
 
 See: [Describing again](reference/sidecars.md#describing-again)
 
@@ -1771,29 +2049,40 @@ See: [Describing again](reference/sidecars.md#describing-again)
 
 Reported by: the tool.
 
-The tool could not write a sidecar, or could not delete one that its `.sql` file no longer needs, or could not read such a one to see that it may be deleted, or could not write the log of `--log` or `SQLSOURCE_LOG`, or the bundle of `diagnose` or its mapping.  The message says which, and ends with the reason the operating system gave.
+The tool could not change a file.  The message says which file, and ends with the reason that the operating system gave.  The tool could not do one of these:
+
+- write a sidecar;
+- delete a sidecar that its `.sql` file no longer needs, or read such a sidecar to see that it can be deleted;
+- write the log of `--log` or `SQLSOURCE_LOG`;
+- write the bundle of `diagnose`, or its mapping.
 
 ```console
 /work/App/Queries/Users.sql.json : error SQLSRC218: '/work/App/Queries/Users.sql.json' could not be written: Access to the path '/work/App/Queries/Users.sql.json' is denied.
 ```
 
-**Fix:** give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  The rest of the run goes on after an error about a sidecar.
+**Fix:** do the one of these that fits the file.
 
-- **A sidecar is never left half written.**  It is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one.
-- **A program that has the sidecar open** can keep the move, or the delete of a sidecar that is no longer needed, from succeeding, as an editor or a build can on Windows.  The tool tries again for about a second, so a file that is held only for a moment is written or deleted without an error; one that stays open is reported as one that `could not be written` or `could not be deleted`.  A refusal of access looks the same to the tool, so a sidecar you have no right to change is reported after that second too.
-- **A sidecar is deleted only** in a run with no `--project`, `--database` or `.sql` path, in which nothing was reported as an error before the files were decided: a setting that is not valid, or a type that could not be read, can make a file look as if it needs no entry.
-- **A sidecar that the tool cannot open**, for lack of permission, because it is locked or because it is a folder, is not deleted when the file beside it needs no entry, since it may be the file of a newer tool.  It is reported as one that `could not be read`.  Delete it yourself, or give yourself the right to read it.  `describe --check` reports the same, since it could not check the file.
+- **A sidecar:** give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open.  Then run the command again.
+- **A log or a bundle:** find the case in the lists below.  Most cases end with what to do.
+
+For a sidecar:
+
+- **The rest of the run goes on after an error about a sidecar.**
+- **A sidecar is never left half written.**  The tool writes it to a temporary file beside it, and then moves that file over the old one.  So a run that fails or is stopped leaves the old file or the new one.
+- **A program that has the sidecar open can keep the tool from changing it**, as an editor or a build can on Windows.  That holds for the move, and for the delete of a sidecar that is no longer needed.  The tool tries again for about a second, so a file that is held only for a moment is written or deleted without an error.  One that stays open is reported as one that `could not be written` or `could not be deleted`.  A refusal of access looks the same to the tool, so a sidecar that you have no right to change is reported after that second too.
+- **A sidecar is deleted only in a run with no `--project`, `--database` or `.sql` path, in which nothing was reported as an error before the files were decided.**  A setting that is not valid, or a type that could not be read, can make a file look as if it needs no entry.
+- **A sidecar that the tool cannot open is not deleted** when the file beside it needs no entry, since it may be the file of a newer tool.  The tool cannot open it for lack of permission, because it is locked, or because it is a folder.  It is reported as one that `could not be read`.  Delete it yourself, or give yourself the right to read it.  `describe --check` reports the same, since it could not check the file.
 
 For a log:
 
-- **The log cannot be made or emptied as the run starts**, because its folder is not there, it is a folder, or the system will not let the tool write it.  Nothing runs and the exit code is 1.  Give a path that can be written, or run the command from another folder.
-- **The path ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a log is not written over a .sql file, a sidecar, a project or a solution`, touches nothing and runs nothing, so that a name left out before a `.sql` path does not empty that file.  Give the log a name of its own.
-- **The log stops being writable while the run goes on**, as when the disk is full.  The run finishes and writes its sidecars, the error is reported once at the end, and the exit code is 1.  The log holds what was written before it stopped.
+- **The log cannot be made or emptied as the run starts.**  Its folder is not there, it is a folder, or the system does not let the tool write it.  Nothing runs, and the exit code is 1.  Give a path that can be written, or run the command from another folder.
+- **The path ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a log is not written over a .sql file, a sidecar, a project or a solution`.  It touches nothing and runs nothing, so that a name left out before a `.sql` path does not empty that file.  Give the log a name of its own.
+- **The log stops being writable while the run goes on**, as when the disk is full.  The run finishes and writes its sidecars.  The error is reported once at the end, and the exit code is 1.  The log holds what was written before it stopped.
 
 For a bundle of `diagnose`:
 
 - **The path of `--out` ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a bundle is not written over a .sql file, a sidecar, a project or a solution`, before it describes anything, and touches nothing.  Give the bundle a name of its own, such as `report.zip`.
-- **The bundle or its mapping cannot be written**, because its folder is not there, it is a folder, or the system will not let the tool write it.  The query has been described by then, and nothing is written past the file that failed: when the mapping fails, the bundle is written and its line printed, and the error is at the mapping.  The exit code is 1.  Run the command again with an `--out` in a folder that exists and can be written.
+- **The bundle or its mapping cannot be written.**  Its folder is not there, it is a folder, or the system does not let the tool write it.  The query has been described by then.  Nothing is written past the file that failed: when the mapping fails, the bundle is written and its line printed, and the error is at the mapping.  The exit code is 1.  Run the command again with an `--out` in a folder that exists and can be written.
 
 See: [Logs](reference/cli.md#logs), [making a bundle with `diagnose`](reference/bundles.md#diagnose)
 
@@ -1803,7 +2092,9 @@ See: [Logs](reference/cli.md#logs), [making a bundle with `diagnose`](reference/
 
 Reported by: the tool.
 
-`describe --check` asked the database to describe every query of the run and compared what it said with the sidecars that are there.  It changes no file.  The message names a query and says what differs, or names the `.sql` file when the whole sidecar does:
+`describe --check` asked the database to describe every query of the run, and compared what it said with the sidecars that are there.  It changes no file.  The message names a query and says what differs.  If the whole sidecar differs, the message names the `.sql` file instead.
+
+What the end of the message means:
 
 | The message ends with | What it means |
 |----|----|
@@ -1821,7 +2112,10 @@ Reported by: the tool.
     help: run 'dotnet sqlsource describe --force' and commit the sidecars
 ```
 
-**Fix:** the `help:` line under each error names the command that mends it, and you then commit the sidecars it writes:
+**Fix:**
+
+1. Run the command that the `help:` line under each error names.  This table gives the command for each message.
+2. Commit the sidecars that the command writes.
 
 | The message | Run |
 |----|----|
@@ -1829,12 +2123,21 @@ Reported by: the tool.
 | Names a difference that the database reports, such as `columns[2].nullable` | `dotnet sqlsource describe --force`: the tool cannot see a change to the schema, and skips a query whose SQL is as it was |
 | Says the sidecar has a higher format than this tool writes | Update the `SqlSource.Tool` package: a newer tool wrote the sidecar, and `describe` leaves it as it is |
 
+Notes:
+
 - **Columns and parameters are counted from 0**: `columns[2]` is the third column.
 - **Only the first difference of a query is named.**
-- **What is compared is what changes generated code**: the query as written (its SQL, the types and nullability of its `-- param:` markers, and its tokens' defaults), its database and the kind of that database, whether it returns rows and which table's rows they match, if any, the name, position, type and nullability of each parameter and column, and the table column each column is read from.  The versions of the tool and of the server are not compared.
-- **With `--database`**, an entry for a query that is no longer in the file, or that needs none, is reported, whatever its database, when `describe` with the same filters would rewrite the sidecar, which drops it.  A sidecar that such a `describe` leaves as it is, because another query of the file, of a database that `--database` does not name, has changed or was never described, keeps the entry, and the check does not report it.
+- **What is compared is what changes generated code.**  That is these:
+  - the query as written: its SQL, the types and nullability of its `-- param:` markers, and the defaults of its tokens;
+  - its database, and the kind of that database;
+  - whether it returns rows, and which table's rows they match, if any;
+  - the name, position, type and nullability of each parameter and column;
+  - the table column that each column is read from.
 
-The tool exits with the code 2 when it reported this error and no other, so that a build can tell a sidecar that is out of date from a check that could not be made.  A query that could not be described has an error of its own, and the exit code is then 1.
+  The versions of the tool and of the server are not compared.
+- **With `--database`, an entry for a query that is no longer in the file, or that needs none, is reported, whatever its database.**  That is so when `describe` with the same filters would rewrite the sidecar, which drops the entry.  Such a `describe` can leave the sidecar as it is, because another query of the file, of a database that `--database` does not name, has changed or was never described.  Then the sidecar keeps the entry, and the check does not report it.
+
+The tool exits with the code 2 when it reported this error and no other.  So a build can tell a sidecar that is out of date from a check that could not be made.  A query that could not be described has an error of its own, and the exit code is then 1.
 
 See: [Check in CI](reference/describing.md#check-in-ci)
 
@@ -1844,7 +2147,12 @@ See: [Check in CI](reference/describing.md#check-in-ci)
 
 Reported by: the tool.
 
-The tool tells that a project uses SqlSource by the package's MSBuild files, and those reach a project only through a restore.  This project either references the SqlSource package and has nothing of it, so it was not restored since the reference was added, or has no file of a restore at all, so nothing says whether it uses SqlSource.  The tool does not restore: a restore is slow and writes into the project.
+The tool tells that a project uses SqlSource by the MSBuild files of the package, and those reach a project only through a restore.  This project is one of these:
+
+- It references the SqlSource package and has nothing of it, so it was not restored after the reference was added.
+- It has no file of a restore at all, so nothing says whether it uses SqlSource.
+
+The tool does not restore: a restore is slow and writes into the project.
 
 ```console
 $ dotnet sqlsource describe
@@ -1852,7 +2160,15 @@ $ dotnet sqlsource describe
     help: run 'dotnet restore'
 ```
 
-Run `dotnet restore` on the solution or the project, then the command again.  In a solution every C# project is checked, one that has no SQL too: a run on a fresh checkout must not succeed by finding nothing.  A reference that keeps the package's MSBuild files out of the project, `ExcludeAssets="build"` for one, gives this error after a restore as well: remove that from the reference.
+**Fix:**
+
+1. Run `dotnet restore` on the solution or the project.
+2. Run the command again.
+
+Notes:
+
+- **In a solution every C# project is checked, one that has no SQL too.**  A run on a fresh checkout must not succeed by finding nothing.
+- **A reference that keeps the MSBuild files of the package out of the project gives this error after a restore as well**, `ExcludeAssets="build"` for one.  Remove that from the reference.
 
 See: [Requirements](reference/cli.md#requirements)
 
@@ -1862,14 +2178,25 @@ See: [Requirements](reference/cli.md#requirements)
 
 Reported by: the tool.
 
-A sidecar, the `.sql.json` file beside a `.sql` file, says which version of the format it has.  This one has a higher version than this tool writes, so a newer `sqlsource` wrote it, and this one must not write it back down: the generator of that newer version would no longer read it.
+A sidecar, the `.sql.json` file beside a `.sql` file, says which version of the format it has.  This one has a higher version than this tool writes, so a newer `sqlsource` wrote it.  This tool must not write it back down: the generator of that newer version would no longer read it.
 
 ```console
 /work/App/Queries/Users.sql.json : error SQLSRC221: '/work/App/Queries/Users.sql.json' has format 2, and this tool writes format 1
     help: update the SqlSource.Tool package
 ```
 
-Update the tool, with `dotnet tool update SqlSource.Tool`, to the version of the SqlSource package the project uses.  The file is left as it is, and every query of its `.sql` file that the run was asked to describe counts as failed.  A sidecar of a lower format version, of another version of the tool, or one that cannot be read, a merge conflict for one, is no error: the tool describes its queries and writes it again.  A run that may delete a sidecar, because a file needs no entry any more, does not delete one of a higher format version either.
+The file is left as it is.  Every query of its `.sql` file that the run was asked to describe counts as failed.
+
+**Fix:**
+
+1. Update the tool with `dotnet tool update SqlSource.Tool`, to the version of the SqlSource package that the project uses.
+
+Notes:
+
+- **A sidecar of a lower format version is no error.**  Nor is one of another version of the tool, or one that cannot be read, a merge conflict for one.  The tool describes the queries of such a sidecar and writes it again.
+- **A run that can delete a sidecar does not delete one of a higher format version either**, when a file needs no entry any more.
+
+See: [Sidecar files](reference/sidecars.md#sidecar-files)
 
 ## SQLSRC222
 
@@ -1877,14 +2204,22 @@ Update the tool, with `dotnet tool update SqlSource.Tool`, to the version of the
 
 Reported by: the tool.
 
-`sqlsource describe` was given a folder, or none and so the current one, and the operating system would not list its files.  The message ends with the reason the system gave.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.  The reason is then only that the system would not list the files, since the system's own words repeat the path.
+`sqlsource describe` was given a folder, and the operating system would not list its files.  If it was given no path, that folder is the current one.  The message ends with the reason that the system gave.
 
 ```console
 $ dotnet sqlsource describe /srv/locked
 sqlsource : error SQLSRC222: '/srv/locked' cannot be read: Access to the path '/srv/locked' is denied.
 ```
 
-Give yourself the right to read the folder.
+**Fix:**
+
+1. Give yourself the right to read the folder.
+
+Notes:
+
+- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.  The reason is then only `the system would not list its files`, since the words of the system repeat the path.
+
+See: [Arguments](reference/cli.md#arguments)
 
 ## SQLSRC223
 
@@ -1892,14 +2227,18 @@ Give yourself the right to read the folder.
 
 Reported by: the tool.
 
-The `.sln` or `.slnx` file that `sqlsource describe` was given, or found in the folder, is not a solution that can be read.  The message ends with the reason of the library that reads it, which is the one the `dotnet` command uses.  A solution that lists one project twice is refused too.
+The `.sln` or `.slnx` file that `sqlsource describe` was given, or found in the folder, is not a solution that can be read.  A solution that lists one project twice is refused too.  The message ends with the reason of the library that reads the solution, which is the one that the `dotnet` command uses.
 
 ```console
 $ dotnet sqlsource describe
 /work/App.sln : error SQLSRC223: '/work/App.sln' cannot be read: Not a solution file.
 ```
 
-Mend the file.  `dotnet sln list` reads it the same way.
+**Fix:**
+
+1. Mend the file.  `dotnet sln list` reads it the same way.
+
+See: [Arguments](reference/cli.md#arguments)
 
 ## SQLSRC224
 
@@ -1909,7 +2248,15 @@ Reported by: the tool.
 
 Database: PostgreSQL and SQL Server.
 
-The tool could not open a session with the database of a query that must be described: nothing answers at the address, the server refused the user or the password, the database does not exist, the driver cannot read the connection string, or a file that the connection string names cannot be used.  The `server:` line says what went wrong in the tool's own words, after the server's SQLSTATE or SQL Server's error number when the server gave one.  It names neither the host nor the user: what the server or the driver said would name them, or quote the connection string or a path in it.
+The tool could not open a session with the database of a query that must be described.  The cause is one of these:
+
+- nothing answers at the address;
+- the server refused the user or the password;
+- the database does not exist;
+- the driver cannot read the connection string;
+- a file that the connection string names cannot be used.
+
+The `server:` line says what went wrong, in the tool's own words.  If the server gave a SQLSTATE or SQL Server's error number, the line starts with it.  The line names neither the host nor the user: what the server or the driver said would name them, or quote the connection string or a path in it.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC224: The database 'app' could not be opened
@@ -1918,9 +2265,16 @@ The tool could not open a session with the database of a query that must be desc
     help: check that the database is running and that the connection string names it
 ```
 
-**Fix:** start the database, or correct the connection string that `--connection` or the database's variable gives.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.  In a build that [runs the tool](reference/msbuild.md#running-in-the-build), the error fails the build, and the `help:` line also says how to build without the database: `To build without the database, remove its connection or set SqlSourceOnline to false`.
+The error is reported once, at the first query of the database that the run would have described.  Each of those queries counts as failed.
 
-The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the error, listed in [PostgreSQL's error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html).
+**Fix:** do the one of these that the `server:` line points to.
+
+- Start the database.
+- Correct the connection string that `--connection` or the variable of the database gives.
+
+In a build that [runs the tool](reference/msbuild.md#running-in-the-build), the error fails the build.  The `help:` line then also says how to build without the database: `To build without the database, remove its connection or set SqlSourceOnline to false`.
+
+**On PostgreSQL.**  The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the error, listed in [PostgreSQL's error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html).
 
 | The `server:` line | What it means |
 |----|----|
@@ -1943,7 +2297,7 @@ The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the erro
 | `GSS authentication is not available on this machine` | The server asks for GSS, and the operating system's GSS library cannot be loaded |
 | `Npgsql cannot read the database's types` | Npgsql read the database's types when it connected and could not use them: a schema before `pg_catalog` on the connection's search path defines an operator `=` on two `oid` or two `"char"`.  Put `pg_catalog` first on the search path of the connection the tool uses, or leave that schema off it |
 
-For SQL Server, the line starts with `Msg <number>, Level <level>, State <state>:` when the server or SqlClient numbered the error, as in `Msg 18456, Level 14, State 1: the server refused the login`.  The number is SQL Server's, listed in [Database Engine errors](https://learn.microsoft.com/sql/relational-databases/errors-events/database-engine-events-and-errors).  The text is one of these:
+**On SQL Server.**  The line starts with `Msg <number>, Level <level>, State <state>:` when the server or SqlClient numbered the error, as in `Msg 18456, Level 14, State 1: the server refused the login`.  The number is SQL Server's, listed in [Database Engine errors](https://learn.microsoft.com/sql/relational-databases/errors-events/database-engine-events-and-errors).  The text of the line is one of these:
 
 | The text of the `server:` line | What it means |
 |----|----|
@@ -1970,7 +2324,14 @@ Reported by: the tool.
 
 Database: PostgreSQL and SQL Server.
 
-The tool asked the server to prepare the query, and the server refused it: a syntax error, a table or a column the database does not have, an operator that does not exist for the types it is given.  The message ends with what the server said, and the `server:` lines give all of it: the SQLSTATE and the message, then its `detail:` and `hint:` where it gave them.
+The tool asked the server about the query, and the server refused it.  The query can have a syntax error, name a table or a column that the database does not have, or use an operator that does not exist for the types it is given.  The message ends with what the server said, and the `server:` lines give all of it.
+
+**Fix:** do one of these.
+
+- Mend the query.
+- Bring the database to the schema that the query was written for.
+
+**On PostgreSQL.**  The tool asks the server to prepare the query.  The `server:` lines give the SQLSTATE and the message, then the `detail:` and `hint:` of the server, where it gave them.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'GetUser': relation "user" does not exist
@@ -1980,13 +2341,13 @@ The tool asked the server to prepare the query, and the server refused it: a syn
     server: at character 15
 ```
 
-**Fix:** mend the query, or bring the database to the schema the query was written for.
+- **`at character` counts from the start of the SQL of the query as the tool sent it.**  That SQL has no comments, has the default of each token in the place of the token, and has `$1` in the place of each parameter.  So the place is close to the place in the file, and not always the same.  Run with `--log` for the SQL as it was sent.
+- **An error at the step `resolve type` has no `at character` line.**  There the server refused the tool's question about a type, and not the query.
+- **A type that a `-- param:` marker declares is checked against every use of the parameter.**  So a declared `int` compared with a text column is this error too.
 
-- **`at character`** counts from the start of the query's SQL as the tool sent it: without its comments, with each token's default in the token's place and `$1` in the place of each parameter, so it is close to the place in the file and not always the same.  Run with `--log` for the SQL as it was sent.
-- **An error at the step `resolve type`** has no `at character` line: there the server refused the tool's question about a type, and not the query.
-- **A type that a `-- param:` marker declares** is checked against every use of the parameter, so a declared `int` compared with a text column is this error too.
+**A query parameter with no declared type takes the type of its first use.**  So `placed_at > now() - @age` makes `@age` a `timestamp with time zone`.  The server then reports `operator does not exist: timestamp with time zone > interval`, an operator that the SQL does not hold.
 
-A parameter with no declared type takes the type of its first use, so `placed_at > now() - @age` makes `@age` a `timestamp with time zone`, and the server then reports `operator does not exist: timestamp with time zone > interval`, an operator that the SQL does not hold.  For an error about a type or an operator, when the query has a parameter with no declared type and a use with no cast, the `help:` line says that the server may have given it the type of its first use, and names each such parameter.  The help is a guess: the server does not say whether its error is at a parameter, so the help can appear for an error that is not, such as a misspelt function.  The `at character` line says where the error is.
+For an error about a type or an operator, the `help:` line can name each such parameter.  It does so when the query has a parameter with no declared type and a use with no cast.  The line says that the server may have given the parameter the type of its first use.  The help is a guess: the server does not say whether its error is at a parameter.  So the help can appear for an error that is not, such as a misspelt function.  The `at character` line says where the error is.
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC225: The server rejected the query 'ListRecentOrders': operator does not exist: timestamp with time zone > interval
@@ -2000,13 +2361,13 @@ A parameter with no declared type takes the type of its first use, so `placed_at
 
 Write the type meant in the place of `<type>`: here `@age::interval`, or `-- param: @age interval`.
 
-A statement that the server cannot prepare, though its SQL is valid, such as `CALL` or `CREATE TABLE`, is [SQLSRC233](#sqlsrc233) and not this error.
+**A statement that the server cannot prepare, though its SQL is valid, is [SQLSRC233](#sqlsrc233) and not this error.**  `CALL` and `CREATE TABLE` are such statements.
 
-It is also given when a type that the query uses was dropped while the tool described it, since another session changed the schema between two of the tool's questions.  A table or a column that the query reads cannot be dropped then: a `DROP TABLE`, or an `ALTER TABLE` that drops or changes a column, waits until the tool has described the query.  The message says what went, as in `the type of the column 'id' no longer exists`; there is no `server:` line, since the server said nothing, and the help says to run the tool again.
+**A type that the query uses can be dropped while the tool describes the query.**  Then another session changed the schema between two of the tool's questions, and the tool gives this error too.  The message says what went, as in `the type of the column 'id' no longer exists`.  There is no `server:` line, since the server said nothing, and the help says to run the tool again.  A table or a column that the query reads cannot be dropped then: a `DROP TABLE`, or an `ALTER TABLE` that drops or changes a column, waits until the tool has described the query.
 
-It is also what a connection that the server ended while the queries were described is reported as.  The query that finds it out has the server's SQLSTATE and `the server ended the session`, as in `57P01: the server ended the session` for a backend that was ended, and it names neither the host nor the user.  When the server said nothing, the line is `the connection to the server was lost`, or `the server did not answer in time` when Npgsql stopped waiting for its answer, with no SQLSTATE.  Every query of that database after it has the line `the connection to the server was lost`, with no SQLSTATE: start the run again.
+**The server can end the connection while the queries are described.**  The tool reports that as this error too.  The query that finds it out has the server's SQLSTATE and `the server ended the session`, as in `57P01: the server ended the session` for a backend that was ended.  The line names neither the host nor the user.  When the server said nothing, the line is `the connection to the server was lost`, or `the server did not answer in time` when Npgsql stopped waiting for its answer, with no SQLSTATE.  Every query of that database after it has the line `the connection to the server was lost`, with no SQLSTATE.  Start the run again.
 
-The step `check parameters` gives it too, for an error of the tool's comparison with Npgsql that says nothing of how Npgsql reads the SQL: a connection that was lost, or an error of the server that is not of class `42` (syntax errors and access rule violations), such as a statement that was cancelled or timed out.  The `server:` line is what the server said, or one of the lines above for a connection that was lost or ended, and the message ends with it.  An error of class `42` there is [SQLSRC231](#sqlsrc231), since a `@` that the two read differently gives one.  Start the run again.
+**The step `check parameters` gives this error too**, for an error of the tool's comparison with Npgsql that says nothing of how Npgsql reads the SQL.  That is a connection that was lost, or an error of the server that is not of class `42` (syntax errors and access rule violations), such as a statement that was cancelled or timed out.  The `server:` line is what the server said, or one of the lines above for a connection that was lost or ended, and the message ends with it.  An error of class `42` there is [SQLSRC231](#sqlsrc231), since a `@` that the two read differently gives one.  Start the run again.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'ListUsers': canceling statement due to statement timeout
@@ -2015,7 +2376,7 @@ The step `check parameters` gives it too, for an error of the tool's comparison 
     server: 57014: canceling statement due to statement timeout
 ```
 
-For SQL Server, each error the server gave is a `server:` line, `Msg <number>, Level <level>, State <state>:` and its text, the cause first.  The last is often `Msg 11501`, which says only that the query did not compile, and the message ends with the cause's text:
+**On SQL Server.**  Each error that the server gave is a `server:` line: `Msg <number>, Level <level>, State <state>:` and its text, the cause first.  The last line is often `Msg 11501`, which says only that the query did not compile.  The message ends with the text of the cause:
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'GetUser': Invalid column name 'nope'.
@@ -2025,7 +2386,7 @@ For SQL Server, each error the server gave is a `server:` line, `Msg <number>, L
     server: Msg 11501, Level 16, State 2: The batch could not be analyzed because of compile errors.
 ```
 
-The step can also be `describe columns`, when SQL Server accepted the query's parameters and could not work out its columns.  There each line is `Msg <number>:` and its text, with no level or state, and the last is often `Msg 11529`, which says only that every path of the query failed.  A call of a procedure that the database does not have, with no argument, is such a query:
+The step can also be `describe columns`, when SQL Server accepted the parameters of the query and could not work out its columns.  There each line is `Msg <number>:` and its text, with no level or state.  The last line is often `Msg 11529`, which says only that every path of the query failed.  A call of a procedure that the database does not have, with no argument, is such a query:
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC225: The server rejected the query 'ArchiveOrders': Could not find stored procedure 'dbo.archive_ordrs'.
@@ -2035,16 +2396,20 @@ The step can also be `describe columns`, when SQL Server accepted the query's pa
     server: Msg 11529: The metadata could not be determined because every code path results in an error; see previous errors for some of these.
 ```
 
-The same call with an argument, `EXEC dbo.archive_ordrs @before`, is `Msg 2812` at the step `describe parameters`, with its level and state, then `Msg 11501`.  Correct the procedure's name, or bring the database to the schema the query was written for.
+The same call with an argument, `EXEC dbo.archive_ordrs @before`, is `Msg 2812` at the step `describe parameters`, with its level and state, then `Msg 11501`.  Correct the name of the procedure, or bring the database to the schema that the query was written for.
 
-- **An `OUTPUT` clause without `INTO`, on a table that has an enabled trigger,** is `Msg 334`.  SQL Server refuses the statement when it runs, too.  Output the rows `INTO` a table variable and select them from it.
-- **A table or a column that the database does not have** is `Msg 208`, `Invalid object name`, or `Msg 207`, `Invalid column name`, as in the first SQL Server example.  A temporary table that the query reads and does not create is `Msg 208` too, since it does not exist when the query is described; one that the query creates is [SQLSRC265](#sqlsrc265).
-- **A `GO` inside the query** is `Msg 102`, `Incorrect syntax near 'GO'`.  `GO` ends a batch in SQL Server Management Studio and `sqlcmd`, and is not T-SQL: give each batch a `-- name:` of its own.
-- **A misspelt keyword at the start of the query**, such as `SELEC 1`, is `Msg 2812`, `Could not find stored procedure 'SELEC'`, then `Msg 11501`: SQL Server reads a query that starts with a name as a call of the procedure of that name.  Correct the spelling.
-- **A type that a `-- param:` marker declares** is checked against every use of the parameter, so `-- param: @p xml` with `WHERE id = @p` is this error, `Msg 206`, `Operand type clash: xml is incompatible with int`.  A type that the query's own text names and the database lacks, `CAST(@p AS dbo.Nope)`, is this error too.
-- **A parameter whose name, with its `@`, is longer than 128 characters** is this error, `Msg 103`, `The identifier that starts with '...' is too long`, whether it is used once, used more than once or declared with `-- param:`; a declared one gives it at the step `resolve type`.  Give the parameter a shorter name.
+Other causes on SQL Server:
+
+- **An `OUTPUT` clause without `INTO`, on a table that has an enabled trigger,** is `Msg 334`.  SQL Server refuses the statement when it runs, too.  Output the rows `INTO` a table variable, and select them from it.
+- **A table or a column that the database does not have** is `Msg 208`, `Invalid object name`, or `Msg 207`, `Invalid column name`, as in the first SQL Server example.  A temporary table that the query reads and does not create is `Msg 208` too, since it does not exist when the query is described.  One that the query creates is [SQLSRC265](#sqlsrc265).
+- **A `GO` inside the query** is `Msg 102`, `Incorrect syntax near 'GO'`.  `GO` ends a batch in SQL Server Management Studio and `sqlcmd`, and is not T-SQL.  Give each batch a `-- name:` of its own.
+- **A misspelt keyword at the start of the query**, such as `SELEC 1`, is `Msg 2812`, `Could not find stored procedure 'SELEC'`, then `Msg 11501`.  SQL Server reads a query that starts with a name as a call of the procedure of that name.  Correct the spelling.
+- **A type that a `-- param:` marker declares** is checked against every use of the parameter.  So `-- param: @p xml` with `WHERE id = @p` is this error, `Msg 206`, `Operand type clash: xml is incompatible with int`.  A type that the text of the query names and the database lacks, `CAST(@p AS dbo.Nope)`, is this error too.
+- **A parameter whose name, with its `@`, is longer than 128 characters** is this error, `Msg 103`, `The identifier that starts with '...' is too long`.  That is so whether the parameter is used once, used more than once or declared with `-- param:`.  A declared one gives it at the step `resolve type`.  Give the parameter a shorter name.
 - **A statement whose result SQL Server cannot work out**, such as `CREATE PROCEDURE`, is `Msg 11527`, `... does not support metadata discovery`.  Give the query `-- output: sql`.
-- **A connection that was lost** has the line `the connection to the server was lost`, or `the server did not answer in time` when SqlClient stopped waiting for its answer, after the error's number.  Every query of that database after it has the line `the connection to the server was lost`: start the run again.  At the step `resolve type`, the server could not be asked about a declared type for the same reasons.
+- **A connection that was lost** has the line `the connection to the server was lost`, or `the server did not answer in time` when SqlClient stopped waiting for its answer, after the number of the error.  Every query of that database after it has the line `the connection to the server was lost`.  Start the run again.  At the step `resolve type`, the server could not be asked about a declared type for the same reasons.
+
+See: [What describing does to your database](reference/databases/postgresql/index.md#what-describing-does), [What can be described](reference/databases/sqlserver/index.md#what-can-be-described)
 
 ## SQLSRC226
 
