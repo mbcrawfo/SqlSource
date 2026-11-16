@@ -11,7 +11,7 @@ FROM dbo.orders AS o
 LEFT JOIN dbo.customers AS c ON c.id = o.customer_id;
 ```
 
-For each column, the tool records whether it can be null, starting from what SQL Server says.  If `orders.id`, `orders.placed_at` and `customers.name` are all `NOT NULL`, `id` and `placed_at` above are never null, and `name` can be null: the `LEFT JOIN` gives a null name to an order with no customer.
+For each column, the tool records whether it can be null, starting from what SQL Server says.  If `orders.id`, `orders.placed_at` and `customers.name` are all `NOT NULL`, then `id` and `placed_at` above are never null.  `name` can be null: the `LEFT JOIN` gives a null name to an order with no customer.
 
 SQL Server treats a column as one that can be null unless it can show that the column never is.  SqlSource keeps that answer unless it can show from your query that the column is never null.  A column that it treats as one that can be null, and that never is, costs a null check in your code.
 
@@ -80,7 +80,7 @@ These answers assume that the connection that runs the query leaves `ANSI_WARNIN
 - **A column of a recursive `WITH` query.**
 - **`COALESCE` over a column of each side of a `FULL JOIN`**, as in `COALESCE(i.id, p.invoice_id)`.
 - **A `CASE` whose `ELSE` is the column that it tests for null**, `CASE WHEN x IS NULL THEN 0 ELSE x END`.  Write `ISNULL(x, 0)`, which is never null.
-- **A column that a filter keeps from being null**, such as a column that can hold null under `WHERE x IS NOT NULL`, or the optional side of a `LEFT JOIN` that the `WHERE` makes inner.
+- **A column that a filter keeps from being null.**  An example is a column that can hold null, under `WHERE x IS NOT NULL`.  Another is the optional side of a `LEFT JOIN` that the `WHERE` makes inner.
 - **A column of a query that is not one `SELECT`.**  Such a query keeps the answer of SQL Server, so a count or a sum in it can be null.  This holds for the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, for a `UNION`, `INTERSECT` or `EXCEPT`, for `FOR XML` or `FOR JSON`, and for several statements in one query.
 - **A conversion to `geometry`, `geography`, `hierarchyid` or another .NET type**, since SQL Server can convert the text `'NULL'` to such a type as null: `CAST(N'NULL' AS geometry)` is null.
 - **`COALESCE`, `GREATEST` or `LEAST` over a value of such a type**, for the same reason: `COALESCE(shape, 'NULL')` is null.
@@ -134,6 +134,6 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 
 **What you see.**  A column whose property cannot be null holds a null when the query runs.  It can be a count, a sum, a cast or a conversion, `COALESCE`, `GREATEST`, `LEAST` or arithmetic that SqlSource treats as never null.
 
-**Why.**  The connection turns `ANSI_WARNINGS` off.  With `ANSI_WARNINGS` and `ARITHABORT` both off, SQL Server returns null where an arithmetic overflow, a value too large for its type or a division by zero would otherwise be an error.
+**Why.**  The connection turns `ANSI_WARNINGS` off.  With `ANSI_WARNINGS` and `ARITHABORT` both off, SQL Server returns null in place of some errors: an arithmetic overflow, a value too large for its type, or a division by zero.
 
 **What to do.**  Leave `ANSI_WARNINGS` on, as Microsoft.Data.SqlClient turns it on when it connects.  Run no `SET ANSI_WARNINGS OFF` on a connection that runs your queries.

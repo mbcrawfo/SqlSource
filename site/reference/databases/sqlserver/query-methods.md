@@ -126,9 +126,9 @@ SQL Server has no arrays, so a query method sends a list of values as a [list pa
   - Under `SET XACT_ABORT ON`, nearly every error rolls it back.
   - With `XACT_ABORT` off, `CAST('x' AS int)` rolls it back.  A `THROW`, a divide by zero or `CAST(300 AS tinyint)` leaves it open.
 - **`rowcount` adds up the rows that the statements insert, update or delete.**  A `SELECT` among them adds nothing.
-- **A loop over streamed rows that ends early throws the error of a row or a statement that it left unread**, at the `break` or in place of the exception of the loop's body.  In a transaction, that error may have rolled the transaction back, as for an error after the rows.  See [streamed rows](../../return-types.md#streaming-rows), which also says how to keep the exception of the body.
+- **A loop over streamed rows that ends early throws the error of a row or a statement that it left unread.**  It throws it at the `break`, or in place of the exception of the loop's body.  In a transaction, that error may have rolled the transaction back, as for an error after the rows.  See [streamed rows](../../return-types.md#streaming-rows), which also says how to keep the exception of the body.
 - **The first exception wins over a later error of the batch.**  A method throws the first exception that it meets, and not an error that the rest of the batch raises after it.  The first exception is one of these:
-  - an exception of the method's own, thrown before it has read the rest of its batch: `UnexpectedRowCountException`, a null in a column whose property cannot be null, the `InvalidCastException` of a `vector` column, or a converter's exception;
+  - an exception of the method's own, thrown before it has read the rest of its batch.  It is `UnexpectedRowCountException`, a null in a column whose property cannot be null, the `InvalidCastException` of a `vector` column, or a converter's exception;
   - an error that SQL Server raises for a row, such as a divide by zero, thrown as its `SqlException`;
   - an error that SQL Server raises for a statement after the rows, such as `CAST(300 AS tinyint)`, thrown as its `SqlException`.
 - **In a transaction that a later error rolled back, the method throws [`TransactionRolledBackException`](../../exceptions.md#transaction-rolled-back) in place of the first exception.**  The rest of the batch still runs after the first exception.  A later error there can roll the transaction back, such as a `CAST('x' AS int)` with `XACT_ABORT` off.  The `InnerException` is the first exception, and not the later error.
@@ -138,7 +138,7 @@ SQL Server has no arrays, so a query method sends a list of values as a [list pa
   - without a transaction;
   - with the transaction still open;
   - for a transaction of a library that wraps Microsoft.Data.SqlClient's and keeps its `Connection` set, as the bullet on a completed transaction says.
-- **The same rules hold for a loop over [streamed rows](../../return-types.md#streaming-rows)**: at a row, after its last row, and for an error of a row or a statement that a `break` or an exception of the body leaves unread.
+- **The same rules hold for a loop over [streamed rows](../../return-types.md#streaming-rows).**  They hold at a row and after its last row.  They also hold for the error of a row or a statement that a `break`, or an exception of the body, leaves unread.
 - **An error that SQL Server raises before the rows begin is thrown as its `SqlException`**, even when the rest of the batch then rolls the transaction back: see [the limit](#limit-hidden-rollback).
 
 <a id="rowcount"></a>
@@ -157,7 +157,7 @@ SQL Server has no arrays, so a query method sends a list of values as a [list pa
   - `SqlException`, with `Number` `0` and a message that ends "Operation cancelled by user.", if the token is cancelled while the command runs, before that.
 - **A `SELECT` usually begins its result before its first row.**  So a cancel while it waits for that row is a `TaskCanceledException`, and a cancel while an `UPDATE` waits on a lock is a `SqlException`.
 - **A `catch (OperationCanceledException)` does not catch the `SqlException`.**  Check the token in a `catch (SqlException)` as well.
-- **A connection that wraps a `SqlConnection` and creates parameters of its own fails**: see [the limit](../../query-methods.md#limit-wrapped-connection).
+- **A method with parameters fails on a connection that wraps a `SqlConnection` and creates parameters of its own**: see [the limit](../../query-methods.md#limit-wrapped-connection).
 
 <a id="collection-methods"></a>
 
@@ -183,7 +183,11 @@ A query's [collection method](../../collection-methods.md#collection-methods) ru
 - **A statement that returns no result set is fine**, such as `SET NOCOUNT ON`, a `DECLARE` or an `UPDATE` without `OUTPUT`.
 - **A second result set, or none for an item, throws `InvalidOperationException`**, and the method's own transaction is rolled back.  This happens to a query of two result sets, and to one whose `SELECT` stands in an `IF` and returns no result set for some items.  The message is "The query 'FindOrder' returned a result set of another shape, or none, for one of the items from 0 to 1, so it cannot run over a collection: a query whose statements return more than one result set, or none for an item, cannot.".  The items it names are those of the round trip up to where the mismatch showed, since the result set too many or missing can be any of theirs.
 - **A second result set with as many columns as the query's rows can fail in another way.**  The method throws the same exception at the end of the round trip.  Or, before that, an item reads the result set as its own and throws `UnexpectedRowCountException` or Microsoft.Data.SqlClient's `InvalidCastException`.  Either way, the method never returns its rows.
-- **Given a transaction, a method that reads rows can throw [`TransactionRolledBackException`](../../exceptions.md#transaction-rolled-back)**, as a query method does [above](#method-results).  It throws it when it threw an exception of its own, or reached an item's error that left the transaction open, and a later error of the round trip then rolled the transaction back.  Its `InnerException` is the method's own exception, such as `UnexpectedRowCountException`, or the [`CollectionItemException`](../../exceptions.md#collection-item-exception) of the item's error.
+- **Given a transaction, a method that reads rows can throw [`TransactionRolledBackException`](../../exceptions.md#transaction-rolled-back)**, as a query method does [above](#method-results).  It throws it when both of these are true:
+  - it threw an exception of its own, or reached an item's error that left the transaction open;
+  - a later error of the round trip then rolled the transaction back.
+
+  Its `InnerException` is the method's own exception, such as `UnexpectedRowCountException`, or the [`CollectionItemException`](../../exceptions.md#collection-item-exception) of the item's error.
 - **An error that rolled the transaction back itself is thrown as its `CollectionItemException`.**
 - **A transaction that has completed is refused** before anything runs, as for a query method: see [transactions](../../collection-methods.md#collection-transactions).
 - **`rowcount` adds 0 for an item under `SET NOCOUNT ON`**, where a query method returns `-1`.
@@ -216,7 +220,7 @@ A query's [collection method](../../collection-methods.md#collection-methods) ru
 - A command of your own, or one that Dapper runs, given the transaction runs outside any transaction, and is committed on its own.
 - `Commit` throws `InvalidOperationException`, "This SqlTransaction has completed; it is no longer usable.".
 
-**Why.**  An error before the first rows, such as a divide by zero in a `DECLARE` or a failed `UPDATE` before the `SELECT`, does not stop the batch: the rest of it still runs.  With `XACT_ABORT` off, the first error alone leaves the transaction open, but a later error of the batch can roll it back, such as a later `CAST('x' AS int)`.  The `SqlException` may not list that later error in its `Errors`.  So the method cannot tell this from an error that rolled the transaction back itself, and it throws the `SqlException` as it is.
+**Why.**  An error before the first rows does not stop the batch, and the rest of it still runs.  Examples are a divide by zero in a `DECLARE`, and a failed `UPDATE` before the `SELECT`.  With `XACT_ABORT` off, the first error alone leaves the transaction open, but a later error of the batch can roll it back, such as a later `CAST('x' AS int)`.  The `SqlException` may not list that later error in its `Errors`.  So the method cannot tell this from an error that rolled the transaction back itself, and it throws the `SqlException` as it is.
 
 **What to do.**  After you catch a `SqlException`, check the transaction, and treat a `Connection` that is null as a rollback:
 

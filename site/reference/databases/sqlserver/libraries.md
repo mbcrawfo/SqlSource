@@ -62,7 +62,7 @@ A project that references NodaTime, and turns it on with the [library types](../
   So `datetime2=NodaTime.LocalDate` reads the date of a `datetime2` and drops its time.
 - **One of these types given to another database type is [SQLSRC279](../../../diagnostics.md#sqlsrc279)**, such as `datetimeoffset=NodaTime.LocalDateTime`.  The error names the type that it can be converted from.
 - **A NodaTime type that none of these is, such as a `ZonedDateTime`, needs [converters](../../converters.md#converters) of your own.**  Without them, Microsoft.Data.SqlClient throws `InvalidCastException` when the query runs.
-- **Your converters replace the query methods' own.**  A [converter](../../converters.md#converters) of your project between a NodaTime type and the C# type it is read as, such as one from `System.DateTime` to `NodaTime.Instant`, is used in its direction in place of SqlSource's conversion, with no error, and SqlSource's is kept for the other direction.
+- **Your converters replace the query methods' own.**  A [converter](../../converters.md#converters) of your project between a NodaTime type and the C# type it is read as is used in its direction, with no error.  An example is a converter from `System.DateTime` to `NodaTime.Instant`.  SqlSource's conversion is kept for the other direction.
 
 What sending a value of NodaTime can change or refuse:
 
@@ -129,7 +129,7 @@ Above, `centre` is a `geography` and `outline` a `geometry`, each `NOT NULL`.
 Every other type keeps the type of [the types](types.md#type-table).
 
 - **Only query methods get NetTopologySuite's types.**  A query whose output is `models` has no C# type for `geography` or `geometry`, with NetTopologySuite on or off, and is [SQLSRC246](../../../diagnostics.md#sqlsrc246).  Give the query the output `repository` or `methods`, or map the type to a type of Microsoft.SqlServer.Types, as [the types](types.md#type-table) say.
-- **A shape is yours to choose**, with the [type override](../../type-mapping.md#setting-type-overrides), a [column type](../../model-properties.md#setting-column-types) or a `-- param:` or `-- column:` marker, whether NetTopologySuite is on or not: `geography=NetTopologySuite.Geometries.Point`, `Polygon` or another of `Geometry`'s subtypes.  A value of another shape throws `InvalidCastException` when it is read.
+- **A shape is yours to choose**, with the [type override](../../type-mapping.md#setting-type-overrides), a [column type](../../model-properties.md#setting-column-types) or a `-- param:` or `-- column:` marker, whether NetTopologySuite is on or not.  An example is `geography=NetTopologySuite.Geometries.Point`, `Polygon` or another of `Geometry`'s subtypes.  A value of another shape throws `InvalidCastException` when it is read.
 - **Your converters do not replace these reads and writes.**  A [converter](../../converters.md#converters) of yours between a NetTopologySuite type and another is not used for a `geography` or a `geometry`.  To read one in another way, map it to `Microsoft.SqlServer.Types.SqlGeography` or `SqlGeometry`, and convert from that.
 - **Without `NetTopologySuite.IO.SqlServerBytes`, NetTopologySuite turned on is [SQLSRC281](../../../diagnostics.md#sqlsrc281).**  A type override to a NetTopologySuite type then leaves the value to Microsoft.Data.SqlClient, which cannot read it, so the query fails when it runs.
 - **On a connection that wraps a `SqlConnection`**, a method reads a spatial column as it does on the `SqlConnection`.  A method with parameters has the [limit](../../query-methods.md#limit-wrapped-connection) of such a connection.
@@ -187,14 +187,18 @@ A `json` column, the type of SQL Server 2025, is a `string`, as [the types](type
 - **System.Text.Json's types are yours to choose**, with the type override, a column type or a marker, with `json` on or off.  They are `JsonElement`, `JsonDocument`, and `JsonNode`, `JsonObject` and `JsonArray` of `System.Text.Json.Nodes`.  You can choose one for a `json` column, or for any column read as a `string`, such as `nvarchar(max)`, with no opt-in.  Each is parsed from the text of the column, and sent as the text of its JSON, as the parameter's own type.
 - **Text that is not JSON throws System.Text.Json's `JsonException` when it is read.**  A string column can hold such text.
 - **A `JsonObject` read from a JSON array, or a `JsonArray` read from an object, throws `InvalidCastException`.**
-- **A `JsonDocument` is yours to dispose.**  Each one that a method returns, in its row's property, holds memory that is returned only when the document is disposed: dispose it, with `using` or once you have read it.  One that you send stays yours.  A `JsonElement` needs no disposal.
+- **A `JsonDocument` is yours to dispose.**  Each one that a method returns, in the property of its row, holds memory until the document is disposed.  Dispose it, with `using` or once you have read it.  One that you send stays yours.  A `JsonElement` needs no disposal.
 - **A class of your own in a `json` column is read and sent through System.Text.Json's serializer**, with `json` on or off.  So is one in a string column that holds JSON by [the JSON opt-in](../../library-types-and-json.md#json-opt-in), such as `metadata` above.  What a class is, the options of the serializer, and the converters that replace it, are in [a class in a JSON column](../../library-types-and-json.md#json-class).
 - **Without the opt-in, a class given to a string column is given to Microsoft.Data.SqlClient as it is**, unless it has converters.  Microsoft.Data.SqlClient then throws `InvalidCastException` when the query runs.
-- **Your converters replace the query methods' own.**  A [converter](../../converters.md#converters) of your project between one of System.Text.Json's types and `string` is used in its direction in place of SqlSource's conversion, with no error, and SqlSource's is kept for the other direction.
-- **A JSON `null` is not a SQL `NULL`.**  A column that holds the JSON `null` is read as a `JsonElement` of the kind `Null`, and as a `JsonDocument` whose root is one, whether its property can be null or not.
+- **Your converters replace the query methods' own.**  A [converter](../../converters.md#converters) of your project between one of System.Text.Json's types and `string` is used in its direction, with no error.  SqlSource's conversion is kept for the other direction.
+- **A JSON `null` is not a SQL `NULL`.**  A column that holds the JSON `null` is read as a `JsonElement` of the kind `Null`, or as a `JsonDocument` whose root is one.  This holds whether its property can be null or not.
 - **A `JsonNode`, a `JsonObject` and a `JsonArray` cannot hold a JSON `null`.**  Into a property that can be null it is null.  Into one that cannot, it throws `InvalidCastException`, "Column 'node' holds a JSON null.", as a class does.
 - **A SQL `NULL` gives its property null**, or throws as any column does.
-- **A `json` column refuses a value that is not an object or an array.**  The `json` of SQL Server 2025 takes no JSON text that is a string, a number, `true`, `false` or `null` alone.  It refuses one with error 13609, "JSON text is not properly formatted", thrown as a `SqlException` when the query runs.  So these cannot be sent to a `json` column: a `JsonElement` of the kind `Null`, one that holds a number, and a class whose JSON is not an object or an array.  An `nvarchar(max)` column takes them.
+- **A `json` column refuses a value that is not an object or an array.**  The `json` of SQL Server 2025 takes no JSON text that is a string, a number, `true`, `false` or `null` alone.  It refuses one with error 13609, "JSON text is not properly formatted", thrown as a `SqlException` when the query runs.  So these cannot be sent to a `json` column:
+  - a `JsonElement` of the kind `Null`, or one that holds a number;
+  - a class whose JSON is not an object or an array.
+
+  An `nvarchar(max)` column takes them.
 - **`json` keeps the structure, not the text.**  It stores JSON in a form of its own:
   - the white space between its tokens is dropped;
   - escapes such as `\u0041` are written as their characters;

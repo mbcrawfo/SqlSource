@@ -182,6 +182,6 @@ A described SQL Server query gets the [models](../../models.md#models) that ever
 
 **What you see.**  A query fails when it is described, because it writes a parameter's name in two ways that SQL Server reads as one.  The query writes `@café` both ways, or declares it one way and uses it the other.
 
-**Why.**  To SqlSource, the two ways are two parameters.  SqlSource compares names ignoring case alone.  SQL Server compares them by its collation, which can also take two spellings for one letter: `é` written as one character and as `e` followed by a combining accent, or the full-width `Ａ` and `A`.
+**Why.**  To SqlSource, the two ways are two parameters.  SqlSource compares names ignoring case alone.  SQL Server compares them by its collation, which can also take two spellings for one letter.  Examples are `é` written as one character and as `e` followed by a combining accent, and the full-width `Ａ` and `A`.
 
 **What to do.**  Write a parameter's name the same way each time.
