@@ -84,10 +84,10 @@ internal static class GlobalConnections
     }
 
     /// <summary>
-    /// The valid globals that the repository can reach, in the order of the marks, each with its
-    /// <see cref="ConnectionCandidate.GlobalTypeText" />: every valid global but a member of a type marked
-    /// <c>[SqlSourceGenerate]</c>, a repository's base type's too, which its derived repositories find first in their
-    /// own candidates.
+    /// Every valid global of the project that the repository can reach, in the order of the marks, each with its
+    /// <see cref="ConnectionCandidate.GlobalTypeText" />, except the statics of types marked
+    /// <c>[SqlSourceGenerate]</c>.  A static of a repository's base type is offered too, and the derived repository
+    /// finds it first among its own members.
     /// </summary>
     /// <param name="marks">The project's marks, from <see cref="GlobalMarkReader" />.</param>
     /// <param name="repository">The repository.</param>
