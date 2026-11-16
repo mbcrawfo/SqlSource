@@ -1,4 +1,4 @@
-# base db3285d4adf7542f6e80e96d7f0b8182cd091a9f
+# base c338a501de2b1557d9a32d4c6650fa3c9ac15845
 # Words, before > after, by check rewrite 13: sql-files.md 2619 > 2664; parameters.md 3405 > 3691, over 3,500, whose clean cut is its three sections on lists, list-parameters, list-padding and list-limit; tokens.md 1450 > 1506; dialects.md 1482 > 1500; the phase 8956 > 9361.
 unit	disposition	to	arg	words	note
 site/sql-files.md:3	move	site/reference/sql-files.md	-	-	The sample now opens the page; the paragraph is split in two, the queries and their markers, then UTF-8 and SQLSRC271
