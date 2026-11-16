@@ -103,7 +103,9 @@ The same holds for an array of a library's type, such as NodaTime's or NetTopolo
 ## What a method reads and throws
 
 - **Give each `methods` method the transaction of a connection that has one.**  Npgsql runs a command in the transaction of its connection even when the method is not given the transaction.  Still pass it, so that the same code runs on every database: see [the connection](../../connection-methods.md#method-connection).
-- **A repository method takes no transaction**: see [transactions and timeouts](../../repositories.md#repository-transactions).  It runs in no transaction of yours, except on a [borrowed connection](../../repositories.md#repository-connection) in which your code began a transaction.  Npgsql runs the method in that transaction.
+- **A repository method takes no transaction**: see [transactions and timeouts](../../repositories.md#repository-transactions).  It runs in no transaction of yours, except in one of these cases:
+  - On a [borrowed connection](../../repositories.md#repository-connection) in which your code began a transaction, Npgsql runs the method in that transaction.
+  - Inside a `TransactionScope`, a connection opened inside the scope takes part in the transaction of the scope, so the method runs in it.
 - **A column is read as the C# type of its property**, which [the types](types.md#type-map) give it.  Npgsql reads some types only once it is taught them, such as an enum mapped to a C# enum, or the type of a plugin.  Such a type needs the teaching on the data source, such as `MapEnum<T>()`.
 - **A type of yours that Npgsql never reads takes [converters](../../converters.md#converters) instead.**  The column is read as the type that [the table](types.md#type-table) gives, a domain as its base type, and then converted.
 - **Every type that [the table](types.md#type-table) gives a C# type is sent and read on Npgsql 8, 9 and 10.**  Each is sent and read as the C# type in the column of that version.  SqlSource is tested on Npgsql 8 and 10.
