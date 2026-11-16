@@ -71,7 +71,7 @@ To turn the default off and list the files yourself:
 - **A build that [runs the tool](online-build.md#running-in-the-build) compiles a sidecar that it has just written for the first time.**  It compiles that sidecar whether you list it or not.
 - **Every later build compiles only the sidecars that you list.**  This is true of a build offline and of a build in CI too.
 
-[Running in the build](online-build.md), where `dotnet build` describes your queries, is a page of its own.
+[Running the tool in the build](online-build.md), where `dotnet build` describes your queries, is a page of its own.
 
 <a id="limits"></a>
 

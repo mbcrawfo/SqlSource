@@ -1,6 +1,6 @@
 # List parameters (IN lists)
 
-This page says how a [query parameter](parameters.md) written after `IN` or `NOT IN` takes a list of values, how the list is padded, and how many values it can hold.
+This page says how a [query parameter](parameters.md) after `IN` or `NOT IN` takes a list of values, and how the list is padded and limited.
 
 <a id="list-parameters"></a>
 

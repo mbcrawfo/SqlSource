@@ -1,4 +1,4 @@
-# Running in the build
+# Running the tool in the build (online build)
 
 This page says how `dotnet build` runs the `sqlsource` tool to describe your queries, when it does not, and which `.env` file that run reads.
 

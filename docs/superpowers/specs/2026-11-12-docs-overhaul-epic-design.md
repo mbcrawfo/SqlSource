@@ -413,20 +413,20 @@ Phase 25, 2026-11-16.  The counts are `wc -w` over each whole page, as the conte
 | `reference/exceptions.md` | 1,950 | 2,150 | 2,150 | - |
 | `reference/generator-parameters.md` | 1,500 | 1,895 | 1,939 | - |
 | `reference/library-types-and-json.md` | 2,500 | 2,870 | 2,870 | - |
-| `reference/list-parameters.md` | - | - | 1,540 | New, from parameters.md |
-| `reference/member-placement.md` | - | - | 2,998 | New, from members.md |
+| `reference/list-parameters.md` | - | - | 1,535 | New, from parameters.md |
+| `reference/member-placement.md` | - | - | 3,000 | New, from members.md |
 | `reference/members.md` | 3,850 | 4,266 | 1,304 | Split |
 | `reference/model-properties.md` | 2,700 | 2,945 | 2,945 | - |
 | `reference/models.md` | 3,350 | 3,659 | 2,493 | Split |
-| `reference/msbuild.md` | 3,200 | 3,507 | 910 | Split |
-| `reference/online-build.md` | - | - | 2,674 | New, from msbuild.md |
-| `reference/parameters.md` | 3,350 | 3,710 | 2,261 | Split |
+| `reference/msbuild.md` | 3,200 | 3,507 | 912 | Split |
+| `reference/online-build.md` | - | - | 2,678 | New, from msbuild.md |
+| `reference/parameters.md` | 3,350 | 3,710 | 2,270 | Split |
 | `reference/query-methods.md` | 3,000 | 3,561 | 2,487 | Split |
 | `reference/repositories.md` | 3,150 | 3,794 | 2,386 | Split |
 | `reference/repository-connections.md` | - | - | 1,445 | New, from repositories.md |
 | `reference/return-types.md` | 1,750 | 1,976 | 1,976 | - |
 | `reference/settings-file.md` | 1,500 | 1,842 | 1,859 | - |
-| `reference/settings.md` | 2,600 | 3,598 | 3,598 | Stays: no clean cut |
+| `reference/settings.md` | 2,600 | 3,598 | 3,598 | Stays: no clean cut, as the outline keeps all four parts on this page |
 | `reference/shared-models.md` | - | - | 1,212 | New, from models.md |
 | `reference/sidecars.md` | 1,750 | 2,037 | 2,037 | - |
 | `reference/sql-files.md` | 2,500 | 2,685 | 2,685 | - |
@@ -467,8 +467,8 @@ No page was merged.
 
 - **`diagnostics.md`**, 49,774: decision 7.  Every help link names the page.
 - **`reference/databases/sqlserver/query-methods.md`**, 4,442: the map's one listed exception.  It has no clean cut, and no sixth file name is added for it.
-- **`reference/type-mapping.md`**, 3,740: no clean cut.  `#property-types` is 520 words and the page's top 12, so a page made of either side of the one possible cut is under 600.  `#setting-type-overrides` is one setting's section of 2,995 words and cannot be divided, and `## Limits` (214) is about type overrides.
-- **`reference/settings.md`**, 3,598: no clean cut.  The outline's "Where rules live" keeps four parts on this page: the places (`#places`, 396), the matrix that `SettingsReferenceTests` reads (`#all-settings`, 729), which place wins (`#precedence`, 901), and the output, database and dialect settings (641, 357 and 420).  Each cut that the size rule allows moves one of them.
+- **`reference/type-mapping.md`**, 3,740: no clean cut.  `#property-types` is 519 words and the page's top 10, so a page made of the part above the one possible cut is under 600.  `#setting-type-overrides` is one setting's section of 2,995 words and cannot be divided, and `## Limits` (216) is about type overrides.
+- **`reference/settings.md`**, 3,598: no clean cut: the outline keeps all four parts on this page (owner, phase 25 Q1).  "Where rules live" names them: the places (`#places`, 396), the matrix that `SettingsReferenceTests` reads (`#all-settings`, 729), which place wins (`#precedence`, 901), and the output, database and dialect settings (641, 357 and 422).  A cut of `#precedence` alone would meet the size rule, but it would move one of the four.
 - **`reference/databases/other.md`**, 300, and **`start/testing.md`**, 546: allowed by the map.
 - **`reference/databases/index.md`**, 474: a page of the databases folder, which no merge touches.  It is the one home of the supported versions, which `SupportedVersionsTests` reads, and the door of the group.
 - **`start/how-it-works.md`** (484), **`start/install.md`** (568) and **`start/call-queries.md`** (586): pages of Get started, which are never merged.  The path is the nine pages of the outline.
@@ -479,7 +479,7 @@ The rewrites reported 36 `no owner:` notes: 1 of phase 13, 1 of phase 15, 2 of p
 
 Placed:
 
-- phase 13, `parameters.md#param-marker`: "a column type never reaches a query parameter" moved to `type-mapping.md#property-types`.  The rest of the bullet stays on `parameters.md`.
+- phase 13, `parameters.md#param-marker`: "a column type never reaches a query parameter" moved to `type-mapping.md#property-types`.  The rest of the bullet stays on `parameters.md`, under a new bold first sentence that links the owner.
 - phase 16, `members.md#generator`, both notes: the sentence on SQLSRC003 and SQLSRC012 moved to `msbuild.md#build-requirements`.  `members.md` keeps the sentence that links it.
 - phase 17, `collection-methods.md#collection-transactions`: the two bullets of each database's levels moved to `generator-parameters.md#gp-transaction`, and a bullet that links them stands in their place.
 - phase 21, SQLSRC003: the several-frameworks sentence copied to `msbuild.md#build-requirements`.
@@ -496,6 +496,8 @@ Held by now, so nothing moved:
 
 The owner named is not the one that holds the fact, and the holder has it:
 
+- SQLSRC017, and the first half of SQLSRC018: `settings.md#a-value-that-is-wrong`.
+- SQLSRC020: the cases of each key, in `type-mapping.md#setting-type-overrides`, `model-properties.md#setting-column-types` and `library-types-and-json.md#setting-library-types`.
 - SQLSRC102: `dialects.md#still-read-differently`.
 - SQLSRC119: `parameters.md#declared-variables`.
 
@@ -505,5 +507,5 @@ Do not fit word for word, so they stay where they stand:
 - phase 17, `collection-methods.md#collection-transactions`: what `on`, a level and `off` do.  These are cells of the table of `transaction`, and a cell cannot move.
 - phase 17, `query-methods.md#reading-rows`: the message "Data is Null.".  It is a sub-bullet, and in the owner it would repeat the bullet above it.
 - phase 21, where each sentence leans on its section ("this error", "the same error", a list's lead):
-  - SQLSRC009, 013, 015, 017, 020, 021, 023, 026, 027, 031, 032, 034, 035, 037, 038, 112, 113, 117;
-  - the first half of SQLSRC018 and of SQLSRC022.
+  - SQLSRC009, 013, 015, 021, 023, 026, 027, 031, 032, 034, 035, 037, 038, 112, 113, 117;
+  - the first half of SQLSRC022.

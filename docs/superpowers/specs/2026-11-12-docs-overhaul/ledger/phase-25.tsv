@@ -1,5 +1,5 @@
 # base 4cc1c24a45510dff5f043782a5246fb471e2f54a
-# Word counts (old > new): members.md 4266 > 1317, member-placement.md new 2998; repositories.md 3794 > 2386, repository-connections.md new 1445; parameters.md 3710 > 2217, list-parameters.md new 1540; models.md 3659 > 2493, shared-models.md new 1212; query-methods.md 3561 > 2487, synchronous-methods.md new 1103; msbuild.md 3507 > 879, online-build.md new 2674
+# Word counts (old > new), after the splits and the facts placed: members.md 4266 > 1304, member-placement.md new 3000; repositories.md 3794 > 2386, repository-connections.md new 1445; parameters.md 3710 > 2270, list-parameters.md new 1535; models.md 3659 > 2493, shared-models.md new 1212; query-methods.md 3561 > 2487, synchronous-methods.md new 1103; msbuild.md 3507 > 912, online-build.md new 2678
 unit	disposition	to	arg	words	note
 @site/reference/members.md:52-187	move	site/reference/member-placement.md#locations	-	-	split: the section moves whole to its new page
 @site/reference/members.md:189-255	move	site/reference/member-placement.md#setting-visibility	-	-	split: the section moves whole to its new page
@@ -39,7 +39,8 @@ unit	disposition	to	arg	words	note
 @site/reference/collection-methods.md:97	move	site/reference/generator-parameters.md#gp-transaction	-	-	no owner placed: phase-17.tsv:39; SQL Server's snapshot needs the database to allow it
 -	new	site/reference/collection-methods.md#collection-transactions	-	-	the sentence that links the owner, where the fact stood: the bullet that sends the reader to the rules of each database for a level under transaction, which the table's 'see below' reaches
 -	new	site/reference/msbuild.md#build-requirements	-	-	no owner placed: copy of the sentence of site/diagnostics.md#sqlsrc003; a project that targets several frameworks puts the attributed types under a condition that excludes the older frameworks (phase-21.tsv:7), as a paragraph
--	new	site/reference/settings-file.md#settings-files	-	-	no owner placed: copy of the sentence of site/diagnostics.md#sqlsrc018; an array with elements, none of them a string, sets nothing, nor does [] (phase-21.tsv:18)
+-	new	site/reference/settings-file.md#file-contents	-	-	no owner placed: copy of the sentence of site/diagnostics.md#sqlsrc018; an array with elements, none of them a string, sets nothing, nor does [] (phase-21.tsv:18)
 -	new	site/reference/generator-parameters.md#setting-generator-parameters	-	-	no owner placed: copy of the sentence of site/diagnostics.md#sqlsrc109; a dialect is not a generator parameter and has a marker of its own (phase-21.tsv:49)
 -	new	site/reference/parameters.md#query-parameters	-	-	no owner placed: copy of the sentence of site/diagnostics.md#sqlsrc121; the collation of the database does not change how the variables are read, except in a contained database (phase-21.tsv:61)
 -	new	site/reference/parameters.md#query-parameters	-	-	no owner placed: copy of the sentence of site/diagnostics.md#sqlsrc121; a parameter that only a token's default writes and a -- param: marker declares is bound as the marker spells it (phase-21.tsv:61)
+-	new	site/reference/parameters.md#param-marker	-	-	The bold lead that links the owner of the sentence that moved to type-mapping.md#property-types, before the sentence that stays (content review)

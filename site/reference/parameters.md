@@ -28,7 +28,7 @@ SqlSource lists each query parameter of a query once, in the order in which it f
 - **A query parameter stays in the SQL exactly as written.**  The constant for `GetUser`, and the SQL that its method sends, hold `@id`.  A [list](list-parameters.md#list-parameters), `IN @ids`, is the one exception, and only in the SQL that a query method sends: that SQL holds a parameter for each value.
 - **Names are compared ignoring case.**  `@Id` and `@id` are one query parameter.
 - **Under `mssql`, a second spelling of one name is a warning, [SQLSRC121](../diagnostics.md#sqlsrc121).**  A SQL Server whose server collation is case-sensitive reads the second spelling as another variable.
-- The collation of the database does not change how the variables of the query are read, except in a contained database.  In a contained database, the variables ignore case, whatever the collation of the server.
+- **The collation of the database does not change how the variables of the query are read, except in a contained database.**  In a contained database, the variables ignore case, whatever the collation of the server.
 - **The query parameter keeps the spelling that the SQL first writes outside a token's default.**  So a spelling in a default or in a `-- param:` marker does not choose it.
 - **A parameter that only a token's default writes, and that a `-- param:` marker declares, is bound as the marker spells it.**
 - **Only `@` starts a query parameter.**  `:name`, `$1` and `?` are not found, and stay in the SQL as written.
@@ -70,7 +70,7 @@ A `-- param:` marker inside a query declares one query parameter.  Its form is `
 - **The C# type is written as a type override's is**: a keyword, a full name or a short name.  It is never `default`, which is [SQLSRC111](../diagnostics.md#sqlsrc111).
 - **With `->`, the other parts stay optional.**  `-- param: @team -> TeamId` gives no type, so the database infers the type from the query, as for a query parameter without a marker.  The marker says nothing of null, so the query parameter is not null.
 - **The marker's C# type wins.**  A query parameter's C# type is its marker's, then the type override's, then, in a query method, a library's of the [library types](library-types-and-json.md#setting-library-types), then the type map's: see [property types](type-mapping.md#property-types).
-- A query parameter is no column of a table, so it names its type in this marker.
+- **A column type never reaches a query parameter: see [property types](type-mapping.md#property-types).**  A query parameter is no column of a table, so it names its type in this marker.
 - **`-> json Type` says that a query parameter of a string type holds JSON**, such as one of `text` or `nvarchar(max)`.  `-- param: @metadata -> json OrderMetadata` sends the `OrderMetadata` of the property as the JSON that System.Text.Json's serializer writes.  See [the JSON opt-in](library-types-and-json.md#json-opt-in).
 - **The word `json` is matched ignoring case.**
 - **A query parameter of `json` or `jsonb` needs no word**, as [a class in a JSON column](library-types-and-json.md#json-class) says.
