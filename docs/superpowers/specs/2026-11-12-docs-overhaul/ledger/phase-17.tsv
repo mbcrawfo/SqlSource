@@ -1,4 +1,4 @@
-# base 7fcae1cdfef63ca03e04e1d865f060db16320040
+# base 6c754f0b6f484ece5442bd921dfa4d258ddc1163
 # Word counts (old > new): connection-methods.md 1271 > 1559; exceptions.md 1777 > 2134; collection-methods.md 1710 > 2223; query-methods.md 2909 > 3546; repositories.md 3194 > 3777; start/transactions.md 790 > 793 (one sentence, owner-granted, p17 Q1); databases/sqlserver/query-methods.md 4395 > 4411 (one lead-in, owner-granted, p17 Q5)
 unit	disposition	to	arg	words	note
 site/generator.md:774	move	site/reference/connection-methods.md#methods-that-take-a-connection	-	-	In plain language; reframing: the output methods is for your own code structures, above all a transaction or a timeout that your code controls (`methods` 1 to 2: the sentence of the reframing names it).  Numerals 1 to 4 are new: the steps of the method as a numbered list, in the old order
