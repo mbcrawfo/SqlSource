@@ -93,17 +93,29 @@ internal static class SqlTemplatingSpans
     /// </summary>
     public static EquatableArray<SqlTemplatingSpan> Order(List<SqlTemplatingSpan> spans)
     {
-        var tokens = spans.Where(static span => span.Kind == SqlTemplatingSpanKind.Token).ToList();
-        return new EquatableArray<SqlTemplatingSpan>(
-            spans
-                .Where(span =>
-                    span.Kind != SqlTemplatingSpanKind.MarkerComment
-                    || !tokens.Exists(token => token.Span.Contains(span.Span))
-                )
-                .OrderBy(static span => span.Span.Start)
-                .ThenBy(static span => span.Span.Length > 0)
-                .ThenBy(static span => span.Kind)
-                .ToImmutableArray()
-        );
+        var ordered = spans
+            .OrderBy(static span => span.Span.Start)
+            .ThenBy(static span => span.Span.Length > 0)
+            .ThenBy(static span => span.Kind);
+        var kept = ImmutableArray.CreateBuilder<SqlTemplatingSpan>(spans.Count);
+
+        // Every token that starts at or before a marker comment comes before it, so the comment lies in one of
+        // them exactly when it ends no later than the furthest end of the tokens seen.
+        var tokensEnd = -1;
+        foreach (var span in ordered)
+        {
+            if (span.Kind == SqlTemplatingSpanKind.Token)
+            {
+                tokensEnd = Math.Max(tokensEnd, span.Span.End);
+            }
+            else if (span.Kind == SqlTemplatingSpanKind.MarkerComment && span.Span.End <= tokensEnd)
+            {
+                continue;
+            }
+
+            kept.Add(span);
+        }
+
+        return new EquatableArray<SqlTemplatingSpan>(kept.ToImmutable());
     }
 }
