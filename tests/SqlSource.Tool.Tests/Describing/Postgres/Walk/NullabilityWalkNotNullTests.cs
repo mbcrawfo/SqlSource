@@ -9,8 +9,9 @@ using static SqlSource.Tool.Tests.PostgresWalkColumns;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
-// NullabilityWalk over a NOT NULL that the catalog does not hold to: one that is not validated, and the columns of a
-// table with children, a foreign partition or an INSTEAD rule.
+// NullabilityWalk over a NOT NULL that the catalog does not hold to: one that is not validated, and the column of a
+// table with an INSTEAD rule, whose plan maps another relation.  The rules of a table with children and of a foreign
+// partition are ColumnNullability's, in ColumnNullabilityTests.
 public sealed class NullabilityWalkNotNullTests
 {
     // The rule of a NOT NULL is written once, in ColumnNullability: one that is NOT VALID is nullable here too.
