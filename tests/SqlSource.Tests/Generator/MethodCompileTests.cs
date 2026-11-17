@@ -716,6 +716,65 @@ public sealed class MethodCompileTests
         run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("= source.Postgres() ?? throw ");
     }
 
+    // A holder of a type parameter that may be a class or a struct, which ?? can test, and a property holder, each
+    // checked for null first, in a class and copied before a struct's iterator.
+    [Fact]
+    public void Run_TypeParameterAndPropertyHolders_Compile()
+    {
+        var source =
+            SourcesUsings
+            + """
+                    public interface IFactory
+                    {
+                        [SqlSourceConnection(Database = "postgres")]
+                        NpgsqlConnection Postgres();
+
+                        [SqlSourceConnection(Database = "mssql")]
+                        ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken);
+                    }
+
+                    public class Factory : IFactory
+                    {
+                        public NpgsqlConnection Postgres() => new();
+
+                        public ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken) =>
+                            new(new SqlConnection());
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Generic<T>(T dbf)
+                        where T : IFactory;
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct GenericStruct<T>(T dbf)
+                        where T : IFactory;
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Properties
+                    {
+                        private Factory? Holder { get; } = new();
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct PropertiesInAStruct
+                    {
+                        public PropertiesInAStruct() { }
+
+                        private Factory Holder { get; } = new();
+                    }
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Generic-1-Methods.g.cs"].ShouldContain("= (dbf ?? throw ");
+        run.Sources["App.GenericStruct-1-Methods.g.cs"].ShouldContain("var source = dbf ?? throw ");
+        run.Sources["App.Properties-Methods.g.cs"].ShouldContain("= (this.Holder ?? throw ");
+        run.Sources["App.PropertiesInAStruct-Methods.g.cs"].ShouldContain("var source = this.Holder ?? throw ");
+    }
+
     // A static of the project of each kind of connection source, for each engine, reached through its type in full.
     [Theory]
     [InlineData("connection string")]

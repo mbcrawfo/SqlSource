@@ -99,3 +99,13 @@ The attribute is `SqlSource.SqlSourceConnectionAttribute`.  SqlSource generates 
 **Why.**  The build skips a member of a base type when the repository, or a base type between them, has a member of the same name.  It skips it even when that member is a method with other parameters, or one that the repository cannot reach, such as a `private` member of a base type between them.  So a method `Open(int retries)` of the repository hides a marked `Open()` of its base type.
 
 **What to do.**  Give the member of the repository, or of the base type between them, another name.
+
+<a id="limit-static-member-of-the-repositorys-name"></a>
+
+### A static member of a base type with the repository's name
+
+**What you see.**  The build fails in the repository's generated methods with CS1061, such as "'string' does not contain a definition for 'Sample'".
+
+**Why.**  The methods reach a `static` connection source, or a `static` member that holds your factory, through the repository's name: `Sample.Sample` for a member `Sample` of the base type of `Sample`.  Inside the repository, `Sample` names the member it inherits, not the type.
+
+**What to do.**  Give the member of the base type another name.

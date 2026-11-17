@@ -211,6 +211,89 @@ public sealed class SharedConnectionMethodTests
             ]);
     }
 
+    // A static holder of a base type may have the repository's name, through which the method reaches it: the token
+    // hides the type, not a parameter.
+    [Fact]
+    public void Run_TokenNamedLikeAStaticHolderOfTheTypesName_ReportsSqlsrc275ForTheType()
+    {
+        const string Source =
+            Factory
+            + """
+                    public abstract class RepositoryBase
+                    {
+                        protected static IDatabaseFactory? Sample { get; set; }
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Sample : RepositoryBase;
+                }
+                """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetFrom\n-- token: {{Sample:users}}\nSELECT id FROM {{Sample}};\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], Source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,17): The token 'Sample' of the query 'GetFrom' has the name "
+                    + "of the type 'Sample', through which the repository methods of 'App.Sample' reach their "
+                    + "connection 'Sample.Open'.  Rename the token.",
+            ]);
+    }
+
+    // Under method-type=both, each method of a held pair calls its own member through the holder: the asynchronous
+    // method awaits the asynchronous one with its token, and the synchronous method calls the synchronous one.
+    [Fact]
+    public void Run_MethodTypeBothThroughAHeldPair_GivesEachMethodItsOwnMember()
+    {
+        const string Source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    Task<NpgsqlConnection> OpenAsync(CancellationToken ct);
+
+                    [SqlSourceConnection]
+                    NpgsqlConnection Open();
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample(IDatabaseFactory dbf);
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- generator: method-type=both\n-- name: GetUser -> one-optional\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetUser", [Parameter("id")], [Column("id")])], Source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodsFile];
+        var synchronous = methods.IndexOf(" GetUser(\n", StringComparison.Ordinal);
+        var asynchronous = methods.IndexOf(" GetUserAsync(\n", StringComparison.Ordinal);
+        synchronous.ShouldBeGreaterThan(0);
+        asynchronous.ShouldBeGreaterThan(synchronous);
+        var synchronousBody = methods[synchronous..asynchronous];
+        var asynchronousBody = methods[asynchronous..];
+        synchronousBody.ShouldContain("var connection = (dbf ?? " + HolderIsNull + ").Open() ?? throw ");
+        synchronousBody.ShouldNotContain("OpenAsync");
+        asynchronousBody.ShouldContain(
+            "var connection = await (dbf ?? "
+                + HolderIsNull
+                + ").OpenAsync(cancellationToken).ConfigureAwait(false) ?? throw "
+        );
+        asynchronousBody.ShouldNotContain(").Open()");
+    }
+
     // A method of the holder's name would hide it, as it would hide a parameter that gives the connection.
     [Fact]
     public void Run_RepositoryMethodNamedLikeTheHolder_ReportsSqlsrc274()

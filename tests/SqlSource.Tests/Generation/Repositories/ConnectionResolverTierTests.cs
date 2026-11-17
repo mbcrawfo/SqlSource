@@ -139,6 +139,7 @@ public sealed class ConnectionResolverTierTests
         resolved.HolderAccessText.ShouldBe("this.@event");
         resolved.HolderName.ShouldBe("event");
         resolved.MemberName.ShouldBe("event.default");
+        resolved.HolderMember.ShouldBe(CandidateMember.Field);
     }
 
     // A static holder of a generic repository is reached with its type parameters, which no local's name has.

@@ -986,8 +986,7 @@ internal static class MethodPlanner
 
     // What a token of the name would hide of the source, as SQLSRC275 says it: the primary-constructor parameter that
     // gives the connection or holds the factory that does, or the type a static member, or a static holder, is reached
-    // through.  Null when it hides nothing.  A member never has its type's name, so a leading name that is the holder's
-    // is a parameter's.
+    // through.  Null when it hides nothing.
     private static string? HiddenSourceReason(ConnectionSource? source, string name)
     {
         if (source?.LeadingName is not { } leadingName || !string.Equals(leadingName, name, StringComparison.Ordinal))
@@ -1004,9 +1003,8 @@ internal static class MethodPlanner
                 + "' their connection";
         }
 
-        var through = string.Equals(source.HolderName, leadingName, StringComparison.Ordinal)
-            ? "the primary-constructor parameter '"
-            : "the type '";
+        var through =
+            source.HolderMember == CandidateMember.Parameter ? "the primary-constructor parameter '" : "the type '";
         return through
             + leadingName
             + "', through which the repository methods of '"

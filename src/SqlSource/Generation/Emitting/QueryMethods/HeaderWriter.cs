@@ -236,9 +236,9 @@ internal static class HeaderWriter
                 .Append(locals.SourceLocal)
                 .Append(" = ")
                 .Append(locals.SourceValue);
-            if (context.Method.Source is { HolderName: { } holderName, HolderCanBeNull: true } source)
+            if (locals.SourceHolderName.Length > 0 && context.Method.Source is { } source)
             {
-                CommandWriter.AppendThrowIfNull(builder, holderName, source.TypeName);
+                CommandWriter.AppendThrowIfNull(builder, locals.SourceHolderName, source.TypeName);
             }
 
             _ = builder.Append(";\n");

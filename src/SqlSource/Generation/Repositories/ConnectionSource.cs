@@ -40,6 +40,10 @@ namespace SqlSource.Generation.Repositories;
 /// Whether the holder of a held candidate can be null, so that a method checks it before it reads the member; false
 /// for a struct's, and for a candidate that is not held.
 /// </param>
+/// <param name="HolderMember">
+/// What kind of member the holder of a held candidate is, which says what a token of its leading name would hide;
+/// else null.
+/// </param>
 internal sealed record ConnectionSource(
     ConnectionSourceKind Kind,
     CandidateMember Member,
@@ -52,5 +56,6 @@ internal sealed record ConnectionSource(
     bool InStruct,
     string? HolderAccessText = null,
     string? HolderName = null,
-    bool HolderCanBeNull = false
+    bool HolderCanBeNull = false,
+    CandidateMember? HolderMember = null
 );

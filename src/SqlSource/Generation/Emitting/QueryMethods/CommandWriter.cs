@@ -193,26 +193,25 @@ internal static class CommandWriter
         var builder = context.Builder;
         var locals = context.Locals;
         var spelling = context.Spelling;
-        var access = locals.SourceAccess;
         _ = builder.Append(indent).Append("var ").Append(locals.Connection).Append(" = ");
         switch (source.Kind)
         {
             case ConnectionSourceKind.ConnectionString:
                 _ = builder.Append("new ").Append(context.Method.Engine.ConnectionTypeText()).Append('(');
-                AppendSourceOrThrow(builder, spelling, source, access, locals.SourceHolder);
+                AppendSourceOrThrow(builder, spelling, source, locals);
                 _ = builder.Append(')');
                 break;
             case ConnectionSourceKind.DataSource:
                 // The data source, or its throw, is the call's target, in parentheses.
                 _ = spelling.AppendAwait(builder).Append('(');
-                AppendSourceOrThrow(builder, spelling, source, access, locals.SourceHolder);
+                AppendSourceOrThrow(builder, spelling, source, locals);
                 _ = spelling.AppendCallMember(builder.Append(')'), DriverCall.OpenConnection);
                 _ = spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
                 _ = spelling.AppendCallEnd(builder);
                 break;
             case ConnectionSourceKind.Factory:
             case ConnectionSourceKind.Borrowed:
-                AppendSourceOrThrow(builder, spelling, source, access, locals.SourceHolder);
+                AppendSourceOrThrow(builder, spelling, source, locals);
                 break;
             default:
                 throw UnexpectedEnumValueException.Of(source.Kind);
@@ -227,16 +226,17 @@ internal static class CommandWriter
 
     // The source's value, or the exception that says it is null: its member, as the method reaches it, read, or called
     // with the token when it takes one, the method's or default, and awaited when it is an asynchronous factory.  The
-    // holder that the access starts with, when one is given, is checked first, in parentheses, and the member is read
-    // from what the check gives.
+    // holder that the access starts with, when the locals give one to check, is checked first, in parentheses, and the
+    // member is read from what the check gives.
     private static void AppendSourceOrThrow(
         StringBuilder builder,
         CallSpelling spelling,
         ConnectionSource source,
-        string access,
-        string holder
+        QueryMethodLocals locals
     )
     {
+        var access = locals.SourceAccess;
+        var holder = locals.SourceHolder;
         var isAwaited = source is { Kind: ConnectionSourceKind.Factory, IsAsync: true };
         if (isAwaited)
         {
@@ -246,7 +246,7 @@ internal static class CommandWriter
         if (holder.Length > 0)
         {
             _ = builder.Append('(').Append(holder);
-            AppendThrowIfNull(builder, source.HolderName ?? holder, source.TypeName);
+            AppendThrowIfNull(builder, locals.SourceHolderName, source.TypeName);
             _ = builder.Append(')').Append(access, holder.Length, access.Length - holder.Length);
         }
         else

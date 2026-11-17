@@ -209,6 +209,7 @@ internal static partial class ConnectionResolver
                 HolderAccessText = holderAccess,
                 HolderName = holder.Name,
                 HolderCanBeNull = holder.CanBeNull,
+                HolderMember = holder.Member,
             };
         }
 

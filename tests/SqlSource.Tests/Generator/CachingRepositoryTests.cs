@@ -310,14 +310,8 @@ public sealed class CachingRepositoryTests
         var edited = Base.Replace("= \"\";", "= \"name\";", System.StringComparison.Ordinal);
         var result = Run(driver, WithTree(compilation, BasePath, edited));
 
-        AllReasons(result, TrackingNames.GlobalConnectionMarks)
-            .ShouldAllBe(reason =>
-                reason == IncrementalStepRunReason.Unchanged || reason == IncrementalStepRunReason.Cached
-            );
-        AllReasons(result, TrackingNames.GlobalConnectionChecks)
-            .ShouldAllBe(reason =>
-                reason == IncrementalStepRunReason.Unchanged || reason == IncrementalStepRunReason.Cached
-            );
+        AllReasons(result, TrackingNames.GlobalConnectionMarks).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.GlobalConnectionChecks).ShouldAllBe(IncrementalStepRunReason.Unchanged);
         AllReasons(result, TrackingNames.RepositoryShapes).ShouldBe([IncrementalStepRunReason.Unchanged]);
     }
 
