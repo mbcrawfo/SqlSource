@@ -25,6 +25,7 @@ only-include = ["sqlfluff_templater_sqlsource", "README.md", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 
 [tool.ruff]
 target-version = "py310"

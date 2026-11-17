@@ -1,2 +1,2 @@
 * text=auto eol=lf
-tests/corpus/**/*.json eol=lf
+tests/corpus/**/*.json text eol=lf
