@@ -1,0 +1,22 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"mssql\" }"
+  ],
+  "input": "@a$b c",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["Parameter", 0, 4],
+      ["Text", 4, 6]
+    ],
+    "spans": [
+      { "kind": "parameter", "start": 0, "end": 4, "name": "a$b", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

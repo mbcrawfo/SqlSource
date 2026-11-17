@@ -1,0 +1,25 @@
+{
+  "fileName": "Orders.sql",
+  "settings": [
+    "{\n  // A test copies the project to the temporary directory, and \"root\" ends the chain at the copy, so that no\n  // settings file above the copy applies.\n  \"root\": true,\n  \"dialect\": \"mssql\",\n  \"database\": \"fixtures\",\n  // The type of the queries is static, which only methods can extend.\n  \"output\": \"methods\",\n}\n"
+  ],
+  "input": "-- name: GetOrders\nSELECT id, total, note FROM dbo.orders WHERE user_id = @userId;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 18],
+      ["Text", 18, 74],
+      ["Parameter", 74, 81],
+      ["Text", 81, 83]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 18, "name": null, "default": null },
+      { "kind": "parameter", "start": 74, "end": 81, "name": "userId", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

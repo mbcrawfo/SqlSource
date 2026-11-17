@@ -1,0 +1,25 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: WalkCteInlined\nWITH s AS (SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id)\nSELECT s.id, s.total FROM s WHERE s.id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 23],
+      ["Text", 23, 150],
+      ["Parameter", 150, 153],
+      ["Text", 153, 155]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 23, "name": null, "default": null },
+      { "kind": "parameter", "start": 150, "end": 153, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

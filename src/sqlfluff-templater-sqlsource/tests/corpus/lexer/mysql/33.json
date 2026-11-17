@@ -1,0 +1,20 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"mysql\" }"
+  ],
+  "input": "/*! h */ x",
+  "expected": {
+    "startDialect": "mysql",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": [],
+    "lexemes": [
+      ["Hint", 0, 8],
+      ["Text", 8, 10]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

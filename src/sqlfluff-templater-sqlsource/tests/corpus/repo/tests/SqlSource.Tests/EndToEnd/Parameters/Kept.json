@@ -1,0 +1,33 @@
+{
+  "fileName": "Kept.sql",
+  "settings": [
+    "{\n  // The members of this folder's queries go on the type.\n  \"memberLocation\": \"Class\",\n}\n",
+    "{\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The header of this file gives every generator parameter its default over the project's, then turns\n-- token-validation off and keep-comments on.\n-- generator: default token-validation=off keep-comments\n\n-- name: Kept\nSELECT 1 /* kept by the header */ AS one;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 101],
+      ["Text", 101, 102],
+      ["LineComment", 102, 147],
+      ["Text", 147, 148],
+      ["LineComment", 148, 204],
+      ["Text", 204, 206],
+      ["LineComment", 206, 219],
+      ["Text", 219, 229],
+      ["BlockComment", 229, 253],
+      ["Text", 253, 262]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 148, "end": 204, "name": null, "default": null },
+      { "kind": "markerComment", "start": 206, "end": 219, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

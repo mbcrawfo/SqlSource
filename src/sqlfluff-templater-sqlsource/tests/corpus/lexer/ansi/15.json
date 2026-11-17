@@ -1,0 +1,22 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"ansi\" }"
+  ],
+  "input": "b'a\\'b' -- c'",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["Text", 0, 1],
+      ["Quoted", 1, 5],
+      ["Text", 5, 6],
+      ["Quoted", 6, 13]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

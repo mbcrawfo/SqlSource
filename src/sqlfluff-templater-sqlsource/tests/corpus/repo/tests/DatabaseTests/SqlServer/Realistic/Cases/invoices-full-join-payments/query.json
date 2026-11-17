@@ -1,0 +1,42 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListBillingActivity\n-- param: @from date\n-- param: @to date\nWITH issued AS (\n    SELECT i.id, i.number, i.issued_at, i.amount\n    FROM billing.invoices AS i\n    WHERE i.issued_at >= @from\n        AND i.issued_at < @to\n        AND i.voided_at IS NULL\n),\nreceived AS (\n    SELECT p.id, p.invoice_id, p.paid_at, p.amount, p.method\n    FROM billing.payments AS p\n    WHERE p.paid_at >= @from\n        AND p.paid_at < @to\n)\nSELECT\n    COALESCE(iss.id, rec.invoice_id) AS invoice_id,\n    iss.number AS invoice_number,\n    iss.issued_at,\n    iss.amount AS invoiced,\n    rec.id AS payment_id,\n    rec.paid_at,\n    rec.amount AS paid,\n    rec.method\nFROM issued AS iss\nFULL JOIN received AS rec ON rec.invoice_id = iss.id\nORDER BY COALESCE(iss.issued_at, CAST(rec.paid_at AS date)), invoice_id, rec.paid_at;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 28],
+      ["Text", 28, 29],
+      ["LineComment", 29, 49],
+      ["Text", 49, 50],
+      ["LineComment", 50, 68],
+      ["Text", 68, 191],
+      ["Parameter", 191, 196],
+      ["Text", 196, 223],
+      ["Parameter", 223, 226],
+      ["Text", 226, 391],
+      ["Parameter", 391, 396],
+      ["Text", 396, 421],
+      ["Parameter", 421, 424],
+      ["Text", 424, 807]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 28, "name": null, "default": null },
+      { "kind": "markerComment", "start": 29, "end": 49, "name": null, "default": null },
+      { "kind": "markerComment", "start": 50, "end": 68, "name": null, "default": null },
+      { "kind": "parameter", "start": 191, "end": 196, "name": "from", "default": null },
+      { "kind": "parameter", "start": 223, "end": 226, "name": "to", "default": null },
+      { "kind": "parameter", "start": 391, "end": 396, "name": "from", "default": null },
+      { "kind": "parameter", "start": 421, "end": 424, "name": "to", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

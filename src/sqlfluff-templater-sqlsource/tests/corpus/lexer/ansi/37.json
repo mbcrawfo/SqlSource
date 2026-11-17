@@ -1,0 +1,20 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"ansi\" }"
+  ],
+  "input": "--+ h\nx",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 5],
+      ["Text", 5, 7]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

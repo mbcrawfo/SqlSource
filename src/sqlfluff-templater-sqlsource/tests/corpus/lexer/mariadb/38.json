@@ -1,0 +1,19 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"mariadb\" }"
+  ],
+  "input": "--+ h\nx",
+  "expected": {
+    "startDialect": "mariadb",
+    "startOptions": [],
+    "dialect": "mariadb",
+    "options": [],
+    "lexemes": [
+      ["Text", 0, 7]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

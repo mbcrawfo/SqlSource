@@ -1,0 +1,29 @@
+{
+  "fileName": "PostgresDollarQuoteBeforeToken.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: Dollar\nSELECT $$ -- x $$ AS a, $tag$ {{no}} $tag$ AS b, {{col:name}} FROM users;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 36],
+      ["Text", 36, 44],
+      ["Quoted", 44, 54],
+      ["Text", 54, 61],
+      ["Quoted", 61, 79],
+      ["Text", 79, 111]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 36, "name": null, "default": null },
+      { "kind": "token", "start": 67, "end": 73, "name": "no", "default": null },
+      { "kind": "token", "start": 86, "end": 98, "name": "col", "default": "name" }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

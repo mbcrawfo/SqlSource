@@ -1,0 +1,29 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: PurgeUsers\n-- param: @tenant int\nDELETE FROM users WHERE status = @status {{filter:AND deleted_at IS NOT NULL}};\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 19],
+      ["Text", 19, 20],
+      ["LineComment", 20, 41],
+      ["Text", 41, 75],
+      ["Parameter", 75, 82],
+      ["Text", 82, 122]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 19, "name": null, "default": null },
+      { "kind": "markerComment", "start": 20, "end": 41, "name": null, "default": null },
+      { "kind": "parameter", "start": 75, "end": 82, "name": "status", "default": null },
+      { "kind": "token", "start": 83, "end": 120, "name": "filter", "default": "AND deleted_at IS NOT NULL" }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

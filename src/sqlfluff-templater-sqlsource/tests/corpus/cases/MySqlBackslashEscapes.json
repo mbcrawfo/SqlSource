@@ -1,0 +1,30 @@
+{
+  "fileName": "MySqlBackslashEscapes.sql",
+  "settings": [],
+  "input": "-- dialect: mysql\n-- name: Escaped\nSELECT 'it\\'s {{no}}', \"a\\\" -- {{no}}\", {{col:name}} FROM users;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 17],
+      ["Text", 17, 18],
+      ["LineComment", 18, 34],
+      ["Text", 34, 42],
+      ["Quoted", 42, 56],
+      ["Text", 56, 58],
+      ["Quoted", 58, 73],
+      ["Text", 73, 100]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 17, "name": null, "default": null },
+      { "kind": "markerComment", "start": 18, "end": 34, "name": null, "default": null },
+      { "kind": "token", "start": 49, "end": 55, "name": "no", "default": null },
+      { "kind": "token", "start": 66, "end": 72, "name": "no", "default": null },
+      { "kind": "token", "start": 75, "end": 87, "name": "col", "default": "name" }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

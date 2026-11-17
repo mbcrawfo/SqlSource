@@ -1,0 +1,41 @@
+{
+  "fileName": "UserEmailRepository.sql",
+  "settings": [
+    "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // No settings file above this folder applies to the project.\n  \"root\": true,\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  \"typeOverrides\": {\n    // Every date is a DateOnly, which Dapper reads through DateOnlyHandler.\n    \"date\": \"System.DateOnly\",\n  },\n  \"columnTypes\": {\n    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.\n    \"order_lines.order_id\": \"OrderId\",\n  },\n  \"libraryTypes\": {\n    // SQL Server turns a library on only when asked, so the project turns on NodaTime, NetTopologySuite and\n    // System.Text.Json, whose types only the methods of Methods/ get.  The type override above still wins over NodaTime\n    // for every date, which stays a DateOnly.\n    \"nodaTime\": \"on\",\n    \"netTopologySuite\": \"on\",\n    \"json\": \"on\",\n  },\n}\n"
+  ],
+  "input": "-- A second repository of the default output, beside UserRepository, for a query that code which does not await calls.\n\n-- name: GetUserEmail -> one-optional\n-- summary: The email address of one user, or null when there is none.\n-- The generator parameter method-type=both gives the query a synchronous method, GetUserEmail, for code that does not\n-- await: it takes no cancellation token and gets its connection from the same connection string, with the driver's\n-- synchronous calls.  Beside it is its asynchronous method, which method-type=both names GetUserEmailAsync, so that the\n-- two never share a name.  Both are members of the interface IUserEmailRepository.\n-- generator: method-type=both\nSELECT email\nFROM users\nWHERE id = @userId;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 118],
+      ["Text", 118, 120],
+      ["LineComment", 120, 157],
+      ["Text", 157, 158],
+      ["LineComment", 158, 228],
+      ["Text", 228, 229],
+      ["LineComment", 229, 347],
+      ["Text", 347, 348],
+      ["LineComment", 348, 463],
+      ["Text", 463, 464],
+      ["LineComment", 464, 584],
+      ["Text", 584, 585],
+      ["LineComment", 585, 668],
+      ["Text", 668, 669],
+      ["LineComment", 669, 699],
+      ["Text", 699, 735],
+      ["Parameter", 735, 742],
+      ["Text", 742, 744]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 120, "end": 157, "name": null, "default": null },
+      { "kind": "markerComment", "start": 158, "end": 228, "name": null, "default": null },
+      { "kind": "markerComment", "start": 669, "end": 699, "name": null, "default": null },
+      { "kind": "parameter", "start": 735, "end": 742, "name": "userId", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

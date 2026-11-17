@@ -60,6 +60,15 @@ end_of_line = lf
 [tests/SqlSource.Tests/Generator/Golden/**]
 max_line_length = off
 
+# The templater's corpus, written by TemplatingCorpusTests, where a file's text is one line.
+[src/sqlfluff-templater-sqlsource/tests/corpus/**]
+max_line_length = off
+end_of_line = lf
+
+# The templater's fidelity case of CRLF line endings.
+[tests/SqlSource.Tests/Parsing/Templating/Cases/CrlfLineEndings.sql]
+end_of_line = crlf
+
 # Files formatted by CSharpier
 [*.{cs,csproj,props,targets,slnx}]
 end_of_line = lf

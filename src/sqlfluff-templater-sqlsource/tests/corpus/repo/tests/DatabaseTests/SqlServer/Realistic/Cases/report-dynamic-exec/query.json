@@ -1,0 +1,51 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListOrdersSorted\n-- param: @since datetime2(0)\n-- param: @sort_column nvarchar(128)\nDECLARE @sql nvarchar(max) = N'\nSELECT o.id, o.placed_at, o.status, c.name AS customer_name, o.ship_city\nFROM dbo.orders AS o\nJOIN dbo.customers AS c ON c.id = o.customer_id\nWHERE o.placed_at >= @since\nORDER BY ' + QUOTENAME(@sort_column) + N', o.id;';\n\nEXEC sys.sp_executesql @sql, N'@since datetime2(0)', @since = @since;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 25],
+      ["Text", 25, 26],
+      ["LineComment", 26, 55],
+      ["Text", 55, 56],
+      ["LineComment", 56, 92],
+      ["Text", 92, 101],
+      ["Parameter", 101, 105],
+      ["Text", 105, 123],
+      ["Quoted", 123, 305],
+      ["Text", 305, 318],
+      ["Parameter", 318, 330],
+      ["Text", 330, 335],
+      ["Quoted", 335, 344],
+      ["Text", 344, 370],
+      ["Parameter", 370, 374],
+      ["Text", 374, 377],
+      ["Quoted", 377, 398],
+      ["Text", 398, 400],
+      ["Parameter", 400, 406],
+      ["Text", 406, 409],
+      ["Parameter", 409, 415],
+      ["Text", 415, 417]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 25, "name": null, "default": null },
+      { "kind": "markerComment", "start": 26, "end": 55, "name": null, "default": null },
+      { "kind": "markerComment", "start": 56, "end": 92, "name": null, "default": null },
+      { "kind": "parameter", "start": 101, "end": 105, "name": "sql", "default": null },
+      { "kind": "parameter", "start": 318, "end": 330, "name": "sort_column", "default": null },
+      { "kind": "parameter", "start": 370, "end": 374, "name": "sql", "default": null },
+      { "kind": "parameter", "start": 400, "end": 406, "name": "since", "default": null },
+      { "kind": "parameter", "start": 409, "end": 415, "name": "since", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

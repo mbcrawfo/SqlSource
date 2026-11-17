@@ -1,0 +1,30 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListOrdersWithLines\n-- param: @customer_id int\nSELECT\n    o.id,\n    o.placed_at,\n    o.status,\n    o.ship_city,\n    (\n        SELECT ol.line_no, p.sku, ol.quantity, ol.unit_price\n        FROM dbo.order_lines AS ol\n        JOIN dbo.products AS p ON p.id = ol.product_id\n        WHERE ol.order_id = o.id\n        ORDER BY ol.line_no\n        FOR JSON PATH\n    ) AS lines\nFROM dbo.orders AS o\nWHERE o.customer_id = @customer_id\nORDER BY o.placed_at DESC, o.id DESC;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 28],
+      ["Text", 28, 29],
+      ["LineComment", 29, 55],
+      ["Text", 55, 419],
+      ["Parameter", 419, 431],
+      ["Text", 431, 470]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 28, "name": null, "default": null },
+      { "kind": "markerComment", "start": 29, "end": 55, "name": null, "default": null },
+      { "kind": "parameter", "start": 419, "end": 431, "name": "customer_id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "fileName": "Users.sql",
+  "settings": [
+    "{\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- Queries for the users table.\n\n-- name: GetUser\n-- summary: Loads one user by id.\nSELECT id, name -- the columns the model needs\nFROM users\nWHERE id = @id;\n\n-- name: ListUsers\nSELECT id, name\nFROM users\nORDER BY name;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 31],
+      ["Text", 31, 33],
+      ["LineComment", 33, 49],
+      ["Text", 49, 50],
+      ["LineComment", 50, 83],
+      ["Text", 83, 100],
+      ["LineComment", 100, 130],
+      ["Text", 130, 153],
+      ["Parameter", 153, 156],
+      ["Text", 156, 159],
+      ["LineComment", 159, 177],
+      ["Text", 177, 220]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 33, "end": 49, "name": null, "default": null },
+      { "kind": "markerComment", "start": 50, "end": 83, "name": null, "default": null },
+      { "kind": "parameter", "start": 153, "end": 156, "name": "id", "default": null },
+      { "kind": "markerComment", "start": 159, "end": 177, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

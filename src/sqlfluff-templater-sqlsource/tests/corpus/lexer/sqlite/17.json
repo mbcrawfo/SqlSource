@@ -1,0 +1,22 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"sqlite\" }"
+  ],
+  "input": "q'[it's -- x]', q'[y's]'",
+  "expected": {
+    "startDialect": "sqlite",
+    "startOptions": [],
+    "dialect": "sqlite",
+    "options": [],
+    "lexemes": [
+      ["Text", 0, 1],
+      ["Quoted", 1, 6],
+      ["Text", 6, 8],
+      ["LineComment", 8, 24]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

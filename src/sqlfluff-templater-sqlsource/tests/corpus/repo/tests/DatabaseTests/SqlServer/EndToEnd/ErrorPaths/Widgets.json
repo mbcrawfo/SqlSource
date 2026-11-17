@@ -1,0 +1,22 @@
+{
+  "fileName": "Widgets.sql",
+  "settings": [
+    "{\n  // A test copies the project to the temporary directory, where no settings file above it may apply.\n  \"root\": true,\n  \"dialect\": \"mssql\",\n  \"database\": \"errors\",\n  // The models need no driver in a build of the copy, which a method of \"methods\" does.\n  \"output\": \"models\",\n}\n"
+  ],
+  "input": "-- name: GetWidgets\nSELECT id, name FROM dbo.error_path_widgets;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 19],
+      ["Text", 19, 65]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 19, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

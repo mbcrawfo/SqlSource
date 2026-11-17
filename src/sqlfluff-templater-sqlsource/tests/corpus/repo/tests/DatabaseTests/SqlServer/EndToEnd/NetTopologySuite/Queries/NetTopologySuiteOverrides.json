@@ -1,0 +1,61 @@
+{
+  "fileName": "NetTopologySuiteOverrides.sql",
+  "settings": [
+    "{\n  \"libraryTypes\": {\n    // NetTopologySuite on, over SQL Server's default, which is off whether the project references it or not.\n    \"netTopologySuite\": \"on\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The queries of spatial_values' two columns that the file header's type overrides make NetTopologySuite's Point,\n-- through geography, and its Polygon, through geometry: the read is cast to the type the override names.\n-- type-override: geography = NetTopologySuite.Geometries.Point\n-- type-override: geometry = NetTopologySuite.Geometries.Polygon\n\n-- name: InsertSpatialOverrides\n-- summary: Inserts a row of spatial_values with a parameter for its point and its polygon, either of which may be null.\n-- param: @pointValue null\n-- param: @polygonValue null\nINSERT INTO dbo.spatial_values (id, point_value, polygon_value)\nVALUES (@id, @pointValue, @polygonValue);\n\n-- name: GetSpatialOverrides -> one\n-- summary: The row of spatial_values with the id, its point and its polygon.\nSELECT id, point_value, polygon_value\nFROM dbo.spatial_values\nWHERE id = @id;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 114],
+      ["Text", 114, 115],
+      ["LineComment", 115, 220],
+      ["Text", 220, 221],
+      ["LineComment", 221, 284],
+      ["Text", 284, 285],
+      ["LineComment", 285, 349],
+      ["Text", 349, 351],
+      ["LineComment", 351, 382],
+      ["Text", 382, 383],
+      ["LineComment", 383, 503],
+      ["Text", 503, 504],
+      ["LineComment", 504, 530],
+      ["Text", 530, 531],
+      ["LineComment", 531, 559],
+      ["Text", 559, 632],
+      ["Parameter", 632, 635],
+      ["Text", 635, 637],
+      ["Parameter", 637, 648],
+      ["Text", 648, 650],
+      ["Parameter", 650, 663],
+      ["Text", 663, 667],
+      ["LineComment", 667, 702],
+      ["Text", 702, 703],
+      ["LineComment", 703, 780],
+      ["Text", 780, 854],
+      ["Parameter", 854, 857],
+      ["Text", 857, 859]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 221, "end": 284, "name": null, "default": null },
+      { "kind": "markerComment", "start": 285, "end": 349, "name": null, "default": null },
+      { "kind": "markerComment", "start": 351, "end": 382, "name": null, "default": null },
+      { "kind": "markerComment", "start": 383, "end": 503, "name": null, "default": null },
+      { "kind": "markerComment", "start": 504, "end": 530, "name": null, "default": null },
+      { "kind": "markerComment", "start": 531, "end": 559, "name": null, "default": null },
+      { "kind": "parameter", "start": 632, "end": 635, "name": "id", "default": null },
+      { "kind": "parameter", "start": 637, "end": 648, "name": "pointValue", "default": null },
+      { "kind": "parameter", "start": 650, "end": 663, "name": "polygonValue", "default": null },
+      { "kind": "markerComment", "start": 667, "end": 702, "name": null, "default": null },
+      { "kind": "markerComment", "start": 703, "end": 780, "name": null, "default": null },
+      { "kind": "parameter", "start": 854, "end": 857, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

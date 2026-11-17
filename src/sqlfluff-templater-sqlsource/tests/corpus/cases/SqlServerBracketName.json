@@ -1,0 +1,31 @@
+{
+  "fileName": "SqlServerBracketName.sql",
+  "settings": [],
+  "input": "-- dialect: mssql\n-- name: Bracketed\nSELECT [a--b], [c]]--d], {{col:name}} FROM users WHERE id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 17],
+      ["Text", 17, 18],
+      ["LineComment", 18, 36],
+      ["Text", 36, 44],
+      ["Quoted", 44, 50],
+      ["Text", 50, 52],
+      ["Quoted", 52, 60],
+      ["Text", 60, 97],
+      ["Parameter", 97, 100],
+      ["Text", 100, 102]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 17, "name": null, "default": null },
+      { "kind": "markerComment", "start": 18, "end": 36, "name": null, "default": null },
+      { "kind": "token", "start": 62, "end": 74, "name": "col", "default": "name" },
+      { "kind": "parameter", "start": 97, "end": 100, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

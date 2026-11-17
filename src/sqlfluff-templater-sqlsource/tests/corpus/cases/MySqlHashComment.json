@@ -1,0 +1,29 @@
+{
+  "fileName": "MySqlHashComment.sql",
+  "settings": [],
+  "input": "-- dialect: mysql\n-- name: Hashed\nSELECT * FROM users # TODO {{f:\nWHERE {{cond:active = 1}} AND id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 17],
+      ["Text", 17, 18],
+      ["LineComment", 18, 33],
+      ["Text", 33, 54],
+      ["LineComment", 54, 65],
+      ["Text", 65, 101],
+      ["Parameter", 101, 104],
+      ["Text", 104, 106]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 17, "name": null, "default": null },
+      { "kind": "markerComment", "start": 18, "end": 33, "name": null, "default": null },
+      { "kind": "token", "start": 72, "end": 91, "name": "cond", "default": "active = 1" },
+      { "kind": "parameter", "start": 101, "end": 104, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

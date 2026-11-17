@@ -190,6 +190,31 @@ A change that is meant to change what the generator writes updates the corpus:
 2. Run it again without the variable, which only compares, and see it pass.
 3. Read the diff of every changed file and see that it shows the change meant, and nothing else.  A PR that changes a golden file says in its description why.
 
+## The templater's corpus
+
+The templater's corpus holds the templating plan of a set of `.sql` files, as `SqlFileParser.PlanTemplating` gives it, so that the sqlfluff templater of `src/sqlfluff-templater-sqlsource/`, a port of the parser, is tested against what the parser does, field for field.  A change to the parser that changes a plan fails a test here until the corpus is written again, and then the templater's tests until the port matches.
+
+- **The files** are in `src/sqlfluff-templater-sqlsource/tests/corpus/`, at LF in every checkout, and are never edited by hand.  `TemplatingCorpusTests` of `tests/SqlSource.Tests/Parsing/Templating/` checks them, with the cases and the writer in `TemplatingCorpus` beside it.
+- **A file holds** the case's file name, the texts of the settings files above it, nearest first, through the first `"root": true`, and its text, then the dialect its settings give and the dialect it is read by, after any `-- dialect:` marker, its lexemes, its spans and the error that stops its plan, with every offset counted in code points.
+- **The cases** have three sources, each a folder of the corpus:
+  - `repo/<path>.json`, every `.sql` file of the repository at `<path>.sql`, read at LF, but for those under `bin/`, `obj/`, `node_modules/`, a folder whose name starts with `.`, the templater's project and the fidelity cases, and for a file with an error that does not stop its plan;
+  - `lexer/<dialect>/<n>.json`, row `<n>` of `SqlLexerTests.Lex_Construct_IsReadByTheRulesOfTheDialect`, counted from 1, once for each dialect it names, which a settings file gives it;
+  - `cases/<name>.json`, each `.sql` file of `Cases/` beside the test, read with its own line endings.  Each names its dialect with a marker first, and has no error but one that stops its plan.  A case the corpus lacks, of a rule the templater must follow, is a new file there.
+
+To run the corpus:
+
+```bash
+dotnet test --project tests/SqlSource.Tests -- --filter-class "SqlSource.Tests.Parsing.Templating.TemplatingCorpusTests"
+```
+
+Each case carries the trait `source`, so `--filter-trait "source=cases"` in place of `--filter-class` runs one source's cases.
+
+A change that changes a plan, or adds, moves or removes a `.sql` file of the repository, updates the corpus:
+
+1. Run the corpus with `SQLSOURCE_UPDATE_TEMPLATER_CORPUS=1`.  It writes the file of each case whose plan changed, and deletes the file of a case that was removed or renamed.
+2. Run it again without the variable, which only compares, and see it pass.
+3. Read the diff of every changed file and see that it shows the change meant, and change the templater to match in the same pull request.
+
 ## The database projects
 
 The seven projects of [`tests/DatabaseTests/`](DatabaseTests/README.md) run against a real server, and reference [the harness](DatabaseTests/README.md#the-harness) in `tests/DatabaseTests/TestHarness`; its readme has their table, how to run one on another image, and [the Npgsql 8 project](DatabaseTests/README.md#the-npgsql-8-project) and [the SqlClient 6.1 project](DatabaseTests/README.md#the-sqlclient-61-project), the two that pin the oldest supported driver.
