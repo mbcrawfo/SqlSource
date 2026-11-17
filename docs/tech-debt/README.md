@@ -40,7 +40,6 @@ Next id: `TD-0118`
 | [TD-0097](TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md) | Open | 2026-11-03 | Medium | What phase 9's design says Visual Studio and VS Code show of a sidecar another process wrote, their design-time builds, the VS Code task and the file events of their saves was checked in Rider on macOS alone |
 | [TD-0114](TD-0114-generator-code-its-own-tests-do-not-check.md) | Open | 2026-11-13 | Low | 2,504 mutants of `src/SqlSource` fail no test of their own folder or are run by none, most in `MethodPlanner.cs`, `ModelReader.cs` and `ExceptionProbe.cs`, though the driver tests and the golden corpus may reach them |
 | [TD-0115](TD-0115-tool-code-its-own-tests-do-not-check.md) | Open | 2026-11-13 | Low | 1,881 mutants of `src/SqlSource.Tool` fail no test of their own folder or are run by none, most in `WatchSession.cs`, `SqlServerLive.cs` and `DiagnoseRun.cs`, though the command tests and the database projects may reach them |
-| [TD-0116](TD-0116-sql-server-list-limit-message-advises-a-table-valued-parameter.md) | Open | 2026-11-14 | Low | The `ArgumentException` that a SQL Server query method throws past 2,098 parameters advises a table-valued parameter, which a query method cannot send; the advice should point to one JSON array read with `OPENJSON` |
 
 ## Columns
 
