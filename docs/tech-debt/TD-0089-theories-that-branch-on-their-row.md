@@ -2,7 +2,7 @@
 
 ## Problem
 
-A theory is clearest when its rows share one arrangement and one set of assertions.  The theories whose row chose between two sets of assertions or two arrangements by an `if` and `else` were split into facts, or into theories whose rows share their arrangement and assertions.  These remain, found by scanning every `[Theory]` of `tests/` for an `if` whose condition names one of its parameters.  Paths are under `tests/`.
+A theory is clearest when its rows share one arrangement and one set of assertions.  The theories whose row chose between two sets of assertions or two arrangements by an `if` and `else` were split into facts, or into theories whose rows share their arrangement and assertions.  These remain, found by scanning every `[Theory]` of `tests/` for an `if` whose condition names one of its parameters.  The list is incomplete: the scan last run, on 2026-11-17, also found the theories under "Not yet checked", which no one has read to sort into the two kinds below.  Paths are under `tests/`.
 
 - An `if` that adds a step or an assertion for some rows only:
   - `DatabaseTests/Postgres/Describer/PlanOutputTests.cs`, `Explain_FullJoinCoalesce_IsComputedAtTheJoin` (`mergeJoin`);
@@ -10,6 +10,9 @@ A theory is clearest when its rows share one arrangement and one set of assertio
   - `DatabaseTests/SqlServer/EndToEnd/AllTypesQueryTests.cs`, `ExecuteAsync_LeftOutColumnAlone_FailsToWriteItsValue`;
   - `DatabaseTests/SqlServer/EndToEnd/RunTimeArgumentTests.cs`, `GetAccountInRange_TokenCancelledBeforeTheCall_ThrowsTaskCanceledException` (`open`);
   - `SqlSource.Tests/Generation/Types/Maps/PostgresTypeMapTests.cs`, `Map_EveryRowOfTheTable_GivesItsType`;
+  - `SqlSource.Tests/Generator/JsonSerializerMethodTests.cs`, `Run_DomainOverJsonb_IsSerialized` (`driver`);
+  - `SqlSource.Tests/Generator/LibraryConversionTests.cs`, `Run_PostgresJsonNode_ByEdgeOnNpgsql8AndByTheDriverOn10` (`npgsql10`) and `Run_JsonGeneratedCode_CompilesWithoutWarnings` (`driver`);
+  - `SqlSource.Tests/Generator/LibraryTypeTests.cs`, `Type_JsonOn_GivesJsonElement` (`place`);
   - `SqlSource.Tests/Generator/MethodTests.cs`, `Run_MethodsQueryNamedLikeTheNestedClass_IsAMethodOfTheExtensionClass`;
   - `SqlSource.Tests/Generator/ModelNameTests.cs`, `Run_ModelNameWithAContextualKeywordThatCSharpRefusesAsATypeName_IsAnError` (`place`);
   - `SqlSource.Tests/Generator/NestedClassTests.cs`, `Run_ContextualKeywordThatCannotNameTheNestedClass_IsAnError` (`inSettingsFile`);
@@ -23,6 +26,21 @@ A theory is clearest when its rows share one arrangement and one set of assertio
   - `SqlSource.Tool.Tests/Logging/RunLogDestinationTests.cs`, `Run_NoLogOptionAndNoVariable_WritesNoFile`;
   - `SqlSource.Tool.Tests/Planning/RunPlannerTests.cs`, `Plan_OutputOfTheChain_DecidesWhetherAQueryNeedsAnEntry`;
   - `SqlSource.Tool.Tests/Projects/ProjectEvaluatorTests.cs`, `Evaluate_Project_RunsTheDotnetThatStartedTheToolOrTheOneOnThePath`.
+- Not yet checked, each of either kind or of neither:
+  - `DatabaseTests/Postgres/EndToEnd/AllTypesQueryTests.cs` and `DatabaseTests/Postgres.Npgsql8/AllTypesQueryTests.cs`, `Int4Array_EachKindOfSequence_RoundTrips` (`ordered`);
+  - `SqlSource.Tests/Generation/Emitting/QueryMethods/QueryMethodWriterTests.cs`, `Append_SynchronousEachShape_ReturnsTheResultWithoutAwaiting` (`returnsXml`);
+  - `SqlSource.Tests/Generation/Placement/TypePlacementTests.cs`, `Of_Protected_IsAnErrorOnlyWhereCSharpForbidsIt` (`reason`);
+  - `SqlSource.Tests/Settings/Libraries/LibrarySettingsTests.cs`, `TryReadEntry_AnEntry_ReadsNamesAndValuesAsAChoice` (`valid`);
+  - `SqlSource.Tool.Tests/Bundles/Renaming/Postgres/PostgresFixtureRenamingTests.cs`, `RenameAsync_Fixture_ReplaysWithTheOriginalsProvenance` (`name`);
+  - `SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/SqlServerErrorRenamingTests.cs`, `RenameAsync_AnAliasOfAColumnOfTheServers_IsRenamed` (`first`);
+  - `SqlSource.Tool.Tests/Commands/ManifestRunTests.cs`, `Run_OnlineWithABuildPathThatHoldsASemicolonOrAnEqualsSign_PrintsItInFull` (`option`);
+  - `SqlSource.Tool.Tests/Commands/OnlineRunTests.cs`, `Run_AutoWithAVariableTwoDatabasesShare_IsSqlsrc214AndNotOffline` (`inDotEnv`);
+  - `SqlSource.Tool.Tests/Commands/SecretTests.cs`, `Diagnose_ConnectionStringWherePathsStand_IsNeverPrintedOrLogged` (`fromVariable`);
+  - `SqlSource.Tool.Tests/Commands/Watch/WatchDuringAPassTests.cs`, `Watch_SaveDuringTheFirstPass_GivesOneMorePassThatDescribesIt` (`polls`);
+  - `SqlSource.Tool.Tests/Commands/Watch/WatchFailureTests.cs`, `Watch_PollingVariable_PollsEachFolderOnlyWhenItAsksTo` (`value`) and `Watch_WatcherErrorDuringAPass_IsWrittenAfterThePassesOutput` (`first`);
+  - `SqlSource.Tool.Tests/Commands/Watch/WatchFolderTests.cs`, `Watch_PolledFolderDeletedAndMadeAgain_ReportsNoError` (`aboveListsWhileItIsGone`) and `Watch_WatchedFolderRemovedThenBack_IsWatchedAgain` (`removed`);
+  - `SqlSource.Tool.Tests/Projects/OnlineMultiTargetTests.cs`, `Build_ProjectThatListsNoSidecar_GivesTheCompilersOnlyTheSidecarTheRunCreated` (`created`);
+  - `SqlSource.Tool.Tests/Watching/WatchSetTests.cs`, `Classify_NamedEnvFileUnderAnIgnoredFolder_Describes` (`path`), `Folders_AssetsFolderBelowTheProject_AddsNoFolder` (`restored`), `Folders_AssetsFolderThatDoesNotExistAboveTheRepository_IsNotWatched` (`repository`), `Folders_AssetsFolderThatDoesNotExistYet_IsBoundByTheBuildProps` (`repository`, `watched`) and `Folders_FolderAboveEachWatchedFolder_IsWatchedOutsideARepository` (`repository`).
 - About fifty more theories derive an expected value or a piece of the arrangement from the row with `?:`, as `nullable is null ? … : …`.  Most of these state one rule over rows that differ only in data, and need no change; a scan for `?:` in a theory's body whose condition names a parameter lists them.
 
 ## Why it exists
