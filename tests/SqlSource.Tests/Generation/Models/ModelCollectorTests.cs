@@ -163,16 +163,15 @@ public sealed class ModelCollectorTests
     }
 
     [Fact]
-    public void Resolve_NoGroups_GivesNoPlaces() =>
-        ModelCollector
-            .Resolve(EquatableArray<ModelGroup>.Empty, EquatableArray<TakenName>.Empty)
-            .Places.ShouldBeEmpty();
+    public void Resolve_NoGroups_GivesAnEmptySet()
+    {
+        var set = ModelCollector.Resolve(EquatableArray<ModelGroup>.Empty, EquatableArray<TakenName>.Empty);
 
-    [Fact]
-    public void Resolve_NoGroups_GivesNoAssignments() =>
-        ModelCollector
-            .Resolve(EquatableArray<ModelGroup>.Empty, EquatableArray<TakenName>.Empty)
-            .Assignments.ShouldBeEmpty();
+        set.Models.ShouldBeEmpty();
+        set.Places.ShouldBeEmpty();
+        set.Diagnostics.ShouldBeEmpty();
+        set.Assignments.ShouldBeEmpty();
+    }
 
     private static ModelSet Resolve(ImmutableArray<ModelRequest> requests) =>
         ModelCollector.Resolve(ModelCollector.Group(requests), EquatableArray<TakenName>.Empty);
