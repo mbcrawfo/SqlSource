@@ -522,7 +522,7 @@ public sealed class TypeEmitterTests
     }
 
     // A methods query's method takes the place of its constant or its token method, whether it gets one or not, on the
-    // type or in the nested class, which a type of only methods queries does not get.
+    // type or in the extension class, a methods query's default, and a type of only such queries gets no nested class.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
