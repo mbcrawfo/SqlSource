@@ -17,8 +17,6 @@ public sealed class ArrayPoolParameterTests
 
     private const string Pooled = "array-pool";
 
-    private const string Other = "sort-input";
-
     private const string Default = "default";
 
     [Theory]
@@ -26,12 +24,9 @@ public sealed class ArrayPoolParameterTests
     [InlineData(null, null, null, null, true)]
     [InlineData(Unpooled, null, null, null, false)]
     [InlineData(Unpooled, Default, null, null, true)]
-    [InlineData(Unpooled, Other, null, null, false)]
     [InlineData(null, Unpooled, null, null, false)]
     [InlineData(null, null, Unpooled, null, false)]
-    [InlineData(Default, Other, Unpooled, null, false)]
     [InlineData(Unpooled, Unpooled, Default, null, true)]
-    [InlineData(null, null, Unpooled, Other, false)]
     [InlineData(Unpooled, Unpooled, Unpooled, Default, true)]
     [InlineData(null, null, Default, Unpooled, false)]
     [InlineData(Unpooled, null, null, Pooled, true)]

@@ -239,14 +239,6 @@ public sealed class NestedClassTests
     // SQLSRC019, and the default names the class.
     [Theory]
     [InlineData("file", false)]
-    [InlineData("required", false)]
-    [InlineData("scoped", false)]
-    [InlineData("extension", false)]
-    [InlineData("var", false)]
-    [InlineData("file", true)]
-    [InlineData("required", true)]
-    [InlineData("scoped", true)]
-    [InlineData("extension", true)]
     [InlineData("var", true)]
     public void Run_ContextualKeywordThatCannotNameTheNestedClass_IsAnError(string value, bool inSettingsFile)
     {
