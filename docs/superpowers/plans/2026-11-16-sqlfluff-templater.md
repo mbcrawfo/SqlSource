@@ -86,18 +86,18 @@ What goes in the plan, per query block (lexemes `[start, end)` of `ReadBlock`):
 The ordinary `Parse` path must allocate nothing new: the collector is null there.  `SqlFileParserAllocationTests` must still pass unchanged.
 
 - [ ] **Step 1: Write the failing tests** in `SqlTemplatingPlanTests.cs`, one `[Fact]` or `[Theory]` per behaviour, asserting on `Spans` as `(Kind, text[Span], Name, Default)` tuples:
-  - `Plan_TokenWithInlineDefault_IsOneTokenSpan`: `"SELECT {{t:users}};"` → `[(Token, "{{t:users}}", "t", "users")]`.
-  - `Plan_TokenDefaultFromMarker_AppliesToItsQueryOnly`: the two-query `cond` example of the spec's Fidelity section → `ByA`'s token default `a = 1`, `ByB`'s `AND b = 2`.
-  - `Plan_IgnoredName_IsNoSpan`: `-- token-ignore: name` with `'Hello, {{name}}'` → no Token span.
-  - `Plan_TokenInComment_IsNoSpan` and `Plan_UnclosedOpenerInComment_SwallowsNothing`: the spec's `-- TODO: add {{filter: ...` case → one Token span, `{{cond:id > 0}}`.
-  - `Plan_ParameterInDefault_IsInsideTheToken`: `{{paging:LIMIT 20 OFFSET @page}}` with `-- param: @page int` → Token then `(Parameter, "@page", "page", null)` inside it.
-  - `Plan_List_IsListSpan`, `Plan_ListAfterComment_IsListSpan` (`IN /* c */ @ids`), `Plan_Position_IsNoList` (`position('@' IN @email)` → Parameter).
-  - `Plan_SystemVariable_IsNoParameter` (`@@rowcount`, mssql) and `Plan_AtInString_IsNoParameter` (`'a@b.c'`).
-  - `Plan_QueryWithoutSemicolon_HasQueryEnd`: two queries without `;` → one `QueryEnd`, at the end of the first query's last SQL; none after the last query; none when the first ends in `;`.
-  - `Plan_MarkerForm_IsProtected`: a `-- token:` marker line and an inline `SELECT 1 -- summary: x` both give `MarkerComment`; `-- just a note` gives none.
-  - `Plan_UnterminatedString_IsError`, `Plan_InvalidDialectMarker_IsError`, `Plan_CommentHoldingCloseBraces_IsSqlsrc120`: `Error` set, `Spans` empty.
-  - `Plan_OtherError_IsBestEffort`: a duplicated query name → `Error` null, `HasOtherErrors` true, spans present.
-  - `Plan_DialectMarker_IsTheResolvedDialect`: `-- dialect: mysql ansi_quotes` → `Dialect` is MySql with `AnsiQuotes`.
+  - `PlanTemplating_TokenWithInlineDefault_IsOneTokenSpan`: `"SELECT {{t:users}};"` → `[(Token, "{{t:users}}", "t", "users")]`.
+  - `PlanTemplating_TokenDefaultFromMarker_AppliesToItsQueryOnly`: the two-query `cond` example of the spec's Fidelity section → `ByA`'s token default `a = 1`, `ByB`'s `AND b = 2`.
+  - `PlanTemplating_IgnoredName_IsNoSpan`: `-- token-ignore: name` with `'Hello, {{name}}'` → no Token span.
+  - `PlanTemplating_TokenInComment_IsNoSpan` and `PlanTemplating_UnclosedOpenerInComment_SwallowsNothing`: the spec's `-- TODO: add {{filter: ...` case → one Token span, `{{cond:id > 0}}`.
+  - `PlanTemplating_ParameterInDefault_IsInsideTheToken`: `{{paging:LIMIT 20 OFFSET @page}}` with `-- param: @page int` → Token then `(Parameter, "@page", "page", null)` inside it.
+  - `PlanTemplating_List_IsListSpan`, `PlanTemplating_ListAfterComment_IsListSpan` (`IN /* c */ @ids`), `PlanTemplating_Position_IsNoList` (`position('@' IN @email)` → Parameter).
+  - `PlanTemplating_SystemVariable_IsNoParameter` (`@@rowcount`, mssql) and `PlanTemplating_AtInString_IsNoParameter` (`'a@b.c'`).
+  - `PlanTemplating_QueryWithoutSemicolon_HasQueryEnd`: two queries without `;` → one `QueryEnd`, at the end of the first query's last SQL; none after the last query; none when the first ends in `;`.
+  - `PlanTemplating_MarkerForm_IsProtected`: a `-- token:` marker line and an inline `SELECT 1 -- summary: x` both give `MarkerComment`; `-- just a note` gives none.
+  - `PlanTemplating_UnterminatedString_IsError`, `PlanTemplating_InvalidDialectMarker_IsError`, `PlanTemplating_CommentHoldingCloseBraces_IsSqlsrc120`: `Error` set, `Spans` empty.
+  - `PlanTemplating_OtherError_IsBestEffort`: a duplicated query name → `Error` null, `HasOtherErrors` true, spans present.
+  - `PlanTemplating_DialectMarker_IsTheResolvedDialect`: `-- dialect: mysql ansi_quotes` → `Dialect` is MySql with `AnsiQuotes`.
 
 - [ ] **Step 2: Run them and see them fail** (no `PlanTemplating`): `zsh -lc 'dotnet test --project tests/SqlSource.Tests --filter-class "*SqlTemplatingPlanTests"'` (use the filter syntax the repository's test runner takes; see `tests/README.md`).  Expected: build error.
 

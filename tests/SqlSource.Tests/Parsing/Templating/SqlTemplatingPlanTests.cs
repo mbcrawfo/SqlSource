@@ -12,7 +12,7 @@ namespace SqlSource.Tests.Parsing.Templating;
 public sealed class SqlTemplatingPlanTests
 {
     [Fact]
-    public void Plan_TokenWithInlineDefault_IsOneTokenSpan()
+    public void PlanTemplating_TokenWithInlineDefault_IsOneTokenSpan()
     {
         const string Text = "SELECT {{t:users}};";
 
@@ -21,7 +21,7 @@ public sealed class SqlTemplatingPlanTests
 
     // Both ends are mapped from the built SQL to the file, though the token's default runs over two lines.
     [Fact]
-    public void Plan_TokenOverLines_SpansItsLines()
+    public void PlanTemplating_TokenOverLines_SpansItsLines()
     {
         const string Text = "SELECT 1 /* c */ {{f:AND a = 1\r\n    AND b = 2}}\r\n";
 
@@ -32,7 +32,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_TokenDefaultFromMarker_AppliesToItsQueryOnly()
+    public void PlanTemplating_TokenDefaultFromMarker_AppliesToItsQueryOnly()
     {
         const string Text =
             "-- name: ByA\n-- token: {{cond:a = 1}}\nSELECT * FROM t WHERE {{cond}};\n\n"
@@ -47,7 +47,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_IgnoredName_IsNoSpan()
+    public void PlanTemplating_IgnoredName_IsNoSpan()
     {
         const string Text = "-- token-ignore: name\nSELECT 'Hello, {{name}}', {{t:users}}";
 
@@ -59,7 +59,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_TokenWithoutDefault_HasNoDefault()
+    public void PlanTemplating_TokenWithoutDefault_HasNoDefault()
     {
         const string Text = "SELECT {{t}}";
 
@@ -67,7 +67,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_TokenInComment_IsNoSpan()
+    public void PlanTemplating_TokenInComment_IsNoSpan()
     {
         const string Text = "SELECT 1 /* {{note}} */ FROM {{t:users}}";
 
@@ -75,7 +75,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_UnclosedOpenerInComment_SwallowsNothing()
+    public void PlanTemplating_UnclosedOpenerInComment_SwallowsNothing()
     {
         const string Text = "SELECT * FROM t -- TODO: add {{filter: ...\nWHERE {{cond:id > 0}}\n";
 
@@ -83,7 +83,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_ParameterInDefault_IsInsideTheToken()
+    public void PlanTemplating_ParameterInDefault_IsInsideTheToken()
     {
         const string Text = "-- param: @page int\nSELECT * FROM t ORDER BY id {{paging:LIMIT 20 OFFSET @page}}\n";
 
@@ -99,7 +99,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_List_IsListSpan()
+    public void PlanTemplating_List_IsListSpan()
     {
         const string Text = "SELECT * FROM t WHERE id IN @ids AND name = @name";
 
@@ -111,7 +111,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_NegatedList_IsListSpan()
+    public void PlanTemplating_NegatedList_IsListSpan()
     {
         const string Text = "SELECT * FROM t WHERE id NOT IN @ids";
 
@@ -119,7 +119,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_ListAfterComment_IsListSpan()
+    public void PlanTemplating_ListAfterComment_IsListSpan()
     {
         const string Text = "SELECT * FROM t WHERE id IN /* c */ @ids";
 
@@ -127,7 +127,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_Position_IsNoList()
+    public void PlanTemplating_Position_IsNoList()
     {
         const string Text = "SELECT * FROM t WHERE position('@' IN @email) > 0";
 
@@ -136,7 +136,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_SystemVariable_IsNoParameter()
+    public void PlanTemplating_SystemVariable_IsNoParameter()
     {
         const string Text = "SELECT @id, @@rowcount";
 
@@ -144,7 +144,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_AtInString_IsNoParameter()
+    public void PlanTemplating_AtInString_IsNoParameter()
     {
         const string Text = "SELECT 'a@b.c', @id";
 
@@ -153,7 +153,7 @@ public sealed class SqlTemplatingPlanTests
 
     // A declared variable is no parameter of the query, but sqlfluff must see it as one where it stands.
     [Fact]
-    public void Plan_DeclaredVariable_IsParameterSpan()
+    public void PlanTemplating_DeclaredVariable_IsParameterSpan()
     {
         const string Text = "DECLARE @n int = 1;\nSELECT @n";
 
@@ -173,7 +173,7 @@ public sealed class SqlTemplatingPlanTests
     [InlineData("-- name: A\nSELECT 1; -- note\n-- name: B\nSELECT 2;\n", "SELECT 1", 0)]
     // A file with one query has no query after it.
     [InlineData("SELECT 1\n", "SELECT 1", 0)]
-    public void Plan_QueryWithoutSemicolon_HasQueryEnd(string text, string lastSql, int expected)
+    public void PlanTemplating_QueryWithoutSemicolon_HasQueryEnd(string text, string lastSql, int expected)
     {
         var ends = Plan(text).Spans.Where(static span => span.Kind == SqlTemplatingSpanKind.QueryEnd).ToArray();
 
@@ -194,7 +194,7 @@ public sealed class SqlTemplatingPlanTests
 
     // The token's span protects the comment, so it is not listed again.
     [Fact]
-    public void Plan_MarkerFormInsideToken_IsNoMarkerSpan()
+    public void PlanTemplating_MarkerFormInsideToken_IsNoMarkerSpan()
     {
         const string Text = "SELECT 1 {{f:a = 1 -- summary: x\n AND b = 2}}";
 
@@ -206,7 +206,7 @@ public sealed class SqlTemplatingPlanTests
 
     // The query's end is empty, so it comes before the comment that starts where it is.
     [Fact]
-    public void Plan_QueryEndWhereAMarkerCommentStarts_ComesFirst()
+    public void PlanTemplating_QueryEndWhereAMarkerCommentStarts_ComesFirst()
     {
         const string Text = "-- name: A\nSELECT 1-- summary: x\n-- name: B\nSELECT 2\n";
 
@@ -222,7 +222,7 @@ public sealed class SqlTemplatingPlanTests
 
     // A # comment is never a marker, whatever it reads.
     [Fact]
-    public void Plan_HashCommentInMarkerForm_IsNoMarkerSpan()
+    public void PlanTemplating_HashCommentInMarkerForm_IsNoMarkerSpan()
     {
         const string Text = "# token: {{a:x}}\nSELECT 1";
 
@@ -230,7 +230,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_MarkerForm_IsProtected()
+    public void PlanTemplating_MarkerForm_IsProtected()
     {
         const string Text = "-- name: Q\n-- token: {{a:x}}\n-- just a note\nSELECT {{a}} -- summary: x\n";
 
@@ -244,7 +244,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_UnterminatedString_IsError()
+    public void PlanTemplating_UnterminatedString_IsError()
     {
         const string Text = "SELECT {{t:users}}, 'abc";
 
@@ -257,7 +257,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_InvalidDialectMarker_IsError()
+    public void PlanTemplating_InvalidDialectMarker_IsError()
     {
         const string Text = "-- dialect: nonsense\nSELECT {{t:users}}";
 
@@ -277,7 +277,7 @@ public sealed class SqlTemplatingPlanTests
 
     // The marker comes first in the file, so its error is the one that stops the plan.
     [Fact]
-    public void Plan_InvalidDialectMarkerBeforeUnterminatedString_IsTheMarkersError()
+    public void PlanTemplating_InvalidDialectMarkerBeforeUnterminatedString_IsTheMarkersError()
     {
         const string Text = "-- dialect: nonsense\nSELECT 'abc";
 
@@ -288,7 +288,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_CommentHoldingCloseBraces_IsSqlsrc120()
+    public void PlanTemplating_CommentHoldingCloseBraces_IsSqlsrc120()
     {
         const string Text = "-- name: Q\nSELECT 1 {{f:AND a = 1 -- note}}\nORDER BY {{o:name}}\n";
 
@@ -302,7 +302,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_OtherError_IsBestEffort()
+    public void PlanTemplating_OtherError_IsBestEffort()
     {
         const string Text = "-- name: Q\nSELECT {{t:users}}\n-- name: Q\nSELECT @id\n";
 
@@ -321,7 +321,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_AcceptedFile_HasNoErrors()
+    public void PlanTemplating_AcceptedFile_HasNoErrors()
     {
         var plan = Plan("-- name: Q\nSELECT {{t:users}}\n");
 
@@ -331,7 +331,7 @@ public sealed class SqlTemplatingPlanTests
 
     // The first valid marker is in effect, and the invalid one after it still stops the plan.
     [Fact]
-    public void Plan_InvalidDialectMarkerAfterAValidOne_IsErrorUnderTheValidOne()
+    public void PlanTemplating_InvalidDialectMarkerAfterAValidOne_IsErrorUnderTheValidOne()
     {
         const string Text = "-- dialect: postgres\n-- dialect: nonsense\nSELECT 1";
 
@@ -350,7 +350,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_DialectMarker_IsTheResolvedDialect()
+    public void PlanTemplating_DialectMarker_IsTheResolvedDialect()
     {
         const string Text = "-- dialect: mysql,ansi_quotes\nSELECT \"a\"";
 
@@ -361,7 +361,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_WithoutDialectMarker_IsTheGivenDialect()
+    public void PlanTemplating_WithoutDialectMarker_IsTheGivenDialect()
     {
         var given = new SqlDialectChoice(SqlDialect.MariaDb, SqlDialectOptions.NoBackslashEscapes);
 
@@ -369,7 +369,7 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
-    public void Plan_Lexemes_AreTheFilesLexemes()
+    public void PlanTemplating_Lexemes_AreTheFilesLexemes()
     {
         const string Text = "-- name: Q\nSELECT 1\n";
 
