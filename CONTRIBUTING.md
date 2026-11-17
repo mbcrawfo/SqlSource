@@ -8,6 +8,7 @@ This repository holds SqlSource, a C# source generator that turns the `.sql` fil
 |----|----|----|
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0.401 or a later 10.x release | Pinned in `global.json` |
 | [Docker](https://docs.docker.com/get-started/get-docker/) | Any current release | Runs the pinned lint images used by the scripts in `tools/`, the PostgreSQL that `tests/DatabaseTests/Postgres` and `tests/DatabaseTests/Postgres.Npgsql8` run against, and the SQL Server that `tests/DatabaseTests/SqlServer` and `tests/DatabaseTests/SqlServer.SqlClient61` run against |
+| [uv](https://docs.astral.sh/uv/) | Any current release | Runs the checks of `src/sqlfluff-templater-sqlsource`, and installs the Python 3.14.7 of its `.python-version` and its virtual environment on the first run |
 | `unzip` | Any | `tools/check-package.sh` lists the contents of the packages with it.  Present on macOS and most Linux distributions. |
 
 CSharpier, ReportGenerator, docfx and Stryker.NET are local .NET tools pinned in `dotnet-tools.json`.  Restore them once after cloning:
@@ -40,6 +41,16 @@ The eleven test projects, the four libraries they share and a stand-in of the to
 - `tests/SqlSource.Tool.StandIn` is a stand-in of the `sqlsource` tool, which the tests of the online build in `tests/SqlSource.Tool.Tests` give a real build as its command.
 
 `tools/MutationReport` is a console program that compares the reports of two mutation runs, which [`tools/mutation-test.sh`](tools/README.md#mutation-testing) runs, and prepares [the evidence of a test review](tools/README.md#the-test-reviews-commands); it builds with the solution and is never packed.
+
+`src/sqlfluff-templater-sqlsource` is the sqlfluff templater, a Python project that is published to PyPI and is not part of the solution.  Run its checks in its folder; the first `uv run` creates its virtual environment:
+
+```bash
+uv run --directory src/sqlfluff-templater-sqlsource ruff check
+uv run --directory src/sqlfluff-templater-sqlsource ruff format --check
+uv run --directory src/sqlfluff-templater-sqlsource pytest
+```
+
+Its corpus is written by a test of the solution, and [`tests/README.md`](tests/README.md#the-templaters-corpus) has the command that writes it.
 
 `site/` is the user manual, which docfx builds into the site published at `https://mbcrawfo.github.io/SqlSource/`: the landing page, `site/index.md`, the errors, `site/diagnostics.md`, and three folders, `site/start/`, `site/guides/` and `site/reference/`, each with the `toc.yml` that is its sidebar.  `tools/build-site.sh` builds it into `artifacts/site`, and docfx serves it at `http://localhost:8080` to read it before a pull request:
 
@@ -118,18 +129,18 @@ Run the checks before committing, and all of them before pushing:
 ./pre-commit-validation.sh --full
 ```
 
-It verifies formatting, runs the [linters](tools/README.md#linters), builds the manual's site, builds the solution, runs the tests, checks the two packages, installs the generator's into a project and installs the tool.  It never rewrites files, runs every step even when one fails (the tests and the three package checks are skipped if the build fails), and ends with a summary of what passed, failed and was skipped.
+It verifies formatting, runs the [linters](tools/README.md#linters), checks the templater's Python, builds the manual's site, builds the solution, runs the tests, checks the two packages, installs the generator's into a project and installs the tool.  It never rewrites files, runs every step even when one fails (the tests and the three package checks are skipped if the build fails), and ends with a summary of what passed, failed and was skipped.
 
 A plain run checks only what the uncommitted change (staged, unstaged and untracked) can affect:
 
 - Formatting is limited to the changed `.cs` files, and skipped when none changed; a change to `format.sh` or to a file that configures the formatters checks everything.
-- editorconfig-checker always runs.  shellcheck and shfmt run when a shell script or `.editorconfig` changed, actionlint when a workflow or `tools/actionlint.sh` changed, the site's build when a file under `site/`, `dotnet-tools.json` or `tools/build-site.sh` changed, and the three package checks when a change can alter what is packed or how the packages are checked.
+- editorconfig-checker always runs.  shellcheck and shfmt run when a shell script or `.editorconfig` changed, actionlint when a workflow or `tools/actionlint.sh` changed, the site's build when a file under `site/`, `dotnet-tools.json` or `tools/build-site.sh` changed, the templater's three checks when a file under `src/sqlfluff-templater-sqlsource/` changed, and the three package checks when a change can alter what is packed or how the packages are checked.  A path under the templater's folder, its corpus included, never sets off the package checks.
 - The build and the tests that need no container always run.  A pair of container test projects, PostgreSQL's or SQL Server's, runs only when the change can reach it.  [`tools/test-scopes.txt`](tools/README.md#test-scopes) decides which pair a path can reach.
 - A clean tree, a change to `pre-commit-validation.sh`, a path of a kind the script does not know and a failing `git` command each make the run full.
 
 `--full` runs everything, and every push needs it, on the tree as it will be pushed.  A partial run says so at its end.  `--plan [path ...]` prints what a run would do and why, for the uncommitted change or for the paths given, and runs nothing.
 
-`format.sh` rewrites C# and project files with `dotnet format style`, `dotnet format analyzers` and CSharpier, and `format.sh --check` reports what it would change and rewrites nothing.  Either takes part names, `style`, `analyzers` or `csharpier`, to run only those parts, and `-- file ...` after them to limit the run to those files; CI runs the parts in separate jobs.  [`tools/README.md`](tools/README.md#formatting) has the form.
+`format.sh` rewrites C# and project files with `dotnet format style`, `dotnet format analyzers` and CSharpier, and the templater's Python with ruff, and `format.sh --check` reports what it would change and rewrites nothing.  Either takes part names, `style`, `analyzers`, `csharpier` or `ruff`, to run only those parts, and `-- file ...` after them to limit the run to those files; CI runs the parts in separate jobs.  [`tools/README.md`](tools/README.md#formatting) has the form.
 
 Both `pre-commit-validation.sh` and `format.sh --check` restore packages in locked mode, as CI does, so a `packages.lock.json` that no longer matches its project fails the check.  After changing a package reference or version, update the lock files and commit them:
 

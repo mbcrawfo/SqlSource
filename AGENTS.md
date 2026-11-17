@@ -48,7 +48,7 @@
    - A failure in CI is one you could have found locally, and it costs a full CI run, a fix, another push and another wait.
    - Do not push on the strength of an earlier run, of a run on another commit, or of the belief that a change is too small to break anything.
 3. **Never skip a check.**  Do not commit or push past a failure, and do not edit the script to make one go away.  If a check is wrong, tell the user.
-4. **It needs the full toolchain.**  The script fails when Docker is not running or when the local tools have not been restored.  Fix the environment; see `CONTRIBUTING.md`.
+4. **It needs the full toolchain.**  The script fails when Docker is not running, uv is not installed or the local tools have not been restored.  Fix the environment; see `CONTRIBUTING.md`.
 
 ## Pull requests
 
