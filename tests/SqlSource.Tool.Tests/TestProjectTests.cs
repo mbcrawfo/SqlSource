@@ -30,6 +30,7 @@ public sealed class TestProjectTests
         manifest.DefineConstants.ShouldBe(["DEBUG", "NET10_0"]);
         manifest.BuildFolders.ShouldBe("|/work/obj/");
         manifest.Files.ShouldBe([sql]);
+        // The project's own file comes first, as the build lists the files of the farther folders first.
         manifest.SettingsFiles.ShouldBe([project.SettingsPath, settings]);
         manifest.CompileFiles.ShouldBe([source]);
     }
@@ -65,18 +66,6 @@ public sealed class TestProjectTests
         project.SettingsPath.ShouldBe(folder.PathOf("App/sqlsource.json"));
         JsonNode.DeepEquals(JsonNode.Parse(File.ReadAllText(project.SettingsPath)), project.Settings).ShouldBeTrue();
         file.Dialect.ShouldBe(SqlDialect.SqlServer);
-    }
-
-    // As the build lists the files of the farther folders first.
-    [Fact]
-    public void Manifest_ProjectWithSettingsAndASettingsFileOfAFolder_ListsTheProjectsFileFirst()
-    {
-        using var folder = new TempFolder();
-        var project = new TestProject(folder);
-        var nearer = project.AddSettings("Queries/sqlsource.json", "{}");
-        project.Settings["output"] = "Sql";
-
-        project.Manifest().SettingsFiles.ShouldBe([project.SettingsPath, nearer]);
     }
 
     [Fact]
