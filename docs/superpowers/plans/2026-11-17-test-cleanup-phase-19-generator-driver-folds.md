@@ -49,7 +49,7 @@ Checked against the spec on `09fb7ee7`: no commit since the review's commit `368
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows no changed test made.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-19/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/*.cs` falls.  RoslynFloor passes.
-- [ ] **Step 3:** Run time of `dotnet test --project tests/SqlSource.Tests` before and after, interleaved on this machine with the load beside each figure.
+- [x] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows no changed test made.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-19/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/*.cs` falls.  RoslynFloor passes.
+- [x] **Step 3:** Run time of `dotnet test --project tests/SqlSource.Tests` before and after, interleaved on this machine with the load beside each figure.
 - [ ] **Step 4:** The pull request lists each dropped row or merged test beside its covers, the compare result, the coverage figures and the run times.
