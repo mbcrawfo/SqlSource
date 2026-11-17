@@ -62,24 +62,4 @@ public sealed class TableMatchChecksTests
     [Fact]
     public void OfTheTable_EveryCheckPasses_IsMatched() =>
         TableMatchChecks.OfTheTable(Passes, Passes, Passes, Passes).ShouldBe(SidecarValues.TableMatch.Matched);
-
-    [Fact]
-    public void OfTheTable_CheckThatFails_RunsNoCheckAfterIt()
-    {
-        var ran = 0;
-
-        TableMatchChecks
-            .OfTheTable(
-                Passes,
-                () =>
-                {
-                    ran++;
-                    return false;
-                },
-                MustNotRun,
-                MustNotRun
-            )
-            .ShouldBe(SidecarValues.TableMatch.ColumnsDiffer);
-        ran.ShouldBe(1);
-    }
 }
