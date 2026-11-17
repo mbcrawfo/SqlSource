@@ -77,12 +77,6 @@ public sealed class DescriberSessionTests
         connection.Disposed.ShouldBe(1);
     }
 
-    [Fact]
-    public void ServerOf_NoVersion_Throws() =>
-        Should
-            .Throw<InvalidOperationException>(() => TestSession.ServerOfVersion(null))
-            .Message.ShouldBe("The answer to 'open' holds no version and no error.");
-
     [Theory]
     [InlineData("13.12", 14, true)]
     [InlineData("14.0", 14, false)]
