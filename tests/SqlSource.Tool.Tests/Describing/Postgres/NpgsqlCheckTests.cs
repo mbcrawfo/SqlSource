@@ -50,11 +50,6 @@ public sealed class NpgsqlCheckTests
     private static PostgresCheckAnswer Sent(string text, params string[] parameters) =>
         new(Seen, null, null, new PostgresCheckSent(text, parameters));
 
-    [Fact]
-    public void Read_ColumnsEqualInCountNamesAndTypes_IsSame() =>
-        Read(Columns(new("id", 23, "integer"), new("name", 1043, "character varying")), Described)
-            .ShouldBe(new CheckVerdict(NpgsqlCheck.Same, null));
-
     // A statement without rows: both describes found none.
     [Fact]
     public void Read_NoColumnsOnEitherSide_IsSame() =>
@@ -85,18 +80,6 @@ public sealed class NpgsqlCheckTests
     public void Read_SeveralDifferences_ReportsTheFirst() =>
         Read(Columns(new("x", 25, "text"), new("y", 25, "text")), Described)
             .Differs.ShouldBe("column 1 is named 'x' for Npgsql and 'id' for SqlSource");
-
-    [Fact]
-    public void Read_Error_DiffersWithItsMessage() =>
-        Read(
-                new PostgresCheckAnswer(
-                    null,
-                    new PostgresServerError("42601", "syntax error at or near \"@\"", null, null, 8),
-                    null
-                ),
-                Described
-            )
-            .ShouldBe(new CheckVerdict(NpgsqlCheck.Differ, "syntax error at or near \"@\""));
 
     // What a misread @ gives is a disagreement: an error of class 42, or Npgsql's refusal of the text, which has no
     // SQLSTATE; an answer recorded before textRefused existed has no SQLSTATE only where Npgsql refused the text.

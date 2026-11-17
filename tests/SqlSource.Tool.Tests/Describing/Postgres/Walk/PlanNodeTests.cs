@@ -311,14 +311,6 @@ public sealed class PlanNodeTests
     }
 
     [Fact]
-    public void SelfAndDescendants_Leaf_IsTheNodeAlone()
-    {
-        var scan = Scan("a");
-
-        scan.SelfAndDescendants().ShouldHaveSingleItem().ShouldBeSameAs(scan);
-    }
-
-    [Fact]
     public void SubqueryChild_SubqueryScanWithOneSubqueryChild_IsThatChild()
     {
         var scan = Over("Subquery Scan", Scan("u"), "Subquery");

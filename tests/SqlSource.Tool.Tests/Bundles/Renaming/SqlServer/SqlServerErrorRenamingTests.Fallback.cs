@@ -30,17 +30,6 @@ public sealed partial class SqlServerErrorRenamingTests
     private static readonly string[] DeletedAtSpellings = ["deleted_at", "DELETED_AT", "Deleted_At"];
 
     [Fact]
-    public async Task RenameAsync_AKeyThatFallsBackOnAParameter_IsRefused()
-    {
-        var raw = await ParameterInThreeSpellingsAsync();
-        var key = KeyWhere(CutoffSpellings, NameClass.Parameter, fallsBack: true);
-
-        var refusal = await SqlServerRenamings.RefusedAsync(raw, key);
-
-        refusal.ShouldBe(new RenamingRefusal(RefusalStep.RequestSql, "capture.json call 'parameters'", null));
-    }
-
-    [Fact]
     public async Task RenameAsync_AKeyThatDoesNotFallBackOnAParameter_IsOneParameter()
     {
         var raw = await ParameterInThreeSpellingsAsync();

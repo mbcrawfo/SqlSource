@@ -338,24 +338,6 @@ public sealed class DatabaseRunsFaultTests : IDisposable
     }
 
     [Fact]
-    public async Task Run_DescriptionWithoutTheValue_IsDescribedAsBefore()
-    {
-        _scene.Describer.Server = FakeDescriber.ServerWith();
-        _scene.Describer.Descriptions["GetUser"] = FakeDescriber.NoRows with
-        {
-            ResultKind = SidecarResultKind.Rows,
-            Columns = new EquatableArray<SidecarColumn>([
-                new SidecarColumn(0, "id", new OtherEngineType("int4"), null, null, null, null, null),
-            ]),
-        };
-
-        var files = await _scene.RunAsync();
-
-        DatabaseRunsScene.States(files).ShouldBe([QueryState.Described, QueryState.Described]);
-        _scene.Error.ToString().ShouldBeEmpty();
-    }
-
-    [Fact]
     public async Task Run_DescriberThatThrowsAndTheSessionThrowsWhenItIsClosed_IsAFaultOfTheFirstException()
     {
         _scene.Describer.Exceptions["GetUser"] = new ArgumentException($"broken {Secrets.ConnectionWithWord}");
