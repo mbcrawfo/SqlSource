@@ -735,13 +735,15 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-The type has no member that gives a connection for a database that its repository queries use.  The error is at the type's `[SqlSourceGenerate]`, once for each database without a connection.
+The type has no connection for a database that its repository queries use.  The error is at the type's `[SqlSourceGenerate]`, once for each database without a connection.
 
-A query whose output is `repository` gets an instance method of the type that claims it.  The method takes its connection from one of these members of the type:
+A query whose output is `repository` gets an instance method of the type that claims it.  The method takes its connection from one of these.  The build looks among the members of the type first, then in the factories it holds, then among the `static` members of the project.
 
-- a `string` field, property or primary-constructor parameter named `connectionString`, `_connectionString` or `ConnectionString`;
-- a field, property or primary-constructor parameter of a type that derives from `DbDataSource`;
-- the member that you mark `[SqlSourceConnection]`.
+- a `string` field, property or primary-constructor parameter of the type named `connectionString`, `_connectionString` or `ConnectionString`;
+- a field, property or primary-constructor parameter of the type, of a type that derives from `DbDataSource`;
+- the member of the type that you mark `[SqlSourceConnection]`;
+- a marked member of a factory that the type holds in a field, property or primary-constructor parameter;
+- a marked `static` member of the project.
 
 The repository queries of a database without a connection get no method.  The database is the one that the [database](reference/settings.md#setting-database) setting of the queries names, or the name of their dialect.
 
@@ -754,19 +756,20 @@ public partial class UserRepository
 ```
 
 ```console
-/work/App/UserRepository.cs(1,2): error SQLSRC028: 'App.UserRepository' has no connection for the database 'postgres', which its repository queries use.  Add a string field, property or primary-constructor parameter named connectionString, or one of a DbDataSource type, or mark the member that gives the connection [SqlSourceConnection].  Or set the output of its repository queries to methods.
+/work/App/UserRepository.cs(1,2): error SQLSRC028: 'App.UserRepository' has no connection for the database 'postgres', which its repository queries use.  Add a string field, property or primary-constructor parameter named connectionString, or one of a DbDataSource type, or mark the member that gives the connection [SqlSourceConnection], whether a member of the type, an instance member of a type it holds in a field, property or primary-constructor parameter, or a static member of the project.  Or set the output of its repository queries to methods.
 ```
 
 **Fix:** do one of these.
 
 - Give the type a member that the build finds by its name or type, such as a primary-constructor parameter `NpgsqlDataSource dataSource`.
-- Mark the member that gives the connection `[SqlSourceConnection]`.
+- Mark the member that gives the connection `[SqlSourceConnection]`: a member of the type, a member of a factory that the type holds, or a `static` member of the project.
+- **A `static` member of the project gives the connection only to the types that can reach it.**  A `private` member of another class gives none.  Make it `internal` or `public`.
 - **When a member is marked, no other is found by its name or type.**  Also mark the member that gives this database its connection.
-- **The type passes a primary-constructor parameter to its base type, or uses it to initialize a field or property.**  Then the parameter is not found by its name or type, and the message names it.  Keep the value in a field or property named `connectionString` or of a `DbDataSource` type.  Or mark the parameter `[SqlSourceConnection]`.
-- **When the repository queries of the type use more than one database, no member is found by its name or type.**  Nothing says which database the member is for.  Mark one member for each database, as `[SqlSourceConnection(Database = "reports")]`.
+- **The type passes a primary-constructor parameter to its base type, or uses it to initialize a field or property.**  Then the parameter is not found by its name or type, and the message names it.  For a type whose repository queries use one database, the build then looks neither in a factory nor among the `static` members of the project.  Keep the value in a field or property named `connectionString` or of a `DbDataSource` type.  Or mark the parameter `[SqlSourceConnection]`.
+- **When the repository queries of the type use more than one database, no member is found by its name or type.**  Nothing says which database the member is for.  Mark one member for each database, as `[SqlSourceConnection(Database = "reports")]`.  A factory or a `static` member of the project can give the connection too, marked for the database or without a `Database`.
 - Set the [output](reference/settings.md#setting-output) of the queries to `methods`.  Their methods take the connection as an argument.
 
-See: [The connection](reference/repository-connections.md#repository-connection)
+See: [Where the build looks](reference/repository-connections.md#connection-order), [the connection](reference/repository-connections.md#repository-connection)
 
 ## SQLSRC029
 
@@ -782,7 +785,11 @@ The members are one of these:
 
 - two members that the build finds by their name or type;
 - two members marked `[SqlSourceConnection]` for the same database that both return a `Task` or `ValueTask`, or both do not;
-- three or more marked members for the same database.
+- three or more marked members for the same database;
+- two such marked members of the factories that the type holds, as when two fields hold one factory type;
+- two such marked `static` members of the project.
+
+The members of the type come first, then those of its factories, then the `static` members of the project.  The build takes its members from the first of these that has any for the database, so members of two of them are never counted together.  The message names a member of a factory through its holder, `'_main.OpenAsync'`, with its interface when the build reaches it through the interface, as an explicit implementation, `'_main.IAuditFactory.OpenAsync'`, and a `static` member through its type, `'Db.Main'`.
 
 ```csharp
 [SqlSourceGenerate]
@@ -801,6 +808,7 @@ public partial class UserRepository
 
 - Mark the member to use `[SqlSourceConnection]`.  The others are then left alone.
 - **When several members are marked**, leave one marked for the database.  Or set the `Database` of each to the database that it connects to.
+- **When two fields hold factories with marked members**, keep one of the fields.  Or mark a member of the type itself that gives the database its connection, which then wins over both factories.
 
 A database can keep two marked members when exactly one of them is a method that returns a `Task` or `ValueTask` of a connection.  Its asynchronous methods get their connection from that one, and its synchronous methods from the other.  The other can be a connection string, a data source, a connection or a method that returns a connection.  This sample shows such a pair, which is allowed:
 
@@ -818,7 +826,7 @@ public partial class UserRepository
 
 - **A primary-constructor parameter is found by its name or type only when no field or property of the type or of a base type is.**  So a parameter that the type stores in a field of its own gives one connection, the field.
 
-See: [The connection](reference/repository-connections.md#repository-connection)
+See: [The connection](reference/repository-connections.md#repository-connection), [a factory that a repository holds](reference/repository-connections.md#held-factory)
 
 ## SQLSRC030
 
@@ -831,6 +839,8 @@ A type gets this error only when it claims a query whose output is `repository`.
 A member is marked `[SqlSourceConnection]` without a `Database`, and the repository queries of the type use more than one database.  The error is at the member.
 
 The build cannot tell which database the member connects to.  Each database that no member is marked for by name gets no repository method until it is fixed.
+
+A member of a factory that the type holds, or a `static` member of the project, marked without a `Database` does not get this error.  It serves each database that no other mark names: see [which database a shared mark is for](reference/repository-connections.md#shared-marks).
 
 ```csharp
 [SqlSourceGenerate]
@@ -870,6 +880,8 @@ The cause is one of these:
 
 The member gives no method its connection, so the warning leaves out no method.  The build compares the name of a database without regard to case.
 
+A member of a factory that the type holds, or a `static` member of the project, marked for a database that the type does not use gets no warning.  It serves other repositories: see [which database a shared mark is for](reference/repository-connections.md#shared-marks).
+
 ```csharp
 [SqlSourceGenerate]
 public partial class UserRepository
@@ -907,11 +919,16 @@ See: [The connection](reference/repository-connections.md#repository-connection)
 
 Reported by: the build.
 
-A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
+A member of a repository, or of a factory that it holds, gets this error only when the repository claims a query whose output is `repository`.  A `static` member of the project, outside every type marked `[SqlSourceGenerate]`, gets it whatever the queries.  The queries that get no method still get their models.
 
-A member marked `[SqlSourceConnection]` cannot give a repository method its connection.  The error is at the member.
+A member marked `[SqlSourceConnection]` cannot give a repository method its connection.  Where the error is depends on where the member is:
 
-The repository queries of the database of the member get no method.  When the member names no database, the repository queries of every database get no method.
+- **A member of the type.**  The error is at the member.
+- **A member of a factory that the type holds.**  The error is at the holder, in each type that would use the member.  The message names the member through its holder: `'IConnectionFactory.OpenAsync' reached through 'connections'`, by the holder's type, or by the interface for a member reached through it.
+- **A `static` member of the project.**  The error is at the member, once, whether a type uses it or not.  The message names the member's own type in place of a repository.
+- **A `static` member of a base type of a type marked `[SqlSourceGenerate]`.**  It is that type's own member, so the error is at the member, in each repository that derives from the base type and needs the member.
+
+The repository queries of the database of the member get no method.  When the member names no database, the repository queries of every database get no method.  A `static` member of the project with this error is never a source, so a type that needs it gets [SQLSRC028](#sqlsrc028).
 
 A connection comes from one of these members:
 
@@ -919,6 +936,16 @@ A connection comes from one of these members:
 - a method that is not generic and takes nothing or one `CancellationToken`.  It must return a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of such a type.
 
 An indexer, a property without a getter, an accessor, an operator and an explicit implementation of an interface's member are none of these either.
+
+A marked interface member that a `ref struct` factory implements explicitly cannot give the connection either, since a `ref struct` cannot be cast to its interface.  Implement it implicitly, as a `public` member of the `ref struct`.
+
+A `static` member of the project also gets this error in these cases, since a method cannot reach it:
+
+- It is in a generic type, or in a type nested in one.
+- It is in a `file` type, or in a type nested in one.
+- It is a `static abstract` or `static virtual` member of an interface.
+
+A mark that can never give a connection gets this error at the mark too.  It is a mark on a parameter of a method, or of the primary constructor of a type that is not marked `[SqlSourceGenerate]`.  It is also a mark on a lambda, a local function or an enum member.
 
 ```csharp
 [SqlSourceGenerate]
@@ -933,11 +960,26 @@ public partial class UserRepository
 /work/App/UserRepository.cs(4,30): error SQLSRC032: 'Connect' of 'App.UserRepository' is marked [SqlSourceConnection], and cannot give a connection.  Mark a field, property or primary-constructor parameter of a string, a DbDataSource or a DbConnection, or a method that is not generic, takes nothing or a CancellationToken, and returns a string, a DbConnection, or a Task or ValueTask of a DbConnection.
 ```
 
-**Fix:**
+```csharp
+public static class Connections<T>
+{
+    [SqlSourceConnection]
+    public static string Main = "";
+}
+```
 
-1. Mark a member of one of the shapes above.
+```console
+/work/App/Connections.cs(4,26): error SQLSRC032: 'Main' of 'App.Connections<T>' is marked [SqlSourceConnection], and cannot give a connection.  Mark a field, property or primary-constructor parameter of a string, a DbDataSource or a DbConnection, or a method that is not generic, takes nothing or a CancellationToken, and returns a string, a DbConnection, or a Task or ValueTask of a DbConnection.
+```
 
-See: [The connection](reference/repository-connections.md#repository-connection)
+**Fix:** do the one that fits.
+
+- Mark a member of one of the shapes above.
+- Implement a marked interface member of a `ref struct` factory implicitly.
+- Move a `static` member of the project out of a generic or `file` type.
+- Remove a mark that can never give a connection.
+
+See: [The connection](reference/repository-connections.md#repository-connection), [a factory that a repository holds](reference/repository-connections.md#held-factory), [a static member of the project](reference/repository-connections.md#static-connection)
 
 ## SQLSRC033
 
@@ -947,12 +989,14 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-The member that gives a database its connection is of a type of the other engine's driver.  The error is at the member.  The type of the member is one of these:
+The member that gives a database its connection is of a type of the other engine's driver.  The error is at the member of the type, at the holder for a member of a factory that the type holds, and at the type's `[SqlSourceGenerate]` for a `static` member of the project.  The type of the member is one of these:
 
 - an Npgsql type, such as `NpgsqlDataSource`, for a SQL Server database;
 - a Microsoft.Data.SqlClient type, such as `SqlConnection`, for a PostgreSQL database.
 
 The repository queries of that database get no method.
+
+A member of a factory, or a `static` member of the project, that is marked without a `Database` does not get this error.  A database of the other engine leaves it out.  Only a mark that names the database gets the error.
 
 ```csharp
 [SqlSourceGenerate]
@@ -968,8 +1012,9 @@ public partial class OrderRepository(NpgsqlDataSource dataSource);
 1. Give the database a member of its own engine's driver, or of `DbDataSource` or `DbConnection`.
 2. If the member is a connection, mark it `[SqlSourceConnection]`.
 3. If the type uses several databases, mark the member for its database, as `[SqlSourceConnection(Database = "mssql")]`.
+4. If the member belongs to a factory or is a `static` member of the project, correct the `Database` of its mark.
 
-See: [The connection](reference/repository-connections.md#repository-connection)
+See: [The connection](reference/repository-connections.md#repository-connection), [which database a shared mark is for](reference/repository-connections.md#shared-marks)
 
 ## SQLSRC034
 
@@ -1043,7 +1088,7 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-The primary-constructor parameter that gives a database its connection has the name of an argument of the repository methods.  The error is at the parameter.  The name is one of these:
+The primary-constructor parameter that gives a database its connection, or that holds the factory it comes from, has the name of an argument of the repository methods.  The error is at the parameter.  The name is one of these:
 
 - `cancellationToken`, which every asynchronous repository method takes as an argument.  This name is refused whatever the `method-type` of the queries.
 - `parameters`, which a method takes as its input model when its query has parameters.  A parameter named `parameters` is an error only when a repository query of that database has parameters.
@@ -1062,9 +1107,9 @@ public partial class UserRepository(NpgsqlDataSource parameters);
 **Fix:** do one of these.
 
 - Rename the parameter.
-- Store the parameter in a field or property of the type, which is then the connection.  Mark that member `[SqlSourceConnection]` when it is not found by its name or type.
+- Store the parameter in a field or property of the type, which is then the connection or holds the factory.  Mark that member `[SqlSourceConnection]` when it is a connection that is not found by its name or type.
 
-See: [The connection](reference/repository-connections.md#repository-connection)
+See: [The connection](reference/repository-connections.md#repository-connection), [a factory that a repository holds](reference/repository-connections.md#held-factory)
 
 ## SQLSRC037
 
@@ -4728,7 +4773,7 @@ The name is taken in each of these cases:
 
 - **Under the [member location](reference/member-placement.md#locations) `extension-class`, it is the name of the extension class that holds the method.**  It is also taken by a member of `DbConnection` or of `object`, such as `Open` or `ToString`.  A call on a connection would find that member before the extension method.  `extension-class` is the default of the output `methods`.
 - **Under `class`, it is the name of a member of the type, of the type itself, or of one of its type parameters.**  It is also taken by the constant or token method of another query of the type, when that method is on the type too.  A nested class that the queries of the type put members in also takes it.
-- **For a `repository` query, it is also the name of the member that its method gets its connection from.**  That is the member of a base type, or the primary-constructor parameter, which the method would hide.
+- **For a `repository` query, it is also the name of the member that its method gets its connection from, or of the field, property or parameter that holds the factory it comes from.**  That is the member of a base type, or the primary-constructor parameter, which the method would hide.
 - **For a synchronous method of a `repository` query that takes no argument, it is also the name `Finalize`.**  Such a method has no parameters and no tokens.  A method of that name and no argument would be taken for the finalizer of the type, and the compiler warns of it.  The asynchronous method of the query, which takes a cancellation token, is not refused.  Nor is a synchronous method that takes a parameter or a token.
 - **For a public method of a `repository` query, it is also the name of the [interface](#sqlsrc035) of the type.**  The interface holds the method too, and a member of it cannot have its name.  The interface is still generated, without the method.
 - **Under `nested-class`, it is the name of the constant, token method or method of another query of the type in the same class.**  That query may come from another file of the type.
@@ -4767,7 +4812,7 @@ A token of a query whose output is `repository` or `methods` has the name of an 
 
 A token is an argument of the method too, so it cannot take one of these names.  That holds even in a query without parameters, whose method has no `parameters`.  So the method is not generated.
 
-A token of a `repository` query also cannot take the name of what its method gets its connection through.  The argument of the token would hide it.  That is the primary-constructor parameter that gives the connection, or the type, when the connection comes from a `static` member of the type.
+A token of a `repository` query also cannot take the name of what its method gets its connection through.  The argument of the token would hide it.  That is the primary-constructor parameter that gives the connection or holds the factory it comes from, or the type, when the connection comes from a `static` member of the type or a factory in one.
 
 The first sample is a token with the name of an argument.  The second is a token with the name of the primary-constructor parameter:
 

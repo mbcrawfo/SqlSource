@@ -1,3 +1,4 @@
+using System;
 using SqlSource.Diagnostics;
 
 namespace SqlSource.Generation.Repositories;
@@ -9,7 +10,9 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="Name">The member's name, as a value: without the <c>@</c> of an escaped keyword.</param>
 /// <param name="Member">What kind of member it is.</param>
 /// <param name="Type">What it gives.</param>
-/// <param name="IsAsync">Whether it is a factory that returns a <c>Task</c> or a <c>ValueTask</c>.</param>
+/// <param name="IsAsync">
+/// Whether it is a method that returns a <c>Task</c> or a <c>ValueTask</c> of a connection.
+/// </param>
 /// <param name="TakesCancellationToken">Whether it is a method that takes a <c>CancellationToken</c>.</param>
 /// <param name="IsStatic">Whether it is a static member.</param>
 /// <param name="IsInherited">Whether it is a member of a base type.</param>
@@ -19,10 +22,30 @@ namespace SqlSource.Generation.Repositories;
 /// </param>
 /// <param name="DeclaredTypeName">
 /// The metadata name, with its namespace, of the member's type, of a method's return type, or of the connection type
-/// of a factory's task.
+/// of a method's task.
 /// </param>
 /// <param name="Location">
 /// Where the member is declared, or where the type's attribute is for a member of a base type in metadata.
+/// </param>
+/// <param name="Tier">
+/// Where the candidate is found: in the repository, in a holder it holds, or anywhere in the project.
+/// </param>
+/// <param name="Holder">
+/// The member of the repository that holds the candidate's object, for a held candidate; else null.
+/// </param>
+/// <param name="GlobalTypeText">
+/// The fully qualified type that declares a global candidate, such as <c>global::App.Outer.Db</c>; else null.
+/// </param>
+/// <param name="CastTypeText">
+/// The fully qualified interface, such as <c>global::App.IDatabaseFactory</c>, that a held candidate's holder is cast
+/// to before the member is reached, when the holder's class or struct cannot be called by the member's name: it
+/// implements the member explicitly, hides its implementation with a new member, or leaves it to the interface's
+/// default.  Null for any other candidate.
+/// </param>
+/// <param name="CastTypeName">
+/// The interface of <paramref name="CastTypeText" /> as a message names it: its own name and its type arguments, such
+/// as <c>IFactory&lt;NpgsqlConnection&gt;</c>, without its namespace or the <c>@</c> of an escaped keyword.  Null when
+/// <paramref name="CastTypeText" /> is.
 /// </param>
 internal sealed record ConnectionCandidate(
     string Name,
@@ -35,5 +58,44 @@ internal sealed record ConnectionCandidate(
     bool IsMarked,
     string? Database,
     string DeclaredTypeName,
-    LocationInfo Location
-);
+    LocationInfo Location,
+    CandidateTier Tier = CandidateTier.Own,
+    CandidateHolder? Holder = null,
+    string? GlobalTypeText = null,
+    string? CastTypeText = null,
+    string? CastTypeName = null
+)
+{
+    /// <summary>
+    /// The name that a message gives the candidate: its own for an own one, the holder's then a dot then its own for a
+    /// held one, with <see cref="CastTypeName" /> and a dot before its own for one reached through a cast, so that a
+    /// member of one name of two interfaces is named apart, and the declaring type's simple name, without the
+    /// <c>@</c> of an escaped keyword, then a dot then its own for a global one.
+    /// </summary>
+    public string DisplayName =>
+        Tier switch
+        {
+            CandidateTier.Own => Name,
+            CandidateTier.Held when Holder is not null && CastTypeName is not null => Holder.Name
+                + "."
+                + CastTypeName
+                + "."
+                + Name,
+            CandidateTier.Held when Holder is not null => Holder.Name + "." + Name,
+            CandidateTier.Global when GlobalTypeText is not null => SimpleNameOf(GlobalTypeText) + "." + Name,
+            _ => Name,
+        };
+
+    // The last name of the text, after its last dot or, for a type of the global namespace, the colons of global::, as
+    // a value: without the @ of an escaped keyword, which the text keeps for access.
+    private static string SimpleNameOf(string typeText)
+    {
+        var start = Math.Max(typeText.LastIndexOf('.'), typeText.LastIndexOf(':')) + 1;
+        if (start < typeText.Length && typeText[start] == '@')
+        {
+            start++;
+        }
+
+        return typeText.Substring(start);
+    }
+}

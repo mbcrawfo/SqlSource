@@ -187,32 +187,31 @@ internal static class CommandWriter
     // The statements that get a repository's method its connection from its source, into the connection's local: a
     // new connection of the engine's driver from a connection string, one opened from a data source, or the one a
     // factory returns, each disposed when the method ends, as the command and the reader are, or a borrowed one, which
-    // is not.  A source that is null throws.
+    // is not.  A source that is null, or the holder of a held one, throws.
     private static void AppendAcquire(in QueryMethodContext context, ConnectionSource source, string indent)
     {
         var builder = context.Builder;
         var locals = context.Locals;
         var spelling = context.Spelling;
-        var access = locals.SourceAccess;
         _ = builder.Append(indent).Append("var ").Append(locals.Connection).Append(" = ");
         switch (source.Kind)
         {
             case ConnectionSourceKind.ConnectionString:
                 _ = builder.Append("new ").Append(context.Method.Engine.ConnectionTypeText()).Append('(');
-                AppendSourceOrThrow(builder, spelling, source, access);
+                AppendSourceOrThrow(builder, spelling, source, locals);
                 _ = builder.Append(')');
                 break;
             case ConnectionSourceKind.DataSource:
                 // The data source, or its throw, is the call's target, in parentheses.
                 _ = spelling.AppendAwait(builder).Append('(');
-                AppendSourceOrThrow(builder, spelling, source, access);
+                AppendSourceOrThrow(builder, spelling, source, locals);
                 _ = spelling.AppendCallMember(builder.Append(')'), DriverCall.OpenConnection);
                 _ = spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
                 _ = spelling.AppendCallEnd(builder);
                 break;
             case ConnectionSourceKind.Factory:
             case ConnectionSourceKind.Borrowed:
-                AppendSourceOrThrow(builder, spelling, source, access);
+                AppendSourceOrThrow(builder, spelling, source, locals);
                 break;
             default:
                 throw UnexpectedEnumValueException.Of(source.Kind);
@@ -226,21 +225,42 @@ internal static class CommandWriter
     }
 
     // The source's value, or the exception that says it is null: its member, as the method reaches it, read, or called
-    // with the token when it takes one, the method's or default, and awaited when it is an asynchronous factory.
+    // with the token when it takes one, the method's or default, and awaited when it is an asynchronous factory.  The
+    // holder that the access starts with, when the locals give one to check, is checked first, in parentheses, and the
+    // member is read from what the check gives, cast to the interface when the source has one to cast it to.
     private static void AppendSourceOrThrow(
         StringBuilder builder,
         CallSpelling spelling,
         ConnectionSource source,
-        string access
+        QueryMethodLocals locals
     )
     {
+        var access = locals.SourceAccess;
+        var holder = locals.SourceHolder;
         var isAwaited = source is { Kind: ConnectionSourceKind.Factory, IsAsync: true };
         if (isAwaited)
         {
             _ = spelling.AppendAwait(builder);
         }
 
-        _ = builder.Append(access);
+        if (holder.Length > 0)
+        {
+            var cast = source.HolderCastText;
+            _ = builder.Append('(');
+            if (cast is not null)
+            {
+                _ = builder.Append('(').Append(cast).Append(")(");
+            }
+
+            _ = builder.Append(holder);
+            AppendThrowIfNull(builder, locals.SourceHolderName, source.TypeName);
+            _ = builder.Append(cast is null ? ")" : "))").Append(access, holder.Length, access.Length - holder.Length);
+        }
+        else
+        {
+            _ = builder.Append(access);
+        }
+
         if (source.Member == CandidateMember.Method)
         {
             _ = builder.Append('(');
@@ -252,16 +272,20 @@ internal static class CommandWriter
             _ = isAwaited ? spelling.AppendCallEnd(builder) : builder.Append(')');
         }
 
+        AppendThrowIfNull(builder, source.MemberName, source.TypeName);
+    }
+
+    // The ?? and the exception it throws, which says that the source, or the holder of a held one, of the name is null.
+    internal static void AppendThrowIfNull(StringBuilder builder, string name, string typeName) =>
         _ = builder
             .Append(" ?? throw new global::System.InvalidOperationException(")
             .Append(
                 SymbolDisplay.FormatLiteral(
-                    "The connection source '" + source.MemberName + "' of '" + source.TypeName + "' is null.",
+                    "The connection source '" + name + "' of '" + typeName + "' is null.",
                     quote: true
                 )
             )
             .Append(')');
-    }
 
     // Each parameter of the input, in a block of its own, bound by the binder of the method's engine into the command,
     // a query method's or a collection method's batch command, from the input, the argument or the item.  A list binds

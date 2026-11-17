@@ -111,7 +111,7 @@ The same holds for an array of a library's type, such as NodaTime's or NetTopolo
 - **Every type that [the table](types.md#type-table) gives a C# type is sent and read on Npgsql 8, 9 and 10.**  Each is sent and read as the C# type in the column of that version.  SqlSource is tested on Npgsql 8 and 10.
 - **Npgsql 8 and 9 do not read `cube`.**  It is sent and read on Npgsql 10.
 - **The types of NodaTime and NetTopologySuite are sent and read on each version of Npgsql too.**  A type of [NodaTime](libraries.md#nodatime) is sent and read with its `Npgsql.NodaTime`, and a type of [NetTopologySuite](libraries.md#nettopologysuite) with its `Npgsql.NetTopologySuite`.
-- **NodaTime's types need `UseNodaTime()` on the data source.**  A method that reads or sends a [NodaTime](libraries.md#nodatime) type runs only on a connection of a data source whose builder called `UseNodaTime()`, of `Npgsql.NodaTime`.  For a repository, that is the data source that is its connection source, or the one that its factory method opens connections from.  It is never a connection string.  Without the call, Npgsql throws `InvalidCastException` when the query runs: "Reading as 'NodaTime.Instant' is not supported for fields having DataTypeName 'timestamp with time zone'", or the same for writing.  Call it on the builder:
+- **NodaTime's types need `UseNodaTime()` on the data source.**  A method that reads or sends a [NodaTime](libraries.md#nodatime) type runs only on a connection of a data source whose builder called `UseNodaTime()`, of `Npgsql.NodaTime`.  For a repository, that is the data source that is its connection source, or the one that its marked method opens connections from.  It is never a connection string.  Without the call, Npgsql throws `InvalidCastException` when the query runs: "Reading as 'NodaTime.Instant' is not supported for fields having DataTypeName 'timestamp with time zone'", or the same for writing.  Call it on the builder:
 
   ```csharp
   var builder = new NpgsqlDataSourceBuilder(connectionString);
@@ -195,4 +195,4 @@ So the repository reads and sends no type that needs a plugin or a mapping, as [
 **What to do.**  Give the repository a connection source that has the plugins and mappings: see [the connection](../../repository-connections.md#repository-connection).  Npgsql itself recommends a data source over a connection string.  Use one of these:
 
 - the `NpgsqlDataSource` that your application builds, with the plugins and mappings;
-- a factory method that opens a connection from that data source.
+- a marked method that returns a connection that it opens from that data source.

@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
@@ -8,6 +7,7 @@ using SqlSource.Generation.Repositories;
 using SqlSource.Settings;
 using SqlSource.Testing.Snapshot;
 using Xunit;
+using static SqlSource.Tests.Generation.Repositories.ResolverCandidates;
 
 namespace SqlSource.Tests.Generation.Repositories;
 
@@ -718,47 +718,4 @@ public sealed class ConnectionResolverTests
 
     private static ConnectionResolution Resolve(ConnectionCandidate[] candidates, params NeededDatabase[] needed) =>
         ConnectionResolver.Resolve(TestModels.Type(), Shape(candidates), needed);
-
-    private static RepositoryShape Shape(params ConnectionCandidate[] candidates) =>
-        new("App.UserRepository", TestSidecars.Of(candidates), [], true, "IUserRepository", null);
-
-    // A candidate declared at a place of its own in the type's file, a field of a string unless the test says
-    // otherwise.
-    private static ConnectionCandidate Candidate(
-        string name,
-        CandidateType type,
-        CandidateMember member = CandidateMember.Field,
-        bool isMarked = false,
-        string? database = null,
-        string? declared = null
-    ) =>
-        new(
-            name,
-            member,
-            type,
-            IsAsync: false,
-            TakesCancellationToken: false,
-            IsStatic: false,
-            IsInherited: false,
-            isMarked,
-            database,
-            declared ?? DeclaredOf(type),
-            new LocationInfo(TestModels.SourceFile, new TextSpan(100 + name.Length, name.Length), default)
-        );
-
-    // A marked factory that returns a task of a connection, for the database when the test names one.
-    private static ConnectionCandidate AsyncFactory(string name, string? database = null) =>
-        Candidate(name, CandidateType.Factory, CandidateMember.Method, isMarked: true, database: database) with
-        {
-            IsAsync = true,
-        };
-
-    private static string DeclaredOf(CandidateType type) =>
-        type switch
-        {
-            CandidateType.DataSource => "System.Data.Common.DbDataSource",
-            CandidateType.Connection or CandidateType.Factory => "System.Data.Common.DbConnection",
-            CandidateType.ConnectionString or CandidateType.Unsupported => "System.String",
-            _ => throw new ArgumentOutOfRangeException(nameof(type)),
-        };
 }

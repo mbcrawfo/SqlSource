@@ -47,7 +47,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var fileLevels = ReadSettings(claims.SqlFiles, settingsFiles);
         var parsedFiles = ParseFiles(context, claims.SqlFiles, settingsFiles, claims.ClaimedPaths);
         var typeQueries = SelectTypeQueries(claims.ClaimingTypes, parsedFiles.Sorted, fileLevels);
-        var repositories = ReadRepositories(context, typeQueries);
+        var globalMarks = ReportGlobalConnections(context, claims.ClaimingTypes);
+        var repositories = ReadRepositories(context, typeQueries, globalMarks);
         var sidecars = CheckSidecars(context, claims.ClaimedPaths, typeQueries, parsedFiles, claims.RepeatedPaths);
         var typing = TypeFiles(context, sidecars.Checks, parsedFiles.Sorted, fileLevels);
         var converters = FindConverters(context, typing.MappedTypeConverters, typing.TypingLibraryProbe);
@@ -360,6 +361,54 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WithTrackingName(TrackingNames.TypeQueries);
     }
 
+    // The project's marks of global connections, with the broken ones reported once, whatever the repositories.  The
+    // transform reads the marked symbol alone, and runs again only for a changed file; the check, which asks what a
+    // member gives and where it is, runs on every compilation, as RepositoryShapes does, and its value is equal until a
+    // problem changes.  It passes over the statics of every type marked [SqlSourceGenerate] and of their base types,
+    // which the repositories' own candidates read.
+    private static IncrementalValueProvider<EquatableArray<GlobalMark>> ReportGlobalConnections(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TypeFiles> claimingTypes
+    )
+    {
+        // The same value until a type comes to carry the attribute or loses it.
+        var repositories = claimingTypes
+            .Select(static (type, _) => type.Type.MetadataName)
+            .Collect()
+            .Select(
+                static (names, _) =>
+                    new EquatableArray<string>(
+                        names
+                            .Distinct(StringComparer.Ordinal)
+                            .OrderBy(static name => name, StringComparer.Ordinal)
+                            .ToImmutableArray()
+                    )
+            );
+
+        var marks = context
+            .SyntaxProvider.ForAttributeWithMetadataName(
+                AttributeSource.ConnectionAttributeMetadataName,
+                static (node, _) => GlobalMarkReader.IsCandidate(node),
+                GlobalMarkReader.Read
+            )
+            .WhereNotNull()
+            .Collect()
+            .Select(static (each, _) => GlobalMarkReader.Sort(each))
+            .WithTrackingName(TrackingNames.GlobalConnectionMarks);
+
+        var checks = marks
+            .Combine(repositories)
+            .Combine(context.CompilationProvider)
+            .Select(
+                static (input, cancellationToken) =>
+                    GlobalConnections.Check(input.Left.Left, input.Left.Right, input.Right, cancellationToken)
+            )
+            .WithTrackingName(TrackingNames.GlobalConnectionChecks);
+        context.RegisterSourceOutput(checks, ReportAll);
+
+        return marks;
+    }
+
     // The candidates for a repository's connection and the settings and name of its interface, of each type that has a
     // repository query.  The read runs on every compilation, as the lookups of the models' names do: a base type, or a
     // type with the interface's name, may be declared in a file that ForAttributeWithMetadataName does not read again.
@@ -367,7 +416,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     // costs it nothing.
     private static IncrementalValueProvider<EquatableArray<RepositoryShape>> ReadRepositories(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<TypeQueries> typeQueries
+        IncrementalValuesProvider<TypeQueries> typeQueries,
+        IncrementalValueProvider<EquatableArray<GlobalMark>> globalMarks
     )
     {
         var interfacesOn = context
@@ -387,10 +437,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         var shapes = repositoryTypes
             .Combine(context.CompilationProvider)
-            .Combine(interfacesOn)
+            .Combine(interfacesOn.Combine(globalMarks))
             .Select(
                 static (input, cancellationToken) =>
-                    RepositoryShapeReader.Read(input.Left.Left, input.Left.Right, input.Right, cancellationToken)
+                    RepositoryShapeReader.Read(
+                        input.Left.Left,
+                        input.Left.Right,
+                        input.Right.Left,
+                        input.Right.Right,
+                        cancellationToken
+                    )
             )
             .WithTrackingName(TrackingNames.RepositoryShapes);
 

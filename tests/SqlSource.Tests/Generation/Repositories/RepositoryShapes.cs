@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -29,17 +30,20 @@ internal static class RepositoryShapes
 
     // The shape of the source's one marked type, at Repository on Npgsql 10, with the usings of the tests before it,
     // and the .sql file it claims by its name, of one query, since the generator reads the shape of a type with a
-    // repository query alone.  The properties are what MSBuild tells the generator.
+    // repository query alone.  The properties are what MSBuild tells the generator, and the source is C# 12 unless the
+    // test needs a newer one.
     public static RepositoryShape Of(
         string source,
         IReadOnlyDictionary<string, string?>? properties = null,
-        MetadataReference[]? references = null
+        MetadataReference[]? references = null,
+        LanguageVersion languageVersion = LanguageVersion.CSharp12
     )
     {
         var run = GeneratorHarness.Run(
             OutputKind.Repository,
             [new SourceFile(GeneratorHarness.SourcePath, Usings + source)],
             [new SqlFile("/app/Repo/" + MarkedTypeNameOf(source) + ".sql", SqlTexts.GetUser)],
+            languageVersion: languageVersion,
             references: [NpgsqlReferences.Npgsql10, .. references ?? []],
             properties: properties
         );
@@ -49,6 +53,12 @@ internal static class RepositoryShapes
             .Single<EquatableArray<RepositoryShape>>(run, TrackingNames.RepositoryShapes)
             .ShouldHaveSingleItem();
     }
+
+    // The line, from 0, of the file that Of compiles that holds the first line of the source with the text.
+    public static int LineOf(string source, string text) =>
+        Usings.Split('\n').Length
+        - 1
+        + source.Split('\n').ToList().FindIndex(line => line.Contains(text, StringComparison.Ordinal));
 
     // The name of the type that carries the attribute, which names the .sql file it claims.
     private static string MarkedTypeNameOf(string source) =>

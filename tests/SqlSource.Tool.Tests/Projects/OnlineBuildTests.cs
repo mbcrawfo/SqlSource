@@ -138,24 +138,13 @@ public sealed class OnlineBuildTests : IDisposable
         run.Manifest.ShouldContain("File=" + SqlFile);
     }
 
-    // The build looks for a .env in the project's folder alone, as the tool does.
-    [Fact]
-    public async Task Build_AutoWithADotEnvInAFolderAbove_RunsNothing()
-    {
-        _ = _fixtures.WriteFile(".env", DotEnvText);
-
-        await PassesAsync(NoVariables);
-
-        StandIn.RunsIn(_folder).ShouldBeEmpty();
-        OnlineFiles().ShouldBeEmpty();
-    }
-
     // Under auto the build goes online exactly when the tool, given the command the build gives it, reads a file, and
     // that is the file the layout means, by its path from the folder of the copies.  A build under true shows the
     // command when auto runs nothing.  A folder's path given with a trailing separator ends in a \ on Windows, which
     // the tool would read with the closing quote as a path holding a ", and fail to read, unless the build doubles it.
     [Theory]
     [InlineData("the project's .env", "Online/.env")]
+    // The build looks for a .env in the project's folder alone, as the tool does.
     [InlineData("a .env above", null)]
     [InlineData("SqlSourceEnvFile relative", "shared.env")]
     [InlineData("SqlSourceEnvFile absolute", "shared.env")]
@@ -228,14 +217,6 @@ public sealed class OnlineBuildTests : IDisposable
         );
 
         StandIn.RunsIn(_folder).ShouldHaveSingleItem().Arguments.Skip(3).ShouldBe(["--online", "auto"]);
-    }
-
-    [Fact]
-    public async Task Build_TrueWithoutAConnectionSource_RunsTheTool()
-    {
-        await PassesAsync(NoVariables, "-p:SqlSourceOnline=true");
-
-        StandIn.RunsIn(_folder).ShouldHaveSingleItem().Arguments.TakeLast(2).ShouldBe(["--online", "true"]);
     }
 
     // The variables the CI services set keep every build offline, under auto with a connection source and under true.
