@@ -1,6 +1,6 @@
 # Give a repository its connection
 
-Give a repository its connection string, data source or connection factory, from dependency injection or a service of your own.
+Give a repository its connection string, data source or a method that returns a connection, from dependency injection, a service of your own, or a factory that every repository shares.
 
 **Use this when** a repository must get its connection from a member that the build does not find by itself, such as a service of yours.  Use it too to make a SQL Server repository from a connection string, or to share one factory or connection string among all your repositories.
 
@@ -119,7 +119,7 @@ builder.Services.AddSingleton<IOrderRepository, OrderRepository>();
 
 - **A repository holds a factory in a field, a property or a primary-constructor parameter, whose type has a marked member.**  The holder needs no mark.  See [a factory that a repository holds](../reference/repository-connections.md#held-factory).
 - **A member of the repository wins over the factory.**  The build uses the factory only for a database that the repository's own members do not give a connection.  See [where the build looks](../reference/repository-connections.md#connection-order).
-- **The marked member is one of the four kinds of source.**  A method is a factory, whose connection the repository method disposes.  See [the connection](../reference/repository-connections.md#repository-connection).
+- **The marked member is one of the four kinds of source.**  The repository method disposes the connection that a marked method returns.  See [the connection](../reference/repository-connections.md#repository-connection).
 - **For synchronous methods, mark a second member that returns no task**, such as `NpgsqlConnection Open()`, beside `OpenAsync`.  See [the connection](../reference/repository-connections.md#repository-connection).
 - **If the holder is null, the method throws `InvalidOperationException`, which names the holder.**  See [a factory that a repository holds](../reference/repository-connections.md#held-factory).
 
@@ -171,7 +171,7 @@ public partial class UserRepository([SqlSourceConnection] DbConnection connectio
 **The rules you need.**
 
 - The build finds a `string` named `connectionString`, `_connectionString` or `ConnectionString` by its name, and a data source by its type.  It never finds a connection by its type, since only you know whether the repository owns it.  See [The connection](../reference/repository-connections.md#repository-connection).
-- You can mark a field, a property, a method or a primary-constructor parameter.  A method is a factory: the repository method disposes what it returns.  A field, a property or a parameter is held: a connection there is borrowed, and never disposed.  See [The connection](../reference/repository-connections.md#repository-connection).
+- You can mark a field, a property, a method or a primary-constructor parameter.  The repository method disposes a connection that a method returns.  A connection in a field, a property or a parameter is borrowed, and never disposed.  See [The connection](../reference/repository-connections.md#repository-connection).
 - When one member is marked, only marked members count.  The build finds no other member by its name or type.  See [The connection](../reference/repository-connections.md#repository-connection).
 - A database can have two marked members only when exactly one of them is a method that returns a task.  The asynchronous methods use that one, and the synchronous methods the other, as in [Give a repository its connection from a service of your own](#connection-from-a-provider).  See [The connection](../reference/repository-connections.md#repository-connection).
 - If the repository queries of the type use more than one logical database, mark one member for each, with its name: `[SqlSourceConnection(Database = "reports")]`.  See [The connection](../reference/repository-connections.md#repository-connection).
@@ -181,7 +181,7 @@ public partial class UserRepository([SqlSourceConnection] DbConnection connectio
 ## If it does not work
 
 - **SQLSRC028.**  The type has no member that the build finds.  Mark the member that gives the connection, or add a `string` named `connectionString` or a data source.  See [SQLSRC028](../diagnostics.md#sqlsrc028).
-- **SQLSRC029.**  The type has more than one member that can give the connection, and the message lists them.  Two fields that hold factories with marked members are two sources too.  Mark only the one to use.  See [SQLSRC029](../diagnostics.md#sqlsrc029).
+- **SQLSRC029.**  The type has more than one member that can give the connection, and the message lists them.  Mark only the one to use.  When two fields hold factories with marked members, keep one of the fields, or mark a member of the type itself that gives the connection, which wins over both.  See [SQLSRC029](../diagnostics.md#sqlsrc029).
 - **SQLSRC030.**  A mark on a member of the repository has no `Database`, and the queries use more than one logical database.  Set its `Database`.  See [SQLSRC030](../diagnostics.md#sqlsrc030).
 - **SQLSRC032.**  The marked member cannot give a connection, such as a method that takes a parameter other than a `CancellationToken`.  For a factory's member, the error is at the holder.  Mark a member of a kind that the table of [The connection](../reference/repository-connections.md#repository-connection) lists.  See [SQLSRC032](../diagnostics.md#sqlsrc032).
 - **`InvalidOperationException`: "The connection source ... is null."**  The source, or the field, property or parameter that holds the factory, is null when the method is called.  The message names it.  See [the connection](../reference/repository-connections.md#repository-connection).

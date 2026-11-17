@@ -191,7 +191,7 @@ A marked `static` member of a type of your project gives the connection to each 
 - **A type marked `[SqlSourceGenerate]` whose queries have no output `repository` needs no connection.**  So the build neither uses nor reports a `static` member or a primary-constructor parameter that such a type marks.
 - **A `static` member of a repository's base type is found first among the repository's own members**, as [the connection](#repository-connection) says.  Other repositories can use it as a static member of the project.
 - **The `Database` of the mark** works as [which database a shared mark is for](#shared-marks) says.
-- **A mark that can never give a connection is [SQLSRC032](../diagnostics.md#sqlsrc032), reported once at the mark**, whether a repository needs it or not.  It is not a source.  These are such marks:
+- **A mark that can never give a connection is [SQLSRC032](../diagnostics.md#sqlsrc032), reported once at the mark**, whether a repository needs it or not.  It is not a source.  A `static` member of a base type of a type marked `[SqlSourceGenerate]` is the exception: it is that type's own member, and each repository that derives from the base type and needs it reports it.  These are such marks:
   - a member that cannot give a connection, as on a repository;
   - a member of a generic type, or of a type nested in one;
   - a member of a `file` type, or of a type nested in one;

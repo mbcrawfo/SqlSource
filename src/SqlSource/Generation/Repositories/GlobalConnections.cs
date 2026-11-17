@@ -31,10 +31,10 @@ internal static class GlobalConnections
     );
 
     /// <summary>
-    /// <c>SQLSRC032</c> at each broken mark, in the order of the marks: a parameter, but of a repository's primary
-    /// constructor, and a broken global.  A static member of a type marked <c>[SqlSourceGenerate]</c> or of one of its
-    /// base types is passed over: the repository's own candidates read it, and report it once for each repository
-    /// that derives from it, as they did before there were globals.
+    /// <c>SQLSRC032</c> at each broken mark, in the order of the marks: a parameter, but of the primary constructor of
+    /// a type marked <c>[SqlSourceGenerate]</c>, and a broken global.  A static member of a type marked
+    /// <c>[SqlSourceGenerate]</c> or of one of its base types is passed over: the repository's own candidates read it,
+    /// and report it once for each repository that derives from it and needs it.
     /// </summary>
     /// <param name="marks">The project's marks, from <see cref="GlobalMarkReader" />.</param>
     /// <param name="repositories">

@@ -142,5 +142,5 @@ Some queries whose output is `repository` or `methods` cannot get a method.  Giv
 
 **What to do.**  Do one of these:
 
-- Give the method the connection of the driver that the wrapper holds.  For a repository, give that connection from its factory method, or as the connection that it borrows.
+- Give the method the connection of the driver that the wrapper holds.  For a repository, give that connection from a marked method that returns it, or as the connection that it borrows.
 - Give the query the output `models`, and send its parameters through the wrapper yourself.

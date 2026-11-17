@@ -16,7 +16,9 @@ namespace SqlSource.Generation.Repositories;
 /// <c>X</c> for a primary-constructor parameter, and the type's name as its own code writes it, with its type
 /// parameters, then <c>.X</c>, for a static member, a base type's included.  A keyword gets its <c>@</c>.
 /// </param>
-/// <param name="IsAsync">Whether it is a factory that returns a <c>Task</c> or a <c>ValueTask</c>.</param>
+/// <param name="IsAsync">
+/// Whether it is a method that returns a <c>Task</c> or a <c>ValueTask</c> of a connection.
+/// </param>
 /// <param name="TakesCancellationToken">Whether it is a method that takes a <c>CancellationToken</c>.</param>
 /// <param name="LeadingName">
 /// The name, as a value, that <paramref name="AccessText" /> starts with and that an argument or a local of the method

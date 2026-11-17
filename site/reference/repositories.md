@@ -151,8 +151,8 @@ By default, every repository gets its interface, named `I` and the name of the t
 
 A repository method takes no transaction and no command timeout.  It runs on the connection that its source gives, under the default timeout of the driver, and gives its command no transaction.  It can still run in a transaction of your code's in two cases:
 
-- **On PostgreSQL, on a connection on which your code has begun a transaction, Npgsql runs the command in that transaction.**  This holds for a borrowed connection.  It holds for an open connection that a factory returns too, but the method then disposes that connection, which rolls your transaction back.  See [the connection](repository-connections.md#repository-connection).
-- **Inside a `TransactionScope`, a connection opened inside the scope takes part in the ambient transaction**, unless its connection string turns enlisting off.  This holds whether the method, a factory or your code opened the connection.  A connection opened before the scope does not, unless your code enlists it with `EnlistTransaction`.  On PostgreSQL, a data source with `Multiplexing=true` cannot take part: Npgsql throws when the connection is opened.
+- **On PostgreSQL, on a connection on which your code has begun a transaction, Npgsql runs the command in that transaction.**  This holds for a borrowed connection.  It holds for an open connection that a marked method returns too, but the method then disposes that connection, which rolls your transaction back.  See [the connection](repository-connections.md#repository-connection).
+- **Inside a `TransactionScope`, a connection opened inside the scope takes part in the ambient transaction**, unless its connection string turns enlisting off.  This holds whether the repository method, a marked method that returns a connection, or your code opened the connection.  A connection opened before the scope does not, unless your code enlists it with `EnlistTransaction`.  On PostgreSQL, a data source with `Multiplexing=true` cannot take part: Npgsql throws when the connection is opened.
 
 If a query needs to run in a transaction with other queries, or needs its own timeout, give it the output `methods` instead.  Put the query in a file of its own with that output, or write `-- output: methods` on the query.  Your own code in the repository then opens a connection, begins the transaction, and calls the [method that takes a connection](connection-methods.md#methods-that-take-a-connection) of the query.  If your code disposes the transaction without committing it, the driver rolls it back.  See [the recipe](../start/transactions.md#queries-in-a-transaction).
 
@@ -217,13 +217,13 @@ The [collection method](collection-methods.md#collection-methods) of the query f
 - **It gets its connection from the repository**, as [the connection](repository-connections.md#repository-connection) says, with the synchronous calls of the driver.  By the kind of member, the connection is one of these:
   - a new connection of a connection string, opened;
   - a connection that a data source opens, `OpenConnection`;
-  - the connection that a factory returns, opened when it is closed, and disposed, with `default` for a factory that takes a `CancellationToken`;
+  - the connection that a marked method returns, opened when it is closed, and disposed, with `default` for a method that takes a `CancellationToken`;
   - a borrowed connection, opened when it is closed, and closed again.
-- **A connection string, a data source, a connection and a factory that returns a `DbConnection` serve both kinds of method.**
-- **A factory that returns a `Task` or `ValueTask` serves asynchronous methods alone.**
-- **If such a factory is the only member that gives the database of the query its connection, a query that would get a synchronous method is [SQLSRC299](../diagnostics.md#sqlsrc299).**  It is an error at the name of the query.
+- **A connection string, a data source, a connection and a method that returns a `DbConnection` serve both kinds of method.**
+- **A method that returns a `Task` or `ValueTask` of a connection serves asynchronous methods alone.**
+- **If such a method is the only member that gives the database of the query its connection, a query that would get a synchronous method is [SQLSRC299](../diagnostics.md#sqlsrc299).**  It is an error at the name of the query.
 - **Under `both`, SQLSRC299 costs the query only its synchronous methods.**  The query keeps its asynchronous method, its member of the interface and its asynchronous collection method.  Under `sync`, the query gets no method.
-- **To fix SQLSRC299, mark a second member that returns no task beside the factory.**  The two are then a [pair](repository-connections.md#repository-connection), and the synchronous methods use the second member.  Or give the query `method-type=async`.
+- **To fix SQLSRC299, mark a second member that returns no task beside that method.**  The two are then a [pair](repository-connections.md#repository-connection), and the synchronous methods use the second member.  Or give the query `method-type=async`.
 - **A stream has no synchronous method**, as for [a query method](synchronous-methods.md#synchronous-methods).  Under `sync`, a stream is [SQLSRC298](../diagnostics.md#sqlsrc298).  Under `both`, it keeps its asynchronous method alone, with both collection methods when it has one.
 - **Under any `method-type`, a token cannot be named `cancellationToken`** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A primary-constructor parameter that gives the connection cannot have that name either, under any `method-type` ([SQLSRC036](../diagnostics.md#sqlsrc036)).
 - **On PostgreSQL, a data source with `Multiplexing=true` refuses a synchronous repository method**, with `NotSupportedException`: see [what a method reads and throws](databases/postgresql/query-methods.md#method-results).

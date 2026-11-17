@@ -926,6 +926,7 @@ A member marked `[SqlSourceConnection]` cannot give a repository method its conn
 - **A member of the type.**  The error is at the member.
 - **A member of a factory that the type holds.**  The error is at the holder, in each type that would use the member.  The message names the member through its holder: `'IConnectionFactory.OpenAsync' reached through 'connections'`.
 - **A `static` member of the project.**  The error is at the member, once, whether a type uses it or not.  The message names the member's own type in place of a repository.
+- **A `static` member of a base type of a type marked `[SqlSourceGenerate]`.**  It is that type's own member, so the error is at the member, in each repository that derives from the base type and needs the member.
 
 The repository queries of the database of the member get no method.  When the member names no database, the repository queries of every database get no method.  A `static` member of the project with this error is never a source, so a type that needs it gets [SQLSRC028](#sqlsrc028).
 

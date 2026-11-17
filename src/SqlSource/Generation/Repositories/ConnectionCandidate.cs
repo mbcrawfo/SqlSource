@@ -9,7 +9,9 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="Name">The member's name, as a value: without the <c>@</c> of an escaped keyword.</param>
 /// <param name="Member">What kind of member it is.</param>
 /// <param name="Type">What it gives.</param>
-/// <param name="IsAsync">Whether it is a factory that returns a <c>Task</c> or a <c>ValueTask</c>.</param>
+/// <param name="IsAsync">
+/// Whether it is a method that returns a <c>Task</c> or a <c>ValueTask</c> of a connection.
+/// </param>
 /// <param name="TakesCancellationToken">Whether it is a method that takes a <c>CancellationToken</c>.</param>
 /// <param name="IsStatic">Whether it is a static member.</param>
 /// <param name="IsInherited">Whether it is a member of a base type.</param>
