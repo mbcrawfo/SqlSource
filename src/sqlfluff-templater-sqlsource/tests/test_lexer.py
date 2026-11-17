@@ -3,7 +3,7 @@ import pytest
 from sqlfluff_templater_sqlsource.dialect_marker import apply_dialect_marker, read_dialect_header
 from sqlfluff_templater_sqlsource.dialects import Dialect, DialectChoice, DialectOptions, parse_dialect_name
 from sqlfluff_templater_sqlsource.errors import ParseError
-from sqlfluff_templater_sqlsource.lexer import Lexer
+from sqlfluff_templater_sqlsource.lexer import Lexeme, LexemeKind, Lexer
 from sqlfluff_templater_sqlsource.quoting import (
     NOT_A_QUOTE,
     UNTERMINATED,
@@ -270,3 +270,25 @@ def test_comment_form_of_the_starting_dialect_above_the_marker_is_read():
 )
 def test_header_ends_at_its_name_marker_or_after_its_last_leading_comment(text, expected):
     assert apply_dialect_marker(Lexer(text, ANSI), text) == expected
+
+
+@pytest.mark.parametrize(
+    ("kind", "start", "end", "expected"),
+    [
+        (LexemeKind.TEXT, 0, 12, (2, 10)),
+        (LexemeKind.TEXT, 10, 12, None),
+        (LexemeKind.QUOTED, 12, 15, (12, 15)),
+        (LexemeKind.PARAMETER, 16, 19, (16, 19)),
+        (LexemeKind.HINT, 20, 28, (20, 28)),
+        (LexemeKind.LINE_COMMENT, 29, 33, None),
+        (LexemeKind.BLOCK_COMMENT, 34, 41, None),
+    ],
+)
+def test_content_span_is_sql_without_comments_and_the_white_space_around_text(kind, start, end, expected):
+    text = "  SELECT 1 \n'a' @id /*+ h */ -- c\n/* b */"
+
+    assert Lexeme(kind, start, end).content_span(text) == expected
+
+
+def test_parameter_name_is_the_lexeme_without_its_prefix():
+    assert Lexeme(LexemeKind.PARAMETER, 7, 10).parameter_name == (8, 10)

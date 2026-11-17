@@ -1,14 +1,15 @@
 """Recognises marker comments.
 
 Mirrors `Markers/SqlMarker.cs`, `Markers/SqlMarkerKind.cs` and `Markers/SqlMarkerReader.cs` in
-`src/SqlSource/Parsing/`, as far as the header of a file needs: the keywords, and reading a marker.
+`src/SqlSource/Parsing/`, but for the words and descriptions that messages name, and the `PlaceOf` that
+`SqlFileParser` and `Markers/SqlMarkerScope.cs` share.
 """
 
 import enum
 from dataclasses import dataclass
 
 from sqlfluff_templater_sqlsource.lexer import Lexeme, LexemeKind
-from sqlfluff_templater_sqlsource.text import equals_ascii_ignoring_case, is_line_terminator, trim
+from sqlfluff_templater_sqlsource.text import equals_ascii_ignoring_case, is_line_terminator, is_white_space, trim
 
 
 class MarkerKind(enum.Enum):
@@ -93,6 +94,37 @@ def read_marker(text: str, lexeme: Lexeme) -> Marker | None:
 
     kind, value_start = found
     return Marker(kind, lexeme.start, lexeme.end, *trim(text, value_start, lexeme.end))
+
+
+def has_marker_form(text: str, lexeme: Lexeme) -> bool:
+    """True for a line comment in the form of a marker, wherever it stands: `--`, optional blanks, a keyword, a colon.
+
+    One that is not the first thing on its line is no marker, but a line break before it would make it one.
+    """
+    return _is_dash_comment(text, lexeme) and _find_keyword(text, lexeme.start, lexeme.end) is not None
+
+
+def split_name(text: str, value_start: int, value_end: int) -> tuple[tuple[int, int], int]:
+    """A name marker's value, "Name" or "Name -> shape", split at its first arrow.
+
+    Gives the span of the name, without the white space before the arrow, and the offset of the first `->` in the
+    value, or -1.  The shape is the text from the arrow's offset plus 2 to the value's end.
+    """
+    arrow = text.find("->", value_start, value_end)
+    if arrow < 0:
+        return (value_start, value_end), -1
+
+    name_end = arrow
+    while name_end > value_start and is_white_space(text[name_end - 1]):
+        name_end -= 1
+    return (value_start, name_end), arrow
+
+
+def place_of(marker: Marker) -> tuple[int, int]:
+    """Where an error of a marker's value is reported: at the value, or at the marker when it has none."""
+    if marker.value_end > marker.value_start:
+        return marker.value_start, marker.value_end
+    return marker.start, marker.end
 
 
 # A line comment can start with a # in some dialects.  A marker always starts with two dashes.

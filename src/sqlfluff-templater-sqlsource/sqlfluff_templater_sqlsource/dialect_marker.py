@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from sqlfluff_templater_sqlsource.dialects import DialectChoice, parse_dialect_name
 from sqlfluff_templater_sqlsource.errors import INVALID_MARKER_VALUE, ParseError
 from sqlfluff_templater_sqlsource.lexer import Lexer
-from sqlfluff_templater_sqlsource.markers import Marker, MarkerKind, read_marker
+from sqlfluff_templater_sqlsource.markers import Marker, MarkerKind, place_of, read_marker
 from sqlfluff_templater_sqlsource.rules import DialectRules
 
 
@@ -54,7 +54,7 @@ def read_dialect_header(lexer: Lexer, text: str) -> DialectHeader:
         dialect = try_read(text, marker)
         if dialect is None:
             if invalid is None:
-                invalid = _invalid_dialect(marker)
+                invalid = invalid_dialect(marker)
         elif named is None:
             lexer.rules = DialectRules.for_choice(dialect)
             named = dialect
@@ -68,8 +68,7 @@ def try_read(text: str, marker: Marker) -> DialectChoice | None:
     return parse_dialect_name(text[marker.value_start : marker.value_end])
 
 
-# The error of a -- dialect: marker whose value is not a dialect: at the value, or at the marker when it has none.
-def _invalid_dialect(marker: Marker) -> ParseError:
-    if marker.value_end > marker.value_start:
-        return ParseError(INVALID_MARKER_VALUE, marker.value_start, marker.value_end)
-    return ParseError(INVALID_MARKER_VALUE, marker.start, marker.end)
+def invalid_dialect(marker: Marker) -> ParseError:
+    """The error of a `-- dialect:` marker whose value is not a dialect: at the value, or at the marker when it has
+    none."""
+    return ParseError(INVALID_MARKER_VALUE, *place_of(marker))

@@ -215,7 +215,7 @@ A file holds its case's text and settings as well as its plan, so each of these 
 - a change to the parser that changes a plan;
 - an edit of the text of a `.sql` file of the repository, or of a `sqlsource.json` above one, a comment included;
 - a `.sql` file of the repository added, moved or removed;
-- a fidelity case added, edited or removed, or a row of the lexer's theory added, edited, moved or removed.
+- a fidelity case added, edited or removed, or a row of the lexer's theory added, edited, moved or removed;
 - a name or an option of `SqlDialectName` added, changed, moved or removed, which updates `dialect-names.json`.
 
 To update it:
