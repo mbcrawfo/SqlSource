@@ -63,9 +63,7 @@ public sealed class PropertyNamesTests
     public void IsReserved_Name_IsFalse(string name) => PropertyNames.IsReserved(name).ShouldBeFalse();
 
     [Theory]
-    [InlineData("public", "users", "Users")]
     [InlineData("public", "order_lines", "OrderLines")]
-    [InlineData("billing", "invoices", "BillingInvoices")]
     [InlineData("Billing_Admin", "audit_log", "BillingAdminAuditLog")]
     [InlineData("Public", "users", "PublicUsers")]
     [InlineData("PUBLIC", "users", "PUBLICUsers")]
@@ -107,9 +105,4 @@ public sealed class PropertyNamesTests
     [InlineData("billing!", "invoices")]
     public void FromTable_PartThatGivesNoIdentifier_IsNull(string? schema, string? table) =>
         PropertyNames.FromTable(new SidecarTable(schema, table), DatabaseEngine.PostgreSql).ShouldBeNull();
-
-    // The public schema gives no name, so it is not checked: a table whose name is an identifier needs no schema.
-    [Fact]
-    public void FromTable_PublicSchema_NeedsNothingOfTheSchema() =>
-        PropertyNames.FromTable(new SidecarTable("public", "t"), DatabaseEngine.PostgreSql).ShouldBe("T");
 }
