@@ -102,8 +102,8 @@ jobs:
         if: ${{ !cancelled() }}
         run: uv run pytest
 
-      # The lock holds the newest sqlfluff, so this puts the floor of pyproject.toml in a fresh environment.  The first
-      # command shows which sqlfluff it is, and fails when it is not the floor.
+      # The floor of pyproject.toml, in a fresh environment.  It equals the lock today; this step keeps it tested once
+      # the lock moves past it.  The first command shows which sqlfluff it is, and fails when it is not the floor.
       - name: Test on the oldest sqlfluff
         if: ${{ !cancelled() }}
         run: |
