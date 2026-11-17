@@ -1,3 +1,5 @@
+import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -147,16 +149,75 @@ def test_file_name_is_matched_exactly(tmp_path):
     assert resolve_dialect(sql) == ANSI
 
 
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="needs a file that cannot be read")
 def test_unreadable_settings_file_is_absent(tmp_path):
-    (tmp_path / "sqlsource.json").mkdir()
-    _write(tmp_path / "sqlsource.json" / "x", "")
-    _write(tmp_path / "sub" / "sqlsource.json", '{"root": true}')
+    _write(tmp_path / "sqlsource.json", '{"dialect": "mssql"}')
+    unreadable = _write(tmp_path / "sub" / "sqlsource.json", '{"root": true}')
     sql = _write(tmp_path / "sub" / "Query.sql", "SELECT 1")
-    (tmp_path / "sub" / "sqlsource.json").chmod(0)
+    unreadable.chmod(0)
     try:
-        assert resolve_dialect(sql) == ANSI
+        assert resolve_dialect(sql) == MSSQL
     finally:
-        (tmp_path / "sub" / "sqlsource.json").chmod(0o644)
+        unreadable.chmod(0o644)
+
+
+def test_folder_named_like_the_settings_file_is_absent(tmp_path):
+    _write(tmp_path / "sqlsource.json", '{"dialect": "mssql"}')
+    (tmp_path / "sub" / "sqlsource.json").mkdir(parents=True)
+    sql = _write(tmp_path / "sub" / "Query.sql", "SELECT 1")
+
+    assert resolve_dialect(sql) == MSSQL
+
+
+def test_path_with_nul_does_not_raise():
+    assert resolve_dialect(Path("a\0b/Query.sql")) == ANSI
+
+
+def test_byte_order_mark_is_not_part_of_the_text(tmp_path):
+    (tmp_path / "sqlsource.json").write_bytes(b'\xef\xbb\xbf{"dialect": "postgres"}')
+
+    assert resolve_dialect(tmp_path / "Query.sql") == POSTGRES
+
+
+@pytest.mark.parametrize("encoding", ["utf-16-le", "utf-16-be", "utf-32-le", "utf-32-be"])
+def test_file_is_decoded_by_its_byte_order_mark(tmp_path, encoding):
+    marks = {
+        "utf-16-le": b"\xff\xfe",
+        "utf-16-be": b"\xfe\xff",
+        "utf-32-le": b"\xff\xfe\x00\x00",
+        "utf-32-be": b"\x00\x00\xfe\xff",
+    }
+    (tmp_path / "sqlsource.json").write_bytes(marks[encoding] + '{"dialect": "mssql"}'.encode(encoding))
+
+    assert resolve_dialect(tmp_path / "Query.sql") == MSSQL
+
+
+def test_control_character_is_not_trimmed_from_a_dialect():
+    # .NET's Trim does not remove U+001C, which Python's strip does.
+    assert read_settings('{"dialect": "\u001cpostgres"}').dialect is None
+
+
+def test_first_root_wins():
+    assert read_settings('{"root": true, "root": false}').root is True
+
+
+@pytest.mark.parametrize("number", ["1.5e+3", "-0", "0", "10", "2E-2", "0.5"])
+def test_valid_numbers_are_accepted(number):
+    assert read_settings('{"a": ' + number + ', "root": true}').root is True
+
+
+@pytest.mark.parametrize("number", ["1.", ".5", "-", "1e", "1e+", "+1", "00"])
+def test_invalid_numbers_are_rejected(number):
+    assert read_settings('{"a": ' + number + ', "root": true}').root is None
+
+
+def test_slash_that_starts_no_comment_is_invalid():
+    assert read_settings('{"root": true / }').root is None
+    assert read_settings('{"root": true} /').root is None
+
+
+def test_line_comment_ends_at_a_carriage_return():
+    assert read_settings('{"root": true // note\r, "dialect": "mssql"}') == SettingsDialect(True, MSSQL)
 
 
 def test_invalid_utf8_does_not_raise(tmp_path):

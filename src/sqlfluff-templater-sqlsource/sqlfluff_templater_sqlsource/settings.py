@@ -7,7 +7,8 @@ with `//` and `/* */` comments and one trailing comma, nested at most `MAX_DEPTH
 not used, as it takes neither.
 
 Nothing here raises.  `read_settings` gives an unknown `root` and no dialect for a text that is not one JSON object.
-`resolve_dialect` treats a settings file it cannot read as absent, and goes on to the folder above.
+`resolve_dialect` treats a settings file it cannot read as absent, and goes on to the folder above.  A file is
+decoded as `FileText.Read` in `src/SqlSource.Tool/Planning/` does: by its byte order mark, else as UTF-8.
 """
 
 import os
@@ -41,21 +42,11 @@ class _Invalid(Exception):
     """The text breaks the grammar."""
 
 
-class _Null:
-    """The value of `null`, which no setting accepts."""
+class _Other:
+    """The value of `null`, a number, an array or an object, which no setting this module reads accepts."""
 
 
-class _Number:
-    """The value of a number, which no setting accepts."""
-
-
-class _Container:
-    """The value of an array or an object, which no setting this module reads accepts."""
-
-
-_NULL = _Null()
-_NUMBER = _Number()
-_CONTAINER = _Container()
+_OTHER = _Other()
 
 
 class _Scanner:
@@ -164,13 +155,13 @@ class _Scanner:
                 self._members(depth + 1)
             else:
                 self._elements(depth + 1)
-            return _CONTAINER
+            return _OTHER
         if character == "t":
             return self._literal("true", True)
         if character == "f":
             return self._literal("false", False)
         if character == "n":
-            return self._literal("null", _NULL)
+            return self._literal("null", _OTHER)
         if character == "-" or ("0" <= character <= "9"):
             return self._number()
         raise _Invalid
@@ -205,7 +196,7 @@ class _Scanner:
                 raise _Invalid
             index = end
         self.position = index
-        return _NUMBER
+        return _OTHER
 
     def _string(self) -> str:
         text = self.text
@@ -259,7 +250,7 @@ def read_settings(text: str) -> SettingsDialect:
         if key == "root" and isinstance(value, bool):
             root = value
         elif key == "dialect" and isinstance(value, str):
-            dialect = parse_dialect_name(value.strip())
+            dialect = parse_dialect_name(value)
     return SettingsDialect(root, dialect)
 
 
@@ -275,14 +266,31 @@ def dialect_of_chain(texts: list[str]) -> DialectChoice:
     return _ANSI
 
 
+def _decode(data: bytes) -> str:
+    # Roslyn's SourceText.From(bytes): a byte order mark picks UTF-8, UTF-16 or UTF-32, and without one the bytes are
+    # UTF-8.  The mark is not part of the text, and a byte that is not valid is a replacement character.
+    if data.startswith(b"\xff\xfe\x00\x00"):
+        return data[4:].decode("utf-32-le", errors="replace")
+    if data.startswith(b"\x00\x00\xfe\xff"):
+        return data[4:].decode("utf-32-be", errors="replace")
+    if data.startswith(b"\xff\xfe"):
+        return data[2:].decode("utf-16-le", errors="replace")
+    if data.startswith(b"\xfe\xff"):
+        return data[2:].decode("utf-16-be", errors="replace")
+    return data.removeprefix(b"\xef\xbb\xbf").decode("utf-8", errors="replace")
+
+
 def _read_file(folder: str) -> str | None:
-    # The name is matched exactly, which an open of it would not on a file system that ignores case.
+    path = os.path.join(folder, FILE_NAME)
     try:
+        if not os.path.isfile(path):
+            return None
+        # The name is matched exactly, which a file system that ignores case would not do for the open.
         if FILE_NAME not in os.listdir(folder):
             return None
-        with open(os.path.join(folder, FILE_NAME), encoding="utf-8-sig", errors="replace") as file:
-            return file.read()
-    except OSError:
+        with open(path, "rb") as file:
+            return _decode(file.read())
+    except (OSError, ValueError):
         return None
 
 
@@ -291,7 +299,10 @@ def resolve_dialect(sql_path: Path) -> DialectChoice:
     root of the file system.  A file that cannot be read, a folder that cannot be listed or a name that is a folder
     counts as no settings file there.  The `-- dialect:` marker of the file is applied over this by `build_plan`."""
     texts = []
-    folder = os.path.dirname(os.path.abspath(sql_path))
+    try:
+        folder = os.path.dirname(os.path.abspath(sql_path))
+    except (OSError, ValueError):
+        return _ANSI
     while True:
         text = _read_file(folder)
         if text is not None:
