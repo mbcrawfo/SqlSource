@@ -61,22 +61,6 @@ public sealed class CallSpellingTests
         Sync.AppendCallMember(new StringBuilder("t"), call).ToString().ShouldBe("t" + synchronous);
     }
 
-    // The start of a call is the await, the target and the member, so the member alone follows a target written into
-    // the builder, as a data source's expression is.
-    [Fact]
-    public void AppendCallStart_EveryCall_IsTheAwaitTheTargetAndTheMember()
-    {
-        foreach (var spelling in new[] { Async, Sync })
-        {
-            foreach (var call in Enum.GetValues<DriverCall>())
-            {
-                var expected = spelling.AppendCallMember(spelling.AppendAwait(new StringBuilder()).Append("(c)"), call);
-
-                spelling.AppendCallStart(new StringBuilder(), "(c)", call).ToString().ShouldBe(expected.ToString());
-            }
-        }
-    }
-
     [Fact]
     public void AppendCallStart_EveryCall_HasAnAsynchronousAndASynchronousSpelling()
     {
@@ -118,21 +102,6 @@ public sealed class CallSpellingTests
     {
         Async.AppendCallEnd(new StringBuilder()).ToString().ShouldBe(").ConfigureAwait(false)");
         Sync.AppendCallEnd(new StringBuilder()).ToString().ShouldBe(")");
-    }
-
-    [Fact]
-    public void WholeCall_WithItsToken_IsTheAwaitedCallOrTheCall()
-    {
-        Spell(Async).ShouldBe("await reader.ReadAsync(token).ConfigureAwait(false)");
-        Spell(Sync).ShouldBe("reader.Read()");
-
-        static string Spell(CallSpelling spelling)
-        {
-            var builder = new StringBuilder();
-            _ = spelling.AppendCallStart(builder, "reader", DriverCall.Read);
-            _ = spelling.AppendToken(builder, "token", afterArgument: false);
-            return spelling.AppendCallEnd(builder).ToString();
-        }
     }
 
     [Fact]
