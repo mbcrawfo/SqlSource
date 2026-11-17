@@ -521,53 +521,17 @@ public sealed class TypeEmitterTests
         );
     }
 
-    // A methods query's method takes the place of its constant, whether it gets one or not.
-    [Fact]
-    public void Emit_MethodsQuery_WritesNoConstant()
-    {
-        var output = EmitOnType(OutputKind.Methods, File("Users.sql", TestModels.Query("GetUser", "SELECT 1;")));
-
-        output.Diagnostics.ShouldBeEmpty();
-        output.Source.ShouldBe(
-            $$"""
-            {{GeneratedFile.Header}}
-            namespace App
-            {
-                partial class UserRepository
-                {
-                }
-            }
-
-            """
-        );
-    }
-
-    [Fact]
-    public void Emit_MethodsTokenQuery_WritesNoTokenMethod()
-    {
-        var output = EmitOnType(OutputKind.Methods, File("Users.sql", TokenQuery("ListFrom")));
-
-        output.Diagnostics.ShouldBeEmpty();
-        output.Source.ShouldBe(
-            $$"""
-            {{GeneratedFile.Header}}
-            namespace App
-            {
-                partial class UserRepository
-                {
-                }
-            }
-
-            """
-        );
-    }
-
-    [Fact]
-    public void Emit_NestedTypeOfOnlyMethodsQueries_WritesNoNestedClass()
+    // A methods query's method takes the place of its constant or its token method, whether it gets one or not, on the
+    // type or in the nested class, which a type of only methods queries does not get.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Emit_OnlyMethodsQueries_WritesTheTypesEmptyPart(bool direct)
     {
         var output = Emit(
             OutputKind.Methods,
             TestModels.Type(),
+            Placement(direct, 1),
             File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"), TokenQuery("ListFrom"))
         );
 
