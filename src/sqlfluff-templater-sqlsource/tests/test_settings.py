@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from corpus_reader import CORPUS_DIRECTORY, corpus_cases
 
+from sqlfluff_templater_sqlsource import settings
 from sqlfluff_templater_sqlsource.dialects import Dialect, DialectChoice, DialectOptions, parse_dialect_name
 from sqlfluff_templater_sqlsource.settings import SettingsDialect, dialect_of_chain, read_settings, resolve_dialect
 
@@ -133,6 +134,38 @@ def test_nearer_file_wins_and_root_ends_the_search(tmp_path):
     sql = _write(tmp_path / "app" / "inner" / "deep" / "Query.sql", "SELECT 1")
 
     assert resolve_dialect(sql) == ANSI
+
+
+def _folders_read(monkeypatch) -> list[str]:
+    read: list[str] = []
+    original = settings._read_file
+
+    def counting(folder: str) -> str | None:
+        read.append(folder)
+        return original(folder)
+
+    monkeypatch.setattr(settings, "_read_file", counting)
+    return read
+
+
+def test_no_settings_file_above_a_root_is_read(tmp_path, monkeypatch):
+    _write(tmp_path / "sqlsource.json", '{"dialect": "mssql"}')
+    _write(tmp_path / "app" / "sqlsource.json", '{"root": true}')
+    sql = _write(tmp_path / "app" / "inner" / "Query.sql", "SELECT 1")
+    read = _folders_read(monkeypatch)
+
+    assert resolve_dialect(sql) == ANSI
+    assert read == [os.path.abspath(tmp_path / "app" / "inner"), os.path.abspath(tmp_path / "app")]
+
+
+def test_no_settings_file_above_the_nearest_dialect_is_read(tmp_path, monkeypatch):
+    _write(tmp_path / "sqlsource.json", '{"dialect": "mssql"}')
+    _write(tmp_path / "app" / "sqlsource.json", '{"dialect": "postgres"}')
+    sql = _write(tmp_path / "app" / "Query.sql", "SELECT 1")
+    read = _folders_read(monkeypatch)
+
+    assert resolve_dialect(sql) == POSTGRES
+    assert read == [os.path.abspath(tmp_path / "app")]
 
 
 def test_search_goes_past_a_folder_without_a_file(tmp_path):

@@ -12,6 +12,7 @@ decoded as `FileText.Read` in `src/SqlSource.Tool/Planning/` does: by its byte o
 """
 
 import os
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -254,9 +255,10 @@ def read_settings(text: str) -> SettingsDialect:
     return SettingsDialect(root, dialect)
 
 
-def dialect_of_chain(texts: list[str]) -> DialectChoice:
+def dialect_of_chain(texts: Iterable[str]) -> DialectChoice:
     """The dialect of the nearest file of the chain that sets one, ANSI when none does.  `texts` are the settings
-    files from the nearest, and the chain ends after a file whose `root` is true."""
+    files from the nearest, and the chain ends after a file whose `root` is true.  No text is taken from `texts` after
+    the one that decides the dialect."""
     for text in texts:
         settings = read_settings(text)
         if settings.dialect is not None:
@@ -294,21 +296,26 @@ def _read_file(folder: str) -> str | None:
         return None
 
 
+# The text of the settings file of `folder` and of each folder above it, up to the root of the file system, read only
+# as each is taken.
+def _texts_from(folder: str) -> Iterator[str]:
+    while True:
+        text = _read_file(folder)
+        if text is not None:
+            yield text
+        parent = os.path.dirname(folder)
+        if parent == folder:
+            return
+        folder = parent
+
+
 def resolve_dialect(sql_path: Path) -> DialectChoice:
     """The dialect `sql_path` starts with: the settings files of its folder and of each folder above it, up to the
-    root of the file system.  A file that cannot be read, a folder that cannot be listed or a name that is a folder
-    counts as no settings file there.  The `-- dialect:` marker of the file is applied over this by `build_plan`."""
-    texts = []
+    first that sets a dialect or whose `root` is true, and no file above that one is read.  A file that cannot be
+    read, a folder that cannot be listed or a name that is a folder counts as no settings file there.  The
+    `-- dialect:` marker of the file is applied over this by `build_plan`."""
     try:
         folder = os.path.dirname(os.path.abspath(sql_path))
     except (OSError, ValueError):
         return _ANSI
-    while True:
-        text = _read_file(folder)
-        if text is not None:
-            texts.append(text)
-        parent = os.path.dirname(folder)
-        if parent == folder:
-            break
-        folder = parent
-    return dialect_of_chain(texts)
+    return dialect_of_chain(_texts_from(folder))

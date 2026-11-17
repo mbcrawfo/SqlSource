@@ -60,7 +60,7 @@ The C# parser tests UTF-16 units, and a Python `str` holds code points.  `text` 
 
 ### The file's dialect
 
-`settings.py` finds the dialect a file starts with as the generator does: the nearest `sqlsource.json` above the file that sets a valid one, up to the first that says `"root": true`, else `ansi`.  It reads the JSON with comments and a trailing comma that SqlSource's reader takes, decodes a file by its byte order mark, and passes over a file whose text is not JSON, as the generator does with `SQLSRC015`, and one it cannot read.  The file's `-- dialect:` marker then wins, through `dialect_marker`.
+`settings.py` finds the dialect a file starts with as the generator does: the nearest `sqlsource.json` above the file that sets a valid one, up to the first that says `"root": true`, else `ansi`.  It reads no settings file above the one that decides the dialect, since `dialect_of_chain` takes each text from a generator as the walk up the folders reads it.  It reads the JSON with comments and a trailing comma that SqlSource's reader takes, decodes a file by its byte order mark, and passes over a file whose text is not JSON, as the generator does with `SQLSRC015`, and one it cannot read.  The file's `-- dialect:` marker then wins, through `dialect_marker`.
 
 ## The corpus
 
