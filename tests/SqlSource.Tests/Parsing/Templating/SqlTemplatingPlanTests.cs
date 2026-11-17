@@ -59,6 +59,14 @@ public sealed class SqlTemplatingPlanTests
     }
 
     [Fact]
+    public void Plan_TokenWithoutDefault_HasNoDefault()
+    {
+        const string Text = "SELECT {{t}}";
+
+        Spans(Text).ShouldBe([(SqlTemplatingSpanKind.Token, "{{t}}", "t", null)]);
+    }
+
+    [Fact]
     public void Plan_TokenInComment_IsNoSpan()
     {
         const string Text = "SELECT 1 /* {{note}} */ FROM {{t:users}}";
@@ -184,6 +192,43 @@ public sealed class SqlTemplatingPlanTests
         }
     }
 
+    // The token's span protects the comment, so it is not listed again.
+    [Fact]
+    public void Plan_MarkerFormInsideToken_IsNoMarkerSpan()
+    {
+        const string Text = "SELECT 1 {{f:a = 1 -- summary: x\n AND b = 2}}";
+
+        Spans(Text)
+            .ShouldBe([
+                (SqlTemplatingSpanKind.Token, "{{f:a = 1 -- summary: x\n AND b = 2}}", "f", "a = 1\n AND b = 2"),
+            ]);
+    }
+
+    // The query's end is empty, so it comes before the comment that starts where it is.
+    [Fact]
+    public void Plan_QueryEndWhereAMarkerCommentStarts_ComesFirst()
+    {
+        const string Text = "-- name: A\nSELECT 1-- summary: x\n-- name: B\nSELECT 2\n";
+
+        Spans(Text)
+            .ShouldBe([
+                (SqlTemplatingSpanKind.MarkerComment, "-- name: A", null, null),
+                (SqlTemplatingSpanKind.QueryEnd, string.Empty, null, null),
+                (SqlTemplatingSpanKind.MarkerComment, "-- summary: x", null, null),
+                (SqlTemplatingSpanKind.MarkerComment, "-- name: B", null, null),
+            ]);
+        Plan(Text).Spans[1].Span.Start.ShouldBe(Text.IndexOf("-- summary", StringComparison.Ordinal));
+    }
+
+    // A # comment is never a marker, whatever it reads.
+    [Fact]
+    public void Plan_HashCommentInMarkerForm_IsNoMarkerSpan()
+    {
+        const string Text = "# token: {{a:x}}\nSELECT 1";
+
+        Spans(Text, dialect: SqlDialect.MySql).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Plan_MarkerForm_IsProtected()
     {
@@ -282,6 +327,26 @@ public sealed class SqlTemplatingPlanTests
 
         plan.Error.ShouldBeNull();
         plan.HasOtherErrors.ShouldBeFalse();
+    }
+
+    // The first valid marker is in effect, and the invalid one after it still stops the plan.
+    [Fact]
+    public void Plan_InvalidDialectMarkerAfterAValidOne_IsErrorUnderTheValidOne()
+    {
+        const string Text = "-- dialect: postgres\n-- dialect: nonsense\nSELECT 1";
+
+        var plan = Plan(Text);
+
+        plan.Dialect.ShouldBe((SqlDialectChoice)SqlDialect.PostgreSql);
+        plan.Error.ShouldBe(
+            SqlParseError.Create(
+                SqlParseErrorKind.InvalidMarkerValue,
+                TextSpans.Of(Text, "nonsense"),
+                "dialect: nonsense",
+                string.Empty
+            )
+        );
+        plan.Spans.ShouldBeEmpty();
     }
 
     [Fact]

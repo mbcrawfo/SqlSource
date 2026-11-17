@@ -64,22 +64,13 @@ internal static class SqlFileParser
                 lexed.Lexemes,
                 EquatableArray<SqlTemplatingSpan>.Empty,
                 Earliest(lexError, invalidDialect),
+                // The parser has not run, so the other error can only be the one of the two not chosen.
                 invalidDialect is not null
             );
         }
 
-        // A marker comment is protected wherever it stands, the preamble and the name markers too, which are in no
-        // block.  Tokens, parameters and the ends of queries are found by the parser, block by block.
-        var spans = lexed
-            .Lexemes.Where(lexeme => SqlMarkerReader.HasMarkerForm(text, lexeme))
-            .Select(static lexeme => new SqlTemplatingSpan(
-                SqlTemplatingSpanKind.MarkerComment,
-                lexeme.Span,
-                null,
-                null
-            ))
-            .ToList();
-
+        // Tokens, parameters and the ends of queries are found by the parser, block by block.
+        var spans = SqlTemplatingSpans.MarkerComments(text, lexed.Lexemes);
         var parsed = new Parser(text, fileName, lexed.Lexemes, headerEnd, lexer.Rules, false, spans).Run();
 
         // Of the file's errors, SQLSRC120 comes from FindHiddenTokenEnds alone: those of the kept form are a block's.
@@ -90,13 +81,9 @@ internal static class SqlFileParser
         return new SqlTemplatingPlan(
             read,
             lexed.Lexemes,
-            error is null
-                ? new EquatableArray<SqlTemplatingSpan>(
-                    spans.OrderBy(static span => span.Span.Start).ThenBy(static span => span.Kind).ToImmutableArray()
-                )
-                : EquatableArray<SqlTemplatingSpan>.Empty,
+            error is null ? SqlTemplatingSpans.Order(spans) : EquatableArray<SqlTemplatingSpan>.Empty,
             error,
-            parsed.Errors.Count > (error is null ? 0 : 1)
+            parsed.Errors.Any(found => !found.Equals(error))
         );
     }
 
@@ -104,10 +91,13 @@ internal static class SqlFileParser
     private static SqlParseError InvalidDialect(string text, SqlMarker marker) =>
         SqlParseError.Create(
             SqlParseErrorKind.InvalidMarkerValue,
-            marker.ValueSpan.IsEmpty ? marker.Span : marker.ValueSpan,
+            PlaceOf(marker),
             SqlMarkerReader.Describe(text, marker),
             string.Empty
         );
+
+    // Where an error of a marker's value is reported: at the value, or at the marker when it has none.
+    private static TextSpan PlaceOf(SqlMarker marker) => marker.ValueSpan.IsEmpty ? marker.Span : marker.ValueSpan;
 
     // The error that starts first, or null when neither is set.
     private static SqlParseError? Earliest(SqlParseError? first, SqlParseError? second) =>
@@ -311,10 +301,9 @@ internal static class SqlFileParser
                 return;
             }
 
-            // A query runs to the next name marker, so one that is not the file's last may lack its semicolon.
             if (spans is not null && end < lexemes.Count)
             {
-                AddQueryEnd(spans, lexemes[lastContent].GetContentSpan(text)!.Value);
+                SqlTemplatingSpans.AddQueryEnd(spans, text, lexemes[lastContent].GetContentSpan(text)!.Value);
             }
 
             var query = BuildQuery(scope, start, end);
@@ -448,7 +437,7 @@ internal static class SqlFileParser
 
             if (spans is not null)
             {
-                AddQuerySpans(spans, sql, scanned.Occurrences, tokens, uses);
+                SqlTemplatingSpans.AddQuery(spans, text, sql, scanned.Occurrences, tokens, uses);
             }
 
             var segments = SqlListSegments.Split(scanned.Segments, scanned.Occurrences, sql, uses, places, parameters);
@@ -758,64 +747,13 @@ internal static class SqlFileParser
             {
                 AddError(
                     SqlParseErrorKind.ConflictingSettings,
-                    marker.ValueSpan.IsEmpty ? marker.Span : marker.ValueSpan,
+                    PlaceOf(marker),
                     SqlMarkerReader.Describe(text, marker)
                 );
             }
             else
             {
                 _dialect = dialect;
-            }
-        }
-
-        // The query's end is right after its last SQL, unless that ends in a semicolon.
-        private void AddQueryEnd(List<SqlTemplatingSpan> found, TextSpan lastContent)
-        {
-            if (text[lastContent.End - 1] != ';')
-            {
-                found.Add(
-                    new SqlTemplatingSpan(SqlTemplatingSpanKind.QueryEnd, new TextSpan(lastContent.End, 0), null, null)
-                );
-            }
-        }
-
-        // Each token with the default its query resolves for its name, and each parameter of the built SQL, a
-        // parameter inside a token's default too, with whether it is used as a list.  An empty list of uses has none.
-        private void AddQuerySpans(
-            List<SqlTemplatingSpan> found,
-            SqlBlockText sql,
-            EquatableArray<SqlTokenOccurrence> occurrences,
-            EquatableArray<SqlToken> tokens,
-            ImmutableArray<SqlParameterUse> uses
-        )
-        {
-            foreach (var occurrence in occurrences)
-            {
-                var token = tokens.First(token => string.Equals(token.Name, occurrence.Name, StringComparison.Ordinal));
-                found.Add(
-                    new SqlTemplatingSpan(
-                        SqlTemplatingSpanKind.Token,
-                        sql.ToSourceSpan(occurrence.Span),
-                        occurrence.Name,
-                        token.Default
-                    )
-                );
-            }
-
-            for (var position = 0; position < sql.Parameters.Length; position++)
-            {
-                var span = sql.ToSourceSpan(sql.Parameters[position]);
-                var name = SqlParameterName.Of(span);
-                found.Add(
-                    new SqlTemplatingSpan(
-                        uses.Length > 0 && uses[position] is SqlParameterUse.List or SqlParameterUse.NegatedList
-                            ? SqlTemplatingSpanKind.List
-                            : SqlTemplatingSpanKind.Parameter,
-                        span,
-                        text.Substring(name.Start, name.Length),
-                        null
-                    )
-                );
             }
         }
 
