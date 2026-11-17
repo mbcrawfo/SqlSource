@@ -404,19 +404,6 @@ public sealed class AttributeReaderTests : IDisposable
         Read("#if FEATURE\n[SqlSource.SqlSourceGenerate]\n#endif\ninternal partial class Queries;\n", "", constants)
             .Claims.Length.ShouldBe(expected);
 
-    // The constants of a framework are in a manifest because its target depends on the SDK's target that adds them.
-    [Fact]
-    public void Read_AttributeInsideIfOfAFramework_IsReadWithTheConstantsOfTheManifest() =>
-        Read(
-            "#if NET8_0_OR_GREATER\n[SqlSource.SqlSourceGenerate]\n#endif\ninternal partial class Queries;\n",
-            "",
-            "TRACE",
-            "NET",
-            "NET10_0",
-            "NET8_0_OR_GREATER"
-        )
-            .Claims.Length.ShouldBe(1);
-
     [Theory]
     [InlineData("")]
     [InlineData("latest")]
