@@ -95,11 +95,15 @@ internal static partial class ConnectionResolver
 
         // The pair, of which one returns a task, are the database's connections, that one of its asynchronous methods
         // and the other of its synchronous ones, when both can be one.  Each is checked, so that each one's problem is
-        // reported, and a problem of either fails the database.
+        // reported, and a problem of either fails the database; a holder of both is checked once, with the first.
         public void Take(NeededDatabase database, ConnectionCandidate first, ConnectionCandidate second)
         {
             var firstIsUsable = IsUsable(database, first);
-            var secondIsUsable = IsUsable(database, second);
+            var secondIsUsable = IsUsable(
+                database,
+                second,
+                checksHolder: second.Holder is null || second.Holder != first.Holder
+            );
             if (!firstIsUsable || !secondIsUsable)
             {
                 Fail(database.Name);
@@ -111,14 +115,14 @@ internal static partial class ConnectionResolver
         }
 
         // Whether the member can be the database's connection, with its problem when it cannot: a parameter that an
-        // argument of the methods hides, the member's own or the holder of a held one, or a type of a driver of another
-        // engine.
-        private bool IsUsable(NeededDatabase database, ConnectionCandidate candidate)
+        // argument of the methods hides, the member's own or the holder of a held one unless the holder is checked
+        // already, or a type of a driver of another engine.
+        private bool IsUsable(NeededDatabase database, ConnectionCandidate candidate, bool checksHolder = true)
         {
             var (member, name, location) = candidate.Holder is { } holder
                 ? (holder.Member, holder.Name, holder.Location)
                 : (candidate.Member, candidate.Name, candidate.Location);
-            if (member == CandidateMember.Parameter && IsAnArgumentsName(name, database))
+            if (checksHolder && member == CandidateMember.Parameter && IsAnArgumentsName(name, database))
             {
                 Report(
                     DiagnosticInfo.Create(
@@ -177,6 +181,8 @@ internal static partial class ConnectionResolver
                 TypeName,
                 type.IsStruct
             );
+            // The readers give every held candidate its holder and every global its type, so the last arm, which reads
+            // either as the type's own member, is never taken; it stands so that a missing one cannot throw.
             return candidate switch
             {
                 { Tier: CandidateTier.Held, Holder: { } holder } => HeldThrough(source, candidate, holder),

@@ -73,14 +73,21 @@ internal static partial class ConnectionResolver
         }
 
         return tier.Where(candidate =>
-                candidate is { Type: not CandidateType.Unsupported, Database: null }
-                && (DriverEngineOf(candidate.DeclaredTypeName) is not { } engine || engine == database.Engine)
+                candidate.Type != CandidateType.Unsupported && IsForDatabase(candidate, database)
             )
             .ToList();
     }
 
+    // Whether a shared mark is one for the database: one that names it, or one without a Database that is not of a
+    // driver of another engine than the database's.
+    private static bool IsForDatabase(ConnectionCandidate candidate, NeededDatabase database) =>
+        candidate.Database is { } name
+            ? DatabaseName.Comparer.Equals(name, database.Name)
+            : DriverEngineOf(candidate.DeclaredTypeName) is not { } engine || engine == database.Engine;
+
     // An unsupported member is reported once, at its holder, when it would be a candidate for a database still to
-    // decide, and fails each such database: its Database, or every one when it names none.
+    // decide, and fails each such database: its Database, or every one when it names none, but those of another
+    // engine than its driver's, which skip it as they skip a valid one.
     private static void ReportUnsupported(
         Resolving resolving,
         EquatableArray<ConnectionCandidate> tier,
@@ -90,9 +97,7 @@ internal static partial class ConnectionResolver
         foreach (var candidate in tier.Where(static candidate => candidate.Type == CandidateType.Unsupported))
         {
             var databases = undecided
-                .Where(database =>
-                    candidate.Database is not { } name || DatabaseName.Comparer.Equals(name, database.Name)
-                )
+                .Where(database => IsForDatabase(candidate, database))
                 .Select(static database => database.Name)
                 .ToList();
             if (databases.Count == 0)

@@ -385,6 +385,33 @@ public sealed class ConnectionResolverTierTests
         resolution.Sources.ShouldHaveSingleItem().Database.ShouldBe("main");
     }
 
+    // A broken default of one driver is skipped by a database of the other engine, as a valid one is, and the global
+    // below it serves that database.
+    [Fact]
+    public void Resolve_HeldUnsupportedDefaultOfOtherDriver_IsIgnored()
+    {
+        var broken = Held("dbf", "Source", CandidateType.Unsupported, declared: "Npgsql.NpgsqlDataSource");
+        var global = Global("global::App.Db", "Main", CandidateType.ConnectionString);
+
+        var resolution = Resolve(Tiers([], held: [broken], global: [global]), Sales);
+
+        resolution.Diagnostics.ShouldBeEmpty();
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.MemberName.ShouldBe("Db.Main");
+    }
+
+    [Fact]
+    public void Resolve_HeldUnsupportedDefaultOfOwnDriver_ReportsSqlsrc032()
+    {
+        var broken = Held("dbf", "Source", CandidateType.Unsupported, declared: "Npgsql.NpgsqlDataSource");
+
+        var resolution = Resolve(Tiers([], held: [broken]), Main);
+
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.ConnectionMemberNotSupported);
+        diagnostic.Location.ShouldBe(broken.Holder!.Location);
+        resolution.FailedDatabases.ShouldBe(["main"]);
+    }
+
     // A held member is not looked at for a database that the repository's own members decide.
     [Fact]
     public void Resolve_HeldUnsupportedForADecidedDatabase_IsNotReported()
@@ -398,35 +425,80 @@ public sealed class ConnectionResolverTierTests
         resolution.Sources.ShouldHaveSingleItem().Asynchronous.MemberName.ShouldBe("connectionString");
     }
 
-    // A database that the repository's own members fail is decided, and keeps today's problem.
+    // A database that the repository's own members fail is decided, and keeps today's problem: the global, which
+    // would serve it, is not used.
     [Theory]
-    [InlineData("unsupported", "SQLSRC032")]
-    [InlineData("without database", "SQLSRC030")]
-    [InlineData("held parameters", "SQLSRC028")]
-    public void Resolve_FailedOwnTierBlocksLowerTiers(string failure, string id)
+    [InlineData("unsupported")]
+    [InlineData("without database")]
+    [InlineData("held parameters")]
+    [InlineData("hidden parameter")]
+    [InlineData("other engine")]
+    public void Resolve_FailedOwnTierBlocksLowerTiers(string failure)
     {
         var global = Global("global::App.Db", "Main", CandidateType.ConnectionString);
-        NeededDatabase[] needed = failure == "held parameters" ? [Main] : [Main, Reports];
-        var shape = failure switch
+        var (own, needed, descriptor, arguments) = failure switch
         {
-            "unsupported" => Tiers(
-                [Candidate("Open", CandidateType.Unsupported, CandidateMember.Method, true)],
-                global: [global]
+            "unsupported" => (
+                Tiers([Candidate("Open", CandidateType.Unsupported, CandidateMember.Method, true)], global: [global]),
+                new NeededDatabase[] { Main, Reports },
+                SqlDiagnostics.ConnectionMemberNotSupported,
+                new[] { "App.UserRepository", "Open" }
             ),
-            "without database" => Tiers(
-                [Candidate("dataSource", CandidateType.DataSource, isMarked: true)],
-                global: [global]
+            "without database" => (
+                Tiers([Candidate("dataSource", CandidateType.DataSource, isMarked: true)], global: [global]),
+                [Main, Reports],
+                SqlDiagnostics.ConnectionNeedsDatabase,
+                ["App.UserRepository", "dataSource", "'main', 'reports'"]
             ),
-            "held parameters" => Tiers([], global: [global]) with
-            {
-                HeldParameters = TestSidecars.Of("connectionString"),
-            },
+            "held parameters" => (
+                Tiers([], global: [global]) with
+                {
+                    HeldParameters = TestSidecars.Of("connectionString"),
+                },
+                [Main],
+                SqlDiagnostics.RepositoryHasNoConnection,
+                [
+                    "App.UserRepository",
+                    "main",
+                    "The primary-constructor parameter 'connectionString' is not chosen by its name or type, since "
+                        + "the type also uses it to initialize a field or property, or passes it to its base type: "
+                        + "keep the value in a field or property named connectionString or of a DbDataSource type, "
+                        + "or mark the parameter [SqlSourceConnection].",
+                ]
+            ),
+            "hidden parameter" => (
+                Tiers(
+                    [Candidate("cancellationToken", CandidateType.DataSource, CandidateMember.Parameter)],
+                    global: [global]
+                ),
+                [Main],
+                SqlDiagnostics.ConnectionParameterHidden,
+                ["App.UserRepository", "cancellationToken", "main"]
+            ),
+            "other engine" => (
+                Tiers(
+                    [Candidate("dataSource", CandidateType.DataSource, declared: "Npgsql.NpgsqlDataSource")],
+                    global: [global]
+                ),
+                [Sales],
+                SqlDiagnostics.ConnectionOfAnotherEngine,
+                [
+                    "App.UserRepository",
+                    "dataSource",
+                    "Npgsql.NpgsqlDataSource",
+                    "sales",
+                    Sales.Engine.DatabaseName(),
+                    Sales.Engine.DriverName(),
+                ]
+            ),
             _ => throw new ArgumentOutOfRangeException(nameof(failure)),
         };
 
-        var resolution = Resolve(shape, needed);
+        var resolution = Resolve(own, needed);
 
-        resolution.Diagnostics.ShouldHaveSingleItem().Descriptor.Id.ShouldBe(id);
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(descriptor);
+        diagnostic.Arguments.ShouldBe(arguments);
         resolution.FailedDatabases.ShouldBe(needed.Select(database => database.Name));
         resolution.Sources.ShouldBeEmpty();
     }
@@ -441,6 +513,23 @@ public sealed class ConnectionResolverTierTests
         var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
         diagnostic.Descriptor.ShouldBe(SqlDiagnostics.ConnectionParameterHidden);
         diagnostic.Location.ShouldBe(held.Holder!.Location);
+        diagnostic.Arguments.ShouldBe(["App.UserRepository", "cancellationToken", "main"]);
+        resolution.FailedDatabases.ShouldBe(["main"]);
+        resolution.Sources.ShouldBeEmpty();
+    }
+
+    // A pair reached through one hidden holder reports the holder once.
+    [Fact]
+    public void Resolve_PairThroughHolderParameterNamedCancellationToken_ReportsSqlsrc036Once()
+    {
+        var asynchronous = Held("cancellationToken", "OpenAsync", isAsync: true);
+        var synchronous = Held("cancellationToken", "Open");
+
+        var resolution = Resolve(Tiers([], held: [asynchronous, synchronous]), Main);
+
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.ConnectionParameterHidden);
+        diagnostic.Location.ShouldBe(asynchronous.Holder!.Location);
         diagnostic.Arguments.ShouldBe(["App.UserRepository", "cancellationToken", "main"]);
         resolution.FailedDatabases.ShouldBe(["main"]);
         resolution.Sources.ShouldBeEmpty();
