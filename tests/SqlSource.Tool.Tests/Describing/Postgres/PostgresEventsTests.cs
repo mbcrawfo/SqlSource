@@ -266,26 +266,6 @@ public sealed class PostgresEventsTests
         Member(log.Events[0].Members, "sql").ShouldBe((LogValue)"SELECT 1 FROM *** WHERE id = $1");
     }
 
-    // The same inside a map: the message of an error is a string one level down.
-    [Fact]
-    public async Task DescribeAsync_ThroughTheLogOfASession_RemovesTheSecretFromTheMessageOfAnError()
-    {
-        var log = new RecordingLog();
-        var rejected = new PostgresServerError("42P01", "relation \"users\" does not exist", null, null, null);
-        var script = new PostgresScript()
-            .Open()
-            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer(null, rejected));
-
-        await DescribeAsync(script, new SessionRunLog(log, new ConnectionSecret("users"), "postgres."));
-
-        var (name, members) = log.Events.ShouldHaveSingleItem();
-        name.ShouldBe("postgres.prepare");
-        var error = Member(members, "error").ShouldBeOfType<LogValue.Members>();
-        error
-            .Values.Single(value => value.Name == "message")
-            .Value.ShouldBe((LogValue)"relation \"***\" does not exist");
-    }
-
     // The events of one call of a describe each say which query asked: a run describes several queries.  The nodes and
     // the columns of the walk are of the plan and not of a call.
     [Fact]

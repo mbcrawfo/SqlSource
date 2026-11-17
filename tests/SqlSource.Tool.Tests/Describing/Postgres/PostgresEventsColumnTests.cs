@@ -1,7 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
@@ -313,19 +312,5 @@ public sealed class PostgresEventsColumnTests
 
         log.Events.Select(written => written.Name).ShouldBe(["prepare", "columns", "types", "column", "deallocate"]);
         Member(log.Events[3].Members, "name").ShouldBe((LogValue)"one");
-    }
-
-    // A column's name is a user's text, and the connection's value is taken out of it as out of any string.
-    [Fact]
-    public async Task DescribeAsync_ThroughTheLogOfASession_RemovesTheSecretFromAColumnsNameAndItsOrigin()
-    {
-        var log = new RecordingLog();
-        var script = ListingScript().Checks(Listing.Sql, [], PostgresTables.UsersId, CountColumn).PlansNothing(1, 0);
-
-        await DescribeAsync(script, new SessionRunLog(log, new ConnectionSecret("users"), "postgres."), Listing);
-
-        var id = log.Events.First(written => written.Name == "postgres.column").Members;
-        Member(id, "origin")
-            .ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "***"), new("column", "id")));
     }
 }

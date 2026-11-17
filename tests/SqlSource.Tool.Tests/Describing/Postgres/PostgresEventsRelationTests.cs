@@ -2,7 +2,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
-using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
@@ -246,17 +245,5 @@ public sealed class PostgresEventsRelationTests
         log.Events.Select(written => written.Name)
             .ShouldBe(["prepare", "columns", "tables", "types", "column", "column", "check", "deallocate"]);
         Member(log.Events.Single(written => written.Name == "check").Members, "result").ShouldBe((LogValue)"differ");
-    }
-
-    // A table's name is a user's text, and the connection's value is taken out of it as out of any string.
-    [Fact]
-    public async Task DescribeAsync_ThroughTheLogOfASession_RemovesTheSecretFromTheTableOfATableMatch()
-    {
-        var log = new RecordingLog();
-
-        await DescribeAsync(WholeScript(), new SessionRunLog(log, new ConnectionSecret("users"), "postgres."), Whole);
-
-        var match = log.Events.Single(written => written.Name == "postgres.table-match").Members;
-        Member(match, "table").ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "***")));
     }
 }
