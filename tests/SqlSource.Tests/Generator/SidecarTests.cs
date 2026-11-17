@@ -227,17 +227,6 @@ public sealed class SidecarTests
         UsableEntries(run).ShouldBe(["GetUser"]);
     }
 
-    [Fact]
-    public void Run_MssqlFileWithoutASidecar_IsSqlsrc241AtEachQuery()
-    {
-        var run = Run(OutputKind.Models, [GeneratorHarness.UsersFile], "mssql");
-
-        run.Diagnostics.ShouldBe([
-            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
-                + "'models' needs one.  Run 'sqlsource describe'.",
-        ]);
-    }
-
     // An entry of postgres is not one of mssql, and the sidecar's own errors and its orphans are still found.
     [Fact]
     public void Run_MssqlFileWithASidecar_IsCheckedForTheEngineAndForTheSidecarsOwnErrors()

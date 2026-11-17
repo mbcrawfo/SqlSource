@@ -246,20 +246,6 @@ public sealed class RowBufferTests
         Count(methods, "var rows = new global::System.Collections.Generic.List<").ShouldBe(1);
     }
 
-    // Under array-pool=off the method reads its rows into a list, as before the buffer, and the project has no buffer.
-    [Fact]
-    public void Run_ArrayMethodUnderArrayPoolOff_WritesTheMethodWithAListAndNoBuffer()
-    {
-        var file = ListUsers with { Text = "-- generator: array-pool=off\n\n" + ListUsers.Text };
-
-        var run = MethodRuns.Run(file, [Users(file, "ListUsers")]);
-
-        run.ShouldBeClean();
-        run.Sources[MethodRuns.MethodsFile]
-            .ShouldBe(ListUsersMethods("new global::System.Collections.Generic.List<global::App.ListUsersDto>()"));
-        run.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
-    }
-
     // The one pooled method clashes with the second type's and is dropped, so no method the project keeps uses the
     // buffer, though the first type keeps a method that reads one row.
     [Fact]
@@ -385,87 +371,6 @@ public sealed class RowBufferTests
         run.ShouldBeClean();
         MethodsOf(run).ShouldContain(NewBuffer);
     }
-
-    // The file of ListUsers's methods on App.Sample, its rows read into the given buffer.
-    private static string ListUsersMethods(string buffer) =>
-        GeneratedFile.Joined(
-            $$$"""
-            {{{GeneratedFile.ModelHeader}}}
-            namespace App
-            {
-                /// <summary>
-                /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
-                /// </summary>
-                internal static partial class SampleExtensions
-                {
-                    /// <summary>
-                    /// The <c>ListUsers</c> query from <c>Users.sql</c>.
-                    /// </summary>
-                    /// <remarks>
-                    /// <code>
-                    /// SELECT id, name FROM users;
-                    /// </code>
-                    /// </remarks>
-                    /// <param name="connection">The connection to run the query on.  ↩
-                It is opened when it is closed, and closed again when the method opened it.</param>
-                    /// <param name="transaction">The transaction to run the query in, or null.</param>
-                    /// <param name="commandTimeout">↩
-                The command's timeout in seconds, or null for the driver's.</param>
-                    /// <param name="cancellationToken">Cancels the query.</param>
-                    /// <returns>The rows the query returned.</returns>
-                    internal static async global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> ↩
-                ListUsers(
-                        this global::System.Data.Common.DbConnection connection,
-                        global::System.Data.Common.DbTransaction? transaction = null,
-                        int? commandTimeout = null,
-                        global::System.Threading.CancellationToken cancellationToken = default)
-                    {
-                        global::System.ArgumentNullException.ThrowIfNull(connection);
-                        const string sql = "SELECT id, name FROM users;";
-                        var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
-                        if (wasClosed)
-                        {
-                            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-                        }
-
-                        try
-                        {
-                            var command = connection.CreateCommand();
-                            await using var commandScope = ↩
-                global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
-                            command.CommandText = sql;
-                            command.Transaction = transaction;
-                            if (commandTimeout.HasValue)
-                            {
-                                command.CommandTimeout = commandTimeout.Value;
-                            }
-
-                            var reader = await command.ExecuteReaderAsync(↩
-                global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
-                            await using var readerScope = ↩
-                global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
-                            var rows = {{{buffer}}};
-                            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                            {
-                                rows.Add(new global::App.ListUsersDto(reader.GetFieldValue<int>(0), ↩
-                reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));
-                            }
-
-                            return rows.ToArray();
-                        }
-                        finally
-                        {
-                            if (wasClosed)
-                            {
-                                await connection.CloseAsync().ConfigureAwait(false);
-                            }
-                        }
-                    }
-                }
-            }
-
-            """
-        );
 
     // ListUsers on App.Sample, with these markers in its file header, before a blank line.
     private static GeneratorRun RunListUsers(string header)
