@@ -43,7 +43,7 @@ public partial class Accounting(
 - **Several databases can share one dialect.**  Here `billing` and `reports` are both `postgres`.  See [database](../reference/settings.md#setting-database).
 - **The variable of a name is `SQLSOURCE_CONNECTION_` and the name in upper case**, with each character that is not a letter or a digit written as `_`: `SQLSOURCE_CONNECTION_BILLING_V2` for `billing-v2`.  See [connections](../reference/connections.md#connections).
 - **The build reads the database of each query too.**  It chooses the connection of each repository method by it.  See [database](../reference/settings.md#setting-database).
-- **A repository that uses several databases marks one connection for each**, as `[SqlSourceConnection(Database = "billing")]`.  See [One repository on two databases](#repository-on-two) and [a repository's connection](../reference/repository-connections.md#repository-connection).
+- **A repository that uses several databases marks one connection for each**, as `[SqlSourceConnection(Database = "billing")]`, or uses the connections that the project marks for all its repositories.  See [One repository on two databases](#repository-on-two), [Share the connections of several databases](#shared-databases) and [a repository's connection](../reference/repository-connections.md#repository-connection).
 - **For files written for another kind of database, set their dialect.**  See [Read one folder with another dialect](#folder-with-another-dialect).
 
 <a id="repository-on-two"></a>
@@ -109,6 +109,70 @@ SQLSOURCE_CONNECTION_BILLING="Server=localhost,1433;Database=billing;User ID=app
 - On SQL Server, which has no data source, mark a connection string, a method that returns a connection, or a connection.  See [The connection](../reference/repository-connections.md#repository-connection).
 - The tool needs a connection for each name.  `SQLSOURCE_CONNECTION` alone serves no database when the run has more than one.  See [Connections](../reference/connections.md#connections).
 
+<a id="shared-databases"></a>
+
+## Share the connections of several databases
+
+If many repositories use the same databases, mark their connections once, as static members of a class of your project.  Mark the connection of the main database without `Database`, and each other connection with its name:
+
+# [PostgreSQL](#tab/postgresql)
+
+```csharp
+public static class Db
+{
+    [SqlSourceConnection]
+    public static NpgsqlDataSource? Main { get; set; }
+
+    [SqlSourceConnection(Database = "billing")]
+    public static NpgsqlDataSource? Billing { get; set; }
+}
+
+[SqlSourceGenerate(Source = ".")]
+public partial class AccountRepository;
+```
+
+```csharp
+// Program.cs
+Db.Main = NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Main")!);
+Db.Billing = NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Billing")!);
+builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
+```
+
+# [SQL Server](#tab/sqlserver)
+
+```csharp
+public static class Db
+{
+    [SqlSourceConnection]
+    public static string? Main { get; set; }
+
+    [SqlSourceConnection(Database = "billing")]
+    public static string? Billing { get; set; }
+}
+
+[SqlSourceGenerate(Source = ".")]
+public partial class AccountRepository;
+```
+
+```csharp
+// Program.cs
+Db.Main = builder.Configuration.GetConnectionString("Main");
+Db.Billing = builder.Configuration.GetConnectionString("Billing");
+builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
+```
+
+---
+
+**What you get.**  `GetInvoice` runs on a connection of `Db.Billing`, and `GetUser` on one of `Db.Main`.  Each other repository of the project with no connection of its own uses them in the same way.  Your application sets both members once, at startup, before a repository method runs.
+
+**The rules you need.**
+
+- **A shared mark without `Database` serves each database that no other mark names**, on a repository of one database or of several.  See [which database a shared mark is for](../reference/repository-connections.md#shared-marks).
+- **A shared mark for a database that a repository does not use is ignored**, with no warning.  See [which database a shared mark is for](../reference/repository-connections.md#shared-marks).
+- **A shared mark of an Npgsql type without `Database` does not serve a SQL Server database**, and one of a Microsoft.Data.SqlClient type does not serve a PostgreSQL database.  So one class can hold the connections of both engines.  See [which database a shared mark is for](../reference/repository-connections.md#shared-marks).
+- **A repository's own members win.**  A repository that marks a member for a database uses it.  See [where the build looks](../reference/repository-connections.md#connection-order).
+- **A factory that a repository holds can mark its members in the same way.**  See [a factory that a repository holds](../reference/repository-connections.md#held-factory).
+
 <a id="folder-with-another-dialect"></a>
 
 ## Read one folder with another dialect
@@ -157,7 +221,8 @@ $ dotnet sqlsource describe
 
 ## If it does not work
 
-- **SQLSRC030.**  A member is marked `[SqlSourceConnection]` with no `Database`, and the queries use more than one database.  Set its `Database`.  See [SQLSRC030](../diagnostics.md#sqlsrc030).
+- **SQLSRC030.**  A member of the repository is marked `[SqlSourceConnection]` with no `Database`, and the queries use more than one database.  Set its `Database`.  See [SQLSRC030](../diagnostics.md#sqlsrc030).
 - **SQLSRC031, a warning.**  No repository query of the class uses the database of a mark.  Its `Database` is misspelt, or the queries of that database have another output.  See [SQLSRC031](../diagnostics.md#sqlsrc031).
-- **SQLSRC028.**  No member is marked for a database that the repository queries use.  Mark one, with its `Database`.  See [SQLSRC028](../diagnostics.md#sqlsrc028).
+- **SQLSRC028.**  No member is marked for a database that the repository queries use.  Mark one, with its `Database`, on the repository or as a shared mark.  See [SQLSRC028](../diagnostics.md#sqlsrc028).
+- **SQLSRC033 at the repository's `[SqlSourceGenerate]`.**  A static member of the project names the database, and is of the other engine's driver.  See [SQLSRC033](../diagnostics.md#sqlsrc033).
 - **SQLSRC213, from the tool.**  A database has a query to describe and no connection.  Set the variable of its name.  See [SQLSRC213](../diagnostics.md#sqlsrc213).

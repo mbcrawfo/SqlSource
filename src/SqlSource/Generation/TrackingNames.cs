@@ -21,6 +21,10 @@ internal static class TrackingNames
 
     public const string RepositoryShapes = nameof(RepositoryShapes);
 
+    public const string GlobalConnectionMarks = nameof(GlobalConnectionMarks);
+
+    public const string GlobalConnectionChecks = nameof(GlobalConnectionChecks);
+
     public const string SqlPaths = nameof(SqlPaths);
 
     public const string CompilePaths = nameof(CompilePaths);

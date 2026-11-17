@@ -6,7 +6,7 @@ using Npgsql;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
-// The four repositories of Queries/Repository.sql, whose header sets the output repository: each gets the file's
+// The six repositories of Queries/Repository.sql, whose header sets the output repository: each gets the file's
 // queries as instance methods, asynchronous and synchronous, and the interface I<its name>, and differs only in where
 // its methods take a connection.
 
@@ -70,4 +70,65 @@ internal sealed partial class BorrowedRepository(DbConnection connection)
 {
     [SqlSourceConnection]
     public DbConnection Connection { get; } = connection;
+}
+
+// A factory that the repository holds, the interface of a primary-constructor parameter: its marked methods, a pair of
+// one asynchronous and one synchronous, are the connection sources of the repository that holds it, which calls them on
+// the parameter and disposes the connection each returns.
+internal interface IConnectionFactory
+{
+    [SqlSourceConnection]
+    ValueTask<NpgsqlConnection?> OpenAsync(CancellationToken cancellationToken);
+
+    [SqlSourceConnection]
+    NpgsqlConnection? Open(CancellationToken cancellationToken);
+}
+
+// The factory of a data source, which keeps the connections it opened for a test to look at and, given none, returns
+// null, as a factory of the user's may.
+internal sealed class DataSourceConnectionFactory(NpgsqlDataSource? dataSource) : IConnectionFactory
+{
+    public List<NpgsqlConnection> Connections { get; } = [];
+
+    public async ValueTask<NpgsqlConnection?> OpenAsync(CancellationToken cancellationToken)
+    {
+        if (dataSource is null)
+        {
+            return null;
+        }
+
+        var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        Connections.Add(connection);
+        return connection;
+    }
+
+    public NpgsqlConnection? Open(CancellationToken cancellationToken)
+    {
+        if (dataSource is null)
+        {
+            return null;
+        }
+
+        var connection = dataSource.OpenConnection();
+        Connections.Add(connection);
+        return connection;
+    }
+}
+
+// A held factory by the parameter's type: each method calls the marked method of the factory it was given, since a
+// factory the repository holds is a source of the repository as its own members are.
+[SqlSourceGenerate(Source = "Queries/Repository.sql")]
+internal sealed partial class HeldFactoryRepository(IConnectionFactory factory);
+
+// No source of its own: a global, a static member marked in the project, serves it.  The global names the logical
+// database of the file, "app", so that it serves no other repository of the project.
+[SqlSourceGenerate(Source = "Queries/Repository.sql")]
+internal sealed partial class GlobalRepository;
+
+// The global of GlobalRepository, which a test sets to a data source of its own and sets back to null.
+internal static class EndToEndConnections
+{
+    // Only tests of one collection may set it, since xUnit runs collections in parallel.
+    [SqlSourceConnection(Database = "app")]
+    public static NpgsqlDataSource? Main { get; set; }
 }

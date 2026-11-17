@@ -48,6 +48,21 @@ public sealed class SynchronousRepositoryTests(SqlServerDatabases sqlServer)
         note.ShouldBe(Notes[0]);
     }
 
+    // The held factory's synchronous method is the one that returns no task, and its connection is the method's to
+    // dispose, which its Disposed event, raised once, proves.
+    [Fact]
+    public void GetNoteSync_HeldFactory_CallsTheSynchronousMethodAndDisposesItsConnection()
+    {
+        var factory = new ConnectionStringConnectionFactory(EndToEndSources.AppConnectionString(sqlServer));
+
+        var note = new HeldFactoryRepository(factory).GetNoteSync(new GetNoteSyncArgs(1));
+
+        note.ShouldBe(Notes[0]);
+        var connection = factory.Connections.ShouldHaveSingleItem();
+        connection.State.ShouldBe(ConnectionState.Closed);
+        factory.Disposed.ShouldBe([connection]);
+    }
+
     [Fact]
     public void ListNotesSync_ConnectionString_ReadsEveryNote()
     {
@@ -236,6 +251,49 @@ public sealed class SynchronousRepositoryTests(SqlServerDatabases sqlServer)
                 + "'SqlSource.DatabaseTests.SqlServer.EndToEnd.FactoryRepository' is null."
         );
         repository.SyncConnections.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void HeldFactory_SyncFactoryReturnsNull_ThrowsNamingTheHoldersMember()
+    {
+        var repository = new HeldFactoryRepository(new ConnectionStringConnectionFactory(null));
+
+        ShouldThrowNullSource(
+            () => repository.GetNoteSync(new GetNoteSyncArgs(1)),
+            "The connection source 'factory.Open' of "
+                + "'SqlSource.DatabaseTests.SqlServer.EndToEnd.HeldFactoryRepository' is null."
+        );
+    }
+
+    // The collection's tests run one at a time, so the global is the source of the test that is running.
+    [Fact]
+    public void GetNoteSync_Global_ReadsTheRowThroughTheGlobal()
+    {
+        EndToEndConnections.Main = EndToEndSources.AppConnectionString(sqlServer);
+
+        try
+        {
+            var note = new GlobalRepository().GetNoteSync(new GetNoteSyncArgs(3));
+
+            note.ShouldBe(Notes[2]);
+        }
+        finally
+        {
+            EndToEndConnections.Main = null;
+        }
+    }
+
+    [Fact]
+    public void GetNoteSync_NullGlobal_ThrowsNamingTheGlobal()
+    {
+        EndToEndConnections.Main = null;
+        var repository = new GlobalRepository();
+
+        ShouldThrowNullSource(
+            () => repository.GetNoteSync(new GetNoteSyncArgs(1)),
+            "The connection source 'EndToEndConnections.Main' of "
+                + "'SqlSource.DatabaseTests.SqlServer.EndToEnd.GlobalRepository' is null."
+        );
     }
 
     [Fact]

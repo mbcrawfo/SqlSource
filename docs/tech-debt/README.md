@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0118`
+Next id: `TD-0120`
 
 ## Active items
 
@@ -40,6 +40,8 @@ Next id: `TD-0118`
 | [TD-0097](TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md) | Open | 2026-11-03 | Medium | What phase 9's design says Visual Studio and VS Code show of a sidecar another process wrote, their design-time builds, the VS Code task and the file events of their saves was checked in Rider on macOS alone |
 | [TD-0114](TD-0114-generator-code-its-own-tests-do-not-check.md) | Open | 2026-11-13 | Low | 2,504 mutants of `src/SqlSource` fail no test of their own folder or are run by none, most in `MethodPlanner.cs`, `ModelReader.cs` and `ExceptionProbe.cs`, though the driver tests and the golden corpus may reach them |
 | [TD-0115](TD-0115-tool-code-its-own-tests-do-not-check.md) | Open | 2026-11-13 | Low | 1,881 mutants of `src/SqlSource.Tool` fail no test of their own folder or are run by none, most in `WatchSession.cs`, `SqlServerLive.cs` and `DiagnoseRun.cs`, though the command tests and the database projects may reach them |
+| [TD-0118](TD-0118-own-candidates-hide-base-members-by-name.md) | Open | 2026-11-16 | Low | A repository's own connection candidates, and its field and property holders, skip a base type's member that any more derived member has the name of, even a method of another signature or a member the repository cannot reach |
+| [TD-0119](TD-0119-static-member-of-the-repositorys-name.md) | Open | 2026-11-16 | Low | A static connection source or factory holder of a base type that has the repository's name is reached as `Sample.Sample`, which binds to the member, so the generated method does not compile |
 
 ## Columns
 
