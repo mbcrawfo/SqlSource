@@ -51,7 +51,7 @@ A theory is clearest when its rows share one arrangement and one set of assertio
   - `SqlSource.Tool.Tests/Projects/OnlineBuildTests.cs`, `Build_AfterAnInputIsTouched_RunsTheToolOnceMore` (`input`);
   - `SqlSource.Tool.Tests/Projects/ProjectEvaluatorTests.cs`, `Evaluate_Project_RunsTheDotnetThatStartedTheToolOrTheOneOnThePath` (`hostPath`);
   - `SqlSource.Tool.Tests/Watching/WatchSetTests.cs`, `Folders_AssetsFolderBelowTheProject_AddsNoFolder` (`restored`), `Folders_AssetsFolderThatDoesNotExistAboveTheRepository_IsNotWatched` and `Folders_FolderAboveEachWatchedFolder_IsWatchedOutsideARepository` (`repository`).
-- 130 more theories derive an expected value or a piece of the arrangement from the row with a `?:`, a `switch` expression or an `if` that only picks a value, as `nullable is null ? … : …`, and then run the same calls and assertions on every row.  These state one rule over rows that differ only in data, and need no change; the same scan lists them.
+- About 130 more theories derive an expected value or a piece of the arrangement from the row with a `?:`, a `switch` expression or an `if` that only picks a value, as `nullable is null ? … : …`, and then run the same calls and assertions on every row.  These state one rule over rows that differ only in data, and need no change; the same scan lists them.
 
 ## Why it exists
 
