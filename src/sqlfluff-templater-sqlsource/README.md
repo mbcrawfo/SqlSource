@@ -7,8 +7,11 @@ left as they are.
 ## Install
 
 ```sh
-pip install sqlfluff sqlfluff-templater-sqlsource
+pip install sqlfluff sqlfluff-templater-sqlsource==<version>
 ```
+
+Replace `<version>` with the version of your `SqlSource` package, as
+[the guide](https://mbcrawfo.github.io/SqlSource/guides/sqlfluff.html#set-up-sqlfluff) says.
 
 ## Use
 
