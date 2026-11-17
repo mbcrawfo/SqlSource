@@ -12,11 +12,13 @@ pip install sqlfluff sqlfluff-templater-sqlsource
 
 ## Use
 
-Select the templater in your `.sqlfluff` file:
+Select the templater and your database's sqlfluff dialect in the `.sqlfluff` file of the folder you run sqlfluff
+from:
 
 ```ini
 [sqlfluff]
 templater = sqlsource
+dialect = postgres
 ```
 
 The guide at <https://mbcrawfo.github.io/SqlSource/guides/sqlfluff.html> describes what sqlfluff then checks and how
