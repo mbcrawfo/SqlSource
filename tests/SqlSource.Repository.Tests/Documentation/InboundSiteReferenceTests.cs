@@ -73,6 +73,8 @@ public sealed partial class InboundSiteReferenceTests
             "https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc"
         ),
         ("tests/SqlSource.Tool.Tests/Expected.cs", "https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc"),
+        // The page is written by a later task of the templater's plan, which removes this exception.
+        ("src/sqlfluff-templater-sqlsource/README.md", "https://mbcrawfo.github.io/SqlSource/guides/sqlfluff.html"),
     ];
 
     // The references of the repository outside the user documents, `docs/superpowers/` and the whole-file exceptions,
