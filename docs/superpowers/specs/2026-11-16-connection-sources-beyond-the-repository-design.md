@@ -98,7 +98,7 @@ Each database a repository needs is resolved on its own, from the first of these
 
 ### Globals
 
-- **A global** is a marked static field, property or method in the project's own source, in a static class or not, outside every type marked `[SqlSourceGenerate]`.  A static member of a repository's base type is a global too, and its derived repositories find it first in tier 1.
+- **A global** is a marked static field, property or method in the project's own source, in a static class or not, outside every type marked `[SqlSourceGenerate]`.  A static member of a repository's base type is a global of other repositories, and never of its derived repositories, whose own member it is in tier 1, found there or hidden by a member of its name.
 - **A repository sees a global only when it can reach it.**  A global it cannot reach is not a candidate, and nothing is reported.
 - **A global's mark for a database the repository does not use is ignored silently.**
 - **A global without `Database`** is a default, as the tiers say.

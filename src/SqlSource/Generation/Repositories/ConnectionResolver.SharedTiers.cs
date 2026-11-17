@@ -8,15 +8,16 @@ internal static partial class ConnectionResolver
 {
     // Adds the candidates of the held factories, then of the globals, for each database that the type's own members do
     // not decide, from the first of the two that has a candidate for it or fails it.  The own members decide a
-    // database that they have a candidate for or fail, and every database when they are none and a primary-constructor
-    // parameter is left out of them, which keeps SQLSRC028 naming the parameter.
+    // database that they have a candidate for or fail, and the type's one database when they are none and a
+    // primary-constructor parameter is left out of them, which keeps SQLSRC028 naming the parameter.  On a type of
+    // several databases no convention would take the parameter, so it decides none of them.
     private static void AddSharedTiers(
         Resolving resolving,
         RepositoryShape shape,
         Dictionary<string, List<ConnectionCandidate>> byDatabase
     )
     {
-        if (shape.Candidates.Count == 0 && shape.HeldParameters.Count > 0)
+        if (resolving.Needed.Count == 1 && shape.Candidates.Count == 0 && shape.HeldParameters.Count > 0)
         {
             return;
         }

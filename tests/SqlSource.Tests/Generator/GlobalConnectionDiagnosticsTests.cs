@@ -491,6 +491,46 @@ public sealed class GlobalConnectionDiagnosticsTests
             ]);
     }
 
+    // A static of a repository's base type is the repository's own member, so one that a member of its name hides is
+    // not the repository's source as a global either; a repository that does not derive from the type still has it.
+    [Fact]
+    public void Run_HiddenStaticOfARepositorysBase_IsNoGlobalOfThatRepository()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    public static string Cs = "";
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    public static new int Cs = 0;
+                }
+
+                [SqlSourceGenerate]
+                public partial class OrderRepository;
+            }
+            """;
+
+        var run = RunTwoRepositories(Source);
+
+        var shapes = StepOutputs.Single<EquatableArray<RepositoryShape>>(run, TrackingNames.RepositoryShapes);
+        shapes.Single(shape => shape.TypeKey == "App.UserRepository").GlobalCandidates.ShouldBeEmpty();
+        shapes
+            .Single(shape => shape.TypeKey == "App.OrderRepository")
+            .GlobalCandidates.ShouldHaveSingleItem()
+            .GlobalTypeText.ShouldBe("global::App.RepositoryBase");
+        var problem = run.Problems().ShouldHaveSingleItem();
+        problem.ShouldStartWith("SQLSRC028 ");
+        problem.ShouldContain("'App.UserRepository'");
+    }
+
     // A lambda is a method, which the attribute may mark, and never a source.  A lambda has no name, so the problem is
     // at the whole lambda, its mark too.
     [Fact]

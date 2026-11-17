@@ -191,6 +191,71 @@ public sealed class HeldFactoryReaderTests
         holder.Member.ShouldBe(CandidateMember.Property);
     }
 
+    // A field that holds a factory leaves the parameters out, even one of another factory that nothing else reads.
+    [Fact]
+    public void Read_FieldHolder_HidesAParameterHolder()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    Task<DbConnection> Open(CancellationToken ct);
+                }
+
+                public interface IAuditFactory
+                {
+                    [SqlSourceConnection(Database = "audit")]
+                    Task<DbConnection> OpenAudit(CancellationToken ct);
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(IAuditFactory audit)
+                {
+                    private readonly IDatabaseFactory _dbf = null!;
+                }
+            }
+            """
+        );
+
+        shape.HeldCandidates.Select(static candidate => candidate.DisplayName).ShouldBe(["_dbf.Open"]);
+    }
+
+    // A parameter that the type passes to its base type, or reads in an initializer, is not a holder, even when no
+    // member that keeps it is one: the base type's is out of the type's reach, and an object holds no factory.
+    [Theory]
+    [InlineData("UserRepository(IDatabaseFactory dbf) : RepositoryBase(dbf);")]
+    [InlineData(
+        "UserRepository(IDatabaseFactory dbf) : RepositoryBase(null!) { private readonly object _kept = dbf; }"
+    )]
+    public void Read_ParameterReadBesides_IsNotAHolder(string declaration)
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    Task<DbConnection> Open(CancellationToken ct);
+                }
+
+                public abstract class RepositoryBase(IDatabaseFactory factory)
+                {
+                    private readonly IDatabaseFactory _factory = factory;
+                }
+
+                [SqlSourceGenerate]
+                public partial class {{declaration}}
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
     // Only a member whose type has candidates is a holder, so a field of another service leaves the parameters to be
     // holders.
     [Fact]

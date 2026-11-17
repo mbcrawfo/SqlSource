@@ -1,3 +1,4 @@
+using System;
 using SqlSource.Diagnostics;
 
 namespace SqlSource.Generation.Repositories;
@@ -66,10 +67,11 @@ internal sealed record ConnectionCandidate(
             _ => Name,
         };
 
-    // The last name of the text, as a value: without the @ of an escaped keyword, which the text keeps for access.
+    // The last name of the text, after its last dot or, for a type of the global namespace, the colons of global::, as
+    // a value: without the @ of an escaped keyword, which the text keeps for access.
     private static string SimpleNameOf(string typeText)
     {
-        var start = typeText.LastIndexOf('.') + 1;
+        var start = Math.Max(typeText.LastIndexOf('.'), typeText.LastIndexOf(':')) + 1;
         if (start < typeText.Length && typeText[start] == '@')
         {
             start++;

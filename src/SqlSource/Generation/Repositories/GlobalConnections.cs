@@ -18,7 +18,8 @@ namespace SqlSource.Generation.Repositories;
 /// <c>static virtual</c> interface member, or when a type around it is file-local, which the generated code, in
 /// another file, can never reach.  A static member of a type marked <c>[SqlSourceGenerate]</c> and a parameter of such
 /// a type's primary constructor are the type's own, which <see cref="ConnectionCandidateReader" /> reads, and both
-/// methods pass over them.
+/// methods pass over them.  So is a static member of its base type, which both pass over for the repositories that
+/// derive from that type.
 /// </summary>
 internal static class GlobalConnections
 {
@@ -86,8 +87,9 @@ internal static class GlobalConnections
     /// <summary>
     /// Every valid global of the project that the repository can reach, in the order of the marks, each with its
     /// <see cref="ConnectionCandidate.GlobalTypeText" />, except the statics of types marked
-    /// <c>[SqlSourceGenerate]</c>.  A static of a repository's base type is offered too, and the derived repository
-    /// finds it first among its own members.
+    /// <c>[SqlSourceGenerate]</c> and of the repository's own base types.  A static of a base type is the repository's
+    /// own member, which its own candidates read, or skip when a more derived member has its name, so it is never the
+    /// repository's global; it is still a global of every other repository that can reach it.
     /// </summary>
     /// <param name="marks">The project's marks, from <see cref="GlobalMarkReader" />.</param>
     /// <param name="repository">The repository.</param>
@@ -104,12 +106,14 @@ internal static class GlobalConnections
         }
 
         var candidates = ImmutableArray.CreateBuilder<ConnectionCandidate>();
+        var ownTypes = TypeAndItsBasesOf(repository);
         foreach (var mark in marks)
         {
             if (
                 mark is not { ParameterOrdinal: null, DeclarationId.Length: > 0 }
                 || Resolve(mark, compilation, CancellationToken.None) is not { } member
                 || IsOwnMember(member)
+                || ownTypes.Contains(member.ContainingType.OriginalDefinition)
                 || !ConnectionCandidateReader.IsReachable(member, repository, compilation)
             )
             {
@@ -248,13 +252,22 @@ internal static class GlobalConnections
         var types = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
         foreach (var name in repositories)
         {
-            for (var type = compilation.GetTypeByMetadataName(name); type is not null; type = type.BaseType)
+            if (compilation.GetTypeByMetadataName(name) is { } type)
             {
-                if (!types.Add(type.OriginalDefinition))
-                {
-                    break;
-                }
+                types.UnionWith(TypeAndItsBasesOf(type));
             }
+        }
+
+        return types;
+    }
+
+    // The type and each of its base types, as declared, whose static members are the type's own.
+    private static HashSet<ISymbol> TypeAndItsBasesOf(INamedTypeSymbol type)
+    {
+        var types = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            _ = types.Add(current.OriginalDefinition);
         }
 
         return types;

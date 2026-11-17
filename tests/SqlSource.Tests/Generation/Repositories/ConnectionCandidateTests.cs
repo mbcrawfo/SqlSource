@@ -51,12 +51,16 @@ public sealed class ConnectionCandidateTests
     public void DisplayName_HeldWithoutHolder_IsItsName() =>
         (Candidate("Open") with { Tier = CandidateTier.Held }).DisplayName.ShouldBe("Open");
 
-    [Fact]
-    public void DisplayName_GlobalWithoutDot_IsTextDotName()
+    // A type of the global namespace has no namespace in its text, whose last name follows the alias's colons.
+    [Theory]
+    [InlineData("global::Db", "Db.Reports")]
+    [InlineData("global::@class", "class.Reports")]
+    [InlineData("global::Outer.Db", "Db.Reports")]
+    public void DisplayName_GlobalOfTheGlobalNamespace_IsTypeDotName(string typeText, string displayName)
     {
-        var candidate = Candidate("Reports") with { Tier = CandidateTier.Global, GlobalTypeText = "Db" };
+        var candidate = Candidate("Reports") with { Tier = CandidateTier.Global, GlobalTypeText = typeText };
 
-        candidate.DisplayName.ShouldBe("Db.Reports");
+        candidate.DisplayName.ShouldBe(displayName);
     }
 
     private static ConnectionCandidate Candidate(string name) =>

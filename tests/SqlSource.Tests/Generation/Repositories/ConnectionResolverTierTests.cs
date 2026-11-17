@@ -517,6 +517,28 @@ public sealed class ConnectionResolverTierTests
         resolution.Sources.ShouldBeEmpty();
     }
 
+    // No convention takes a parameter on a type of several databases, so a parameter that the type passes on decides
+    // none of them, and the held tier serves each.
+    [Fact]
+    public void Resolve_HeldParametersOnSeveralDatabases_LeaveThemToTheSharedTiers()
+    {
+        var shape = Tiers(
+            [],
+            held: [Held("dbf", "Main", database: "main"), Held("dbf", "Reports", database: "reports")]
+        ) with
+        {
+            HeldParameters = TestSidecars.Of("dataSource"),
+        };
+
+        var resolution = Resolve(shape, Main, Reports);
+
+        resolution.Diagnostics.ShouldBeEmpty();
+        resolution.FailedDatabases.ShouldBeEmpty();
+        resolution
+            .Sources.Select(resolved => (resolved.Database, resolved.Asynchronous.MemberName))
+            .ShouldBe([("main", "dbf.Main"), ("reports", "dbf.Reports")]);
+    }
+
     [Fact]
     public void Resolve_HolderParameterNamedCancellationToken_ReportsSqlsrc036()
     {

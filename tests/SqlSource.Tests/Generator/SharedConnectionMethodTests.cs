@@ -153,6 +153,34 @@ public sealed class SharedConnectionMethodTests
             .ShouldContain("new global::Npgsql.NpgsqlConnection(global::App.Outer.Db.ConnectionString ?? throw ");
     }
 
+    // A type of the global namespace is reached from global::, and a message names it without that.
+    [Fact]
+    public void Run_GlobalInTheGlobalNamespace_NamesTheTypeAlone()
+    {
+        const string Source = """
+            using SqlSource;
+
+            public static class Db
+            {
+                [SqlSourceConnection]
+                public static string? ConnectionString { get; set; }
+            }
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample;
+            }
+            """;
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], Source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodsFile];
+        methods.ShouldContain("new global::Npgsql.NpgsqlConnection(global::Db.ConnectionString ?? throw ");
+        methods.ShouldContain("\"The connection source 'Db.ConnectionString' of 'App.Sample' is null.\"");
+    }
+
     // A struct's local function reaches no primary-constructor parameter, so its streaming method copies the holder,
     // checked, into a local before the iterator, which opens the connection through that local.
     [Fact]
