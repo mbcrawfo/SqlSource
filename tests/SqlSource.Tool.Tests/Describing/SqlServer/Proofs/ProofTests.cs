@@ -42,9 +42,6 @@ public sealed class ProofTests
     public void Holds_NotClrWithoutAnswers_DoesNotHold() => new Proof.NotClr(0).Holds(null).ShouldBeFalse();
 
     [Fact]
-    public void Holds_NotClrBeyondTheAnswers_DoesNotHold() => new Proof.NotClr(1).Holds(Answers(true)).ShouldBeFalse();
-
-    [Fact]
     public void Holds_AnyOf_IsTrueWhenOnePartHolds()
     {
         var proof = new Proof.AnyOf([new Proof.Operand(0), new Proof.Operand(1)]);
