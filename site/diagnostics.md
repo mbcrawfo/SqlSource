@@ -808,7 +808,7 @@ public partial class UserRepository
 
 - Mark the member to use `[SqlSourceConnection]`.  The others are then left alone.
 - **When several members are marked**, leave one marked for the database.  Or set the `Database` of each to the database that it connects to.
-- **When two fields hold factories**, keep one of them, or set a different `Database` on the marks of the factory types.
+- **When two fields hold factories with marked members**, keep one of the fields.  Or mark a member of the type itself that gives the database its connection, which then wins over both factories.
 
 A database can keep two marked members when exactly one of them is a method that returns a `Task` or `ValueTask` of a connection.  Its asynchronous methods get their connection from that one, and its synchronous methods from the other.  The other can be a connection string, a data source, a connection or a method that returns a connection.  This sample shows such a pair, which is allowed:
 
@@ -919,7 +919,7 @@ See: [The connection](reference/repository-connections.md#repository-connection)
 
 Reported by: the build.
 
-A member of a repository, or of a factory that it holds, gets this error only when the repository claims a query whose output is `repository`.  A `static` member of the project gets it whatever the queries.  The queries that get no method still get their models.
+A member of a repository, or of a factory that it holds, gets this error only when the repository claims a query whose output is `repository`.  A `static` member of the project, outside every type marked `[SqlSourceGenerate]`, gets it whatever the queries.  The queries that get no method still get their models.
 
 A member marked `[SqlSourceConnection]` cannot give a repository method its connection.  Where the error is depends on where the member is:
 
@@ -942,7 +942,7 @@ A `static` member of the project also gets this error in these cases, since a me
 - It is in a `file` type, or in a type nested in one.
 - It is a `static abstract` or `static virtual` member of an interface.
 
-A mark that can never give a connection gets this error at the mark too.  It is a mark on a parameter of a method, or of the primary constructor of a type that is not a repository.  It is also a mark on a lambda, a local function or an enum member.
+A mark that can never give a connection gets this error at the mark too.  It is a mark on a parameter of a method, or of the primary constructor of a type that is not marked `[SqlSourceGenerate]`.  It is also a mark on a lambda, a local function or an enum member.
 
 ```csharp
 [SqlSourceGenerate]

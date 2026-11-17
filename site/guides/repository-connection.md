@@ -23,27 +23,27 @@ public partial class UserRepository(IConnectionStrings connectionStrings)
 ```
 
 ```csharp
-public interface IConnectionFactory
+public interface IConnectionProvider
 {
-    Task<DbConnection> OpenAsync(CancellationToken cancellationToken);
+    Task<DbConnection> OpenAsync(string database, CancellationToken cancellationToken);
 
-    DbConnection Open();
+    DbConnection Open(string database);
 }
 
 [SqlSourceGenerate]
-public partial class OrderRepository(IConnectionFactory connections)
+public partial class OrderRepository(IConnectionProvider connections)
 {
     [SqlSourceConnection]
     private Task<DbConnection> OpenAsync(CancellationToken cancellationToken) =>
-        connections.OpenAsync(cancellationToken);
+        connections.OpenAsync("orders", cancellationToken);
 
     // For the synchronous methods of method-type=sync or both
     [SqlSourceConnection]
-    private DbConnection Open() => connections.Open();
+    private DbConnection Open() => connections.Open("orders");
 }
 ```
 
-**What you get.**  The property of `UserRepository` gives a connection string.  Each method of the repository makes a connection from it, and disposes it.  The methods of `OrderRepository` are factories.  Each repository method calls one: `OpenAsync` for an asynchronous method, and `Open` for a [synchronous one](../reference/repositories.md#synchronous-repository-methods).  It opens the connection that the factory returns when it is closed, and disposes it.
+**What you get.**  The property of `UserRepository` gives a connection string.  Each method of the repository makes a connection from it, and disposes it.  The marked methods of `OrderRepository` each return a new connection that `connections` opens for the name `orders`.  Each repository method calls one: `OpenAsync` for an asynchronous method, and `Open` for a [synchronous one](../reference/repositories.md#synchronous-repository-methods).  It opens the connection that the marked method returns when it is closed, and disposes it.
 
 **The rules you need.**
 

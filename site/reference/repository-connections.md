@@ -11,11 +11,11 @@ This page says where the methods of a [repository](repositories.md) get their co
 public partial class OrderRepository(string connectionString);
 
 [SqlSourceGenerate]
-public partial class AuditRepository(IConnectionFactory factory)
+public partial class AuditRepository(IConnectionProvider provider)
 {
     [SqlSourceConnection]
     private Task<DbConnection> OpenAsync(CancellationToken cancellationToken) =>
-        factory.OpenAsync("audit", cancellationToken);
+        provider.OpenAsync("audit", cancellationToken);
 }
 ```
 
@@ -28,7 +28,7 @@ A repository method gets its connection from one member, its *connection source*
 | A method that returns a `DbConnection` or a type derived from it, or a `Task` or `ValueTask` of one, and that takes nothing or one `CancellationToken`, which gets the method's, or `default` from a synchronous method | When marked | The connection it returns, called for each call of the method, opened when it is closed, and disposed.  One that returns a `Task` or `ValueTask` serves asynchronous methods alone |
 | A field, property or primary-constructor parameter of `DbConnection` or a type derived from it | When marked | Borrowed: opened when it is closed and closed again before the method returns, never disposed |
 
-The rule to remember: **a method is a factory, and a field, a property or a parameter is held.**  The repository method disposes the connection that a method returns.  A connection that the repository holds is borrowed, and the method leaves it as it found it.  A connection string and a data source make a new connection for each call, which the method disposes.
+The rule to remember: **a connection that a method returns is disposed, and a connection in a field, a property or a parameter is borrowed.**  The repository method disposes the connection that a method returns.  A connection that a field, a property or a parameter keeps is borrowed, and the method leaves it as it found it.  A connection string and a data source make a new connection for each call, which the method disposes.
 
 A [synchronous method](repositories.md#synchronous-repository-methods) gets its connection in the same way, with the synchronous calls of the driver.  It can use any member except a method that returns a task, which it cannot call.  For a synchronous method, give the database one of the other members, or a pair of members.
 
@@ -46,14 +46,14 @@ A [synchronous method](repositories.md#synchronous-repository-methods) gets its 
 
   ```csharp
   [SqlSourceGenerate]
-  public partial class AuditRepository(IConnectionFactory factory)
+  public partial class AuditRepository(IConnectionProvider provider)
   {
       [SqlSourceConnection]
       private Task<DbConnection> OpenAsync(CancellationToken cancellationToken) =>
-          factory.OpenAsync("audit", cancellationToken);
+          provider.OpenAsync("audit", cancellationToken);
 
       [SqlSourceConnection]
-      private DbConnection Open() => factory.Open("audit");
+      private DbConnection Open() => provider.Open("audit");
   }
   ```
 
@@ -74,15 +74,15 @@ A [synchronous method](repositories.md#synchronous-repository-methods) gets its 
 - **A mark for a database that no repository query of the type uses is the warning [SQLSRC031](../diagnostics.md#sqlsrc031).**
 - **A query whose output is not `repository` needs no source.**
 - **The source must be of the engine of its database.**  An Npgsql type for a SQL Server database is [SQLSRC033](../diagnostics.md#sqlsrc033).  So is a Microsoft.Data.SqlClient type for a PostgreSQL database.
-- **A SQL Server repository takes a connection string, a factory method, or a connection that it borrows.**  Microsoft.Data.SqlClient has no data source.
+- **A SQL Server repository takes a connection string, a method that returns a connection, or a connection that it borrows.**  Microsoft.Data.SqlClient has no data source.
 - **A primary-constructor parameter that gives the connection cannot be named `cancellationToken`** ([SQLSRC036](../diagnostics.md#sqlsrc036)).  Every asynchronous method has an argument of that name, which hides the parameter.  The build refuses the name under any `method-type`, though a synchronous method takes no such argument.  Rename the parameter.
 - **A primary-constructor parameter that gives the connection cannot be named `parameters` when a repository query of its database has parameters** ([SQLSRC036](../diagnostics.md#sqlsrc036)).  A method whose query has parameters takes its input model as `parameters`, which hides the parameter.  Rename the parameter.
-- **A null source throws.**  The method throws `InvalidOperationException` if a connection string, a data source or a connection is null when the method is called.  It also throws if a factory returns null.  The message is "The connection source 'dataSource' of 'App.UserRepository' is null.", and the method throws before it sends anything.
+- **A null source throws.**  The method throws `InvalidOperationException` if a connection string, a data source or a connection is null when the method is called.  It also throws if a marked method returns null.  The message is "The connection source 'dataSource' of 'App.UserRepository' is null.", and the method throws before it sends anything.
 - **A method that [streams its rows](return-types.md#streaming-rows) gets its connection when the loop asks for the first row.**  When the loop ends, the method disposes the connection, or closes a borrowed connection that it opened.  So the method holds the connection for the whole loop.
 - **On a borrowed connection, a repository method gives its command no transaction.**  To run queries in a transaction, give them the output `methods`: see [transactions and timeouts](repositories.md#repository-transactions).
 - **On SQL Server, Microsoft.Data.SqlClient refuses the command on a borrowed connection that has a pending transaction.**  It throws `InvalidOperationException`, from a synchronous method as from an asynchronous one.
 - **On PostgreSQL, Npgsql runs the command in the transaction of the borrowed connection.**
-- **An open connection that a factory returns, with a transaction that your code began on it, is the same case.**  Microsoft.Data.SqlClient refuses the command, and Npgsql runs it in that transaction.  The method then disposes the connection, which ends that transaction.
+- **An open connection that a marked method returns, with a transaction that your code began on it, is the same case.**  Microsoft.Data.SqlClient refuses the command, and Npgsql runs it in that transaction.  The method then disposes the connection, which ends that transaction.
 - **On PostgreSQL, a connection string makes a bare connection.**  The connection knows none of the plugins and mappings of your data source: see [limits](databases/postgresql/query-methods.md#limit-connection-string-repository).  Give a PostgreSQL repository a data source.
 
 The attribute is `SqlSource.SqlSourceConnectionAttribute`.  SqlSource generates it into your project beside `[SqlSourceGenerate]`.  Its one property, `Database`, names the [logical database](settings.md#setting-database) as the `database` setting does.
@@ -146,13 +146,15 @@ public partial class OrderRepository(IConnectionFactory connections);
 
 A repository can get its connection from a marked member of an object that it holds, a *factory*.  You mark the member once, on the factory's type, and every repository that holds such a factory uses it.  In the sample, each method of `OrderRepository` calls `connections.OpenAsync(cancellationToken)`, and disposes the connection that it returns.
 
+In this section, a *factory* is the object that the repository holds, not a marked method.  The connection that it gives follows the rule of the kind of its marked member, as in [the connection](#repository-connection): the repository method disposes a connection that a marked method returns, and borrows a connection that a marked field or property keeps.
+
 - **A holder is a field, a property or a primary-constructor parameter of the repository**, or a field or property of a base type that the repository can reach.  It can be `static`, and it needs no mark.
 - **The type of a holder has a marked member that the repository can reach.**  So a field of another type, such as an `ILogger`, holds no factory.  The type can be a class, an interface, a struct, a nullable struct, or a type parameter whose constraints have such a member.
 - **A marked field, property or parameter is a connection source of the repository itself, not a holder.**
 - **A field, property or parameter of a `string`, a `DbDataSource`, a `DbConnection` or a type derived from them is never a holder.**
 - **A primary-constructor parameter is a holder only when no field or property of the type or of a base type is one.**  So `OrderRepository(IConnectionFactory connections) { private readonly IConnectionFactory _connections = connections; }` uses `_connections`.
 - **A parameter that the type passes to its base type, or uses to initialize a field or property, is not a holder.**  So `OrderRepository(IConnectionFactory connections) : RepositoryBase(connections)` uses the holder of the base type, when the type can reach one.
-- **The marked members of the factory are its instance fields, properties and methods**, and those of its base types and of the interfaces it implements, that the repository can reach.  Each is one of the four kinds of [the connection](#repository-connection), with the same rules.  The repository method disposes the connection that a marked method returns, and borrows a connection that a field or property holds.
+- **The marked members of the factory are its instance fields, properties and methods**, and those of its base types and of the interfaces it implements, that the repository can reach.  Each is one of the four kinds of [the connection](#repository-connection), with the same rules.
 - **A member of the factory that implements a marked member of an interface is marked as that member is, with its `Database`.**  So a holder of a class `ConnectionFactory` that implements `IConnectionFactory` finds the mark on `IConnectionFactory.OpenAsync`.  A repository that implements such an interface gets no mark from it.
 - **An override of a marked member is marked as the member it overrides**, as on a repository.
 - **The `static` members of a factory are [static members of the project](#static-connection).**  The build does not reach them through the holder.
@@ -163,7 +165,7 @@ A repository can get its connection from a marked member of an object that it ho
 - **A problem of a factory's member is reported at the holder**, in each repository that would use the member: [SQLSRC032](../diagnostics.md#sqlsrc032) and [SQLSRC033](../diagnostics.md#sqlsrc033).  The message names the member and the holder, as `'IConnectionFactory.OpenAsync' reached through 'connections'`.
 - **A primary-constructor parameter that holds a factory cannot be named `cancellationToken`, or `parameters` when a repository query of its database has parameters** ([SQLSRC036](../diagnostics.md#sqlsrc036)).  The method's argument of that name would hide it.  Rename the parameter.
 - **The method reaches the member through the holder, and the holder first.**  If the holder is null when the method is called, it throws `InvalidOperationException`: "The connection source 'connections' of 'App.OrderRepository' is null."
-- **If the member's value is null, or the factory returns null, the message names the member through its holder**: "The connection source 'connections.OpenAsync' of 'App.OrderRepository' is null."  The method throws before it sends anything.
+- **If the member's value is null, or the marked method returns null, the message names the member through its holder**: "The connection source 'connections.OpenAsync' of 'App.OrderRepository' is null."  The method throws before it sends anything.
 
 <a id="static-connection"></a>
 
@@ -182,10 +184,11 @@ public partial class ReportRepository;
 
 A marked `static` member of a type of your project gives the connection to each repository that has no source of its own and holds no factory with one.  Your application sets the member once, at startup.  In the sample, each method of `ReportRepository` makes a connection of `Db.ConnectionString`, and disposes it.
 
-- **A static field, constant, property or method can be the source**, of any of the four kinds of [the connection](#repository-connection).  Its type can be a static class or any other type of the project.
+- **A static field, constant, property or method can be the source**, of any of the four kinds of [the connection](#repository-connection).  Its type can be a static class or any other type of the project, but a type marked `[SqlSourceGenerate]`.
 - **The member is in your project's own code.**  A marked member of a referenced project or package is not a source of your project.
 - **A repository uses the member only when the repository can reach it.**  The build reports nothing for one that it cannot reach, such as a `private` member of another class.
-- **A `static` member of a repository is the repository's own, and never the source of another repository.**  A static class nested in a repository is a type of its own, and its members are static members of the project.
+- **A `static` member of a type marked `[SqlSourceGenerate]` is that type's own, and never the source of another repository.**  A static class nested in such a type is a type of its own, and its members are static members of the project.
+- **A type marked `[SqlSourceGenerate]` whose queries have no output `repository` needs no connection.**  So the build neither uses nor reports a `static` member or a primary-constructor parameter that such a type marks.
 - **A `static` member of a repository's base type is found first among the repository's own members**, as [the connection](#repository-connection) says.  Other repositories can use it as a static member of the project.
 - **The `Database` of the mark** works as [which database a shared mark is for](#shared-marks) says.
 - **A mark that can never give a connection is [SQLSRC032](../diagnostics.md#sqlsrc032), reported once at the mark**, whether a repository needs it or not.  It is not a source.  These are such marks:
@@ -193,9 +196,9 @@ A marked `static` member of a type of your project gives the connection to each 
   - a member of a generic type, or of a type nested in one;
   - a member of a `file` type, or of a type nested in one;
   - a `static abstract` or `static virtual` member of an interface;
-  - a mark on a parameter of a method, or of the primary constructor of a type that is not a repository;
+  - a mark on a parameter of a method, or of the primary constructor of a type that is not marked `[SqlSourceGenerate]`;
   - a mark on a lambda, a local function or an enum member.
-- **A mark on an instance member of a type that is not a repository is the member of a factory.**  The build uses it only through a [holder](#held-factory), and reports nothing for it otherwise.
+- **A mark on an instance member of another type marks a member of a factory.**  The build uses it only through a [holder](#held-factory), and reports nothing for it otherwise.
 - **The method reaches the member through its type, by its full name.**  So no argument or local of the method hides it.
 - **If the member's value is null, or the method returns null, the message names the type and the member**: "The connection source 'Db.ConnectionString' of 'App.ReportRepository' is null."  The method throws `InvalidOperationException` before it sends anything.
 
@@ -248,3 +251,13 @@ The marks of a factory and of the static members of the project are shared: one 
 **Why.**  The methods reach a `static` connection source, or a `static` member that holds your factory, through the repository's name: `Sample.Sample` for a member `Sample` of the base type of `Sample`.  Inside the repository, `Sample` names the member it inherits, not the type.
 
 **What to do.**  Give the member of the base type another name.
+
+<a id="limit-type-parameter-holder"></a>
+
+### SQLSRC029 for a factory whose holder has a type parameter as its type
+
+**What you see.**  The build reports [SQLSRC029](../diagnostics.md#sqlsrc029) for two marked members of one name, though C# would call only one of them.
+
+**Why.**  The repository holds its factory in a member whose type is a type parameter.  The type parameter is constrained to a class and to an interface that the class does not implement, and each has a marked member of that name.  C# calls the class's member, but the build counts both.
+
+**What to do.**  Mark the member on one of the two types only, or give the holder the class's type.

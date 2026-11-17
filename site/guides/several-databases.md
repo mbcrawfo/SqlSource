@@ -115,6 +115,8 @@ SQLSOURCE_CONNECTION_BILLING="Server=localhost,1433;Database=billing;User ID=app
 
 If many repositories use the same databases, mark their connections once, as static members of a class of your project.  Mark the connection of the main database without `Database`, and each other connection with its name:
 
+# [PostgreSQL](#tab/postgresql)
+
 ```csharp
 public static class Db
 {
@@ -129,7 +131,39 @@ public static class Db
 public partial class AccountRepository;
 ```
 
-**What you get.**  `GetInvoice` runs on a connection of `Db.Billing`, and `GetUser` on one of `Db.Main`.  Each other repository of the project with no connection of its own uses them in the same way.  Your application sets both data sources once, at startup.
+```csharp
+// Program.cs
+Db.Main = NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Main")!);
+Db.Billing = NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Billing")!);
+builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
+```
+
+# [SQL Server](#tab/sqlserver)
+
+```csharp
+public static class Db
+{
+    [SqlSourceConnection]
+    public static string? Main { get; set; }
+
+    [SqlSourceConnection(Database = "billing")]
+    public static string? Billing { get; set; }
+}
+
+[SqlSourceGenerate(Source = ".")]
+public partial class AccountRepository;
+```
+
+```csharp
+// Program.cs
+Db.Main = builder.Configuration.GetConnectionString("Main");
+Db.Billing = builder.Configuration.GetConnectionString("Billing");
+builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
+```
+
+---
+
+**What you get.**  `GetInvoice` runs on a connection of `Db.Billing`, and `GetUser` on one of `Db.Main`.  Each other repository of the project with no connection of its own uses them in the same way.  Your application sets both members once, at startup, before a repository method runs.
 
 **The rules you need.**
 
