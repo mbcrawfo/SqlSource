@@ -111,6 +111,7 @@ Set sqlfluff's `dialect` to one that suits the SqlSource dialect of your files:
 | `mssql` | `tsql` |
 | `postgres`, `cockroachdb` | `postgres`, `duckdb`, `redshift`, `greenplum`, `materialize` |
 | `mysql`, `mariadb` | `mysql`, `mariadb` |
+| `mysql`, `mariadb` with `ansi-quotes` or `no-backslash-escapes` | None |
 | `sqlite` | `sqlite` |
 | `oracle` | `oracle` |
 
@@ -122,6 +123,21 @@ L:   0 | P:   0 |  TMP | The SqlSource dialect mssql cannot be linted with the
 ```
 
 If your repository has files of two databases, run sqlfluff once for each, as [a migration folder](#sqlfluff-migrations) is run.  SqlSource's dialect names are on [the dialects page](../reference/dialects.md#choosing-a-dialect).
+
+<a id="sqlfluff-mysql-options"></a>
+
+### MySQL and MariaDB options
+
+sqlfluff's `mysql` and `mariadb` dialects read `"..."` as a string, and a backslash in a string as an escape.  The options [`ansi-quotes` and `no-backslash-escapes`](../reference/dialects.md#dialect-options) change these rules, so `fix` could make a string an identifier.  So sqlfluff reports each file read with either option as `TMP`, and checks nothing in it:
+
+```text
+L:   0 | P:   0 |  TMP | The SqlSource dialect mysql with ansi-quotes cannot be
+                       | linted with the sqlfluff dialect mysql, or with any
+                       | other: ansi-quotes makes "..." a quoted identifier,
+                       | which sqlfluff reads as a string.
+```
+
+Do not lint the files read with either option.  Leave their folders out of the run with a `.sqlfluffignore`, as [a migration folder](#sqlfluff-migrations) is left out.  The run then checks the files that SqlSource reads without the option.
 
 <a id="what-sqlfluff-checks"></a>
 
@@ -229,6 +245,7 @@ $ sqlfluff lint .
 - **"Requested templater 'sqlsource' which is not currently available".**  The templater is not installed beside the sqlfluff that ran.  Install it in the same environment, as [Lint and format your queries](#set-up-sqlfluff) shows.
 - **"Attempt to set templater to sqlsource failed", then `TMP` errors about Jinja.**  The `.sqlfluff` that sets the templater is in a folder below the one that sqlfluff ran from.  Move it, or run sqlfluff from its folder.
 - **`TMP` and "The SqlSource dialect … cannot be linted with the sqlfluff dialect …".**  Set sqlfluff's dialect to one that suits the file.  See [Set sqlfluff's dialect](#sqlfluff-dialects).
+- **`TMP` and "… with ansi-quotes cannot be linted …", or "… with no-backslash-escapes …".**  No sqlfluff dialect reads the file as the option does.  Leave the file out of the run.  See [MySQL and MariaDB options](#sqlfluff-mysql-options).
 - **`TMP` and a SqlSource error, such as "SQLSRC101: Quote is not closed."**  Fix the error at its line and position.  See [the list of errors](../diagnostics.md).
 - **`PRS` at a token.**  The token has no default, so sqlfluff checks its name.  Give it a default.  See [defaults](../reference/tokens.md#token-defaults).
 - **`CV06` that `fix` does not fix.**  See [CV06 on a query without `;`](#limit-cv06-without-semicolon).

@@ -74,8 +74,15 @@ MSSQL = DialectChoice(Dialect.SQL_SERVER)
 POSTGRES = DialectChoice(Dialect.POSTGRESQL)
 COCKROACH = DialectChoice(Dialect.COCKROACHDB)
 MYSQL = DialectChoice(Dialect.MYSQL)
-MYSQL_ANSI_QUOTES = DialectChoice(Dialect.MYSQL, DialectOptions.ANSI_QUOTES)
 MARIADB = DialectChoice(Dialect.MARIADB)
+BOTH_OPTIONS = DialectOptions.ANSI_QUOTES | DialectOptions.NO_BACKSLASH_ESCAPES
+# Each MySQL and MariaDB choice with an option that sqlfluff's mysql and mariadb read as the server does without it:
+# `"..."` as a string, and a backslash in a string as an escape.  No sqlfluff dialect reads either option.
+UNLINTABLE = [
+    DialectChoice(dialect, options)
+    for dialect in (Dialect.MYSQL, Dialect.MARIADB)
+    for options in (DialectOptions.ANSI_QUOTES, DialectOptions.NO_BACKSLASH_ESCAPES, BOTH_OPTIONS)
+]
 SQLITE = DialectChoice(Dialect.SQLITE)
 ORACLE = DialectChoice(Dialect.ORACLE)
 
@@ -116,10 +123,10 @@ PAIRS = {
     POSTGRES: {"postgres", "duckdb", "redshift", "greenplum", "materialize"},
     COCKROACH: {"postgres", "duckdb", "redshift", "greenplum", "materialize"},
     MYSQL: {"mysql", "mariadb"},
-    MYSQL_ANSI_QUOTES: {"mysql", "mariadb"},
     MARIADB: {"mariadb", "mysql"},
     SQLITE: {"sqlite"},
     ORACLE: {"oracle"},
+    **{choice: set() for choice in UNLINTABLE},
 }
 
 

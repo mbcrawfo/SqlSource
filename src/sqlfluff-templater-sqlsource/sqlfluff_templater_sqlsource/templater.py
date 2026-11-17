@@ -10,7 +10,7 @@ from sqlfluff.core.formatter import FormatterInterface
 from sqlfluff.core.templaters import RawTemplater, TemplatedFile
 from sqlfluff.core.templaters.base import large_file_check
 
-from sqlfluff_templater_sqlsource.dialects import canonical_name
+from sqlfluff_templater_sqlsource.dialects import DialectChoice, canonical_name, option_names
 from sqlfluff_templater_sqlsource.errors import (
     INVALID_MARKER_VALUE,
     TOKEN_CROSSES_COMMENT,
@@ -21,7 +21,7 @@ from sqlfluff_templater_sqlsource.errors import (
 from sqlfluff_templater_sqlsource.plan import Plan, build_plan
 from sqlfluff_templater_sqlsource.render import render
 from sqlfluff_templater_sqlsource.settings import resolve_dialect
-from sqlfluff_templater_sqlsource.stand_ins import compatible
+from sqlfluff_templater_sqlsource.stand_ins import UNLINTABLE_OPTIONS, compatible
 
 # The title of each error that stops a plan, as its C# diagnostic descriptor gives it.  A test keeps it equal to
 # `tests/corpus/diagnostic-titles.json`.
@@ -58,12 +58,7 @@ class SqlSourceTemplater(RawTemplater):
             plan = build_plan(in_str[mark:], os.path.basename(fname), resolve_dialect(Path(fname)))
             errors = []
             if sqlfluff_dialect is not None and not compatible(plan.dialect, sqlfluff_dialect):
-                errors.append(
-                    SQLTemplaterError(
-                        f"The SqlSource dialect {canonical_name(plan.dialect.dialect)} cannot be linted with the "
-                        f"sqlfluff dialect {sqlfluff_dialect}."
-                    )
-                )
+                errors.append(SQLTemplaterError(_mismatch(plan.dialect, sqlfluff_dialect)))
             if plan.error is not None:
                 errors.append(_stopping_error(in_str, plan.error, mark))
             if errors:
@@ -72,6 +67,26 @@ class SqlSourceTemplater(RawTemplater):
         # Any failure is reported as a templating error of this file, where a crash would stop sqlfluff's whole run.
         except Exception as error:
             return None, [SQLTemplaterError(f"sqlsource templater failed: {type(error).__name__}: {error}")]
+
+
+# Why sqlfluff cannot lint a file under each of `UNLINTABLE_OPTIONS`, named as the option is by `option_names`.
+_OPTION_REASONS = {
+    "ansi-quotes": 'ansi-quotes makes "..." a quoted identifier, which sqlfluff reads as a string',
+    "no-backslash-escapes": (
+        "no-backslash-escapes makes a backslash in a string a character, which sqlfluff reads as an escape"
+    ),
+}
+
+
+def _mismatch(sqlsource: DialectChoice, sqlfluff_dialect: str) -> str:
+    dialect = canonical_name(sqlsource.dialect)
+    options = option_names(sqlsource.options & UNLINTABLE_OPTIONS)
+    if not options:
+        return f"The SqlSource dialect {dialect} cannot be linted with the sqlfluff dialect {sqlfluff_dialect}."
+    return (
+        f"The SqlSource dialect {dialect} with {' and '.join(options)} cannot be linted with the sqlfluff dialect "
+        f"{sqlfluff_dialect}, or with any other: {'; '.join(_OPTION_REASONS[option] for option in options)}."
+    )
 
 
 # The error at its line and position, both counted from 1, in the text sqlfluff handed the templater.

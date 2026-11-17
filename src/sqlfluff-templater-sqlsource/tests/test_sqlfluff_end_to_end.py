@@ -498,6 +498,67 @@ def test_dialect_from_a_settings_file_is_checked_too(tmp_path):
     assert "mssql" in linted.get_violations()[0].desc()
 
 
+# Queries that sqlfluff's mysql and mariadb read otherwise than the server does under the option.  Under ansi-quotes
+# `"order"` and `"x"` are identifiers, which sqlfluff reads as strings, so CV10 would turn `'active'` into the
+# identifier `"active"`.  Under no-backslash-escapes `'C:\'` is closed, which sqlfluff reads as open.
+ANSI_QUOTES_QUERY = '-- name: A\nSELECT "order" FROM orders WHERE status = \'active\' AND note = "x";\n'
+NO_BACKSLASH_ESCAPES_QUERY = "-- name: A\nSELECT 'C:\\' AS p, 'x' AS y FROM t;\n"
+
+
+@pytest.mark.parametrize("sqlfluff_dialect", ["mysql", "mariadb"])
+@pytest.mark.parametrize("sqlsource", ["mysql", "mariadb"])
+@pytest.mark.parametrize(
+    ("options", "query", "reasons"),
+    [
+        ("ansi_quotes", ANSI_QUOTES_QUERY, ['ansi-quotes makes "..." a quoted identifier']),
+        ("no_backslash_escapes", NO_BACKSLASH_ESCAPES_QUERY, ["no-backslash-escapes makes a backslash"]),
+        (
+            "ansi_quotes,no_backslash_escapes",
+            ANSI_QUOTES_QUERY,
+            ['ansi-quotes makes "..." a quoted identifier', "no-backslash-escapes makes a backslash"],
+        ),
+    ],
+    ids=["ansi_quotes", "no_backslash_escapes", "both"],
+)
+def test_option_sqlfluff_reads_otherwise_is_a_templating_error(
+    sqlfluff_dialect, sqlsource, options, query, reasons, tmp_path
+):
+    (tmp_path / "sqlsource.json").write_text(
+        f'{{ "root": true, "dialect": "{sqlsource},{options}" }}', encoding="utf-8"
+    )
+
+    linted = lint(query, sqlfluff_dialect, tmp_path, rules="all")
+
+    violations = linted.get_violations()
+    assert [violation.rule_code() for violation in violations] == ["TMP"]
+    description = violations[0].desc()
+    assert description.startswith(f"The SqlSource dialect {sqlsource} with ")
+    assert f"cannot be linted with the sqlfluff dialect {sqlfluff_dialect}, or with any other: " in description
+    for reason in reasons:
+        assert reason in description
+    assert linted.templated_file is None
+
+
+def test_option_of_a_dialect_marker_is_a_templating_error(tmp_path):
+    (tmp_path / "sqlsource.json").write_text('{ "root": true, "dialect": "mysql" }', encoding="utf-8")
+
+    linted = lint("-- dialect: mysql, ansi-quotes\n" + ANSI_QUOTES_QUERY, "mysql", tmp_path)
+
+    violations = linted.get_violations()
+    assert [violation.rule_code() for violation in violations] == ["TMP"]
+    assert violations[0].desc().startswith("The SqlSource dialect mysql with ansi-quotes cannot be linted")
+
+
+@pytest.mark.parametrize("sqlfluff_dialect", ["mysql", "mariadb"])
+@pytest.mark.parametrize("sqlsource", ["mysql", "mariadb"])
+def test_mysql_and_mariadb_without_an_option_pair_with_both(sqlfluff_dialect, sqlsource, tmp_path):
+    (tmp_path / "sqlsource.json").write_text(f'{{ "root": true, "dialect": "{sqlsource}" }}', encoding="utf-8")
+
+    linted = lint(ANSI_QUOTES_QUERY, sqlfluff_dialect, tmp_path, rules="all")
+
+    assert [code for code in codes(linted) if code in ("PRS", "TMP", "LXR")] == []
+
+
 @pytest.mark.parametrize(
     ("text", "code", "line", "position"),
     [

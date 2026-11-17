@@ -10,7 +10,7 @@ import unicodedata
 from collections.abc import Callable
 from typing import NamedTuple
 
-from sqlfluff_templater_sqlsource.dialects import Dialect, DialectChoice
+from sqlfluff_templater_sqlsource.dialects import Dialect, DialectChoice, DialectOptions
 
 # The stand-in for a parameter whose name the dialect cannot take after its prefix, and for any parameter in a
 # dialect without one: a literal parses wherever a value can stand, in every sqlfluff dialect.
@@ -78,6 +78,12 @@ _COMPATIBLE = {
 }
 
 
+# The options under which SqlSource reads quotes as no sqlfluff dialect does.  sqlfluff's mysql and mariadb read `"..."`
+# as a string and a backslash in a string as an escape, as the server does without them, so `fix` could turn a string
+# into an identifier.
+UNLINTABLE_OPTIONS = DialectOptions.ANSI_QUOTES | DialectOptions.NO_BACKSLASH_ESCAPES
+
+
 def stand_in(name: str, sqlfluff_dialect: str) -> str:
     """What sqlfluff sees in place of the parameter `name`, given without its prefix."""
     form = _PREFIXES.get(sqlfluff_dialect)
@@ -90,4 +96,6 @@ def compatible(sqlsource: DialectChoice, sqlfluff_dialect: str) -> bool:
     """Whether a file SqlSource reads as `sqlsource` can be linted in `sqlfluff_dialect`."""
     if sqlsource.dialect == Dialect.ANSI:
         return True
+    if sqlsource.options & UNLINTABLE_OPTIONS:
+        return False
     return sqlfluff_dialect in _COMPATIBLE[sqlsource.dialect]

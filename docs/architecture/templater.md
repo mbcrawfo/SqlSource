@@ -94,7 +94,7 @@ A parameter's stand-in must parse wherever SqlSource lets a parameter stand, and
 
 ### Dialect pairs
 
-The plan is read by the SqlSource dialect, and the stand-ins are chosen by the sqlfluff dialect.  `compatible` of `stand_ins.py` allows a pair only when both can be right about one file: `ansi` with any sqlfluff dialect, and each other SqlSource dialect with the sqlfluff dialects that `_COMPATIBLE` names for it.  [The guide's table](../../site/guides/sqlfluff.md#sqlfluff-dialects) lists the pairs for users.  Any other pair is a templating error that names both dialects.
+The plan is read by the SqlSource dialect, and the stand-ins are chosen by the sqlfluff dialect.  `compatible` of `stand_ins.py` allows a pair only when both can be right about one file: `ansi` with any sqlfluff dialect, and each other SqlSource dialect with the sqlfluff dialects that `_COMPATIBLE` names for it.  A MySQL or MariaDB choice with an option of `UNLINTABLE_OPTIONS`, `ANSI_QUOTES` or `NO_BACKSLASH_ESCAPES`, pairs with no sqlfluff dialect: sqlfluff's `mysql` and `mariadb` read `"..."` as a string and a backslash in a string as an escape, as the server does without the option, so CV10 could rewrite a string as an identifier.  [The guide's table](../../site/guides/sqlfluff.md#sqlfluff-dialects) lists the pairs for users.  Any other pair is a templating error that names both dialects, and for an option, the option and why, from `_mismatch` of `templater.py`.
 
 ### The templater
 
