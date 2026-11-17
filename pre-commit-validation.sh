@@ -209,7 +209,8 @@ for path in ${changes[@]+"${changes[@]}"}; do
     if [[ "$scope" == sqlserver || "$scope" == both ]]; then first sqlserver_trigger; fi
     if [[ "$packages" == true ]]; then first packages_trigger; fi
     # uv runs ruff and pytest in the project's folder, from its .python-version and uv.lock.
-    if [[ "$path" == src/sqlfluff-templater-sqlsource/* ]]; then first templater_trigger; fi
+    # format.sh runs the templater's ruff steps too, so a change to it sets off the templater's checks.
+    if [[ "$path" == src/sqlfluff-templater-sqlsource/* || "$path" == format.sh ]]; then first templater_trigger; fi
     # A deleted file has nothing to format, but its scopes still apply.
     if [[ "$path" == *.cs && -f "$path" ]]; then
         format_files+=("$path")
@@ -262,7 +263,7 @@ decide packages "$packages_trigger" 'no change reaches the packages'
 # run.  A missing tool fails the run here, and not as three failed steps.
 # shellcheck disable=SC2154 # decide sets templater_go, through printf -v.
 if [[ "$plan" == false && "$templater_go" == true ]] && ! command -v uv >/dev/null 2>&1; then
-    echo 'pre-commit-validation.sh: uv is not installed, which the templater needs:https://docs.astral.sh/uv/' >&2
+    echo 'pre-commit-validation.sh: uv is not installed, which the templater needs: https://docs.astral.sh/uv/' >&2
     exit 1
 fi
 
