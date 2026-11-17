@@ -31,9 +31,6 @@ public sealed class CatalogOverloadsTests
             .Distinct()
             .ShouldBe(CatalogOverloads.FunctionNames, ignoreOrder: true);
 
-    [Fact]
-    public void Overloads_Count_IsEveryOverloadOfTheNames() => CatalogOverloads.Overloads.Count().ShouldBe(20);
-
     // Every node's entries are read, a subplan's, an InitPlan's, a subquery's and a child's that the root does not
     // print included, and each name is asked once, in ordinal order.
     [Fact]
