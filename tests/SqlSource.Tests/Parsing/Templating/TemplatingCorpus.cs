@@ -32,6 +32,9 @@ internal static class TemplatingCorpus
 {
     public const string UpdateVariable = "SQLSOURCE_UPDATE_TEMPLATER_CORPUS";
 
+    // The file of the names a dialect and its options are set by, at the root of the corpus.  It is no case.
+    public const string DialectNames = "dialect-names";
+
     private const string Repository = "repo";
     private const string Lexer = "lexer";
     private const string Fidelity = "cases";
@@ -102,7 +105,7 @@ internal static class TemplatingCorpus
             .. Directory
                 .EnumerateFiles(Folder, "*.json", SearchOption.AllDirectories)
                 .Select(file => Path.ChangeExtension(Path.GetRelativePath(Folder, file), null).Replace('\\', '/'))
-                .Where(name => !Cases.ContainsKey(name))
+                .Where(name => !Cases.ContainsKey(name) && name != DialectNames)
                 .OrderBy(name => name, StringComparer.Ordinal),
         ];
     }
@@ -197,6 +200,39 @@ internal static class TemplatingCorpus
             .Append(plan.HasOtherErrors ? "true" : "false")
             .Append("\n  }\n}\n")
             .ToString();
+    }
+
+    // SqlDialectName.Names and SqlDialectName.Options in their order, each name with its dialect's member of SqlDialect
+    // or its option's value, so that the templater reads the names that the parser reads.
+    public static string RenderDialectNames()
+    {
+        var json = new StringBuilder().Append("{\n  \"names\": ");
+        AppendLines(
+            json,
+            SqlDialectName.Names,
+            "  ",
+            (line, entry) =>
+            {
+                _ = line.Append('[');
+                AppendString(line, entry.Name);
+                _ = line.Append(", ");
+                AppendString(line, entry.Dialect.ToString());
+                _ = line.Append(']');
+            }
+        );
+        _ = json.Append(",\n  \"options\": ");
+        AppendLines(
+            json,
+            SqlDialectName.Options,
+            "  ",
+            (line, entry) =>
+            {
+                _ = line.Append('[');
+                AppendString(line, entry.Name);
+                _ = line.Append(", ").Append(((int)entry.Option).ToString(CultureInfo.InvariantCulture)).Append(']');
+            }
+        );
+        return json.Append("\n}\n").ToString();
     }
 
     // The dialect the chain of the case's settings files gives its .sql file, as the generator resolves it: the files

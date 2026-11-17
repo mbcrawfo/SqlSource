@@ -7,7 +7,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing.Templating;
 
-// The corpus of the sqlfluff templater: each case's templating plan is the text of its file.
+// The corpus of the sqlfluff templater: each case's templating plan is the text of its file, and the names of the
+// dialects and their options are the text of dialect-names.json.
 // SQLSOURCE_UPDATE_TEMPLATER_CORPUS=1 writes the files instead; see "The templater's corpus" in tests/README.md.
 public sealed class TemplatingCorpusTests
 {
@@ -21,6 +22,10 @@ public sealed class TemplatingCorpusTests
     [MemberData(nameof(CaseNames))]
     public void Corpus_EveryCase_MatchesTheParser(string name) =>
         TemplatingCorpus.Check(name, TemplatingCorpus.Render(TemplatingCorpus.Cases[name]));
+
+    [Fact]
+    public void Corpus_DialectNames_MatchTheParser() =>
+        TemplatingCorpus.Check(TemplatingCorpus.DialectNames, TemplatingCorpus.RenderDialectNames());
 
     // A corpus file of a case that was renamed or removed fails here, and the opt-in deletes it.
     [Fact]

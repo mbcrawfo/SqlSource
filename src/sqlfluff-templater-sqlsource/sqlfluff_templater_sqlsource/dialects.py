@@ -12,20 +12,22 @@ from sqlfluff_templater_sqlsource.text import equals_ascii_ignoring_case, trim
 
 
 class Dialect(enum.Enum):
-    """The database whose rules decide where comments, strings and quoted identifiers start and end."""
+    """The database whose rules decide where comments, strings and quoted identifiers start and end, valued by the
+    names the C# enum gives them."""
 
-    ANSI = enum.auto()
-    SQL_SERVER = enum.auto()
-    POSTGRESQL = enum.auto()
-    MYSQL = enum.auto()
-    MARIADB = enum.auto()
-    SQLITE = enum.auto()
-    ORACLE = enum.auto()
-    COCKROACHDB = enum.auto()
+    ANSI = "Ansi"
+    SQL_SERVER = "SqlServer"
+    POSTGRESQL = "PostgreSql"
+    MYSQL = "MySql"
+    MARIADB = "MariaDb"
+    SQLITE = "Sqlite"
+    ORACLE = "Oracle"
+    COCKROACHDB = "CockroachDb"
 
 
 class DialectOptions(enum.Flag):
-    """Settings of a database server that change one rule of its dialect.  Only MySQL and MariaDB have any."""
+    """Settings of a database server that change one rule of its dialect.  Only MySQL and MariaDB have any.  The
+    values are those of the C# enum."""
 
     NONE = 0
     ANSI_QUOTES = 1

@@ -46,6 +46,9 @@ _COMMENT_STARTERS = "-#/"
 # The prefix of a parameter in every dialect SqlSource reads.
 _AT_SIGN = "@"
 
+# One for each combination of DialectOptions.
+_OPTION_SETS = 4
+
 
 class DialectRules:
     """How one dialect reads comments and quoted regions.  The lexer reads by the rules it is given."""
@@ -152,7 +155,7 @@ def _create_mysql_family(dialect: Dialect) -> list[DialectRules]:
     # "..." an identifier, which has none; NO_BACKSLASH_ESCAPES takes them from both.  MySQL reads dollar quotes, and
     # MariaDB has its own hint.
     family = []
-    for value in range(4):
+    for value in range(_OPTION_SETS):
         options = DialectOptions(value)
         no_backslash = bool(options & DialectOptions.NO_BACKSLASH_ESCAPES)
         ansi_quotes = bool(options & DialectOptions.ANSI_QUOTES)

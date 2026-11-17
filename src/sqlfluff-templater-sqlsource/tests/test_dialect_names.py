@@ -1,5 +1,7 @@
 import pytest
+from corpus_reader import dialect_names
 
+from sqlfluff_templater_sqlsource import dialects
 from sqlfluff_templater_sqlsource.dialects import (
     Dialect,
     DialectChoice,
@@ -9,30 +11,17 @@ from sqlfluff_templater_sqlsource.dialects import (
     parse_dialect_name,
 )
 
-# SqlDialectName.Names and SqlDialectName.Options, as the C# code lists them.
-NAMES = [
-    ("ansi", Dialect.ANSI),
-    ("mssql", Dialect.SQL_SERVER),
-    ("sqlserver", Dialect.SQL_SERVER),
-    ("tsql", Dialect.SQL_SERVER),
-    ("postgres", Dialect.POSTGRESQL),
-    ("postgresql", Dialect.POSTGRESQL),
-    ("cockroachdb", Dialect.COCKROACHDB),
-    ("cockroach", Dialect.COCKROACHDB),
-    ("mysql", Dialect.MYSQL),
-    ("mariadb", Dialect.MARIADB),
-    ("sqlite", Dialect.SQLITE),
-    ("oracle", Dialect.ORACLE),
-]
-
-OPTIONS = [
-    ("ansi-quotes", DialectOptions.ANSI_QUOTES),
-    ("ansi_quotes", DialectOptions.ANSI_QUOTES),
-    ("no-backslash-escapes", DialectOptions.NO_BACKSLASH_ESCAPES),
-    ("no_backslash_escapes", DialectOptions.NO_BACKSLASH_ESCAPES),
-]
+# SqlDialectName.Names and SqlDialectName.Options, as TemplatingCorpusTests writes them from the C# code.
+_NAMES, _OPTIONS = dialect_names()
+NAMES = [(name, Dialect(member)) for name, member in _NAMES]
+OPTIONS = [(name, DialectOptions(value)) for name, value in _OPTIONS]
 
 BOTH = DialectOptions.ANSI_QUOTES | DialectOptions.NO_BACKSLASH_ESCAPES
+
+
+def test_names_and_options_are_those_of_the_parser_in_its_order():
+    assert list(dialects.NAMES) == NAMES
+    assert list(dialects.OPTIONS) == OPTIONS
 
 
 @pytest.mark.parametrize(("name", "dialect"), NAMES)

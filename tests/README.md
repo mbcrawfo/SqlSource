@@ -200,6 +200,7 @@ The templater's corpus holds the templating plan of a set of `.sql` files, as `S
   - `repo/<path>.json`, every `.sql` file of the repository at `<path>.sql`, read at LF, but for those under `bin/`, `obj/`, `node_modules/`, a folder whose name starts with `.`, the templater's project and the fidelity cases, and for a file with an error that does not stop its plan.  The cases are found on the file system, not in git, so an untracked `.sql` file of the checkout, a scratch file say, is a case too, and fails the test until it is removed;
   - `lexer/<dialect>/<n>.json`, row `<n>` of `SqlLexerTests.Lex_Construct_IsReadByTheRulesOfTheDialect`, counted from 1, once for each dialect it names, which a settings file gives it.  A row with an error that does not stop its plan fails its case;
   - `cases/<name>.json`, each `.sql` file of `Cases/` beside the test, read with its own line endings.  Each names its dialect with a marker first, and has no error but one that stops its plan.  A case the corpus lacks, of a rule the templater must follow, is a new file there.
+- **`dialect-names.json`**, at the root of the corpus and no case, holds `SqlDialectName.Names` and `SqlDialectName.Options` in their order, each name with its dialect's member of `SqlDialect` or its option's value, so that the templater reads the names the parser reads.  The same test checks it.
 
 To run the corpus:
 
@@ -215,6 +216,7 @@ A file holds its case's text and settings as well as its plan, so each of these 
 - an edit of the text of a `.sql` file of the repository, or of a `sqlsource.json` above one, a comment included;
 - a `.sql` file of the repository added, moved or removed;
 - a fidelity case added, edited or removed, or a row of the lexer's theory added, edited, moved or removed.
+- a name or an option of `SqlDialectName` added, changed, moved or removed, which updates `dialect-names.json`.
 
 To update it:
 

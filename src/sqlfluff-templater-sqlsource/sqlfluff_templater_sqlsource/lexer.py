@@ -1,8 +1,6 @@
-"""Splits SQL text into quoted regions, comments, hints, parameters and plain text, and reads a file's dialect marker.
+"""Splits SQL text into quoted regions, comments, hints, parameters and plain text.
 
-Mirrors `SqlLexer.cs`, `SqlLexeme.cs`, `SqlLexemeKind.cs` and `SqlDialectMarker.cs` in `src/SqlSource/Parsing/`,
-with `SqlParameterName.Of`, the part of `Markers/SqlMarkerReader.cs` that finds a `-- name:` or `-- dialect:` marker,
-and the place `SqlFileParser.InvalidDialect` gives the error of a `-- dialect:` marker whose value is not a dialect.
+Mirrors `SqlLexer.cs`, `SqlLexeme.cs` and `SqlLexemeKind.cs` in `src/SqlSource/Parsing/`, with `SqlParameterName.Of`.
 
 The lexer reads by the `DialectRules` it holds and names no dialect and no quoting form.  Where the rules leave a
 choice it keeps text, because a comment left in the SQL is harmless and SQL removed from it is a bug.  The one thing
@@ -13,26 +11,17 @@ its own, and the gap is ordinary text and comments.
 import enum
 from dataclasses import dataclass
 
-from sqlfluff_templater_sqlsource.dialects import DialectChoice, parse_dialect_name
+from sqlfluff_templater_sqlsource.errors import UNTERMINATED_BLOCK_COMMENT, UNTERMINATED_QUOTE, ParseError
 from sqlfluff_templater_sqlsource.quoting import NOT_A_QUOTE, UNTERMINATED, QuoteReader
 from sqlfluff_templater_sqlsource.rules import DialectRules, StringContinuation
 from sqlfluff_templater_sqlsource.text import (
     char_at,
-    equals_ascii_ignoring_case,
     find_line_end,
     is_control,
     is_line_terminator,
     is_white_space,
     trim,
 )
-
-UNTERMINATED_QUOTE = "SQLSRC101"
-UNTERMINATED_BLOCK_COMMENT = "SQLSRC102"
-INVALID_MARKER_VALUE = "SQLSRC111"
-
-# The keywords of the two markers that the header reads.
-_NAME = "name:"
-_DIALECT = "dialect:"
 
 
 class LexemeKind(enum.Enum):
@@ -76,15 +65,6 @@ class Lexeme:
         return None if start == end else (start, end)
 
 
-@dataclass(frozen=True)
-class LexError:
-    """An error that stops the templating plan: its diagnostic's code and where it is."""
-
-    code: str
-    start: int
-    end: int
-
-
 class Lexer:
     """Reads a text by the rules it holds, which may be changed between two lexemes."""
 
@@ -95,7 +75,7 @@ class Lexer:
         # The offset after the last lexeme that was read.
         self.position = 0
         self._lexemes: list[Lexeme] = []
-        self._error: LexError | None = None
+        self._error: ParseError | None = None
         self._text_start = 0
         # A string that may go on after a gap: the reader of its next part, or None when no string is waiting for
         # one; the quote that opens that part; how far the gap has been checked; and whether it has held a line break.
@@ -122,7 +102,7 @@ class Lexer:
         self._step()
         return None if self._error is not None else self._lexemes[-1]
 
-    def read_to_end(self) -> tuple[list[Lexeme], LexError | None]:
+    def read_to_end(self) -> tuple[list[Lexeme], ParseError | None]:
         """Reads the rest of the text and gives every lexeme, or no lexeme and the error that stopped the lexer."""
         text = self._text
         while self.position < len(text) and self._error is None:
@@ -248,7 +228,7 @@ class Lexer:
                 index += 1
 
         if depth > 0:
-            self._error = LexError(UNTERMINATED_BLOCK_COMMENT, start, start + 2)
+            self._error = ParseError(UNTERMINATED_BLOCK_COMMENT, start, start + 2)
             return
 
         self._add(LexemeKind.HINT if self._is_block_hint(start) else LexemeKind.BLOCK_COMMENT, start, index)
@@ -262,7 +242,7 @@ class Lexer:
             self.position += 1
             self._continuation = None
         elif end == UNTERMINATED:
-            self._error = LexError(UNTERMINATED_QUOTE, start, start + 1)
+            self._error = ParseError(UNTERMINATED_QUOTE, start, start + 1)
         else:
             self._add(LexemeKind.QUOTED, start, end)
             if pending is None:
@@ -279,78 +259,3 @@ class Lexer:
 # What MySQL wants after the two dashes.  The end of the text is '\0' here, which is a control character.
 def _is_dash_boundary(value: str) -> bool:
     return is_white_space(value) or is_control(value)
-
-
-@dataclass(frozen=True)
-class DialectHeader:
-    """What the comments at the start of a file set.
-
-    `end` is the offset where the header ends: a `-- dialect:` marker that starts at or after it is misplaced.
-    `named` is the dialect that the marker put into effect names, or None when none did.  `invalid` is the error of
-    the first `-- dialect:` marker of the header whose value is not a dialect, placed at its value, or at the marker
-    when it has none, as the parser places it; or None.
-    """
-
-    end: int
-    named: DialectChoice | None
-    invalid: LexError | None
-
-
-def apply_dialect_marker(lexer: Lexer, text: str) -> int:
-    """Reads the comments at the start of `text` from `lexer`, switches it to the dialect that the first valid
-    `-- dialect:` marker among them names, and returns the offset where the header ends."""
-    return read_dialect_header(lexer, text).end
-
-
-def read_dialect_header(lexer: Lexer, text: str) -> DialectHeader:
-    """As `apply_dialect_marker`, and gives the dialect named and the first invalid marker too.
-
-    The header is read under the dialect the lexer starts with, and the marker applies from the line after it.
-    """
-    named: DialectChoice | None = None
-    invalid: LexError | None = None
-    while (comment := lexer.try_read_leading_comment()) is not None:
-        marker = _read_header_marker(text, comment)
-        if marker is None:
-            continue
-
-        keyword, value_start, value_end = marker
-        if keyword == _NAME:
-            return DialectHeader(comment.start, named, invalid)
-
-        choice = parse_dialect_name(text[value_start:value_end])
-        if choice is None:
-            if invalid is None:
-                start, end = (value_start, value_end) if value_end > value_start else (comment.start, comment.end)
-                invalid = LexError(INVALID_MARKER_VALUE, start, end)
-        elif named is None:
-            lexer.rules = DialectRules.for_choice(choice)
-            named = choice
-
-    return DialectHeader(lexer.position, named, invalid)
-
-
-# The keyword of a -- name: or -- dialect: marker that `comment` is, and the span of its value, or None.  A marker is
-# a line comment that is the first thing on its line and reads --, optional blanks, a keyword, a colon.  A marker of
-# another keyword does nothing in the header, so it is read as no marker here.
-def _read_header_marker(text: str, comment: Lexeme) -> tuple[str, int, int] | None:
-    if comment.kind != LexemeKind.LINE_COMMENT or text[comment.start] != "-" or not _starts_line(text, comment.start):
-        return None
-
-    keyword_start = comment.start + 2
-    while keyword_start < comment.end and text[keyword_start] in (" ", "\t"):
-        keyword_start += 1
-
-    for keyword in (_NAME, _DIALECT):
-        value_start = keyword_start + len(keyword)
-        if value_start <= comment.end and equals_ascii_ignoring_case(text[keyword_start:value_start], keyword):
-            return (keyword, *trim(text, value_start, comment.end))
-    return None
-
-
-# Only blanks may come before the comment on its line.
-def _starts_line(text: str, start: int) -> bool:
-    index = start - 1
-    while index >= 0 and text[index] in (" ", "\t"):
-        index -= 1
-    return index < 0 or is_line_terminator(text[index])
