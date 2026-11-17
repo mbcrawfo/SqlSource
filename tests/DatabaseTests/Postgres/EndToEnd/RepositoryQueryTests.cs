@@ -13,7 +13,8 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // The queries of Queries/Repository.sql, run on the seed of "app" through the instance methods of the repositories of
 // RepositoryQueries.cs, which take no connection: each reads through its own source, a data source, a connection
 // string, a factory whose connection the method disposes, even at a break out of a stream, and a borrowed connection,
-// which the method leaves as it found it.  A source that is null throws before the method opens anything, and the
+// which the method leaves as it found it; a repository with none of its own reads through a factory it holds or a
+// global.  A source that is null throws before the method opens anything, and the
 // generated interface runs the same methods.  A repository method takes no transaction, so TouchNote writes the body
 // it reads and leaves the seed as it was.
 [Collection(UsesPostgres.Name)]
@@ -77,6 +78,65 @@ public sealed class RepositoryQueryTests(PostgresDatabases postgres)
         var connection = repository.Connections.ShouldHaveSingleItem();
         connection.State.ShouldBe(ConnectionState.Closed);
         _ = await Should.ThrowAsync<ObjectDisposedException>(() => connection.OpenAsync(token));
+    }
+
+    // The held factory's connection is the method's to dispose, as the repository's own factory's is.
+    [Fact]
+    public async Task ListNotes_BreakAfterFirstRow_DisposesTheHeldFactoryConnection()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var dataSource = EndToEndSources.App(postgres);
+        var factory = new DataSourceConnectionFactory(dataSource);
+        var repository = new HeldFactoryRepository(factory);
+
+        var rows = new List<RepositoryNote>();
+
+        await foreach (var note in repository.ListNotes(token))
+        {
+            rows.Add(note);
+            if (rows.Count == 1)
+            {
+                break;
+            }
+        }
+
+        rows.ShouldBe([Notes[0]]);
+        var connection = factory.Connections.ShouldHaveSingleItem();
+        connection.State.ShouldBe(ConnectionState.Closed);
+        _ = await Should.ThrowAsync<ObjectDisposedException>(() => connection.OpenAsync(token));
+    }
+
+    // The collection's tests run one at a time, so the global is the data source of the test that is running.
+    [Fact]
+    public async Task GetNote_Global_ReadsTheRowThroughTheGlobal()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var dataSource = EndToEndSources.App(postgres);
+        EndToEndConnections.Main = dataSource;
+
+        try
+        {
+            var note = await new GlobalRepository().GetNote(new GetNoteArgs(3), token);
+
+            note.ShouldBe(Notes[2]);
+        }
+        finally
+        {
+            EndToEndConnections.Main = null;
+        }
+    }
+
+    [Fact]
+    public async Task GetNote_NullGlobal_ThrowsNamingTheGlobal()
+    {
+        EndToEndConnections.Main = null;
+        var repository = new GlobalRepository();
+
+        await ShouldThrowNullSourceAsync(
+            () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
+            "The connection source 'EndToEndConnections.Main' of "
+                + "'SqlSource.DatabaseTests.Postgres.EndToEnd.GlobalRepository' is null."
+        );
     }
 
     [Fact]
@@ -143,6 +203,30 @@ public sealed class RepositoryQueryTests(PostgresDatabases postgres)
             () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
             "The connection source 'OpenAsync' of "
                 + "'SqlSource.DatabaseTests.Postgres.EndToEnd.FactoryRepository' is null."
+        );
+    }
+
+    [Fact]
+    public async Task HeldFactory_NullFactory_ThrowsNamingTheHolder()
+    {
+        var repository = new HeldFactoryRepository(null!);
+
+        await ShouldThrowNullSourceAsync(
+            () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
+            "The connection source 'factory' of "
+                + "'SqlSource.DatabaseTests.Postgres.EndToEnd.HeldFactoryRepository' is null."
+        );
+    }
+
+    [Fact]
+    public async Task HeldFactory_FactoryReturnsNull_ThrowsNamingTheHoldersMember()
+    {
+        var repository = new HeldFactoryRepository(new DataSourceConnectionFactory(null));
+
+        await ShouldThrowNullSourceAsync(
+            () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
+            "The connection source 'factory.OpenAsync' of "
+                + "'SqlSource.DatabaseTests.Postgres.EndToEnd.HeldFactoryRepository' is null."
         );
     }
 

@@ -53,6 +53,22 @@ public sealed class SynchronousRepositoryTests(PostgresDatabases postgres)
         note.ShouldBe(Notes[1]);
     }
 
+    // The held factory's synchronous method is the one that returns no task, and its connection is the method's to
+    // dispose.
+    [Fact]
+    public void GetNoteSync_HeldFactory_CallsTheSynchronousMethodAndDisposesItsConnection()
+    {
+        using var dataSource = EndToEndSources.App(postgres);
+        var factory = new DataSourceConnectionFactory(dataSource);
+
+        var note = new HeldFactoryRepository(factory).GetNoteSync(new GetNoteSyncArgs(1));
+
+        note.ShouldBe(Notes[0]);
+        var connection = factory.Connections.ShouldHaveSingleItem();
+        connection.State.ShouldBe(ConnectionState.Closed);
+        _ = Should.Throw<ObjectDisposedException>(connection.Open);
+    }
+
     [Fact]
     public void ListNotesSync_DataSource_ReadsEveryNote()
     {

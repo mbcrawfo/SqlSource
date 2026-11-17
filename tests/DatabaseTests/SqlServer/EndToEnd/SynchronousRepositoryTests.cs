@@ -48,6 +48,21 @@ public sealed class SynchronousRepositoryTests(SqlServerDatabases sqlServer)
         note.ShouldBe(Notes[0]);
     }
 
+    // The held factory's synchronous method is the one that returns no task, and its connection is the method's to
+    // dispose, which its Disposed event, raised once, proves.
+    [Fact]
+    public void GetNoteSync_HeldFactory_CallsTheSynchronousMethodAndDisposesItsConnection()
+    {
+        var factory = new ConnectionStringConnectionFactory(EndToEndSources.AppConnectionString(sqlServer));
+
+        var note = new HeldFactoryRepository(factory).GetNoteSync(new GetNoteSyncArgs(1));
+
+        note.ShouldBe(Notes[0]);
+        var connection = factory.Connections.ShouldHaveSingleItem();
+        connection.State.ShouldBe(ConnectionState.Closed);
+        factory.Disposed.ShouldBe([connection]);
+    }
+
     [Fact]
     public void ListNotesSync_ConnectionString_ReadsEveryNote()
     {

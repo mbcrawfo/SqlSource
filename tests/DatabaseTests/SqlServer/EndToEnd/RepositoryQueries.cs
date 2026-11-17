@@ -6,7 +6,7 @@ using Microsoft.Data.SqlClient;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// The three repositories of Queries/Repository.sql, whose header sets the output repository: each gets the file's
+// The five repositories of Queries/Repository.sql, whose header sets the output repository: each gets the file's
 // queries as instance methods, asynchronous and synchronous, and the interface I<its name>, and differs only in where
 // its methods take a connection.
 // SqlClient has no data source, so a SQL Server repository has none.
@@ -74,4 +74,70 @@ internal sealed partial class BorrowedRepository(DbConnection connection)
 {
     [SqlSourceConnection]
     public DbConnection Connection { get; } = connection;
+}
+
+// A factory that the repository holds, the interface of a primary-constructor parameter: its marked methods, a pair of
+// one asynchronous and one synchronous, are the connection sources of the repository that holds it, which calls them on
+// the parameter and disposes the connection each returns.
+internal interface IConnectionFactory
+{
+    [SqlSourceConnection]
+    ValueTask<SqlConnection?> OpenAsync(CancellationToken cancellationToken);
+
+    [SqlSourceConnection]
+    SqlConnection? Open(CancellationToken cancellationToken);
+}
+
+// The factory of a connection string, which keeps the connections it opened, with those whose Disposed event has been
+// raised, for a test to look at and, given no connection string, returns null, as a factory of the user's may.
+internal sealed class ConnectionStringConnectionFactory(string? connectionString) : IConnectionFactory
+{
+    public List<SqlConnection> Connections { get; } = [];
+
+    public List<SqlConnection> Disposed { get; } = [];
+
+    public async ValueTask<SqlConnection?> OpenAsync(CancellationToken cancellationToken)
+    {
+        if (connectionString is null)
+        {
+            return null;
+        }
+
+        var connection = new SqlConnection(connectionString);
+        Connections.Add(connection);
+        connection.Disposed += (_, _) => Disposed.Add(connection);
+        await connection.OpenAsync(cancellationToken);
+        return connection;
+    }
+
+    public SqlConnection? Open(CancellationToken cancellationToken)
+    {
+        if (connectionString is null)
+        {
+            return null;
+        }
+
+        var connection = new SqlConnection(connectionString);
+        Connections.Add(connection);
+        connection.Disposed += (_, _) => Disposed.Add(connection);
+        connection.Open();
+        return connection;
+    }
+}
+
+// A held factory by the parameter's type: each method calls the marked method of the factory it was given, since a
+// factory the repository holds is a source of the repository as its own members are.
+[SqlSourceGenerate(Source = "Queries/Repository.sql")]
+internal sealed partial class HeldFactoryRepository(IConnectionFactory factory);
+
+// No source of its own: a global, a static member marked in the project, serves it.  The global names the logical
+// database of the file, "app", so that it serves no other repository of the project.
+[SqlSourceGenerate(Source = "Queries/Repository.sql")]
+internal sealed partial class GlobalRepository;
+
+// The global of GlobalRepository, a connection string, which a test sets to the one of "app" and sets back to null.
+internal static class EndToEndConnections
+{
+    [SqlSourceConnection(Database = "app")]
+    public static string? Main { get; set; }
 }
