@@ -62,15 +62,16 @@ def _token(span: PlanSpan, inner: list[PlanSpan], dialect: DialectChoice, sqlflu
     rules = DialectRules.for_choice(dialect)
     lexemes, _ = Lexer(default, rules).read_to_end()
     parameters = [lexeme for lexeme in lexemes if lexeme.kind == LexemeKind.PARAMETER]
-    if [default[lexeme.start + 1 : lexeme.end] for lexeme in parameters] == [found.name for found in inner]:
+    names = [default[slice(*lexeme.parameter_name)] for lexeme in parameters]
+    if names == [found.name for found in inner]:
         lists = [found.kind == SpanKind.LIST for found in inner]
     else:
         lists = find_lists(default, lexemes, 0, len(lexemes), rules) or [False] * len(parameters)
 
     parts = []
     written = 0
-    for lexeme, is_list in zip(parameters, lists, strict=True):
-        replacement = stand_in(default[lexeme.start + 1 : lexeme.end], sqlfluff_dialect)
+    for lexeme, name, is_list in zip(parameters, names, lists, strict=True):
+        replacement = stand_in(name, sqlfluff_dialect)
         parts.append(default[written : lexeme.start])
         parts.append(f"({replacement})" if is_list else replacement)
         written = lexeme.end

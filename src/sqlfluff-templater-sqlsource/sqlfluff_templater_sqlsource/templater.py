@@ -23,7 +23,8 @@ from sqlfluff_templater_sqlsource.render import render
 from sqlfluff_templater_sqlsource.settings import resolve_dialect
 from sqlfluff_templater_sqlsource.stand_ins import compatible
 
-# The title that `site/diagnostics.md` gives each error that stops a plan.
+# The title of each error that stops a plan, as its C# diagnostic descriptor gives it.  A test keeps it equal to
+# `tests/corpus/diagnostic-titles.json`.
 _TITLES = {
     UNTERMINATED_QUOTE: "Quote is not closed",
     UNTERMINATED_BLOCK_COMMENT: "Comment is not closed",

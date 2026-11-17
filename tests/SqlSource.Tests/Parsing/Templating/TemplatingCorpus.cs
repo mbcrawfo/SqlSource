@@ -35,6 +35,19 @@ internal static class TemplatingCorpus
     // The file of the names a dialect and its options are set by, at the root of the corpus.  It is no case.
     public const string DialectNames = "dialect-names";
 
+    // The file of the titles of the errors that stop a plan, which the templater reports, at the root of the corpus.
+    // It is no case.
+    public const string DiagnosticTitles = "diagnostic-titles";
+
+    // The errors that stop a plan, in the order of their codes.
+    private static readonly ImmutableArray<SqlParseErrorKind> StoppingErrors =
+    [
+        SqlParseErrorKind.UnterminatedQuote,
+        SqlParseErrorKind.UnterminatedBlockComment,
+        SqlParseErrorKind.InvalidMarkerValue,
+        SqlParseErrorKind.TokenCrossesComment,
+    ];
+
     private const string Repository = "repo";
     private const string Lexer = "lexer";
     private const string Fidelity = "cases";
@@ -105,7 +118,7 @@ internal static class TemplatingCorpus
             .. Directory
                 .EnumerateFiles(Folder, "*.json", SearchOption.AllDirectories)
                 .Select(file => Path.ChangeExtension(Path.GetRelativePath(Folder, file), null).Replace('\\', '/'))
-                .Where(name => !Cases.ContainsKey(name) && name != DialectNames)
+                .Where(name => !Cases.ContainsKey(name) && name != DialectNames && name != DiagnosticTitles)
                 .OrderBy(name => name, StringComparer.Ordinal),
         ];
     }
@@ -230,6 +243,27 @@ internal static class TemplatingCorpus
                 _ = line.Append('[');
                 AppendString(line, entry.Name);
                 _ = line.Append(", ").Append(((int)entry.Option).ToString(CultureInfo.InvariantCulture)).Append(']');
+            }
+        );
+        return json.Append("\n}\n").ToString();
+    }
+
+    // The code and the title of the diagnostic of each error that stops a plan, as SqlDiagnostics.ForParseError gives
+    // it, so that the templater names the error as the build does.
+    public static string RenderDiagnosticTitles()
+    {
+        var json = new StringBuilder().Append("{\n  \"titles\": ");
+        AppendLines(
+            json,
+            StoppingErrors.Select(SqlDiagnostics.ForParseError),
+            "  ",
+            (line, descriptor) =>
+            {
+                _ = line.Append('[');
+                AppendString(line, descriptor.Id);
+                _ = line.Append(", ");
+                AppendString(line, descriptor.Title.ToString(CultureInfo.InvariantCulture));
+                _ = line.Append(']');
             }
         );
         return json.Append("\n}\n").ToString();

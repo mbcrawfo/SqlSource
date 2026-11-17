@@ -1,9 +1,11 @@
 """The templater run by sqlfluff's own linter: `lint`, `fix` and `format` leave what SqlSource reads as written."""
 
 import codecs
+from collections import Counter
 from pathlib import Path
 
 import pytest
+from corpus_reader import diagnostic_titles
 from sqlfluff.core import FluffConfig, Linter
 from sqlfluff.core.linter import LintedFile
 
@@ -82,30 +84,33 @@ def query_ends(text: str) -> int:
     return sum(1 for span in plan.spans if span.kind == SpanKind.QUERY_END)
 
 
+# Every protected part is messy too, so that a fix that reached inside one would change it: lower-case keywords and
+# bad spacing in an inline default, in a marker's default, in a default with a list, and in marker-form comments.
 MESSY = (
     "-- dialect: {sqlsource}\n"
     "-- name: First\n"
-    "-- token: {{{{sort:a DESC}}}}\n"
+    "--   token:   {{{{sort:a   desc}}}}\n"
     "SELECT a,b   from t where a = @a and c in @ids ORDER BY {{{{sort}}}}\n"
     "\n"
     "-- name: Second\n"
-    "select   a from t where {{{{cond:b = @b}}}}  -- token: inline\n"
+    "select   a from t where {{{{cond:b=@b   and   c=1 and x in @xs}}}}  --   token:   inline\n"
 )
 
 
+@pytest.mark.parametrize("rules", [None, "all"])
 @pytest.mark.parametrize(("sqlfluff_dialect", "sqlsource"), PAIRS)
-def test_fix_never_changes_a_token_default_parameter_list_or_marker(sqlfluff_dialect, sqlsource, tmp_path):
+def test_fix_never_changes_a_token_default_parameter_list_or_marker(sqlfluff_dialect, sqlsource, rules, tmp_path):
     text = MESSY.format(sqlsource=sqlsource)
 
-    linted = lint(text, sqlfluff_dialect, tmp_path)
+    linted = lint(text, sqlfluff_dialect, tmp_path, rules=rules)
     result, _ = linted.fix_string()
 
     assert not [code for code in codes(linted) if code in ("PRS", "TMP", "LXR")]
-    # The keywords take the case of the first, and the spacing is fixed.
+    # The keywords take the case of the first, and the spacing is fixed, outside the protected parts.
     assert "from t" not in result
-    assert "where" not in result
-    assert "b   " not in result
-    assert "SELECT   a" not in result
+    assert " where " not in result
+    assert "b   from" not in result
+    assert "select   a" not in result
     assert protected_texts(result) == protected_texts(text)
     assert query_ends(result) == query_ends(text) == 1
 
@@ -307,9 +312,10 @@ def test_stand_in_sets_off_no_rule(sqlfluff_dialect, sqlsource, tmp_path):
     found = lint(with_parameters, sqlfluff_dialect, tmp_path, fix=False, rules="all")
     expected = lint(with_literals, sqlfluff_dialect, tmp_path, fix=False, rules="all")
 
-    found_codes = {(violation.rule_code(), violation.line_no) for violation in found.get_violations()}
-    expected_codes = {(violation.rule_code(), violation.line_no) for violation in expected.get_violations()}
-    assert found_codes - expected_codes == set()
+    # Positions are not compared: a stand-in is not as long as the literal it is compared with.
+    found_codes = Counter((violation.rule_code(), violation.line_no) for violation in found.get_violations())
+    expected_codes = Counter((violation.rule_code(), violation.line_no) for violation in expected.get_violations())
+    assert found_codes - expected_codes == Counter()
     assert not [code for code in codes(found) if code in ("PRS", "TMP", "LXR")]
 
 
@@ -398,7 +404,7 @@ def test_rejected_file_lints_without_crash(tmp_path):
         linted = lint(text, "postgres", tmp_path)
 
         assert "TMP" not in codes(linted), text
-        assert linted.fix_string()[0].count("{{") == text.count("{{")
+        assert protected_texts(linted.fix_string()[0]) == protected_texts(text), text
 
 
 def test_failure_inside_the_templater_is_a_templating_error(tmp_path, monkeypatch):
@@ -457,6 +463,10 @@ def test_stopping_error_names_its_code(text, code, line, position, tmp_path):
     assert violations[0].desc().startswith(code + ": ")
     assert (violations[0].line_no, violations[0].line_pos) == (line, position)
     assert linted.templated_file is None
+
+
+def test_stopping_errors_take_the_titles_of_the_diagnostics():
+    assert diagnostic_titles() == templater_module._TITLES
 
 
 def test_empty_file_lints(tmp_path):

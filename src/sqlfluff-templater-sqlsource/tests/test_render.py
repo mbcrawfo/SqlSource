@@ -95,6 +95,7 @@ def test_list_in_a_default_is_a_list():
     templated = render_text("SELECT * FROM t WHERE 1 = 1 {{f:AND id IN @ids AND b = @b}};")
 
     assert templated_slices(templated) == [("{{f:AND id IN @ids AND b = @b}}", "AND id IN (:ids) AND b = :b")]
+    assert_consistent(templated)
 
 
 def test_parameter_in_a_marker_default_is_swapped():
@@ -103,6 +104,7 @@ def test_parameter_in_a_marker_default_is_swapped():
     templated = render_text(text)
 
     assert ("{{f}}", "AND a = :a") in templated_slices(templated)
+    assert_consistent(templated)
 
 
 def test_list_in_a_marker_default_is_a_list():
@@ -111,6 +113,7 @@ def test_list_in_a_marker_default_is_a_list():
     templated = render_text(text)
 
     assert ("{{f}}", "AND id IN (:ids)") in templated_slices(templated)
+    assert_consistent(templated)
 
 
 def test_default_with_a_comment_renders_without_it():
@@ -119,6 +122,7 @@ def test_default_with_a_comment_renders_without_it():
     templated = render_text(text)
 
     assert templated_slices(templated) == [("{{f:a /* note */ = @a}}", "a   = :a")]
+    assert_consistent(templated)
 
 
 def test_default_is_lexed_by_the_dialect_of_the_plan():
@@ -128,6 +132,7 @@ def test_default_is_lexed_by_the_dialect_of_the_plan():
     templated = render_text(text, "tsql", MSSQL)
 
     assert templated_slices(templated) == [("{{f:[@x] = @y}}", "[@x] = @y")]
+    assert_consistent(templated)
 
 
 def test_parameter_renders_the_stand_in_of_the_sqlfluff_dialect():
@@ -190,6 +195,7 @@ def test_query_end_right_before_a_marker_comment_has_an_empty_source():
     assert templated_slices(templated)[1:3] == [("", ";"), ("-- token: x", "-- token: x")]
     end = text.index("-- token")
     assert [part.source_slice for part in templated.sliced_file if part.slice_type == "templated"][1] == slice(end, end)
+    assert_consistent(templated)
 
 
 def test_query_end_after_a_token():
