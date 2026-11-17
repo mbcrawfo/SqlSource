@@ -123,11 +123,11 @@ public sealed class CheckFilterTests : IDisposable
 
     // An entry of a query that is gone makes the file's text differ from what describe would write, so a describe
     // with --database rewrites the file without it, whatever the entry's database: the check reports it whichever
-    // database is named, in whatever case.
+    // database is named, in whatever case.  These rows name the entry's database; the case of another database is
+    // Check_EntryOfAnotherDatabaseThatIsGone_AgreesWithDescribe's.
     [Theory]
     [InlineData("billing")]
     [InlineData("BILLING")]
-    [InlineData("postgres")]
     public async Task Check_EntryOfAQueryThatIsGoneUnderDatabase_IsReportedWhenDescribeWouldWriteTheFile(string named)
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);

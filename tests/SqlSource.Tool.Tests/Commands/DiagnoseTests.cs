@@ -347,6 +347,7 @@ public sealed class DiagnoseTests : IDisposable
     [Theory]
     [InlineData("report.SQL.JSON")]
     [InlineData("App.csproj")]
+    [InlineData("report.sql")]
     public async Task Diagnose_OutIsAFileOfTheRun_IsSQLSRC218(string name)
     {
         _ = _scene.AddCase(_scene.Case(Plain));
@@ -365,18 +366,6 @@ public sealed class DiagnoseTests : IDisposable
             )
         );
         (File.Exists(path) ? ReadText(path) : null).ShouldBe(before);
-    }
-
-    [Fact]
-    public async Task Diagnose_OutEndsInSql_IsSQLSRC218()
-    {
-        _ = _scene.AddCase(_scene.Case(Plain));
-
-        var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.sql");
-
-        result.ExitCode.ShouldBe(1);
-        result.Error.ShouldStartWith($"{_scene.PathOf("report.sql")} : error SQLSRC218: ");
-        File.Exists(_scene.PathOf("report.sql")).ShouldBeFalse();
     }
 
     [Fact]
