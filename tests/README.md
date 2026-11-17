@@ -224,6 +224,8 @@ To update it:
 2. Run it again without the variable, which only compares, and see it pass.
 3. Read the diff of every changed file and see that it shows the change meant.  Where a plan changed, and not only the text of a case or of its settings files, change the templater to match in the same pull request.
 
+The templater's `tests/test_examples_parse.py` lints each case under `repo/examples/` with sqlfluff, in `postgres` or `tsql`, and fails on a parse or templating error.  An example that sqlfluff's own grammar cannot parse is a line of `src/sqlfluff-templater-sqlsource/tests/examples_unparsable.txt`: its path under `repo/examples/`, a `#`, and the construct sqlfluff fails on.
+
 ## The database projects
 
 The seven projects of [`tests/DatabaseTests/`](DatabaseTests/README.md) run against a real server, and reference [the harness](DatabaseTests/README.md#the-harness) in `tests/DatabaseTests/TestHarness`; its readme has their table, how to run one on another image, and [the Npgsql 8 project](DatabaseTests/README.md#the-npgsql-8-project) and [the SqlClient 6.1 project](DatabaseTests/README.md#the-sqlclient-61-project), the two that pin the oldest supported driver.
