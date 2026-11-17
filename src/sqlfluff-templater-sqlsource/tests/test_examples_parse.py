@@ -8,8 +8,7 @@ from sqlfluff.core import FluffConfig, Linter
 
 EXAMPLES_DIRECTORY = CORPUS_DIRECTORY / "repo" / "examples"
 
-# The examples that sqlfluff's own grammar cannot parse: one path under `tests/corpus/repo/examples/` per line, with a
-# `#` and the reason, naming the sqlfluff construct.
+# The examples that do not parse: one path under `tests/corpus/repo/examples/` per line, with a `#` and the reason.
 UNPARSABLE_PATH = Path(__file__).parent / "examples_unparsable.txt"
 
 NATURAL_DIALECTS = {"postgres": "postgres", "mssql": "tsql"}

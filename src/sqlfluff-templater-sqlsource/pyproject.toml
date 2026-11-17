@@ -9,7 +9,9 @@ version = "0.0.0.dev0"
 description = "A sqlfluff templater for SqlSource queries"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["sqlfluff>=4.0,<5"]
+# Not 4.0 or 4.1: there LT05 copies an inline `-- token:` comment onto a line of its own, which makes it a marker,
+# :name sets off LT01, and 4.0.0 cannot parse an example of the repository.
+dependencies = ["sqlfluff>=4.2,<5"]
 
 [project.entry-points.sqlfluff]
 sqlfluff_templater_sqlsource = "sqlfluff_templater_sqlsource"

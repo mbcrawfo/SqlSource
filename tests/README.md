@@ -224,7 +224,7 @@ To update it:
 2. Run it again without the variable, which only compares, and see it pass.
 3. Read the diff of every changed file and see that it shows the change meant.  Where a plan changed, and not only the text of a case or of its settings files, change the templater to match in the same pull request.
 
-The templater's `tests/test_examples_parse.py` lints each case under `repo/examples/` with sqlfluff, in `postgres` or `tsql`, and fails on a parse or templating error.  An example that sqlfluff's own grammar cannot parse is a line of `src/sqlfluff-templater-sqlsource/tests/examples_unparsable.txt`: its path under `repo/examples/`, a `#`, and the construct sqlfluff fails on.
+The templater's `tests/test_examples_parse.py` lints each case under `repo/examples/` with sqlfluff, in `postgres` or `tsql`, and fails on a parse or templating error.  An example that does not parse is a line of `src/sqlfluff-templater-sqlsource/tests/examples_unparsable.txt`: its path under `repo/examples/`, a `#`, and why it fails.
 
 ## The database projects
 

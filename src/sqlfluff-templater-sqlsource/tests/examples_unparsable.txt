@@ -1,1 +1,1 @@
-SqlServerExamples/Sql/CountQueries.json  # tsql reserves TABLE, and {{table}}, which has no default, renders as its name: sqlfluff reads `FROM table` as no table reference
+SqlServerExamples/Sql/CountQueries.json  # not a gap in sqlfluff: {{table}} has no default, so it renders as its name, and tsql reserves TABLE

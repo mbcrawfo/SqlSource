@@ -168,6 +168,28 @@ def test_cv06_with_semicolons_on_new_lines_never_writes_one(body, tmp_path):
     assert linted.fix_string()[0] == text
 
 
+@pytest.mark.parametrize(
+    ("body", "tail"),
+    [
+        ("SELECT a FROM t", "\n"),
+        ("SELECT a FROM t", " -- note\n"),
+        ("SELECT\n    a\nFROM t", " -- note\n"),
+        ("SELECT\n    a\nFROM t", " -- note\n\n"),
+    ],
+)
+def test_cv06_on_new_lines_ignores_the_inserted_semicolon(body, tail, tmp_path):
+    # The query's end is no user text, so its slice is untagged: a violation anchored in it is dropped as templated,
+    # and fix cannot write there.  CV06 anchors a multi-line query's on the comment after its SQL.
+    text = "-- dialect: postgres\n-- name: A\n" + body + tail + "-- name: B\nSELECT\n    2\n;\n"
+
+    linted = lint(
+        text, "postgres", tmp_path, rules="CV06", rule_configs={"convention.terminator": {"multiline_newline": True}}
+    )
+
+    assert codes(linted) == []
+    assert linted.fix_string()[0] == text
+
+
 def test_long_line_fix_never_moves_a_marker_form_comment(tmp_path):
     # LT05 moves a trailing comment onto a line of its own, as it does with sqlfluff's raw templater, where this one
     # would become a marker that SqlSource reads.

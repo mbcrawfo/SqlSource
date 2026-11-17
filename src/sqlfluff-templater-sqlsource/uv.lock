@@ -761,7 +761,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "sqlfluff", specifier = ">=4.0,<5" }]
+requires-dist = [{ name = "sqlfluff", specifier = ">=4.2,<5" }]
 
 [package.metadata.requires-dev]
 dev = [
