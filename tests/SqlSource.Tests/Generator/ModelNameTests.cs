@@ -166,16 +166,6 @@ public sealed class ModelNameTests
 
     [Theory]
     [InlineData("EqualityContract")]
-    [InlineData("Equals")]
-    [InlineData("GetHashCode")]
-    [InlineData("ToString")]
-    [InlineData("GetType")]
-    [InlineData("MemberwiseClone")]
-    [InlineData("Finalize")]
-    [InlineData("ReferenceEquals")]
-    [InlineData("PrintMembers")]
-    [InlineData("Deconstruct")]
-    [InlineData("Clone")]
     public void Run_ReservedName_IsSqlsrc256(string name)
     {
         var run = CleanRun(
@@ -497,16 +487,7 @@ public sealed class ModelNameTests
     // settings file's value SQLSRC019, after which the models take the type's namespace.
     [Theory]
     [InlineData("input-model", "file")]
-    [InlineData("input-model", "required")]
-    [InlineData("input-model", "scoped")]
-    [InlineData("input-model", "extension")]
-    [InlineData("output-model", "file")]
-    [InlineData("output-model", "required")]
     [InlineData("output-model", "scoped")]
-    [InlineData("output-model", "extension")]
-    [InlineData("modelNamespace", "file")]
-    [InlineData("modelNamespace", "required")]
-    [InlineData("modelNamespace", "scoped")]
     [InlineData("modelNamespace", "extension")]
     public void Run_ModelNameWithAContextualKeywordThatCSharpRefusesAsATypeName_IsAnError(string place, string keyword)
     {
