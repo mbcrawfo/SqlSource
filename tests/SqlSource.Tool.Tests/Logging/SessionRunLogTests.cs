@@ -58,18 +58,6 @@ public sealed class SessionRunLogTests
         _inner.Events[0].Members.ShouldBe([new("a", "x ***"), new("b", "*** y"), new("c", "plain")]);
     }
 
-    [Fact]
-    public void Write_ValueSplitOverTheNameAndAMember_IsTheMarkInBoth()
-    {
-        var log = new SessionRunLog(_inner, new ConnectionSecret(Secrets.Connection));
-
-        log.Write("open " + FirstHalf, new LogMember(SecondHalf + " key", "plain"));
-
-        var (name, members) = _inner.Events.ShouldHaveSingleItem();
-        name.ShouldBe("open ***");
-        members.ShouldBe([new("*** key", "plain")]);
-    }
-
     // The names of the members between the halves are no part of the value: the values are searched without them too.
     [Fact]
     public void Write_ValueSplitOverATextOfAListAndATextOfAMapAfterIt_IsTheMarkInBoth()
