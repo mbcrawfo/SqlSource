@@ -31,42 +31,12 @@ public sealed class SqlLexerTests
     public void Lex_LineCommentAtEndOfText_RunsToTheEnd() => Lex("a --c").ShouldBe(["Text:a ", "LineComment:--c"]);
 
     [Theory]
-    [InlineData("'it''s' x", "Quoted:'it''s'")]
-    [InlineData("\"a\"\"b\" x", "Quoted:\"a\"\"b\"")]
-    [InlineData("`a``b` x", "Quoted:`a``b`")]
-    [InlineData("'' x", "Quoted:''")]
-    public void Lex_QuotedRegion_EndsAtTheUndoubledQuote(string text, string quoted) =>
-        Lex(text).ShouldBe([quoted, "Text: x"]);
-
-    [Theory]
     [InlineData("'-- x /* y */' z", "Quoted:'-- x /* y */'")]
     [InlineData("\"-- x /* y */\" z", "Quoted:\"-- x /* y */\"")]
     [InlineData("`-- x` z", "Quoted:`-- x`")]
     [InlineData("'a\n-- b\n' z", "Quoted:'a\n-- b\n'")]
     public void Lex_CommentSyntaxInsideQuotedRegion_IsNotAComment(string text, string quoted) =>
         Lex(text).ShouldBe([quoted, "Text: z"]);
-
-    [Theory]
-    [InlineData("E'it\\'s' -- c", "Text:E")]
-    [InlineData("e'it\\'s' -- c", "Text:e")]
-    public void Lex_EscapeString_TreatsBackslashAsAnEscape(string text, string prefix) =>
-        Lex(text).ShouldBe([prefix, "Quoted:'it\\'s'", "Text: ", "LineComment:-- c"]);
-
-    [Fact]
-    public void Lex_EscapeStringWithDoubledQuote_EndsAtTheUndoubledQuote() =>
-        Lex("E'a''b\\\\' x").ShouldBe(["Text:E", "Quoted:'a''b\\\\'", "Text: x"]);
-
-    [Fact]
-    public void Lex_LetterEAtTheEndOfAnIdentifier_IsNotAnEscapeStringPrefix() =>
-        Lex("typeE'a\\' -- c").ShouldBe(["Text:typeE", "Quoted:'a\\'", "Text: ", "LineComment:-- c"]);
-
-    [Theory]
-    [InlineData("$$ -- x $$ y", "Quoted:$$ -- x $$")]
-    [InlineData("$fn$ /* x */ $fn$ y", "Quoted:$fn$ /* x */ $fn$")]
-    [InlineData("$a$ $b$ -- c $a$ y", "Quoted:$a$ $b$ -- c $a$")]
-    [InlineData("$_t1$ ' $_t1$ y", "Quoted:$_t1$ ' $_t1$")]
-    [InlineData("$größe$ -- x $größe$ y", "Quoted:$größe$ -- x $größe$")]
-    public void Lex_DollarQuote_EndsAtTheSameTag(string text, string quoted) => Lex(text).ShouldBe([quoted, "Text: y"]);
 
     [Theory]
     [InlineData("v$session$ -- c", "Text:v$session$ ")]

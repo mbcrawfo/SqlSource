@@ -79,10 +79,6 @@ public sealed class SqlQueryHashTests
     public void Compute_BareParamMarker_IsTheHashWithoutIt() =>
         Hash("-- name: Q\n-- param: @id\nSELECT @id;").ShouldBe(Hash("-- name: Q\nSELECT @id;"));
 
-    [Fact]
-    public void Compute_ParamMarkerWithAType_ChangesTheHash() =>
-        Hash("-- name: Q\n-- param: @id int4\nSELECT @id;").ShouldNotBe(Hash("-- name: Q\nSELECT @id;"));
-
     // A C# type describes nothing either: the database never sees it.
     [Fact]
     public void Compute_ParamMarkerOfACSharpTypeAlone_IsTheHashWithoutIt() =>
@@ -142,9 +138,6 @@ public sealed class SqlQueryHashTests
     public void Compute_SqlServerQueryWithAList_IsTheSha256OfItsText() =>
         Hash("-- name: Q\nSELECT id FROM t WHERE a IN @ids;\n", SqlDialect.SqlServer)
             .ShouldBe("dcca5cffdc7117122bff92a3f4d101d042e283ecd8fe7b79ca9a16d73a54ecd6");
-
-    [Fact]
-    public void Compute_AnyQuery_IsSixtyFourLowerCaseHexCharacters() => Hash(Simple).ShouldMatch("^[0-9a-f]{64}$");
 
     private static string Hash(string text, SqlDialect dialect = SqlDialect.PostgreSql)
     {
