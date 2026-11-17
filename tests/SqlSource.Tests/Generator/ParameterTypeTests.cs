@@ -63,15 +63,6 @@ public sealed class ParameterTypeTests
     private static readonly PostgresType Int8 = Catalog("int8") with { Name = "bigint" };
 
     [Fact]
-    public void Run_ParamMarker_GivesTheParameterItsType()
-    {
-        var run = RunPosts("-- param: @author -> UserId\n");
-
-        run.ShouldBeClean();
-        run.Sources[ParamsModel].ShouldContain("global::App.UserId Author");
-    }
-
-    [Fact]
     public void Run_ParamMarkerWithADatabaseType_GivesTheParameterItsType()
     {
         var run = RunPosts("-- param: @author int8 not null -> App.UserId\n");

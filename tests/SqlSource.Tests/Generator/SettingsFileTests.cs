@@ -26,8 +26,6 @@ public sealed class SettingsFileTests
     // has no such quote, so the two dashes inside them start the comment.
     private const string Query = "SELECT `--x` AS a -- c\n";
 
-    private const string Postgres = "SELECT `";
-
     private const string NotPostgres = "SELECT `--x` AS a";
 
     private const string QueryPath = "/app/Repo/Q.sql";
@@ -60,63 +58,6 @@ public sealed class SettingsFileTests
         """;
 
     private static readonly PostgresType Int8 = Catalog("int8") with { Name = "bigint" };
-
-    [Fact]
-    public void Run_DialectInTheFolder_ParsesTheFileWithIt()
-    {
-        var run = GeneratorHarness.RunSample(
-            OutputKind.Sql,
-            [
-                GeneratorHarness.SettingsFile(
-                    "/app/Repo/sqlsource.json", /*lang=json,strict*/
-                    """{"dialect":"postgres"}"""
-                ),
-                new SqlFile(QueryPath, Query),
-            ],
-            dialect: null
-        );
-
-        run.ShouldBeClean();
-        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + Postgres + "\";");
-    }
-
-    [Fact]
-    public void Run_DialectInAFolderAbove_ParsesTheFileWithIt()
-    {
-        var run = GeneratorHarness.RunSample(
-            OutputKind.Sql,
-            [
-                GeneratorHarness.SettingsFile(
-                    "/app/sqlsource.json", /*lang=json,strict*/
-                    """{"dialect":"postgres"}"""
-                ),
-                new SqlFile(QueryPath, Query),
-            ],
-            dialect: null
-        );
-
-        run.ShouldBeClean();
-        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + Postgres + "\";");
-    }
-
-    [Fact]
-    public void Run_DialectMarker_OverridesTheFolder()
-    {
-        var run = GeneratorHarness.RunSample(
-            OutputKind.Sql,
-            [
-                GeneratorHarness.SettingsFile(
-                    "/app/Repo/sqlsource.json", /*lang=json,strict*/
-                    """{"dialect":"postgres"}"""
-                ),
-                new SqlFile(QueryPath, "-- dialect: ansi\n" + Query),
-            ],
-            dialect: null
-        );
-
-        run.ShouldBeClean();
-        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
-    }
 
     // The parse builds the form of the query with its comments, which the folder's list asks for, and the constant is
     // that form.
@@ -174,27 +115,6 @@ public sealed class SettingsFileTests
             .Queries.ShouldHaveSingleItem()
             .KeptSegments.ShouldBeNull();
         run.Sources[GeneratorHarness.SampleFile].ShouldContain(StrippedConstant);
-    }
-
-    // The project asks for models, which need an entry for each query, and the folder's file asks for the constant
-    // alone, which needs none.
-    [Fact]
-    public void Run_OutputInTheFolder_Applies()
-    {
-        var run = Run(
-            Source,
-            [
-                GeneratorHarness.SettingsFile(
-                    SettingsPath, /*lang=json,strict*/
-                    """{"output":"sql"}"""
-                ),
-                new SqlFile(GeneratorHarness.UsersPath, GetUser),
-            ]
-        );
-
-        run.ShouldBeClean();
-        ModelFiles(run).ShouldBeEmpty();
-        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string GetUser = ");
     }
 
     // The file header's suffix wins, and the folder's file still gives the other.

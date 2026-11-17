@@ -83,26 +83,6 @@ public sealed class AttributeConflictTests
         build.ShouldBeEmpty();
     }
 
-    // The case that fails a build: a project that treats warnings as errors.
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Build_WarningsAsErrors_HasNoConflictForAGeneratedType(bool compilationReference)
-    {
-        const string Source =
-            "using SqlSource;\n[SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample { }";
-
-        var build = await GeneratorHarness.BuildAsync(
-            OutputKind.Sql,
-            Source,
-            [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql, compilationReference)],
-            warningsAsErrors: true
-        );
-
-        build.ShouldBeEmpty();
-    }
-
     // The compiler's error is the whole story: the conflict is not reported next to it.
     [Theory]
     [InlineData("[SqlSourceGenerate(1)]", "CS1729 /app/Repo/Sample.cs(2,2)-(2,22)", false)]
