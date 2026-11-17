@@ -8,10 +8,12 @@ import pytest
 from corpus_reader import diagnostic_titles
 from sqlfluff.core import FluffConfig, Linter
 from sqlfluff.core.linter import LintedFile
+from test_stand_ins import KEPT
 
 from sqlfluff_templater_sqlsource import templater as templater_module
 from sqlfluff_templater_sqlsource.dialects import Dialect, DialectChoice
 from sqlfluff_templater_sqlsource.plan import SpanKind, build_plan
+from sqlfluff_templater_sqlsource.stand_ins import LITERAL, stand_in
 from sqlfluff_templater_sqlsource.templater import SqlSourceTemplater
 
 # The rules of `sqlfluff format`, as its command sets them.
@@ -59,6 +61,11 @@ def lint(
         configs["core"] = {"max_line_length": max_line_length}
     linter = Linter(config=FluffConfig(configs=configs, overrides=overrides))
     return linter.lint_string(text, fname=str(folder / "Query.sql"), fix=fix)
+
+
+def lint_raw(text: str, sqlfluff_dialect: str) -> LintedFile:
+    linter = Linter(config=FluffConfig(overrides={"dialect": sqlfluff_dialect, "templater": "raw", "rules": "all"}))
+    return linter.lint_string(text)
 
 
 def fixed(text: str, sqlfluff_dialect: str, folder: Path, **options) -> str:
@@ -319,15 +326,66 @@ def test_stand_in_sets_off_no_rule(sqlfluff_dialect, sqlsource, tmp_path):
     assert not [code for code in codes(found) if code in ("PRS", "TMP", "LXR")]
 
 
+@pytest.mark.parametrize(("sqlfluff_dialect", "name"), [(dialect, name) for dialect in KEPT for name in KEPT[dialect]])
+def test_stand_in_of_a_kept_name_sets_off_no_rule(sqlfluff_dialect, name):
+    # The stand-in is linted as sqlfluff's raw templater hands it on, since SqlSource reads no `$` in a name but in
+    # mssql, nor a name after a colon.
+    limit = LIMITS.get(sqlfluff_dialect, "ORDER BY a LIMIT {value}")
+    value = stand_in(name, sqlfluff_dialect)
+    assert value != LITERAL
+    query = STAND_IN_QUERY.replace("-- dialect: {sqlsource}\n", "")
+    with_stand_in = query.format(
+        select=value, equal=value, like=value, list=f"({value})", limit=limit.format(value=value)
+    )
+    with_literals = query.format(select="1", equal="1", like="'x'", list="(1)", limit=limit.format(value="10"))
+
+    found = lint_raw(with_stand_in, sqlfluff_dialect)
+    expected = lint_raw(with_literals, sqlfluff_dialect)
+
+    found_codes = Counter((violation.rule_code(), violation.line_no) for violation in found.get_violations())
+    expected_codes = Counter((violation.rule_code(), violation.line_no) for violation in expected.get_violations())
+    assert found_codes - expected_codes == Counter()
+    assert not [code for code in codes(found) if code in ("PRS", "TMP", "LXR")]
+
+
+@pytest.mark.parametrize("name", ["_x", "x$y", "x#y", "tötal", "名前"])
 @pytest.mark.parametrize(
-    ("sqlfluff_dialect", "sqlsource"),
-    [("postgres", "postgres"), ("mysql", "mysql"), ("oracle", "oracle"), ("tsql", "mssql")],
+    "body",
+    [
+        "DECLARE @{name} INT;\nSET @{name} = 1;\nSELECT @{name};\n",
+        "DECLARE @{name} TABLE (a INT);\nSELECT a FROM @{name};\n",
+    ],
 )
-def test_parameter_with_a_name_the_dialect_cannot_lex_parses(sqlfluff_dialect, sqlsource, tmp_path):
-    text = f"-- dialect: {sqlsource}\n-- name: Q\nSELECT a FROM t WHERE a = @名前 AND b = @_x;\n"
+def test_tsql_variable_keeps_its_name(name, body, tmp_path):
+    # A literal cannot stand where T-SQL declares, sets or reads a table from a variable.
+    text = "-- dialect: mssql\n-- name: Q\n" + body.format(name=name)
+
+    linted = lint(text, "tsql", tmp_path, fix=False)
+
+    assert linted.templated_file.templated_str == text
+    assert [code for code in codes(linted) if code in ("PRS", "TMP", "LXR")] == []
+
+
+@pytest.mark.parametrize(
+    ("sqlfluff_dialect", "sqlsource", "name"),
+    [
+        ("postgres", "postgres", "名前"),
+        ("postgres", "postgres", "1st"),
+        ("duckdb", "postgres", "名前"),
+        ("mysql", "mysql", "名前"),
+        ("sqlite", "sqlite", "名前"),
+        ("oracle", "oracle", "名前"),
+        ("oracle", "oracle", "_x"),
+        ("tsql", "mssql", "x٣"),
+        ("tsql", "mssql", "xⅫ"),
+    ],
+)
+def test_parameter_with_a_name_the_dialect_cannot_lex_parses(sqlfluff_dialect, sqlsource, name, tmp_path):
+    text = f"-- dialect: {sqlsource}\n-- name: Q\nSELECT a FROM t WHERE a = @{name} AND b IN @{name};\n"
 
     linted = lint(text, sqlfluff_dialect, tmp_path, fix=False)
 
+    assert "WHERE a = 0 AND b IN (0);" in linted.templated_file.templated_str
     assert [code for code in codes(linted) if code in ("PRS", "TMP", "LXR")] == []
 
 
