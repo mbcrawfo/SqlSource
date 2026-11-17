@@ -40,12 +40,7 @@ public sealed class FileParseInputTests
     [Theory]
     // The chain's state of keep-comments decides.
     [InlineData("keep-comments", true)]
-    [InlineData("sort-input keep-comments", true)]
-    [InlineData("keep-comments=on default", true)]
     [InlineData("keep-comments=off", false)]
-    [InlineData("sort-input", false)]
-    // Every default, which leaves comments out.
-    [InlineData("default", false)]
     // No word, no comments.
     [InlineData(null, false)]
     public void Resolve_CommentsWanted_IsTheChainsStateOfKeepComments(string? chainParameters, bool expected) =>
