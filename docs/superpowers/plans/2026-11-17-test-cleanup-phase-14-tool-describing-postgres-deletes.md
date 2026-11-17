@@ -25,10 +25,10 @@ None: the change removes tests and adds no behaviour.  Checked against the spec 
 
 ### Task 0: The guard's "before" half
 
-- [ ] The `tool-describing-postgres` mutation run into `artifacts/test-cleanup/phase-14/tool-describing-postgres/before`.
-- [ ] `kills` on the before report for each of the sixteen tests.
-- [ ] Coverage of `tests/SqlSource.Tool.Tests` into `artifacts/test-cleanup/phase-14/coverage-before/SqlSource.Tool.Tests`, with the line figures of each file of `src/SqlSource.Tool/Describing/Postgres/**/*.cs`.
-- [ ] Run time of `dotnet test --project tests/SqlSource.Tool.Tests`, with the load beside it.
+- [x] The `tool-describing-postgres` mutation run into `artifacts/test-cleanup/phase-14/tool-describing-postgres/before`.
+- [x] `kills` on the before report for each of the sixteen tests.
+- [x] Coverage of `tests/SqlSource.Tool.Tests` into `artifacts/test-cleanup/phase-14/coverage-before/SqlSource.Tool.Tests`, with the line figures of each file of `src/SqlSource.Tool/Describing/Postgres/**/*.cs`.
+- [x] Run time of `dotnet test --project tests/SqlSource.Tool.Tests`, with the load beside it.
 
 ### Task 1: Delete the tests
 
@@ -42,14 +42,14 @@ None: the change removes tests and adds no behaviour.  Checked against the spec 
 - Modify: `tests/SqlSource.Tool.Tests/Describing/Postgres/Walk/Expressions/CatalogOverloadsTests.cs` (remove `Overloads_Count_IsEveryOverloadOfTheNames`)
 - Modify: `docs/superpowers/specs/2026-11-13-test-cleanup-epic-design.md` (row 14's state)
 
-- [ ] **Step 1:** Remove each test with its attribute and the comment that is its own; a `using` left unused goes too.
-- [ ] **Step 2:** Set row 14 of the epic's table to `done`.
-- [ ] **Step 3:** `./format.sh`, then `dotnet test --project tests/SqlSource.Tool.Tests`: every test passes, sixteen fewer than before.
-- [ ] **Step 4:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 1:** Remove each test with its attribute and the comment that is its own; a `using` left unused goes too.
+- [x] **Step 2:** Set row 14 of the epic's table to `done`.
+- [x] **Step 3:** `./format.sh`, then `dotnet test --project tests/SqlSource.Tool.Tests`: every test passes, sixteen fewer than before.
+- [x] **Step 4:** `./pre-commit-validation.sh`, then commit.
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows no removed test made.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-14/coverage-after/SqlSource.Tool.Tests`: no file of `src/SqlSource.Tool/Describing/Postgres/**/*.cs` falls.
-- [ ] **Step 3:** Run time of the test project after, on the same machine.
-- [ ] **Step 4:** The pull request lists each removed test beside its covers, the compare result, the coverage figures and the run times.
+- [x] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows no removed test made.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-14/coverage-after/SqlSource.Tool.Tests`: no file of `src/SqlSource.Tool/Describing/Postgres/**/*.cs` falls.
+- [x] **Step 3:** Run time of the test project after, on the same machine.
+- [x] **Step 4:** The pull request lists each removed test beside its covers, the compare result, the coverage figures and the run times.
