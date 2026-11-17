@@ -65,7 +65,7 @@ public sealed class ManifestTargetTests : IDisposable
                 "Compile=" + Path.Combine(folder, "UserRepository.cs"),
             ]);
         lines[4].ShouldStartWith("DefineConstants=");
-        // Its value is the machine's: WriteManifest_ProjectWithOneFramework_HoldsTheBuildsFolders reads it.
+        // Its value is the machine's: WriteManifest_BuildFoldersOfAnOddPath_DecodeToTheRealFolders reads it.
         lines[5].ShouldStartWith(BuildFoldersLine);
         lines.Count(line => line.StartsWith(BuildFoldersLine, StringComparison.Ordinal)).ShouldBe(1);
         // The project's settings are in its sqlsource.json and its file's header, and no line holds a setting.
@@ -253,20 +253,6 @@ public sealed class ManifestTargetTests : IDisposable
         lines.ShouldContain("Compile=" + Path.Combine(folder, "a;b=c%41 'é.cs"));
     }
 
-    // The tool reads the folders of the build from the manifest as the generator reads them from the compiler's
-    // options: the line holds the obj and bin folders of the project.
-    [Fact]
-    public async Task WriteManifest_ProjectWithOneFramework_HoldsTheBuildsFolders()
-    {
-        var project = _fixtures.Copy("Single");
-        var folder = Path.GetDirectoryName(project)!;
-
-        var folders = await BuildFoldersOfAsync(project);
-
-        folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar));
-        folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "bin") + Path.DirectorySeparatorChar));
-    }
-
     // A package that ships C# files as content adds Compile items under the folder NuGet restored it to, and their
     // chain would climb past the project's root file, so the line holds the NuGet package folders too: the global
     // packages folder, NuGetPackageRoot, once, though NuGetPackageFolders names it as well, and each fallback folder
@@ -313,10 +299,11 @@ public sealed class ManifestTargetTests : IDisposable
         folders.ShouldAllBe(path => SqlPath.IsInFolder(path, folder));
     }
 
-    // The folder of the project holds a semicolon, "%41" that MSBuild would read as "A", an equals sign, a quote and
-    // an accented letter.  The target escapes the folder's %, |, # and ;, and the manifest line then writes the
-    // property through Escape, which WriteLinesToFile undoes, so the line holds the target's escapes and BuildFolders
-    // decodes them.
+    // The tool reads the folders of the build from the manifest as the generator reads them from the compiler's
+    // options: the line holds the obj and bin folders of the project.  The folder of the project holds a semicolon,
+    // "%41" that MSBuild would read as "A", an equals sign, a quote and an accented letter.  The target escapes the
+    // folder's %, |, # and ;, and the manifest line then writes the property through Escape, which WriteLinesToFile
+    // undoes, so the line holds the target's escapes and BuildFolders decodes them.
     [Fact]
     public async Task WriteManifest_BuildFoldersOfAnOddPath_DecodeToTheRealFolders()
     {

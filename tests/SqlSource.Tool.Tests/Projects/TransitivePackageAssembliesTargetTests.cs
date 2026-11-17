@@ -17,21 +17,14 @@ public sealed class TransitivePackageAssembliesTargetTests : IDisposable
 
     // Only the assemblies of Brought.Client, the one package the project does not list: not those of the packages it
     // lists, nor the framework's, nor a project's, nor one of no package.  Each is named once, by its file's name.
+    // NuGet reads a package's id ignoring case, so mixed.case.package is the package Mixed.Case.Package, and its
+    // assembly Mixed is not in the value.
     [Fact]
     public async Task Run_ReferencesOfAPackageNotListed_AreTheValue()
     {
         var value = await ValueOfAsync(_fixtures.Copy("PackageAssemblies"));
 
         value.Split('|').ShouldBe(["Brought.Client", "Brought.Client.Extra"]);
-    }
-
-    // NuGet reads a package's id ignoring case, so mixed.case.package is the package Mixed.Case.Package.
-    [Fact]
-    public async Task Run_PackageListedInAnotherCase_IsNotInTheValue()
-    {
-        var value = await ValueOfAsync(_fixtures.Copy("PackageAssemblies"));
-
-        value.Split('|').ShouldNotContain("Mixed");
     }
 
     // Run by name, nothing resolves the references of Single, so the value is empty, and no name is said to come from
