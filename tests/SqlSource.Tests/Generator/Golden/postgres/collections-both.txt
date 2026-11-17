@@ -2106,8 +2106,11 @@ namespace SqlSource
     /// Marks the member, or the primary-constructor parameter, that gives a repository its connection: a
     /// connection string, a <c>DbDataSource</c>, a <c>DbConnection</c> that the repository borrows, or a method
     /// that returns a new <c>DbConnection</c>, or a task of one, and takes nothing or a
-    /// <c>CancellationToken</c>.  It is not conditional, unlike <see cref="SqlSourceGenerateAttribute" />: a
-    /// repository finds a marked member of a base class in a referenced assembly in its metadata.
+    /// <c>CancellationToken</c>.  The member can be the repository's own, an instance member of a factory
+    /// that the repository holds in a field, property or primary-constructor parameter, or a static member of
+    /// any type of the project.  The repository's own member wins over a factory's, and a factory's over a
+    /// static member.  It is not conditional, unlike <see cref="SqlSourceGenerateAttribute" />: a repository
+    /// finds a marked member of a base class or of a factory in a referenced assembly in its metadata.
     /// </summary>
     [global::Microsoft.CodeAnalysis.Embedded]
     [global::System.AttributeUsage(
@@ -2121,8 +2124,9 @@ namespace SqlSource
     internal sealed class SqlSourceConnectionAttribute : global::System.Attribute
     {
         /// <summary>
-        /// The database whose queries use the connection, as the <c>database</c> setting names it.  Needed
-        /// only when the repository's queries use more than one database.
+        /// The database whose queries use the connection, as the <c>database</c> setting names it.  On a
+        /// repository's own member, needed only when the repository's queries use more than one database.  A
+        /// factory's member or a static member without it serves each database that no other mark names.
         /// </summary>
         public string Database { get; set; }
     }

@@ -40,7 +40,7 @@ var users = new UserRepository(dataSource);
 GetUserDto? user = await users.GetUser(new GetUserParams(42));
 ```
 
-A repository is a type marked `[SqlSourceGenerate]` whose queries have the [output](settings.md#setting-output) `repository`, the default output.  Each of these queries gets a repository method: an instance method of the type that claims the query.  A repository method gets its own connection from a member of the type, its [connection source](repository-connections.md#repository-connection), such as a connection string or a data source.  So the code that calls the method passes no connection, and needs none.
+A repository is a type marked `[SqlSourceGenerate]` whose queries have the [output](settings.md#setting-output) `repository`, the default output.  Each of these queries gets a repository method: an instance method of the type that claims the query.  A repository method gets its own connection from a member of the type, its [connection source](repository-connections.md#repository-connection), such as a connection string or a data source.  The source can also be a member of a [factory that the type holds](repository-connections.md#held-factory), or a [static member of the project](repository-connections.md#static-connection).  So the code that calls the method passes no connection, and needs none.
 
 In the sample, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method `GetUser` gets a new connection from the data source `dataSource`.  It sends each parameter, runs the query, and reads the row into the output model.  It disposes the connection before it returns or throws.
 
@@ -78,10 +78,10 @@ A repository method has the name of the query.  Under the [generator parameter](
   - a member of the type, the type itself, or one of its type parameters;
   - a constant or token method that another query puts on the type;
   - a nested class of the queries of the type;
-  - the member of a base type, or the primary-constructor parameter, that gives the method its connection;
+  - the member of a base type, or the primary-constructor parameter, that gives the method its connection or holds the factory it comes from;
   - for a public method, the name of the interface of the type.
 - **A [synchronous method](generator-parameters.md#setting-generator-parameters) that takes no argument cannot be named `Finalize`** ([SQLSRC274](../diagnostics.md#sqlsrc274)).  The compiler would take it for the finalizer of the type.
-- **A token cannot be named `parameters` or `cancellationToken`, or as any other argument that a query method can have** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A token also cannot have the name of the primary-constructor parameter that gives the connection.  Nor can it have the name of the repository, when the repository is not generic and a `static` member gives the connection.
+- **A token cannot be named `parameters` or `cancellationToken`, or as any other argument that a query method can have** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A token also cannot have the name of the primary-constructor parameter that gives the connection, or that holds the factory it comes from.  Nor can it have the name of the repository, when the repository is not generic and a `static` member of it gives the connection or holds the factory.
 - **The repository methods of a type are in the file of its methods**, `App.UserRepository-Methods.g.cs`, with its other query methods and its interface.
 
 [Where a repository gets its connection](repository-connections.md) is a page of its own.

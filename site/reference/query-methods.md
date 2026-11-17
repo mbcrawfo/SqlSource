@@ -55,7 +55,7 @@ A type that claims the file of a query gives the query its methods when all of t
   - If the method goes in the extension class, that class can be written ([SQLSRC276](../diagnostics.md#sqlsrc276)).
 - **For a repository query, the type has the connection of the query.**  All of these are true:
   - The type is not static ([SQLSRC034](../diagnostics.md#sqlsrc034)).
-  - One member of the type, or a pair of members, gives the connection of the database of the query, as [the connection](repository-connections.md#repository-connection) says ([SQLSRC028](../diagnostics.md#sqlsrc028) to [SQLSRC033](../diagnostics.md#sqlsrc033), [SQLSRC036](../diagnostics.md#sqlsrc036)).
+  - One member, or a pair of members, gives the connection of the database of the query: a member of the type, of a factory that it holds, or a static member of the project, as [where the build looks](repository-connections.md#connection-order) says ([SQLSRC028](../diagnostics.md#sqlsrc028) to [SQLSRC033](../diagnostics.md#sqlsrc033), [SQLSRC036](../diagnostics.md#sqlsrc036)).
   - For a synchronous method, one member that gives the connection returns no task ([SQLSRC299](../diagnostics.md#sqlsrc299)).
 - **The [converters](converters.md#converters) of the query serve it.**  This is for a column or parameter whose type has converters, and whose type a type override, a column type or a `-- param:` marker chose.  It has a converter that it can use, and all of these are true:
   - The converter is of the direction that the column or parameter needs ([SQLSRC280](../diagnostics.md#sqlsrc280)).

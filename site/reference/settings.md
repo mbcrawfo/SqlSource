@@ -240,7 +240,7 @@ SELECT id, kind FROM events;
 A logical database is a name for one particular database that your queries run against, such as `billing`.  The `database` setting names the logical database that a query belongs to.  In the sample, `ListEvents` belongs to `events`, and every other query of the file to `billing`.  The setting has two uses:
 
 - **The tool reads it to choose the connection that it describes a query through.**  The tool asks that database about the query, through a connection that you give the tool by that name: see [connections](connections.md#connections).  The [sidecar](sidecars.md#sidecar-files) of the file records the name.
-- **The build reads it to choose the connection source of a [repository method](repository-connections.md#repository-connection).**  A [repository](repositories.md#repository-methods) that uses several logical databases marks a connection source for each.
+- **The build reads it to choose the connection source of a [repository method](repository-connections.md#repository-connection).**  A [repository](repositories.md#repository-methods) that uses several logical databases needs a connection source for each: a member it marks, or a [shared mark](repository-connections.md#shared-marks) of a factory or of the project.
 
 The dialect and the logical database answer different questions.  The dialect is *which kind of SQL* a file is written in; the logical database is *which database* the tool asks about it.  Several logical databases can share a dialect: `billing` and `reports` can both be `postgres`.
 
