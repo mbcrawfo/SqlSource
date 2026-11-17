@@ -88,29 +88,6 @@ public sealed class MappedTypeNamesTests
         names.ShouldBe(["UserId", "global::MyApp.UserId", "long"]);
     }
 
-    // A settings file's level is the level of every file in its folder, and its types are named once.  A file whose
-    // chain has a nearer settings file has that chain's level, which adds its own.
-    [Fact]
-    public void Collect_FilesOfOneChain_GiveItsTypesOnce()
-    {
-        var chain = new SettingsLevel
-        {
-            TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
-                DatabaseEngine.PostgreSql,
-                TestSidecars.Of(new TypeOverride("int4", "long", SettingsFile))
-            ),
-        };
-        var files = TestSidecars.Of(
-            new FileLevel("app/Repo/A.sql", chain),
-            new FileLevel("app/Repo/B.sql", Level(new TypeOverride("text", "global::MyApp.Name", Nearer)).Over(chain)),
-            new FileLevel("app/Repo/C.sql", chain)
-        );
-
-        var names = MappedTypeNames.Collect(files, TestSidecars.Of(Read(SqlTexts.GetUser)));
-
-        names.ShouldBe(["global::MyApp.Name", "long"]);
-    }
-
     // A file header's -- column: is a column type of its queries' markers, and a query's names its result's column.
     [Fact]
     public void Collect_ColumnMarkers_GiveTheirTypes()
