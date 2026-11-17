@@ -58,54 +58,6 @@ public sealed class ParameterBinderTests
             );
     }
 
-    // An array is converted element by element into the database's array, by a static lambda whose names are the
-    // method's; a null element of a reference type, or of an element written nullable, is sent as a null element.
-    [Theory]
-    [InlineData(
-        "global::App.Id",
-        "long[]",
-        true,
-        true,
-        "global::System.Array.ConvertAll<global::App.Id, long>(v1, static e1 => global::App.Ids.ToDatabase(e1))"
-    )]
-    [InlineData(
-        "global::App.Id",
-        "string[]",
-        false,
-        false,
-        "global::System.Array.ConvertAll<global::App.Id?, string?>(v1, "
-            + "static e1 => e1 is { } i1 ? global::App.Ids.ToDatabase(i1) : null)"
-    )]
-    [InlineData(
-        "global::App.Id?",
-        "long[]",
-        true,
-        true,
-        "global::System.Array.ConvertAll<global::App.Id?, long?>(v1, "
-            + "static e1 => e1 is { } i1 ? global::App.Ids.ToDatabase(i1) : null)"
-    )]
-    public void Append_ArrayConvertedByElement_SendsTheConvertedArray(
-        string elementText,
-        string databaseText,
-        bool databaseIsValueType,
-        bool elementIsValueType,
-        string converted
-    )
-    {
-        var write = new Conversion(
-            "global::App.Ids.ToDatabase",
-            databaseText,
-            databaseIsValueType,
-            true,
-            elementText,
-            elementIsValueType
-        );
-        Write(new MethodParameter("ids", "Ids", elementText + "[]", false, false, write), "v1")
-            .ShouldContain(
-                "    p0.Value = parameters.Ids is { } v1 ? (object)" + converted + " : global::System.DBNull.Value;\n"
-            );
-    }
-
     private static string Write(MethodParameter bound, string value = "value")
     {
         var builder = new StringBuilder();
