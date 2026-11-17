@@ -17,6 +17,20 @@ namespace SqlSource.Tests.Generator;
 // warning wave, so a method compiles with no error and no warning in what is generated.
 public sealed class MethodCompileTests
 {
+    // The usings of a source whose members of each kind MembersOf gives, and the namespace it opens.
+    private const string SourcesUsings = """
+        using System.Data.Common;
+        using System.Threading;
+        using System.Threading.Tasks;
+        using Microsoft.Data.SqlClient;
+        using Npgsql;
+        using SqlSource;
+
+        namespace App
+        {
+
+        """;
+
     private static readonly SqlFile Postgres = new(
         GeneratorHarness.UsersPath,
         """
@@ -567,6 +581,534 @@ public sealed class MethodCompileTests
         methods.ShouldContain(contract);
         methods.ShouldContain(" FindUser(\n");
         methods.ShouldContain(" StreamDocuments(\n");
+    }
+
+    // A repository that holds a factory of each kind of connection source, for each engine, through a parameter and
+    // through a field, reached through the holder, which each method checks for null first.
+    [Theory]
+    [InlineData("connection string", "parameter")]
+    [InlineData("connection string", "field")]
+    [InlineData("data source", "parameter")]
+    [InlineData("data source", "field")]
+    [InlineData("factory", "parameter")]
+    [InlineData("factory", "field")]
+    [InlineData("borrowed", "parameter")]
+    [InlineData("borrowed", "field")]
+    public void Run_HeldFactoryOfEachKind_Compiles(string kind, string holder)
+    {
+        var repository =
+            holder == "parameter"
+                ? "    public partial class Repo(Factory factory);\n"
+                : "    public partial class Repo\n    {\n        private readonly Factory _factory = new();\n    }\n";
+        var source =
+            SourcesUsings
+            + "    public class Factory\n    {\n"
+            + MembersOf(kind, string.Empty)
+            + "    }\n\n    [SqlSourceGenerate(Source = \".\")]\n"
+            + repository
+            + "}\n";
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources["App.Repo-Methods.g.cs"];
+        methods.ShouldContain(holder == "parameter" ? "(factory ?? throw " : "(this._factory ?? throw ");
+        methods.ShouldContain("\"The connection source '" + (holder == "parameter" ? "factory" : "_factory"));
+    }
+
+    // A holder that can be null, of an interface and of a struct, whose value a method reads after its check, in a
+    // project whose code has nullable annotations on.
+    [Fact]
+    public void Run_NullableHolder_CompilesWithoutWarnings()
+    {
+        const string Source = """
+            #nullable enable
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Microsoft.Data.SqlClient;
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    Task<NpgsqlConnection> Open(CancellationToken cancellationToken);
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    string SqlServer { get; }
+                }
+
+                public struct StructFactory
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    public readonly NpgsqlConnection Open() => new();
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    public readonly ValueTask<SqlConnection?> OpenAsync(CancellationToken cancellationToken) =>
+                        new(new SqlConnection());
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Interfaces(IDatabaseFactory? dbf);
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Structs(StructFactory? dbf);
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial struct StructsInAStruct(StructFactory? dbf);
+            }
+            """;
+
+        var run = RunRepositories(Source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Interfaces-Methods.g.cs"].ShouldContain("(dbf ?? throw ");
+        run.Sources["App.Structs-Methods.g.cs"].ShouldContain("(dbf ?? throw ");
+        run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("var source = dbf ?? throw ");
+    }
+
+    // A holder of a struct, or of a type parameter constrained to one, can never be null, so a method reads its member
+    // with no check, which ?? could not apply to: in a class, and copied before a struct's iterator.
+    [Fact]
+    public void Run_HolderThatCannotBeNull_CompilesWithoutWarnings()
+    {
+        var source =
+            SourcesUsings
+            + """
+                    public interface IFactory
+                    {
+                        [SqlSourceConnection(Database = "postgres")]
+                        NpgsqlConnection Postgres();
+
+                        [SqlSourceConnection(Database = "mssql")]
+                        ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken);
+                    }
+
+                    public struct Factory : IFactory
+                    {
+
+                """
+            + MembersOf("factory", "readonly ")
+            + """
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Structs(Factory dbf);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Constrained<T>(T dbf)
+                        where T : struct, IFactory;
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct StructsInAStruct(Factory dbf);
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Structs-Methods.g.cs"].ShouldContain("= dbf.Postgres() ?? throw ");
+        run.Sources["App.Constrained-1-Methods.g.cs"].ShouldContain("= dbf.Postgres() ?? throw ");
+        run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("var source = dbf;\n");
+        run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("= source.Postgres() ?? throw ");
+    }
+
+    // A holder of a type parameter that may be a class or a struct, which ?? can test, and a property holder, each
+    // checked for null first, in a class and copied before a struct's iterator.
+    [Fact]
+    public void Run_TypeParameterAndPropertyHolders_Compile()
+    {
+        var source =
+            SourcesUsings
+            + """
+                    public interface IFactory
+                    {
+                        [SqlSourceConnection(Database = "postgres")]
+                        NpgsqlConnection Postgres();
+
+                        [SqlSourceConnection(Database = "mssql")]
+                        ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken);
+                    }
+
+                    public class Factory : IFactory
+                    {
+                        public NpgsqlConnection Postgres() => new();
+
+                        public ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken) =>
+                            new(new SqlConnection());
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Generic<T>(T dbf)
+                        where T : IFactory;
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct GenericStruct<T>(T dbf)
+                        where T : IFactory;
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Properties
+                    {
+                        private Factory? Holder { get; } = new();
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct PropertiesInAStruct
+                    {
+                        public PropertiesInAStruct() { }
+
+                        private Factory Holder { get; } = new();
+                    }
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Generic-1-Methods.g.cs"].ShouldContain("= (dbf ?? throw ");
+        run.Sources["App.GenericStruct-1-Methods.g.cs"].ShouldContain("var source = dbf ?? throw ");
+        run.Sources["App.Properties-Methods.g.cs"].ShouldContain("= (this.Holder ?? throw ");
+        run.Sources["App.PropertiesInAStruct-Methods.g.cs"].ShouldContain("var source = this.Holder ?? throw ");
+    }
+
+    // A factory of each kind of connection source, for each engine, that implements the marked members of its
+    // interface explicitly, in a class and in a struct, reached through a cast of the holder to the interface:
+    // through a parameter, a field, a property, a static field, a Nullable<T> of the struct, the struct, which cannot
+    // be null, a type parameter constrained to the class, and in a struct repository, whose streaming methods cast a
+    // copy of the holder, of the class and of the struct, in a project whose code has nullable annotations on.
+    [Theory]
+    [InlineData("connection string")]
+    [InlineData("data source")]
+    [InlineData("factory")]
+    [InlineData("borrowed")]
+    public void Run_HeldExplicitImplementationOfEachKind_Compiles(string kind)
+    {
+        var (members, implementations) = ExplicitMembersOf(kind);
+        var source =
+            "#nullable enable\n"
+            + SourcesUsings
+            + "    public interface IFactory\n    {\n"
+            + members
+            + "    }\n\n    public class Factory : IFactory\n    {\n"
+            + implementations
+            + "    }\n\n    public struct StructFactory : IFactory\n    {\n"
+            + implementations.Replace("        ", "        readonly ", StringComparison.Ordinal)
+            + """
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Parameters(Factory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Fields
+                    {
+                        private readonly Factory? _factory = new();
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Properties
+                    {
+                        private Factory Holder { get; } = new();
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Statics
+                    {
+                        private static readonly Factory Shared = new();
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class NullableStructs(StructFactory? factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Structs(StructFactory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Constrained<T>(T factory)
+                        where T : Factory;
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct InAStruct(Factory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct StructsInAStruct(StructFactory factory);
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
+        run.Sources["App.Fields-Methods.g.cs"].ShouldContain("((global::App.IFactory)(this._factory ?? throw ");
+        run.Sources["App.Properties-Methods.g.cs"].ShouldContain("((global::App.IFactory)(this.Holder ?? throw ");
+        run.Sources["App.Statics-Methods.g.cs"].ShouldContain("((global::App.IFactory)(Statics.Shared ?? throw ");
+        run.Sources["App.NullableStructs-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
+        run.Sources["App.Structs-Methods.g.cs"].ShouldContain("((global::App.IFactory)factory).");
+        run.Sources["App.Constrained-1-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
+        run.Sources["App.InAStruct-Methods.g.cs"].ShouldContain("var source = factory ?? throw ");
+        run.Sources["App.InAStruct-Methods.g.cs"].ShouldContain("((global::App.IFactory)source).");
+        run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("var source = factory;\n");
+        run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("((global::App.IFactory)source).");
+    }
+
+    // A factory that implements one generic interface twice, explicitly, once for each engine's connection, and once
+    // with a nullable annotation, gives each engine its own member, reached through the interface closed as the class
+    // implements it.
+    [Fact]
+    public void Run_HeldExplicitImplementationOfAGenericInterface_Compiles()
+    {
+        var source =
+            "#nullable enable\n"
+            + SourcesUsings
+            + """
+                    public interface IFactory<TConnection>
+                    {
+                        [SqlSourceConnection]
+                        TConnection Open();
+                    }
+
+                    public class Factory : IFactory<NpgsqlConnection>, IFactory<SqlConnection?>
+                    {
+                        NpgsqlConnection IFactory<NpgsqlConnection>.Open() => new();
+
+                        SqlConnection? IFactory<SqlConnection?>.Open() => new();
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Repo(Factory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct StructRepo(Factory factory);
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources["App.Repo-Methods.g.cs"];
+        methods.ShouldContain("((global::App.IFactory<global::Npgsql.NpgsqlConnection>)(factory ?? throw ");
+        methods.ShouldContain("((global::App.IFactory<global::Microsoft.Data.SqlClient.SqlConnection?>)(factory ?? ");
+        run.Sources["App.StructRepo-Methods.g.cs"]
+            .ShouldContain("((global::App.IFactory<global::Npgsql.NpgsqlConnection>)source).Open()");
+    }
+
+    // A factory whose base class implements the marked members of its interface, each of which the factory hides with
+    // a new member, a method of its signature and a property of its name, gives each engine the base class's member
+    // through a cast of the holder to the interface: through a parameter, a type parameter that the class and the
+    // interface constrain, and in a struct repository, whose streaming methods cast a copy of the holder.
+    [Fact]
+    public void Run_HeldImplementationThatANewMemberHides_Compiles()
+    {
+        var source =
+            "#nullable enable\n"
+            + SourcesUsings
+            + """
+                    public interface IFactory
+                    {
+                        [SqlSourceConnection(Database = "postgres")]
+                        NpgsqlConnection Postgres();
+
+                        [SqlSourceConnection(Database = "mssql")]
+                        ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken);
+                    }
+
+                    public class FactoryBase : IFactory
+                    {
+                        public NpgsqlConnection Postgres() => new();
+
+                        public ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken) =>
+                            new(new SqlConnection());
+                    }
+
+                    public class Factory : FactoryBase
+                    {
+                        public new NpgsqlConnection Postgres() => new();
+
+                        public new string SqlServer => "";
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Parameters(Factory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Constrained<T>(T factory)
+                        where T : Factory, IFactory;
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct InAStruct(Factory factory);
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        var parameters = run.Sources["App.Parameters-Methods.g.cs"];
+        parameters.ShouldContain("((global::App.IFactory)(factory ?? throw ");
+        parameters.ShouldContain(")).Postgres()");
+        parameters.ShouldContain(")).SqlServer(cancellationToken)");
+        run.Sources["App.Constrained-1-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
+        run.Sources["App.InAStruct-Methods.g.cs"].ShouldContain("((global::App.IFactory)source).");
+    }
+
+    // A static of the project of each kind of connection source, for each engine, reached through its type in full.
+    [Theory]
+    [InlineData("connection string")]
+    [InlineData("data source")]
+    [InlineData("factory")]
+    [InlineData("borrowed")]
+    public void Run_GlobalOfEachKind_Compiles(string kind)
+    {
+        var source =
+            SourcesUsings
+            + "    public static class Connections\n    {\n"
+            + MembersOf(kind, "static ")
+            + "    }\n\n    [SqlSourceGenerate(Source = \".\")]\n    public partial class Repo;\n\n"
+            + "    [SqlSourceGenerate(Source = \".\")]\n    public partial struct StructRepo;\n}\n";
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Repo-Methods.g.cs"].ShouldContain("global::App.Connections.Postgres");
+        run.Sources["App.StructRepo-Methods.g.cs"].ShouldContain("global::App.Connections.SqlServer");
+    }
+
+    // A struct repository whose streaming methods reach a held member through a copy of the holder, checked before
+    // their iterator, which cannot reach this or a primary-constructor parameter of a struct: a parameter, a field and
+    // a static field.
+    [Fact]
+    public void Run_StructRepositoryStreamingThroughHolder_Compiles()
+    {
+        var source =
+            SourcesUsings
+            + "    public class Factory\n    {\n"
+            + MembersOf("factory", string.Empty)
+            + """
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct Parameters(Factory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct Fields
+                    {
+                        private readonly Factory? _factory;
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial record struct Statics
+                    {
+                        private static readonly Factory Shared = new();
+                    }
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("var source = factory ?? throw ");
+        run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("= source.Postgres() ?? throw ");
+        run.Sources["App.Fields-Methods.g.cs"].ShouldContain("var source = this._factory ?? throw ");
+        run.Sources["App.Statics-Methods.g.cs"].ShouldContain("var source = Statics.Shared ?? throw ");
+        run.Sources["App.Statics-Methods.g.cs"]
+            .ShouldContain("= await source.SqlServer(cancellationToken).ConfigureAwait(false) ?? throw ");
+    }
+
+    // A marked member of each engine, of the kind of connection source, instance or static as the modifier says, at
+    // the indent of a type's members in a namespace.
+    private static string MembersOf(string kind, string modifier)
+    {
+        var (postgres, sqlServer) = kind switch
+        {
+            "connection string" => (
+                "string Postgres { get; } = \"\";",
+                "string? SqlServer(CancellationToken cancellationToken) => null;"
+            ),
+            "data source" => (
+                "NpgsqlDataSource Postgres { get; } = NpgsqlDataSource.Create(\"\");",
+                "DbDataSource? SqlServer { get; set; }"
+            ),
+            "factory" => (
+                "NpgsqlConnection Postgres() => new();",
+                "ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken) => new(new SqlConnection());"
+            ),
+            "borrowed" => ("DbConnection? Postgres { get; set; }", "SqlConnection SqlServer = new();"),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+        return "        [SqlSourceConnection(Database = \"postgres\")]\n        public "
+            + modifier
+            + postgres
+            + "\n\n        [SqlSourceConnection(Database = \"mssql\")]\n        public "
+            + modifier
+            + sqlServer
+            + "\n";
+    }
+
+    // The marked members of an interface, of each engine, of the kind of connection source, and the explicit
+    // implementation of each, at the indent of a type's members in a namespace.
+    private static (string Members, string Implementations) ExplicitMembersOf(string kind)
+    {
+        var (postgres, sqlServer, postgresBody, sqlServerBody) = kind switch
+        {
+            "connection string" => (
+                "string Postgres { get; }",
+                "string? SqlServer(CancellationToken cancellationToken)",
+                " => \"\";",
+                " => null;"
+            ),
+            "data source" => (
+                "NpgsqlDataSource Postgres { get; }",
+                "DbDataSource? SqlServer { get; }",
+                " => NpgsqlDataSource.Create(\"\");",
+                " => null;"
+            ),
+            "factory" => (
+                "NpgsqlConnection Postgres()",
+                "ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken)",
+                " => new();",
+                " => new(new SqlConnection());"
+            ),
+            "borrowed" => (
+                "DbConnection? Postgres { get; }",
+                "SqlConnection SqlServer { get; }",
+                " => null;",
+                " => new();"
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+        var members =
+            "        [SqlSourceConnection(Database = \"postgres\")]\n        "
+            + postgres
+            + (postgres.EndsWith('}') ? "\n\n" : ";\n\n")
+            + "        [SqlSourceConnection(Database = \"mssql\")]\n        "
+            + sqlServer
+            + (sqlServer.EndsWith('}') ? "\n" : ";\n");
+        var implementations =
+            "        "
+            + ExplicitOf(postgres)
+            + postgresBody
+            + "\n\n        "
+            + ExplicitOf(sqlServer)
+            + sqlServerBody
+            + "\n";
+        return (members, implementations);
+    }
+
+    // The member's declaration as an explicit implementation of IFactory's: its name after IFactory., and a property's
+    // accessors left for the body's =>.
+    private static string ExplicitOf(string declaration)
+    {
+        var withoutAccessors = declaration.Replace(" { get; }", string.Empty, StringComparison.Ordinal);
+        var open = withoutAccessors.IndexOf('(', StringComparison.Ordinal);
+        var name = withoutAccessors.LastIndexOf(' ', open >= 0 ? open : withoutAccessors.Length - 1) + 1;
+        return withoutAccessors[..name] + "IFactory." + withoutAccessors[name..];
     }
 
     // The repositories of the source, at Repository, claiming a postgres file and an mssql file of a query that reads

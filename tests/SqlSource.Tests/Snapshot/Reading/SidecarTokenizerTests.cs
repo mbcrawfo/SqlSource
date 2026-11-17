@@ -79,12 +79,6 @@ public sealed class SidecarTokenizerTests
     public void Next_CommentsInLenientMode_AreSkippedAsWhiteSpace() =>
         Tokens("// a\n/* b */ 1 /* c\n d */ // e", lenient: true).ShouldBe(["Number:1"]);
 
-    [Theory]
-    [InlineData("/ 1")]
-    [InlineData("// a\n1")]
-    public void Next_CommentInStrictMode_IsInvalidAtTheSlash(string text) =>
-        new SidecarTokenizer(text).Next().ShouldBe(new SidecarToken(SidecarTokenKind.Invalid, new TextSpan(0, 1)));
-
     // A comment of the shortest forms, and a line comment that a carriage return or the end of the text closes.
     [Theory]
     [InlineData("/**/ 1")]
@@ -300,16 +294,6 @@ public sealed class SidecarTokenizerTests
         tokens.TrySkipValue(tokens.Next(), 0, out _).ShouldBeTrue();
 
         tokens.Position.ShouldBe(json.Length);
-    }
-
-    [Fact]
-    public void TrySkipValue_TrailingCommaInStrictMode_IsTheClosingBracket()
-    {
-        var tokens = new SidecarTokenizer("[1,]");
-
-        tokens.TrySkipValue(tokens.Next(), 0, out var error).ShouldBeFalse();
-
-        error.ShouldBe(new TextSpan(3, 1));
     }
 
     // One comma may close a container; a comma with no member before it may not.

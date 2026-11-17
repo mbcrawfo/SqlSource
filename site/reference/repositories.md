@@ -40,7 +40,7 @@ var users = new UserRepository(dataSource);
 GetUserDto? user = await users.GetUser(new GetUserParams(42));
 ```
 
-A repository is a type marked `[SqlSourceGenerate]` whose queries have the [output](settings.md#setting-output) `repository`, the default output.  Each of these queries gets a repository method: an instance method of the type that claims the query.  A repository method gets its own connection from a member of the type, its [connection source](repository-connections.md#repository-connection), such as a connection string or a data source.  So the code that calls the method passes no connection, and needs none.
+A repository is a type marked `[SqlSourceGenerate]` whose queries have the [output](settings.md#setting-output) `repository`, the default output.  Each of these queries gets a repository method: an instance method of the type that claims the query.  A repository method gets its own connection from a member of the type, its [connection source](repository-connections.md#repository-connection), such as a connection string or a data source.  The source can also be a member of a [factory that the type holds](repository-connections.md#held-factory), or a [static member of the project](repository-connections.md#static-connection).  So the code that calls the method passes no connection, and needs none.
 
 In the sample, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method `GetUser` gets a new connection from the data source `dataSource`.  It sends each parameter, runs the query, and reads the row into the output model.  It disposes the connection before it returns or throws.
 
@@ -78,10 +78,10 @@ A repository method has the name of the query.  Under the [generator parameter](
   - a member of the type, the type itself, or one of its type parameters;
   - a constant or token method that another query puts on the type;
   - a nested class of the queries of the type;
-  - the member of a base type, or the primary-constructor parameter, that gives the method its connection;
+  - the member of a base type, or the primary-constructor parameter, that gives the method its connection or holds the factory it comes from;
   - for a public method, the name of the interface of the type.
 - **A [synchronous method](generator-parameters.md#setting-generator-parameters) that takes no argument cannot be named `Finalize`** ([SQLSRC274](../diagnostics.md#sqlsrc274)).  The compiler would take it for the finalizer of the type.
-- **A token cannot be named `parameters` or `cancellationToken`, or as any other argument that a query method can have** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A token also cannot have the name of the primary-constructor parameter that gives the connection.  Nor can it have the name of the repository, when the repository is not generic and a `static` member gives the connection.
+- **A token cannot be named `parameters` or `cancellationToken`, or as any other argument that a query method can have** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A token also cannot have the name of the primary-constructor parameter that gives the connection, or that holds the factory it comes from.  Nor can it have the name of the repository, when the repository is not generic and a `static` member of it, or of a base type, gives the connection or holds the factory.
 - **The repository methods of a type are in the file of its methods**, `App.UserRepository-Methods.g.cs`, with its other query methods and its interface.
 
 [Where a repository gets its connection](repository-connections.md) is a page of its own.
@@ -151,8 +151,8 @@ By default, every repository gets its interface, named `I` and the name of the t
 
 A repository method takes no transaction and no command timeout.  It runs on the connection that its source gives, under the default timeout of the driver, and gives its command no transaction.  It can still run in a transaction of your code's in two cases:
 
-- **On PostgreSQL, on a connection on which your code has begun a transaction, Npgsql runs the command in that transaction.**  This holds for a borrowed connection.  It holds for an open connection that a factory returns too, but the method then disposes that connection, which rolls your transaction back.  See [the connection](repository-connections.md#repository-connection).
-- **Inside a `TransactionScope`, a connection opened inside the scope takes part in the ambient transaction**, unless its connection string turns enlisting off.  This holds whether the method, a factory or your code opened the connection.  A connection opened before the scope does not, unless your code enlists it with `EnlistTransaction`.  On PostgreSQL, a data source with `Multiplexing=true` cannot take part: Npgsql throws when the connection is opened.
+- **On PostgreSQL, on a connection on which your code has begun a transaction, Npgsql runs the command in that transaction.**  This holds for a borrowed connection.  It holds for an open connection that a marked method returns too, but the method then disposes that connection, which rolls your transaction back.  See [the connection](repository-connections.md#repository-connection).
+- **Inside a `TransactionScope`, a connection opened inside the scope takes part in the ambient transaction**, unless its connection string turns enlisting off.  This holds whether the repository method, a marked method that returns a connection, or your code opened the connection.  A connection opened before the scope does not, unless your code enlists it with `EnlistTransaction`.  On PostgreSQL, a data source with `Multiplexing=true` cannot take part: Npgsql throws when the connection is opened.
 
 If a query needs to run in a transaction with other queries, or needs its own timeout, give it the output `methods` instead.  Put the query in a file of its own with that output, or write `-- output: methods` on the query.  Your own code in the repository then opens a connection, begins the transaction, and calls the [method that takes a connection](connection-methods.md#methods-that-take-a-connection) of the query.  If your code disposes the transaction without committing it, the driver rolls it back.  See [the recipe](../start/transactions.md#queries-in-a-transaction).
 
@@ -217,13 +217,13 @@ The [collection method](collection-methods.md#collection-methods) of the query f
 - **It gets its connection from the repository**, as [the connection](repository-connections.md#repository-connection) says, with the synchronous calls of the driver.  By the kind of member, the connection is one of these:
   - a new connection of a connection string, opened;
   - a connection that a data source opens, `OpenConnection`;
-  - the connection that a factory returns, opened when it is closed, and disposed, with `default` for a factory that takes a `CancellationToken`;
+  - the connection that a marked method returns, opened when it is closed, and disposed, with `default` for a method that takes a `CancellationToken`;
   - a borrowed connection, opened when it is closed, and closed again.
-- **A connection string, a data source, a connection and a factory that returns a `DbConnection` serve both kinds of method.**
-- **A factory that returns a `Task` or `ValueTask` serves asynchronous methods alone.**
-- **If such a factory is the only member that gives the database of the query its connection, a query that would get a synchronous method is [SQLSRC299](../diagnostics.md#sqlsrc299).**  It is an error at the name of the query.
+- **A connection string, a data source, a connection and a method that returns a `DbConnection` serve both kinds of method.**
+- **A method that returns a `Task` or `ValueTask` of a connection serves asynchronous methods alone.**
+- **If such a method is the only member that gives the database of the query its connection, a query that would get a synchronous method is [SQLSRC299](../diagnostics.md#sqlsrc299).**  It is an error at the name of the query.
 - **Under `both`, SQLSRC299 costs the query only its synchronous methods.**  The query keeps its asynchronous method, its member of the interface and its asynchronous collection method.  Under `sync`, the query gets no method.
-- **To fix SQLSRC299, mark a second member that returns no task beside the factory.**  The two are then a [pair](repository-connections.md#repository-connection), and the synchronous methods use the second member.  Or give the query `method-type=async`.
+- **To fix SQLSRC299, mark a second member that returns no task beside that method.**  The two are then a [pair](repository-connections.md#repository-connection), and the synchronous methods use the second member.  Or give the query `method-type=async`.
 - **A stream has no synchronous method**, as for [a query method](synchronous-methods.md#synchronous-methods).  Under `sync`, a stream is [SQLSRC298](../diagnostics.md#sqlsrc298).  Under `both`, it keeps its asynchronous method alone, with both collection methods when it has one.
 - **Under any `method-type`, a token cannot be named `cancellationToken`** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A primary-constructor parameter that gives the connection cannot have that name either, under any `method-type` ([SQLSRC036](../diagnostics.md#sqlsrc036)).
 - **On PostgreSQL, a data source with `Multiplexing=true` refuses a synchronous repository method**, with `NotSupportedException`: see [what a method reads and throws](databases/postgresql/query-methods.md#method-results).

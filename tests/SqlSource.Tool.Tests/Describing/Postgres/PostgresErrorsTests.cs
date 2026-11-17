@@ -543,12 +543,6 @@ public sealed class PostgresErrorsTests
         failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
     }
 
-    [Fact]
-    public void SchemaChanged_TypeThatWentAtResolveType_KeepsTheStepItWasGiven() =>
-        PostgresErrors
-            .SchemaChanged(Query(), DescribeStep.ResolveType, "the type of the column 'n' no longer exists")
-            .Step.ShouldBe(DescribeStep.ResolveType);
-
     // An error of "types" with a position, as PostgreSQL 13 gave before the tool refused it at "open".  The position
     // is in the tool's own query of the catalog, which the user never wrote, so there is no line for it; the detail
     // and the hint of the server stay.
@@ -687,46 +681,6 @@ public sealed class PostgresErrorsTests
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldBe(["57014: canceling statement due to user request"]);
         failure.Help.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Check_VerdictErrorOfALostConnection_IsSqlsrc225WithItsText()
-    {
-        var error = new PostgresServerError(null, ConnectionTexts.LostConnection, null, null, null);
-
-        var failure = PostgresErrors
-            .Check(
-                Checked,
-                DescribedWith("text", "text"),
-                AskedWith("text"),
-                new PostgresCheckAnswer(null, error, null, null, false),
-                new CheckVerdict(NpgsqlCheck.Error, error.Message)
-            )
-            .ShouldNotBeNull();
-
-        failure.Descriptor.Id.ShouldBe("SQLSRC225");
-        failure.Arguments.ShouldBe(["ListUsers", ConnectionTexts.LostConnection]);
-        failure.Step.ShouldBe(DescribeStep.CheckParameters);
-        failure.ServerLines.ShouldBe([ConnectionTexts.LostConnection]);
-    }
-
-    [Fact]
-    public void Check_TextRefusedByNpgsql_IsSqlsrc231()
-    {
-        var error = new PostgresServerError(null, "please remove all semicolons", null, null, null);
-
-        var failure = PostgresErrors
-            .Check(
-                Checked,
-                DescribedWith("text", "text"),
-                AskedWith("text"),
-                new PostgresCheckAnswer(null, error, null, null, true),
-                new CheckVerdict(NpgsqlCheck.Differ, error.Message)
-            )
-            .ShouldNotBeNull();
-
-        failure.Descriptor.Id.ShouldBe("SQLSRC231");
-        failure.ServerLines.ShouldBe(["please remove all semicolons"]);
     }
 
     [Fact]

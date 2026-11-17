@@ -1,3 +1,4 @@
+using System;
 using Shouldly;
 using SqlSource.Generation.Types;
 using SqlSource.Settings;
@@ -13,42 +14,24 @@ public sealed class FileTypesInputTests
 {
     private static readonly TypeOverride Entry = new("int", "long", SettingsFile);
 
-    // A level whose only type setting is one engine's override must survive, whichever engine reads it.
-    [Fact]
-    public void TypeSettingsOf_LevelWithOnlyASqlServerTypeOverride_KeepsIt()
+    // A level whose only type setting is one engine's override must survive, whichever engine reads it, and leave every
+    // other engine's slot empty.
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public void TypeSettingsOf_LevelWithOnlyOneEnginesTypeOverride_KeepsIt(string engineName)
     {
-        var level = new SettingsLevel
-        {
-            TypeOverrides = PerEngine.Only(
-                DatabaseEngine.SqlServer,
-                (EquatableArray<TypeOverride>?)TestSidecars.Of(Entry)
-            ),
-        };
+        var engine = Enum.Parse<DatabaseEngine>(engineName);
+        var overrides = PerEngine.Only(engine, (EquatableArray<TypeOverride>?)TestSidecars.Of(Entry));
+        var level = new SettingsLevel { TypeOverrides = overrides };
 
         var result = FileTypesInput.TypeSettingsOf(level);
 
         ReferenceEquals(result, SettingsLevel.None).ShouldBeFalse();
-        result.TypeOverrides[DatabaseEngine.SqlServer].ShouldNotBeNull().ShouldBe([Entry]);
-        result.TypeOverrides[DatabaseEngine.PostgreSql].ShouldBeNull();
+        result.TypeOverrides[engine].ShouldNotBeNull().ShouldBe([Entry]);
+        result.TypeOverrides.ShouldBe(overrides);
     }
 
-    [Fact]
-    public void TypeSettingsOf_LevelWithOnlyAPostgreSqlTypeOverride_KeepsIt()
-    {
-        var level = new SettingsLevel
-        {
-            TypeOverrides = PerEngine.Only(
-                DatabaseEngine.PostgreSql,
-                (EquatableArray<TypeOverride>?)TestSidecars.Of(Entry)
-            ),
-        };
-
-        var result = FileTypesInput.TypeSettingsOf(level);
-
-        ReferenceEquals(result, SettingsLevel.None).ShouldBeFalse();
-        result.TypeOverrides[DatabaseEngine.PostgreSql].ShouldNotBeNull().ShouldBe([Entry]);
-        result.TypeOverrides[DatabaseEngine.SqlServer].ShouldBeNull();
-    }
+    public static TheoryData<string> Engines() => [with(Enum.GetNames<DatabaseEngine>())];
 
     [Fact]
     public void TypeSettingsOf_LevelWithNoTypeSetting_IsNone()

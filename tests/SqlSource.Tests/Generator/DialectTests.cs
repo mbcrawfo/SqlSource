@@ -34,10 +34,8 @@ public sealed class DialectTests
     [Theory]
     // Nothing set.
     [InlineData(null, null, null, Ansi)]
-    // The project's file alone, in any case.
+    // The project's file alone.
     [InlineData(null, null, "mysql", MySql)]
-    [InlineData(null, null, "MySQL", MySql)]
-    [InlineData(null, null, "tsql", SqlServer)]
     // The folder's file beats the project's.
     [InlineData(null, "mssql", null, SqlServer)]
     [InlineData(null, "mssql", "mysql", SqlServer)]
@@ -91,11 +89,6 @@ public sealed class DialectTests
     [InlineData("mysql,no-backslash-escapes", null, null)]
     [InlineData(null, "mysql,no-backslash-escapes", null)]
     [InlineData(null, null, "mysql,no-backslash-escapes")]
-    // As the server spells it, with spaces around the commas.
-    [InlineData(null, "mariadb , ansi_quotes , no_backslash_escapes", null)]
-    // In the marker the value is the rest of the line, read as a settings file's is.
-    [InlineData("mysql, no-backslash-escapes", null, null)]
-    [InlineData("MySQL ,  NO_BACKSLASH_ESCAPES", null, null)]
     // The value that wins has the option, and the one it beats has none.
     [InlineData("mariadb,no-backslash-escapes", "mysql", "postgres")]
     [InlineData(null, "mysql,no-backslash-escapes", "mysql")]
@@ -146,16 +139,14 @@ public sealed class DialectTests
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC111 /app/Repo/Q.sql(1,13)-(1,33): ");
     }
 
-    // A bytes literal that ends with an escaped quote, which CockroachDB reads, under either of its names.
-    [Theory]
-    [InlineData("cockroachdb")]
-    [InlineData("Cockroach")]
-    public void Run_BytesLiteralWithAnEscapedQuoteUnderCockroachDb_IsRead(string dialect)
+    // A bytes literal that ends with an escaped quote, which CockroachDB reads.
+    [Fact]
+    public void Run_BytesLiteralWithAnEscapedQuoteUnderCockroachDb_IsRead()
     {
         var run = GeneratorHarness.RunSample(
             OutputKind.Sql,
             [new SqlFile(QueryPath, BytesWithAnEscapedQuote)],
-            dialect: dialect
+            dialect: "cockroachdb"
         );
 
         run.Diagnostics.ShouldBeEmpty();

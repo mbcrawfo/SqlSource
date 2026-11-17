@@ -319,8 +319,9 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the type in full, {1} the database, and {2} the members, each quoted, in the order they are declared.
-    // Reported at the type's attribute.
+    // {0} is the type in full, {1} the database, and {2} the members, each quoted, in the order they are declared, a
+    // held one after its holder and a global after its type, as dbf.Open and Db.Reports.  Reported at the type's
+    // attribute.
     public static readonly DiagnosticDescriptor RepositoryHasManyConnections = new(
         id: "SQLSRC029",
         title: "Repository has more than one connection",
@@ -362,7 +363,9 @@ internal static class SqlDiagnostics
         helpLinkUri: HelpLinkBase + "sqlsrc031"
     );
 
-    // {0} is the type in full and {1} the member.  Reported at the member.
+    // {0} is the type in full and {1} the member, which for a member of a factory the type holds reads
+    // IDatabaseFactory.Open' reached through 'dbf inside the quotes.  Reported at the member, or at the holder for a
+    // member of a factory.
     public static readonly DiagnosticDescriptor ConnectionMemberNotSupported = new(
         id: "SQLSRC032",
         title: "Connection member is not supported",
@@ -377,8 +380,9 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the type in full, {1} the member, {2} its type, {3} the database, {4} the database's engine and {5} that
-    // engine's driver.  Reported at the member.
+    // {0} is the type in full, {1} the member, as SQLSRC032 gives it, {2} its type, {3} the database, {4} the
+    // database's engine and {5} that engine's driver.  Reported at the member, at the holder for a member of a factory
+    // the type holds, and at the type's attribute for a static member of another type of the project.
     public static readonly DiagnosticDescriptor ConnectionOfAnotherEngine = new(
         id: "SQLSRC033",
         title: "Connection is of another database engine",
@@ -418,7 +422,8 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the type in full, {1} the parameter and {2} the database.  Reported at the parameter.
+    // {0} is the type in full, {1} the parameter, the source or the holder of a factory's member, and {2} the
+    // database.  Reported at the parameter.
     public static readonly DiagnosticDescriptor ConnectionParameterHidden = new(
         id: "SQLSRC036",
         title: "Connection parameter is hidden by a method argument",

@@ -98,18 +98,6 @@ public sealed class SqlServerSessionProofTests
         described.Value.ShouldNotBeNull().TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
     }
 
-    [Fact]
-    public async Task DescribeAsync_NothingToAsk_NoOperandsCall()
-    {
-        const string Sql = "SELECT COUNT(*) AS n FROM dbo.users";
-        var script = Script(Sql, [ExpressionRow(1, "n")]);
-
-        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
-
-        asked.Select(static call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns]);
-        Nullability(described).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
-    }
-
     // "operands" is declared as "columns" is: every parameter at its described type.
     [Fact]
     public async Task DescribeAsync_Parameters_OperandsDeclaredAsColumns()

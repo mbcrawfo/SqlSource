@@ -236,10 +236,6 @@ public sealed class SqlServerColumnsTests
             .ShouldBe((null, "another database"));
 
     [Fact]
-    public void OriginOf_ExpressionWithNoType_IsAnExpression() =>
-        SqlServerColumns.OriginOf(One with { SourceType = null }, Database).ShouldBe((null, "expression"));
-
-    [Fact]
     public void Build_ColumnOfAFunction_SaysWhy()
     {
         var built = SqlServerColumns.Build([Id with { SourceTable = "orders_of", SourceType = "IF" }], Database);

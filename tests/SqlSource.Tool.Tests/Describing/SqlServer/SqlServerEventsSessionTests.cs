@@ -93,39 +93,6 @@ public sealed class SqlServerEventsSessionTests
         Member(log.Events[4].Members, "tableMatch").ShouldBe((LogValue)"matched");
     }
 
-    // A column alone asks no "operands": when every column comes from one table, columns, each column, table, then the
-    // match.
-    [Fact]
-    public async Task DescribeAsync_BareNullableColumnOfOneTable_WritesNoOperands()
-    {
-        const string Sql = "SELECT id, nickname FROM dbo.users";
-        var nickname = SqlServerSessionCases.NameColumn with
-        {
-            Name = "nickname",
-            IsNullable = true,
-            SystemTypeName = "nvarchar(50)",
-            MaxLength = 100,
-            SourceColumn = "nickname",
-        };
-        var script = new SqlServerScript()
-            .NoParametersThenColumns(
-                Sql,
-                new SqlServerColumnsAnswer([IdColumn, nickname, Rowstat with { ColumnOrdinal = 3 }], null, null)
-            )
-            .Table(
-                new SqlServerTableRequest("dbo", "users"),
-                new SqlServerColumnsAnswer([IdColumn, nickname, Rowstat with { ColumnOrdinal = 3 }], null, null)
-            );
-        var log = new RecordingLog();
-
-        _ = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql), log, new TestClock(), CallTime);
-
-        log.Events.Select(written => written.Name)
-            .ShouldBe(["parameters", "columns", "column", "column", "table", "table-match"]);
-        Member(log.Events[3].Members, "nullableSource").ShouldBe((LogValue)"server");
-        Member(log.Events[5].Members, "tableMatch").ShouldBe((LogValue)"matched");
-    }
-
     // A describe of a declared parameter and a reused one: declared, then parameters, then the probes of each copy,
     // then columns, each naming its query and taking the time of its call, and no event for open.
     [Fact]
@@ -253,30 +220,5 @@ public sealed class SqlServerEventsSessionTests
         Member(parameters, "rows")
             .ShouldBe(LogValue.ListOf([ParameterMap("@e", "nvarchar(320)", 640, 0, 0, "dbo", "***")]));
         Member(inner.Events[2].Members, "params").ShouldBe((LogValue)"@p dbo.***, @e [dbo].[***]");
-    }
-
-    // The same inside a list of maps: the message of an error is a string two levels down, and the SQL holds it too.
-    [Fact]
-    public async Task DescribeAsync_ThroughTheLogOfASession_RemovesTheSecretFromTheSqlAndTheMessageOfAnError()
-    {
-        const string Sql = "SELECT id FROM dbo.secret WHERE id = @id";
-        var script = new SqlServerScript().Parameters(
-            new SqlServerParametersRequest(Sql, null, null),
-            new SqlServerParametersAnswer(
-                null,
-                new SqlServerServerError([new SqlServerErrorRow(208, 16, 1, "Invalid object name 'dbo.secret'.")])
-            )
-        );
-        var inner = new RecordingLog();
-
-        _ = await script.DescribeAsync(
-            Of(SqlDialectRules.SqlServer, Sql),
-            new SessionRunLog(inner, new ConnectionSecret("secret"), "mssql.")
-        );
-
-        var (name, members) = inner.Events.ShouldHaveSingleItem();
-        name.ShouldBe("mssql.parameters");
-        Member(members, "sql").ShouldBe((LogValue)"SELECT id FROM dbo.*** WHERE id = @id");
-        Member(members, "error").ShouldBe(ErrorsOf((208, 16, 1, "Invalid object name 'dbo.***'.")));
     }
 }

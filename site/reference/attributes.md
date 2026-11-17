@@ -10,7 +10,7 @@ SqlSource has three attributes that you write on your code.  This table gives ea
 |----|----|----|
 | `[SqlSourceGenerate]` | `Source` | [The attribute](#attribute), [`Source`](#setting-source) |
 | `[SqlSourceGenerate]` | `GenerateInterface`, `InterfaceName` | [Repository interfaces](repositories.md#repository-interfaces) |
-| `[SqlSourceConnection]` | `Database` | [The connection](repository-connections.md#repository-connection) |
+| `[SqlSourceConnection]` | `Database` | [The connection](repository-connections.md#repository-connection), [a factory that a repository holds](repository-connections.md#held-factory), [a static member of the project](repository-connections.md#static-connection) |
 | `[SqlSourceConverter]` | No property | [Converters](converters.md#converters) |
 
 <a id="attribute"></a>
@@ -111,7 +111,7 @@ A type can claim only a file that the project includes.  [Which files the compil
 - **Only what the generator writes is compiled into your project.**  That is the code it generates for your queries, and the types in this list.
 - **Three attributes**, as internal types in the namespace `SqlSource`:
   - [`[SqlSourceGenerate]`](#attribute), which you mark your types with;
-  - [`[SqlSourceConnection]`](repository-connections.md#repository-connection), which you mark their connection sources with;
+  - [`[SqlSourceConnection]`](repository-connections.md#repository-connection), which you mark their connection sources with: a member of a repository, of a [factory that it holds](repository-connections.md#held-factory), or a [static member](repository-connections.md#static-connection) of any type of the project;
   - [`[SqlSourceConverter]`](converters.md#converters), which you mark your converters with.
 - **Three exceptions that a query method throws**, as internal types in the namespace `SqlSource`: [`UnexpectedRowCountException`](exceptions.md#unexpected-row-count), [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back) and [`CollectionItemException`](exceptions.md#collection-item-exception).
   - If your project uses the exceptions of another project, the package leaves them out.

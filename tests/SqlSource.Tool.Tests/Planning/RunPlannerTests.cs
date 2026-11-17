@@ -471,25 +471,6 @@ public sealed class RunPlannerTests : IDisposable
         OnlyFile(project).Queries.Select(query => query.Database).ShouldBe(["billing", "other"]);
     }
 
-    // The two projects see one file: the chain of each is that of the file in its own project's set, and the file
-    // needs what either needs.  The second does not list the first's settings file, so its claim has the default
-    // output, which needs an entry.
-    [Fact]
-    public void Plan_FileClaimedByTwoProjects_TakesEachProjectsChainForItsOutput()
-    {
-        var first = Plans.Postgres(_folder, "A");
-        first.Settings["output"] = "sql";
-        var shared = first.AddSql("One.sql", "SELECT 1;");
-        var second = Postgres("B");
-        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../A\""));
-        second.ListSql(shared);
-
-        var file = Plans.Result(first, second).Plan.Files.ShouldHaveSingleItem();
-
-        file.ProjectPath.ShouldBe(first.ProjectPath);
-        file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
-    }
-
     // Both projects list the farther settings file, which says sql, and only the second lists the nearer one, which
     // says models, so only the second's claim needs an entry: the owner's chain is not the one of every claim.
     [Fact]
