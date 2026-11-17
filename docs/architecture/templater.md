@@ -94,22 +94,11 @@ A parameter's stand-in must parse wherever SqlSource lets a parameter stand, and
 
 ### Dialect pairs
 
-The plan is read by the SqlSource dialect, and the stand-ins are chosen by the sqlfluff dialect.  `compatible` of `stand_ins.py` allows a pair only when both can be right about one file:
-
-| SqlSource dialect | sqlfluff dialects |
-|----|----|
-| `ansi` | Any |
-| `mssql` | `tsql` |
-| `postgres`, `cockroachdb` | `postgres`, `duckdb`, `redshift`, `greenplum`, `materialize` |
-| `mysql`, `mariadb` | `mysql`, `mariadb` |
-| `sqlite` | `sqlite` |
-| `oracle` | `oracle` |
-
-Any other pair is a templating error that names both dialects.
+The plan is read by the SqlSource dialect, and the stand-ins are chosen by the sqlfluff dialect.  `compatible` of `stand_ins.py` allows a pair only when both can be right about one file: `ansi` with any sqlfluff dialect, and each other SqlSource dialect with the sqlfluff dialects that `_COMPATIBLE` names for it.  [The guide's table](../../site/guides/sqlfluff.md#sqlfluff-dialects) lists the pairs for users.  Any other pair is a templating error that names both dialects.
 
 ### The templater
 
-`SqlSourceTemplater.process` of `templater.py` resolves the file's dialect, builds the plan, and checks the pair.  An error that stops the plan, or a pair that is not allowed, is a `SQLTemplaterError`, which sqlfluff reports as `TMP`: the error of a plan carries its code, its title from `diagnostic-titles.json` and its line and position.  Any other exception is caught and reported the same way, so that one file cannot stop sqlfluff's whole run.  The templater has no configuration of its own; it reads only sqlfluff's `dialect`.
+`SqlSourceTemplater.process` of `templater.py` resolves the file's dialect, builds the plan, and checks the pair.  An error that stops the plan, or a pair that is not allowed, is a `SQLTemplaterError`, which sqlfluff reports as `TMP`: the error of a plan carries its code, its title from `_TITLES` of `templater.py`, which a test keeps equal to `diagnostic-titles.json`, and its line and position.  Any other exception is caught and reported the same way, so that one file cannot stop sqlfluff's whole run.  The templater has no configuration of its own; it reads only sqlfluff's `dialect`.
 
 ### Byte order marks and line endings
 
@@ -118,15 +107,15 @@ SqlSource reads a file without its byte order mark.  sqlfluff drops the mark whe
 ## How the two sides keep each other honest
 
 - **The C# side** fails when a plan changes and the corpus does not.  [`src/SqlSource/Parsing/AGENTS.md`](../../src/SqlSource/Parsing/AGENTS.md) lists what a plan changes with.
-- **The Python side** fails when the corpus changes and the port does not.  `test_lexer_corpus.py` compares the lexemes, the dialect and the lexer's error of every case.  `test_plan_corpus.py` compares the spans and the error of each case whose file SqlSource accepts, and builds a plan without failing for the rest.  `test_settings.py` resolves each case's chain of settings files, and `test_dialect_names.py` and a test of `test_sqlfluff_end_to_end.py` read the two files of names.
+- **The Python side** fails when the corpus changes and the port does not.  `test_lexer_corpus.py` compares the lexemes, the dialect and the lexer's error of every case.  `test_plan_corpus.py` compares the spans, the dialect and its options, and the error of every case without other errors, those whose plan an error stops included, and builds a plan without failing for the rest.  `test_settings.py` resolves each case's chain of settings files, and `test_dialect_names.py` and a test of `test_sqlfluff_end_to_end.py` read the two files of names.
 - **sqlfluff itself** is run by `test_sqlfluff_end_to_end.py`, which shows that `lint`, `fix` and `format` change no token, default, parameter, list or marker comment, and never write a `;`, and by `test_examples_parse.py`, which lints every example of the repository and fails on a parse error, but for those that `tests/examples_unparsable.txt` lists.  CI runs the tests on the lowest sqlfluff the project allows, and the nightly run on the newest.
 - **The corpus covers what its cases reach.**  A rule that no case reaches is a fidelity case of its own.
 
-While the port was written, it was also checked against the built parser directly, outside the repository: a scratch console app loaded the built `SqlSource.dll` by reflection, compared every character test of `text.py` with .NET's for all 65,536 UTF-16 units, and compared `build_plan` with `PlanTemplating` on several hundred thousand generated inputs of every dialect.  It found no difference.  It is not committed, since it needs a built assembly; a change that rewrites much of the port can be checked the same way.
+A change that rewrites much of the port can also be checked against the built parser directly, beyond what the corpus reaches.  A scratch console app loads the built `SqlSource.dll` by reflection, compares each character test of `text.py` with .NET's over all 65,536 UTF-16 units, and compares `build_plan` with `PlanTemplating`, offsets in code points, on many generated inputs of every dialect.
 
 ## Known limitations
 
 - **Unicode categories come from the running Python's `unicodedata`.**  Python 3.14 and .NET 10 both have the tables of Unicode 16.0, but the package allows Python 3.10.  An older Python can classify a character newer than its Unicode version differently, just as SqlSource classifies a character by the .NET runtime it builds on.
 - **The safety of a query end's `;` is empirical.**  No rule of sqlfluff's edits the slice, and the tests show it; nothing in sqlfluff guarantees it for a slice that covers nothing.
 - **`CV06` with `multiline_newline = True` reports, without a fix, a multi-line query that has no `;`.**  sqlfluff anchors that report on a zero-length marker of its own, which it treats as literal, so dropping violations at the query end does not reach it.  [The guide's limit](../../site/guides/sqlfluff.md#limit-cv06-without-semicolon) tells users to end such queries with `;`.
-- **A violation on a comment between a query without `;` and the next query is dropped**, such as `LT05` on a long comment line, since that comment is part of the query end's slice.  [The guide's limit](../../site/guides/sqlfluff.md#limit-comment-after-query) says so.
+- **A violation on the white space or comments between a query without `;` and the next query is dropped, and no fix is written there**, such as `LT01` on trailing white space or `LT05` on a long comment line, since that text is part of the query end's slice.  [The guide's limit](../../site/guides/sqlfluff.md#limit-text-after-query) says so.

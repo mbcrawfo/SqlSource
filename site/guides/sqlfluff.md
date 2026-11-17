@@ -8,25 +8,25 @@ Lint and format the `.sql` files of a SqlSource project with sqlfluff, from a te
 
 ## Lint and format your queries
 
-Install sqlfluff with the templater.  Use the version of your `SqlSource` package; this page uses 0.1.0.
+Install sqlfluff with the templater.  In each command of this page, replace `<version>` with the version of your `SqlSource` package.
 
 # [pip](#tab/pip)
 
 ```console
-$ pip install sqlfluff sqlfluff-templater-sqlsource==0.1.0
+$ pip install sqlfluff sqlfluff-templater-sqlsource==<version>
 ```
 
 # [uv](#tab/uv)
 
 ```console
-$ uv tool install sqlfluff --with sqlfluff-templater-sqlsource==0.1.0
+$ uv tool install sqlfluff --with sqlfluff-templater-sqlsource==<version>
 ```
 
 # [pipx](#tab/pipx)
 
 ```console
 $ pipx install sqlfluff
-$ pipx inject sqlfluff sqlfluff-templater-sqlsource==0.1.0
+$ pipx inject sqlfluff sqlfluff-templater-sqlsource==<version>
 ```
 
 ---
@@ -149,10 +149,10 @@ repos:
     hooks:
       - id: sqlfluff-lint
         additional_dependencies:
-          - sqlfluff-templater-sqlsource==0.1.0
+          - sqlfluff-templater-sqlsource==<version>
       - id: sqlfluff-fix
         additional_dependencies:
-          - sqlfluff-templater-sqlsource==0.1.0
+          - sqlfluff-templater-sqlsource==<version>
 ```
 
 **What you get.**  Each commit runs `sqlfluff lint` and `sqlfluff fix` on the `.sql` files that it changes.
@@ -170,7 +170,7 @@ sqlfluff's image does not have the templater.  Build an image from it that does,
 
 ```dockerfile
 FROM sqlfluff/sqlfluff:4.5.0
-RUN pip install --no-cache-dir sqlfluff-templater-sqlsource==0.1.0
+RUN pip install --no-cache-dir sqlfluff-templater-sqlsource==<version>
 ```
 
 Build the image in the folder of the `Dockerfile`.  Then run it in the folder of your `.sqlfluff`:
@@ -232,7 +232,7 @@ $ sqlfluff lint .
 - **`TMP` and a SqlSource error, such as "SQLSRC101: Quote is not closed."**  Fix the error at its line and position.  See [the list of errors](../diagnostics.md).
 - **`PRS` at a token.**  The token has no default, so sqlfluff checks its name.  Give it a default.  See [defaults](../reference/tokens.md#token-defaults).
 - **`CV06` that `fix` does not fix.**  See [CV06 on a query without `;`](#limit-cv06-without-semicolon).
-- **No report for a comment after a query.**  See [a comment after a query without `;`](#limit-comment-after-query).
+- **No report on the white space or comments after a query.**  See [white space and comments after a query without `;`](#limit-text-after-query).
 - **pip upgrades sqlfluff, or a pre-commit hook fails to install.**  See [sqlfluff 4.4 or older](#limit-sqlfluff-version).
 
 <a id="limits"></a>
@@ -249,15 +249,15 @@ $ sqlfluff lint .
 
 **What to do.**  End each query of more than one line with `;`.  `fix` then moves the `;` onto a line of its own.
 
-<a id="limit-comment-after-query"></a>
+<a id="limit-text-after-query"></a>
 
-### A comment after a query without `;`
+### White space and comments after a query without `;`
 
-**What you see.**  sqlfluff reports nothing on a comment that follows a query without `;`, such as a long comment line that `LT05` would report elsewhere.
+**What you see.**  sqlfluff reports nothing on the white space and comments between a query without `;` and the next query, and `fix` changes nothing there.  For example, trailing white space after the query's last SQL gets no `LT01`, and a long comment line gets no `LT05`.
 
-**Why.**  The query is checked as if it ended in `;`.  The comments between it and the next query stand where that `;` would be, and the `;` is not in your file, so sqlfluff shows no report there.
+**Why.**  The query is checked as if it ended in `;`.  The white space and comments after its last SQL stand where that `;` would be, and the `;` is not in your file, so sqlfluff shows no report there.
 
-**What to do.**  End the query with `;`, and the comments after it are checked.
+**What to do.**  End the query with `;`.  The white space and comments after it are then checked and fixed.
 
 <a id="limit-sqlfluff-version"></a>
 

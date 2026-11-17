@@ -86,7 +86,7 @@ Find the message of the exception in this list.  Each entry gives the cause, wha
 ## sqlfluff does not do what you expect
 
 - **`CV06` at the end of a query, and `sqlfluff fix` does not fix it.**  With `multiline_newline = True`, a query of several lines without `;` is reported.  End it with `;`.  See [CV06 on a query without `;`](sqlfluff.md#limit-cv06-without-semicolon).
-- **sqlfluff reports nothing on a comment after a query.**  A comment between a query without `;` and the next query is not reported on.  End the query with `;`.  See [a comment after a query without `;`](sqlfluff.md#limit-comment-after-query).
+- **sqlfluff reports nothing on the white space or comments after a query.**  The white space and comments between a query without `;` and the next query are neither reported nor fixed.  End the query with `;`.  See [white space and comments after a query without `;`](sqlfluff.md#limit-text-after-query).
 - **pip upgrades sqlfluff when it installs the templater, or a pre-commit hook of sqlfluff fails to install.**  The templater needs sqlfluff 4.5 or later.  See [sqlfluff 4.4 or older](sqlfluff.md#limit-sqlfluff-version).
 
 <a id="watch"></a>

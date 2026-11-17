@@ -90,4 +90,4 @@ The PyPI project does not exist before the first release that holds the template
 1. On PyPI, under the account's publishing settings, add a pending publisher for the project `sqlfluff-templater-sqlsource`, with the owner `mbcrawfo`, the repository `SqlSource`, the workflow `publish.yml` and the environment `pypi`.  The first push creates the project and turns the pending publisher into its trusted publisher.
 2. In the repository's settings, add the environment `pypi` with the settings of the table.
 
-Without them, `publish-pypi` fails after `publish` has pushed to nuget.org, and the release waits.  Make both, then run the failed jobs again.
+Without them, `publish-pypi` fails, a failure that leaves the NuGet push of `publish` standing, and the release waits.  Make both, then run the failed jobs again.
