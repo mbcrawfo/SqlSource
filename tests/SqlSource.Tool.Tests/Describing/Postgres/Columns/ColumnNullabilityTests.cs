@@ -75,25 +75,6 @@ public sealed class ColumnNullabilityTests
             .Of(Origin("r", notNull), gated: true)
             .ShouldBe((true, SidecarValues.NullableSource.Heuristic));
 
-    [Fact]
-    public void Of_NotNullColumnOfATable_IsNotNullableByTheCatalog() =>
-        ColumnNullability
-            .Of(Origin("r", notNull: true), gated: false)
-            .ShouldBe((false, SidecarValues.NullableSource.Catalog));
-
-    [Fact]
-    public void Of_NullableColumnOfATable_IsNullableByTheCatalog() =>
-        ColumnNullability
-            .Of(Origin("r", notNull: false), gated: false)
-            .ShouldBe((true, SidecarValues.NullableSource.Catalog));
-
-    // A partitioned table enforces its constraints as a table does.
-    [Fact]
-    public void Of_NotNullColumnOfAPartitionedTable_IsNotNullableByTheCatalog() =>
-        ColumnNullability
-            .Of(Origin("p", notNull: true), gated: false)
-            .ShouldBe((false, SidecarValues.NullableSource.Catalog));
-
     // PostgreSQL 18 sets attnotnull for a NOT NULL constraint that is NOT VALID, and rows that were there before may
     // hold NULL.  Only a constraint that the server says is not validated changes the answer: null is an older
     // server, a column without the constraint, or an answer recorded before the member existed.
@@ -150,13 +131,6 @@ public sealed class ColumnNullabilityTests
             .Of(Origin("r", notNull: true, relhassubclass: relhassubclass), gated: false)
             .ShouldBe((false, SidecarValues.NullableSource.Catalog));
 
-    // A partition can never drop its parent's NOT NULL, and none of this table's is a foreign table.
-    [Fact]
-    public void Of_NotNullColumnOfAPartitionedTableWithPartitions_IsNotNullableByTheCatalog() =>
-        ColumnNullability
-            .Of(Origin("p", notNull: true, relhassubclass: true), gated: false)
-            .ShouldBe((false, SidecarValues.NullableSource.Catalog));
-
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -174,7 +148,8 @@ public sealed class ColumnNullabilityTests
             .Of(Origin("p", notNull: true, relhassubclass: true, hasForeignPartition: true), gated: false)
             .ShouldBe((true, SidecarValues.NullableSource.Catalog));
 
-    // False is a partitioned table without a foreign partition, and null an answer recorded before the member
+    // A partitioned table enforces its constraints as a table does, and a partition can never drop its parent's NOT
+    // NULL.  False is a partitioned table without a foreign partition, and null an answer recorded before the member
     // existed.
     [Theory]
     [InlineData(false)]

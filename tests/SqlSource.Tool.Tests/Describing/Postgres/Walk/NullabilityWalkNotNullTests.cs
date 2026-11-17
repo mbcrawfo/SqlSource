@@ -9,8 +9,9 @@ using static SqlSource.Tool.Tests.PostgresWalkColumns;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
-// NullabilityWalk over a NOT NULL that the catalog does not hold to: one that is not validated, and the columns of a
-// table with children, a foreign partition or an INSTEAD rule.
+// NullabilityWalk over a NOT NULL that the catalog does not hold to: one that is not validated, and the column of a
+// table with an INSTEAD rule, whose plan maps another relation.  The rules of a table with children and of a foreign
+// partition are ColumnNullability's, in ColumnNullabilityTests.
 public sealed class NullabilityWalkNotNullTests
 {
     // The rule of a NOT NULL is written once, in ColumnNullability: one that is NOT VALID is nullable here too.
@@ -34,72 +35,6 @@ public sealed class NullabilityWalkNotNullTests
 
         var outcome = NullabilityWalk.Run(
             new PlanInstancesCache(Scan("n", "id"), null),
-            [column],
-            [origin],
-            Scope(true)
-        );
-
-        AnswersOf(outcome).ShouldBe([NullableCatalog]);
-    }
-
-    // And a NOT NULL column of a table that has inheritance children, whose child may have dropped it.
-    [Fact]
-    public void Run_NotNullColumnOfATableWithChildren_IsNullableByTheCatalog()
-    {
-        var parent = PostgresTables.TableOf(
-            16703,
-            "p",
-            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
-        ) with
-        {
-            Relhassubclass = true,
-        };
-        var row = PostgresTables.ColumnOf(0, "id", PostgresRows.Int4.Oid, parent, 1);
-        var origin = ColumnOrigin.Find(row, PostgresTables.Of(parent));
-        var column = PostgresColumns.Build(
-            row,
-            origin,
-            PostgresRows.Of(PostgresRows.Int4),
-            TypeSpellings.None,
-            gated: true
-        );
-
-        var outcome = NullabilityWalk.Run(
-            new PlanInstancesCache(Scan("p", "id"), null),
-            [column],
-            [origin],
-            Scope(true)
-        );
-
-        AnswersOf(outcome).ShouldBe([NullableCatalog]);
-    }
-
-    // And a NOT NULL column of a partitioned table with a foreign partition, which nothing holds to it.
-    [Fact]
-    public void Run_NotNullColumnOfAPartitionedTableWithAForeignPartition_IsNullableByTheCatalog()
-    {
-        var parted = PostgresTables.TableOf(
-            16704,
-            "pt",
-            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
-        ) with
-        {
-            Relkind = "p",
-            Relhassubclass = true,
-            HasForeignPartition = true,
-        };
-        var row = PostgresTables.ColumnOf(0, "id", PostgresRows.Int4.Oid, parted, 1);
-        var origin = ColumnOrigin.Find(row, PostgresTables.Of(parted));
-        var column = PostgresColumns.Build(
-            row,
-            origin,
-            PostgresRows.Of(PostgresRows.Int4),
-            TypeSpellings.None,
-            gated: true
-        );
-
-        var outcome = NullabilityWalk.Run(
-            new PlanInstancesCache(Scan("pt", "id"), null),
             [column],
             [origin],
             Scope(true)
