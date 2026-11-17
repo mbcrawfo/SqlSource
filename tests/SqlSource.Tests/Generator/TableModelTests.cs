@@ -230,31 +230,6 @@ public sealed class TableModelTests
         run.Sources["App.UsersDto-Model.g.cs"].ShouldContain("read by the query <c>GetA</c> from <c>A.sql</c>.\n");
     }
 
-    // The names of both tables are ABC, and the models agree, so the two share one model that names both tables.
-    [Fact]
-    public void Run_TwoTablesOfOneModelName_ShareOneModelThatNamesBothTables()
-    {
-        var (a, b) = OfOneTable();
-
-        var run = Run(
-            Source,
-            [
-                a,
-                Sidecar(a, "GetA", new SidecarTable("a_b", "c"), [Column("id")]),
-                b,
-                Sidecar(b, "GetB", new SidecarTable("a", "b_c"), [Column("id")]),
-            ]
-        );
-
-        run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["App.ABCDto-Model.g.cs"]);
-        run.Sources["App.ABCDto-Model.g.cs"]
-            .ShouldContain(
-                "    /// A row of the tables <c>a_b.c</c> and <c>a.b_c</c>, read by the queries <c>GetA</c> from "
-                    + "<c>A.sql</c> and <c>GetB</c> from <c>B.sql</c>.\n"
-            );
-    }
-
     // Three tables, each once although a table is read by two queries.
     [Fact]
     public void Run_ThreeTablesOfOneModelName_AreNamedOnceEach()
@@ -278,6 +253,7 @@ public sealed class TableModelTests
         );
 
         run.ShouldBeClean();
+        ModelFiles(run).ShouldBe(["App.ABCDto-Model.g.cs"]);
         run.Sources["App.ABCDto-Model.g.cs"]
             .ShouldContain(
                 "    /// A row of the tables <c>a_b.c</c>, <c>a.b_c</c> and <c>A_b.c</c>, read by the queries "

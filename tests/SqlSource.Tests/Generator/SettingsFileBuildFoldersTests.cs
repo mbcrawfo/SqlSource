@@ -40,17 +40,6 @@ public sealed class SettingsFileBuildFoldersTests
         run.ShouldBeClean();
     }
 
-    [Fact]
-    public void Run_CompileItemUnderTheOutputFolder_ReachesNoSettingsFile()
-    {
-        var run = RunOutsideTheProject(
-            "/repo/artifacts/bin/App/debug/Extra.cs",
-            new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/repo/artifacts/bin/App/" }
-        );
-
-        run.ShouldBeClean();
-    }
-
     // Each folder the build writes C# trees or its outputs into, outside the project: IntermediateOutputPath moved out
     // of obj, where the SDK's items and the compiler's own output are, OutDir, and the folder the compiler writes its
     // generated files to under EmitCompilerGeneratedFiles, where it roots their trees.  The property is what the

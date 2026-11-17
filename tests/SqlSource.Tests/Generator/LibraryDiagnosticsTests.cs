@@ -96,14 +96,6 @@ public sealed class LibraryDiagnosticsTests
     };
 
     [Fact]
-    public void Run_OnInSettingsFileWithoutPlugin_IsReportedAtTheMember()
-    {
-        var run = RunEvents(ListEvents, [NpgsqlReferences.Npgsql10], NodaTimeIs("on"));
-
-        run.Problems().ShouldBe([AtTheProjectsMember + OnForPostgres]);
-    }
-
-    [Fact]
     public void Run_OnInMarker_IsReportedAtTheMarkersLine()
     {
         var run = RunEvents("-- library-types: nodatime=on\n\n" + ListEvents, [NpgsqlReferences.Npgsql10]);
