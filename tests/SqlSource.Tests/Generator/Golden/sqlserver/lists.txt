@@ -372,7 +372,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListIds' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -611,7 +611,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListExcept' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -855,7 +855,7 @@ namespace App
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
                         + " parameters; SQL Server accepts 2098.  Pass fewer values in '"
                         + (count1 > count0 ? "Owners" : "Ids")
-                        + "', or use a table-valued parameter.",
+                        + "', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -1162,7 +1162,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListUsedTwice' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -1422,7 +1422,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListUsedTwiceOnceNegated' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -1682,7 +1682,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListOptional' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -1940,7 +1940,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListWithToken' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -2183,7 +2183,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListBesideItsExpansionName' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -2430,7 +2430,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListKeepsComments' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -2669,7 +2669,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'StreamIds' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -3005,7 +3005,7 @@ namespace App
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
                         + " parameters; SQL Server accepts 2098.  Pass fewer values in '"
                         + (count1 > count0 ? "Emails" : "Ids")
-                        + "', or use a table-valued parameter.",
+                        + "', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -3319,7 +3319,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListOneShape' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }
@@ -3567,7 +3567,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListAmounts' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Amounts', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Amounts', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }

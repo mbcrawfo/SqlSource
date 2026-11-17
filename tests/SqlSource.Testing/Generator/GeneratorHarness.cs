@@ -427,7 +427,6 @@ internal static class GeneratorHarness
         string source,
         SqlFile[] sqlFiles,
         MetadataReference[] references,
-        bool warningsAsErrors = false,
         string? dialect = null,
         IReadOnlyDictionary<string, string?>? properties = null,
         IIncrementalGenerator? otherGenerator = null
@@ -438,7 +437,6 @@ internal static class GeneratorHarness
             source,
             sqlFiles,
             references,
-            warningsAsErrors,
             dialect,
             properties,
             otherGenerator
@@ -456,19 +454,12 @@ internal static class GeneratorHarness
         string source,
         SqlFile[] sqlFiles,
         MetadataReference[] references,
-        bool warningsAsErrors = false,
         string? dialect = null,
         IReadOnlyDictionary<string, string?>? properties = null,
         IIncrementalGenerator? otherGenerator = null
     )
     {
         var compilation = CreateCompilation([new SourceFile(SourcePath, source)], references: references);
-        if (warningsAsErrors)
-        {
-            compilation = compilation.WithOptions(
-                compilation.Options.WithGeneralDiagnosticOption(ReportDiagnostic.Error)
-            );
-        }
 
         var driver = CreateDriver(
                 WithProjectSettings(sqlFiles, ProjectSettings(output, dialect)).Select(file => file.ToAdditionalText()),

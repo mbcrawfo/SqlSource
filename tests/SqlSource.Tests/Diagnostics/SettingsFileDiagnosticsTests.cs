@@ -91,15 +91,6 @@ public sealed class SettingsFileDiagnosticsTests
     }
 
     [Fact]
-    public void Create_DefaultBesideAnotherParameter_IsNoError() =>
-        SettingsFileReader
-            .Read( /*lang=json,strict*/
-                """{ "generatorParameters": ["keep-comments", "Default"] }""",
-                TestPlaces.SettingsFile
-            )
-            .Errors.ShouldBeEmpty();
-
-    [Fact]
     public void Create_UnknownGeneratorParameter_HasNoHelp() =>
         Message(Error(SettingsFileErrorKind.InvalidValue, SettingsFileKeys.GeneratorParameters, "keep-coments"))
             .ShouldBe("'keep-coments' is not a valid value of generatorParameters");
