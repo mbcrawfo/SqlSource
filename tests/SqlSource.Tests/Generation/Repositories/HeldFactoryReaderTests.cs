@@ -1,9 +1,11 @@
 using System;
 using System.Linq;
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation.Repositories;
 using SqlSource.Testing.Generator;
 using Xunit;
+using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generation.Repositories;
 
@@ -740,67 +742,86 @@ public sealed class HeldFactoryReaderTests
     }
 
     // The interface is written in full from global::, as the method's code can name it: closed over the factory's type
-    // arguments, with a nullable annotation's ?, a keyword's @ and the types it is nested in.  A member that the class
-    // cannot be called by is reached so too: one its base class implements explicitly, one a derived interface
-    // implements explicitly, and an interface's default that the class does not implement.
+    // arguments, with a nullable annotation's ?, a keyword's @ and the types it is nested in.  A message names it by
+    // its own name and its type arguments, without a keyword's @.  A member that the class cannot be called by is
+    // reached so too: one its base class implements explicitly, one a derived interface implements explicitly, and an
+    // interface's default that the class does not implement.
     [Theory]
     [InlineData(
         "public interface IFactory<TConnection> { [SqlSourceConnection] TConnection Open(); }\n"
             + "public sealed class DatabaseFactory : IFactory<NpgsqlConnection>"
             + " { NpgsqlConnection IFactory<NpgsqlConnection>.Open() => null!; }",
         "DatabaseFactory",
-        "global::App.IFactory<global::Npgsql.NpgsqlConnection>"
+        "global::App.IFactory<global::Npgsql.NpgsqlConnection>",
+        "IFactory<NpgsqlConnection>"
     )]
     [InlineData(
         "public interface IFactory<TConnection> { [SqlSourceConnection] TConnection Open(); }\n"
             + "public sealed class DatabaseFactory<TConnection> : IFactory<TConnection>"
             + " { TConnection IFactory<TConnection>.Open() => default!; }",
         "DatabaseFactory<NpgsqlConnection>",
-        "global::App.IFactory<global::Npgsql.NpgsqlConnection>"
+        "global::App.IFactory<global::Npgsql.NpgsqlConnection>",
+        "IFactory<NpgsqlConnection>"
     )]
     [InlineData(
         "#nullable enable\npublic interface IFactory<TConnection> { [SqlSourceConnection] TConnection Open(); }\n"
             + "public sealed class DatabaseFactory : IFactory<NpgsqlConnection?>"
             + " { NpgsqlConnection? IFactory<NpgsqlConnection?>.Open() => null; }",
         "DatabaseFactory",
-        "global::App.IFactory<global::Npgsql.NpgsqlConnection?>"
+        "global::App.IFactory<global::Npgsql.NpgsqlConnection?>",
+        "IFactory<NpgsqlConnection?>"
     )]
     [InlineData(
         "public interface @event { [SqlSourceConnection] DbConnection Open(); }\n"
             + "public sealed class DatabaseFactory : @event { DbConnection @event.Open() => null!; }",
         "DatabaseFactory",
-        "global::App.@event"
+        "global::App.@event",
+        "event"
     )]
     [InlineData(
         "public static class Outer { public interface IFactory { [SqlSourceConnection] DbConnection Open(); } }\n"
             + "public sealed class DatabaseFactory : Outer.IFactory { DbConnection Outer.IFactory.Open() => null!; }",
         "DatabaseFactory",
-        "global::App.Outer.IFactory"
+        "global::App.Outer.IFactory",
+        "IFactory"
     )]
     [InlineData(
         "public interface IDatabaseFactory { [SqlSourceConnection] DbConnection Open(); }\n"
             + "public class FactoryBase : IDatabaseFactory { DbConnection IDatabaseFactory.Open() => null!; }\n"
             + "public sealed class DatabaseFactory : FactoryBase;",
         "DatabaseFactory",
-        "global::App.IDatabaseFactory"
+        "global::App.IDatabaseFactory",
+        "IDatabaseFactory"
     )]
     [InlineData(
         "public interface IOpener { [SqlSourceConnection] DbConnection Open(); }\n"
             + "public interface IDatabaseFactory : IOpener { DbConnection IOpener.Open() => null!; }\n"
             + "public sealed class DatabaseFactory : IDatabaseFactory;",
         "DatabaseFactory",
-        "global::App.IOpener"
+        "global::App.IOpener",
+        "IOpener"
     )]
     [InlineData(
         "public interface IDatabaseFactory { [SqlSourceConnection] DbConnection Open() => null!; }\n"
             + "public sealed class DatabaseFactory : IDatabaseFactory;",
         "DatabaseFactory",
-        "global::App.IDatabaseFactory"
+        "global::App.IDatabaseFactory",
+        "IDatabaseFactory"
+    )]
+    [InlineData(
+        "public sealed class @class;\n"
+            + "public interface IFactory<T> { [SqlSourceConnection] DbConnection Open(); }\n"
+            + "public sealed class DatabaseFactory : IFactory<@class>"
+            + " { DbConnection IFactory<@class>.Open() => null!; }",
+        "DatabaseFactory",
+        "global::App.IFactory<global::App.@class>",
+        "IFactory<class>"
     )]
     public void Read_MemberTheClassCannotBeCalledBy_IsCastToTheInterfaceInFull(
         string declarations,
         string holderType,
-        string cast
+        string cast,
+        string castName
     )
     {
         var shape = RepositoryShapes.Of(
@@ -815,6 +836,8 @@ public sealed class HeldFactoryReaderTests
         candidate.Name.ShouldBe("Open");
         candidate.IsMarked.ShouldBeTrue();
         candidate.CastTypeText.ShouldBe(cast);
+        candidate.CastTypeName.ShouldBe(castName);
+        candidate.DisplayName.ShouldBe("dbf." + castName + ".Open");
     }
 
     // Every holder of the class reaches an explicit implementation through the interface: a struct, which cannot be
@@ -978,6 +1001,9 @@ public sealed class HeldFactoryReaderTests
         shape
             .HeldCandidates.Select(static candidate => (candidate.Name, candidate.CastTypeText))
             .ShouldBe([("Open", null), ("Open", "global::App.IAuditOpener")]);
+        shape
+            .HeldCandidates.Select(static candidate => candidate.DisplayName)
+            .ShouldBe(["dbf.Open", "dbf.IAuditOpener.Open"]);
     }
 
     // A marked member that is no connection source is unsupported, implemented explicitly as implicitly, so that the
@@ -1425,5 +1451,312 @@ public sealed class HeldFactoryReaderTests
         candidate.Name.ShouldBe("Open");
         candidate.CastTypeText.ShouldBeNull();
         candidate.Holder.ShouldNotBeNull().TypeName.ShouldBe("TFactory");
+    }
+
+    // A ref struct cannot be cast to its interface, so a marked member that it implements explicitly cannot give the
+    // connection: an unsupported candidate, which the build reports at the holder, of each kind of member.  C# 13 lets
+    // a ref struct implement an interface, and a ref struct repository hold one.
+    [Theory]
+    [InlineData("DbConnection Open();", "DbConnection IDatabaseFactory.Open() => null!;", "Open")]
+    [InlineData("NpgsqlDataSource Source { get; }", "NpgsqlDataSource IDatabaseFactory.Source => null!;", "Source")]
+    public void Read_ExplicitImplementationOfARefStruct_IsAnUnsupportedCandidateOfTheHolder(
+        string member,
+        string implementation,
+        string name
+    )
+    {
+        var source = $$"""
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    {{member}}
+                }
+
+                public ref struct RefFactory : IDatabaseFactory
+                {
+                    {{implementation}}
+                }
+
+                [SqlSourceGenerate]
+                public ref partial struct UserRepository
+                {
+                    private RefFactory dbf;
+                }
+            }
+            """;
+
+        var shape = RepositoryShapes.Of(source, languageVersion: LanguageVersion.CSharp13);
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe(name);
+        candidate.Type.ShouldBe(CandidateType.Unsupported);
+        var holder = candidate.Holder.ShouldNotBeNull();
+        holder.Name.ShouldBe("dbf");
+        holder.Location.LineSpan.Start.Line.ShouldBe(RepositoryShapes.LineOf(source, "private RefFactory dbf;"));
+    }
+
+    // A ref struct's implicit implementation is called directly, with no cast.
+    [Fact]
+    public void Read_ImplicitImplementationOfARefStruct_IsCalledDirectly()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public ref struct RefFactory : IDatabaseFactory
+                {
+                    public DbConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public ref partial struct UserRepository
+                {
+                    private RefFactory dbf;
+                }
+            }
+            """,
+            languageVersion: LanguageVersion.CSharp13
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Type.ShouldBe(CandidateType.Factory);
+        candidate.CastTypeText.ShouldBeNull();
+    }
+
+    // A call through the class names the member that hides the implementation of the marked interface member, which
+    // is then reached through the interface, as an explicit one is: a new method of its signature, a new member of its
+    // name that is no method, a new property over a property, a new member two classes down, a new member over an
+    // override of it, and a holder of a type parameter that the class constrains, alone or with the interface.  An
+    // interface's default that a class member of its name hides is reached so too, though the interface constrains
+    // the type parameter.  The candidate is the interface's member, located at the implementation.
+    [Theory]
+    [InlineData(
+        "public class FactoryBase : IDatabaseFactory { public DbConnection Open() => null!; }\n"
+            + "public sealed class DatabaseFactory : FactoryBase { public new DbConnection Open() => null!; }",
+        "UserRepository(DatabaseFactory dbf)"
+    )]
+    [InlineData(
+        "public class FactoryBase : IDatabaseFactory { public DbConnection Open() => null!; }\n"
+            + "public sealed class DatabaseFactory : FactoryBase { public new string Open => \"\"; }",
+        "UserRepository(DatabaseFactory dbf)"
+    )]
+    [InlineData(
+        "public class FactoryBase : IDatabaseFactory { public DbConnection Open() => null!; }\n"
+            + "public class Middle : FactoryBase;\n"
+            + "public sealed class DatabaseFactory : Middle { public new DbConnection Open() => null!; }",
+        "UserRepository(DatabaseFactory dbf)"
+    )]
+    [InlineData(
+        "public class FactoryBase : IDatabaseFactory { public virtual DbConnection Open() => null!; }\n"
+            + "public class Middle : FactoryBase { public override DbConnection Open() => null!; }\n"
+            + "public sealed class DatabaseFactory : Middle { public new DbConnection Open() => null!; }",
+        "UserRepository(DatabaseFactory dbf)"
+    )]
+    [InlineData(
+        "public class FactoryBase : IDatabaseFactory { public DbConnection Open() => null!; }\n"
+            + "public class DatabaseFactory : FactoryBase { public new DbConnection Open() => null!; }",
+        "UserRepository<T>(T dbf) where T : DatabaseFactory"
+    )]
+    [InlineData(
+        "public class FactoryBase : IDatabaseFactory { public DbConnection Open() => null!; }\n"
+            + "public class DatabaseFactory : FactoryBase { public new DbConnection Open() => null!; }",
+        "UserRepository<T>(T dbf) where T : DatabaseFactory, IDatabaseFactory"
+    )]
+    public void Read_ImplementationThatANewMemberHides_IsReachedThroughTheInterface(string classes, string declaration)
+    {
+        var source =
+            "namespace App\n{\n"
+            + "public interface IDatabaseFactory\n{\n    [SqlSourceConnection]\n    DbConnection Open();\n}\n\n"
+            + classes
+            + "\n\n[SqlSourceGenerate]\npublic partial class "
+            + declaration
+            + ";\n}\n";
+
+        var shape = RepositoryShapes.Of(source);
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.Type.ShouldBe(CandidateType.Factory);
+        candidate.IsMarked.ShouldBeTrue();
+        candidate.CastTypeText.ShouldBe("global::App.IDatabaseFactory");
+        candidate.CastTypeName.ShouldBe("IDatabaseFactory");
+    }
+
+    // A marked property that a new property hides is reached through the interface, located at its implementation.
+    [Fact]
+    public void Read_PropertyThatANewPropertyHides_IsReachedThroughTheInterface()
+    {
+        const string Source = """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection(Database = "audit")]
+                    NpgsqlDataSource Source { get; }
+                }
+
+                public class FactoryBase : IDatabaseFactory
+                {
+                    public NpgsqlDataSource Source => null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public new NpgsqlDataSource Source => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """;
+
+        var shape = RepositoryShapes.Of(Source);
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Source");
+        candidate.Type.ShouldBe(CandidateType.DataSource);
+        candidate.Database.ShouldBe("audit");
+        candidate.CastTypeText.ShouldBe("global::App.IDatabaseFactory");
+        candidate.Location.LineSpan.Start.Line.ShouldBe(
+            RepositoryShapes.LineOf(Source, "public NpgsqlDataSource Source => null!;")
+        );
+    }
+
+    // An interface's default that a class member of its name hides from a type parameter, which the class and the
+    // interface constrain, is reached through the interface: the call through the type parameter would name the
+    // class's member.
+    [Fact]
+    public void Read_DefaultMemberThatAClassMemberHidesFromATypeParameter_IsReachedThroughTheInterface()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open() => null!;
+                }
+
+                public class FactoryBase : IDatabaseFactory
+                {
+                    public string Open => "";
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository<TFactory>(TFactory dbf)
+                    where TFactory : FactoryBase, IDatabaseFactory;
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.CastTypeText.ShouldBe("global::App.IDatabaseFactory");
+    }
+
+    // A call through the class names an implementation that only an override of it follows, or that a member it cannot
+    // reach would hide, so it is called directly: one candidate, with no cast.
+    [Theory]
+    [InlineData(
+        "public class FactoryBase : IDatabaseFactory { public virtual DbConnection Open() => null!; }\n"
+            + "public sealed class DatabaseFactory : FactoryBase { public override DbConnection Open() => null!; }"
+    )]
+    [InlineData(
+        "public class FactoryBase : IDatabaseFactory { public DbConnection Open() => null!; }\n"
+            + "public sealed class DatabaseFactory : FactoryBase { private new DbConnection Open() => null!; }"
+    )]
+    public void Read_ImplementationThatNoReachableNewMemberHides_IsCalledDirectly(string classes)
+    {
+        var shape = RepositoryShapes.Of(
+            "namespace App\n{\n"
+                + "public interface IDatabaseFactory\n{\n    [SqlSourceConnection]\n    DbConnection Open();\n}\n\n"
+                + classes
+                + "\n\n[SqlSourceGenerate]\npublic partial class UserRepository(DatabaseFactory dbf);\n}\n"
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.CastTypeText.ShouldBeNull();
+        candidate.CastTypeName.ShouldBeNull();
+    }
+
+    // A ref struct repository that holds a ref struct factory, whose marked member the factory implements explicitly,
+    // gets SQLSRC032 at the holder, and no method that would cast the factory, which the build could not compile.  The
+    // tests of tests/SqlSource.Tests/Generator/ hand the compiler C# 12 at most, and a ref struct implements an
+    // interface from C# 13.
+    [Fact]
+    public void Run_RefStructFactoryWithAnExplicitImplementation_ReportsSqlsrc032AtTheHolder()
+    {
+        var run = RunRefStructFactory("NpgsqlConnection IDatabaseFactory.Open() => new();");
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC032 /app/Repo/Sample.cs(20,28)-(20,31): 'IDatabaseFactory.Open' reached through 'dbf' of "
+                    + "'App.Sample' is marked [SqlSourceConnection], and cannot give a connection.  Mark a field, "
+                    + "property or primary-constructor parameter of a string, a DbDataSource or a DbConnection, or a "
+                    + "method that is not generic, takes nothing or a CancellationToken, and returns a string, a "
+                    + "DbConnection, or a Task or ValueTask of a DbConnection.",
+            ]);
+        run.Sources.Values.ShouldAllBe(text => !text.Contains("(global::App.IDatabaseFactory)"));
+    }
+
+    // A ref struct factory that implements the marked member implicitly is called directly.
+    [Fact]
+    public void Run_RefStructFactoryWithAnImplicitImplementation_CallsTheMember()
+    {
+        var run = RunRefStructFactory("public NpgsqlConnection Open() => new();");
+
+        run.ShouldBeClean();
+        run.Sources["App.Sample-Methods.g.cs"].ShouldContain("var connection = this.dbf.Open() ?? throw ");
+    }
+
+    // A ref struct repository, Sample, that holds a ref struct factory of the implementation in a field, at C# 13, with
+    // a synchronous method of GetUser, since a ref struct cannot be used in an asynchronous one.
+    private static GeneratorRun RunRefStructFactory(string implementation)
+    {
+        var source = $$"""
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    NpgsqlConnection Open();
+                }
+
+                public ref struct RefFactory : IDatabaseFactory
+                {
+                    {{implementation}}
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public ref partial struct Sample
+                {
+                    private RefFactory dbf;
+                }
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- generator: method-type=sync\n-- name: GetUser -> one-optional\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        return RepositoryRuns.Run(
+            file,
+            [Entry(file, "GetUser", [Parameter("id")], [Column("id")])],
+            source,
+            languageVersion: LanguageVersion.CSharp13
+        );
     }
 }

@@ -21,6 +21,14 @@ internal static class HeldFactoryReader
             SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
         );
 
+    // An interface as a message names it: its own name with its type arguments, each so too, and a nullable
+    // annotation's ?, without a keyword's @, which a message gives no name.
+    private static readonly SymbolDisplayFormat CastNameFormat = SymbolDisplayFormat
+        .MinimallyQualifiedFormat.AddMiscellaneousOptions(
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
+        )
+        .RemoveMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
+
     /// <summary>
     /// The marked instance members of the factories that the type holds, each with its <see cref="CandidateHolder" />,
     /// in the order the holders are declared: the type's own fields and properties first, then each base type's, then
@@ -162,7 +170,9 @@ internal static class HeldFactoryReader
 
         if (implementer is not null)
         {
-            candidates.AddRange(ReadCastMembers(implementer, lookedIn, holder, isInherited, type, compilation));
+            candidates.AddRange(
+                ReadCastMembers(implementer, lookedIn, holder, isInherited, type, compilation, factory)
+            );
         }
 
         return candidates;
@@ -170,17 +180,20 @@ internal static class HeldFactoryReader
 
     // The marked instance members of the interfaces of the factory's class or struct that a call through it cannot
     // name, as held candidates reached through a cast of the holder to the interface: one that the class implements
-    // explicitly, itself or in a base type, or that a derived interface implements explicitly, and an interface's
-    // default that nothing implements, unless a type parameter's constraint is the interface, through which the call
-    // already reaches it.  A member that the class implements implicitly is its own member's candidate.  Each is the
-    // interface's member, located at its implementation.
+    // explicitly, itself or in a base type, or that a derived interface implements explicitly; one whose
+    // implementation a member that the call can reach hides, a new member of a derived class or of its name; and an
+    // interface's default that nothing implements, unless a type parameter's constraint is the interface, through
+    // which the call already reaches it.  A member that the class implements implicitly, and that nothing hides, is its
+    // own member's candidate.  Each is the interface's member, located at its implementation.  A ref struct cannot be
+    // cast to an interface, so each of its own is an unsupported candidate, which the build reports at the holder.
     private static IEnumerable<ConnectionCandidate> ReadCastMembers(
         INamedTypeSymbol implementer,
         List<INamedTypeSymbol> lookedIn,
         CandidateHolder holder,
         bool isInherited,
         INamedTypeSymbol type,
-        Compilation compilation
+        Compilation compilation,
+        ITypeSymbol factory
     )
     {
         foreach (var @interface in implementer.AllInterfaces)
@@ -197,6 +210,7 @@ internal static class HeldFactoryReader
                             SymbolEqualityComparer.Default.Equals(implementation, member)
                             && !lookedIn.Contains(@interface, SymbolEqualityComparer.Default)
                         )
+                        || IsHiddenFromTheCall(implementation, lookedIn, type, compilation, factory)
                     )
                     && ConnectionCandidateReader.IsReachable(member, type, compilation, @interface)
                     && ConnectionCandidateReader.ReadMarkedMember(member, isInherited, holder.Location) is { } candidate
@@ -204,14 +218,57 @@ internal static class HeldFactoryReader
                 {
                     yield return candidate with
                     {
+                        Type = implementer.IsRefLikeType ? CandidateType.Unsupported : candidate.Type,
                         Location = ConnectionCandidateReader.SourceLocationOr(implementation, holder.Location),
                         Tier = CandidateTier.Held,
                         Holder = holder,
                         CastTypeText = @interface.ToDisplayString(CastFormat),
+                        CastTypeName = @interface.ToDisplayString(CastNameFormat),
                     };
                 }
             }
         }
+    }
+
+    // Whether a call through the factory's class or struct names another member than the implementation: one that the
+    // type can reach hides the implementation's override in the most derived of the classes the call looks in, or the
+    // implementation itself when none overrides it.  The walk hides an implementation by its override, which is
+    // marked as it is and called directly, so it is the override's hiding that is asked.
+    private static bool IsHiddenFromTheCall(
+        ISymbol implementation,
+        List<INamedTypeSymbol> lookedIn,
+        INamedTypeSymbol type,
+        Compilation compilation,
+        ITypeSymbol factory
+    )
+    {
+        var called = LastOverrideOf(implementation, lookedIn);
+        return IsHidden(called, called.ContainingType, lookedIn, type, compilation, factory);
+    }
+
+    // The override of the implementation in the first of the types that declares one, each derived type before its
+    // base, or the implementation itself when none does.
+    private static ISymbol LastOverrideOf(ISymbol implementation, List<INamedTypeSymbol> lookedIn)
+    {
+        foreach (var current in lookedIn)
+        {
+            foreach (var member in current.GetMembers(implementation.Name))
+            {
+                for (
+                    var overridden = ConnectionCandidateReader.OverriddenOf(member);
+                    overridden is not null;
+                    overridden = ConnectionCandidateReader.OverriddenOf(overridden)
+                )
+                {
+                    if (SymbolEqualityComparer.Default.Equals(overridden, implementation))
+                    {
+                        return member;
+                    }
+                }
+            }
+        }
+
+        return implementation;
     }
 
     // Whether the member is an explicit implementation of an interface's member, which no call can name.

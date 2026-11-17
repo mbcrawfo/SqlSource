@@ -8,8 +8,10 @@ namespace SqlSource.Generation.Repositories;
 /// What kind of member it is: a method, a connection string's included, is called, and anything else read.
 /// </param>
 /// <param name="MemberName">
-/// The candidate's <see cref="ConnectionCandidate.DisplayName" />: its name as a value, without the <c>@</c> of an
-/// escaped keyword, after the holder's or the type's for a held or a global one.
+/// The member's name as a value, without the <c>@</c> of an escaped keyword, after the holder's or the type's for a
+/// held or a global one: the candidate's <see cref="ConnectionCandidate.DisplayName" />, without the interface of a
+/// held one reached through a cast, which the method's message of a null member names as it reads it,
+/// <c>dbf.Open</c>.
 /// </param>
 /// <param name="AccessText">
 /// The member as a method of the type reaches it, without the call of a method: <c>this.X</c> for an instance member,

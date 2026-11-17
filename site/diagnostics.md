@@ -789,7 +789,7 @@ The members are one of these:
 - two such marked members of the factories that the type holds, as when two fields hold one factory type;
 - two such marked `static` members of the project.
 
-The members of the type come first, then those of its factories, then the `static` members of the project.  The build takes its members from the first of these that has any for the database, so members of two of them are never counted together.  The message names a member of a factory through its holder, `'_main.OpenAsync'`, and a `static` member through its type, `'Db.Main'`.
+The members of the type come first, then those of its factories, then the `static` members of the project.  The build takes its members from the first of these that has any for the database, so members of two of them are never counted together.  The message names a member of a factory through its holder, `'_main.OpenAsync'`, with its interface when the build reaches it through the interface, as an explicit implementation, `'_main.IAuditFactory.OpenAsync'`, and a `static` member through its type, `'Db.Main'`.
 
 ```csharp
 [SqlSourceGenerate]
@@ -924,7 +924,7 @@ A member of a repository, or of a factory that it holds, gets this error only wh
 A member marked `[SqlSourceConnection]` cannot give a repository method its connection.  Where the error is depends on where the member is:
 
 - **A member of the type.**  The error is at the member.
-- **A member of a factory that the type holds.**  The error is at the holder, in each type that would use the member.  The message names the member through its holder: `'IConnectionFactory.OpenAsync' reached through 'connections'`.
+- **A member of a factory that the type holds.**  The error is at the holder, in each type that would use the member.  The message names the member through its holder: `'IConnectionFactory.OpenAsync' reached through 'connections'`, by the holder's type, or by the interface for a member reached through it.
 - **A `static` member of the project.**  The error is at the member, once, whether a type uses it or not.  The message names the member's own type in place of a repository.
 - **A `static` member of a base type of a type marked `[SqlSourceGenerate]`.**  It is that type's own member, so the error is at the member, in each repository that derives from the base type and needs the member.
 
@@ -936,6 +936,8 @@ A connection comes from one of these members:
 - a method that is not generic and takes nothing or one `CancellationToken`.  It must return a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of such a type.
 
 An indexer, a property without a getter, an accessor, an operator and an explicit implementation of an interface's member are none of these either.
+
+A marked interface member that a `ref struct` factory implements explicitly cannot give the connection either, since a `ref struct` cannot be cast to its interface.  Implement it implicitly, as a `public` member of the `ref struct`.
 
 A `static` member of the project also gets this error in these cases, since a method cannot reach it:
 
@@ -973,6 +975,7 @@ public static class Connections<T>
 **Fix:** do the one that fits.
 
 - Mark a member of one of the shapes above.
+- Implement a marked interface member of a `ref struct` factory implicitly.
 - Move a `static` member of the project out of a generic or `file` type.
 - Remove a mark that can never give a connection.
 

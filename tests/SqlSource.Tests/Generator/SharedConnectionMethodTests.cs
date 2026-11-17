@@ -361,6 +361,109 @@ public sealed class SharedConnectionMethodTests
         open.ShouldBeGreaterThan(iterator);
     }
 
+    // A member that a new member of the holder's class hides implements the marked interface member, and is called
+    // through a cast of the holder to the interface, as an explicit implementation is; the message of a null member
+    // names it through the holder.
+    [Fact]
+    public void Run_HeldImplementationThatANewMemberHides_CastsTheHolderToTheInterface()
+    {
+        const string Source = """
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    NpgsqlConnection Open();
+                }
+
+                public class FactoryBase : IDatabaseFactory
+                {
+                    public NpgsqlConnection Open() => new();
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public new NpgsqlConnection Open() => new();
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample(DatabaseFactory dbf);
+            }
+            """;
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], Source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodsFile];
+        methods.ShouldContain(
+            "var connection = ((global::App.IDatabaseFactory)(dbf ?? " + HolderIsNull + ")).Open() ?? throw "
+        );
+        methods.ShouldContain("\"The connection source 'dbf.Open' of 'App.Sample' is null.\"");
+    }
+
+    // A member of one name of two interfaces of the holder's class, called directly through one and through a cast to
+    // the other, or through a cast to each of two constructions of one generic interface, is two connections, which
+    // SQLSRC029 names apart by the interface of each one reached through a cast.
+    [Theory]
+    [InlineData(
+        """
+                public interface IMainOpener
+                {
+                    [SqlSourceConnection]
+                    NpgsqlConnection Open();
+                }
+
+                public interface IAuditOpener
+                {
+                    [SqlSourceConnection]
+                    NpgsqlConnection Open();
+                }
+
+                public sealed class DatabaseFactory : IMainOpener, IAuditOpener
+                {
+                    public NpgsqlConnection Open() => new();
+
+                    NpgsqlConnection IAuditOpener.Open() => new();
+                }
+            """,
+        "'dbf.Open', 'dbf.IAuditOpener.Open'"
+    )]
+    [InlineData(
+        """
+                public interface IFactory<TConnection>
+                {
+                    [SqlSourceConnection]
+                    TConnection Open();
+                }
+
+                public sealed class DatabaseFactory : IFactory<NpgsqlConnection>, IFactory<DbConnection>
+                {
+                    NpgsqlConnection IFactory<NpgsqlConnection>.Open() => new();
+
+                    DbConnection IFactory<DbConnection>.Open() => new NpgsqlConnection();
+                }
+            """,
+        "'dbf.IFactory<NpgsqlConnection>.Open', 'dbf.IFactory<DbConnection>.Open'"
+    )]
+    public void Run_HeldMembersOfOneNameThroughACast_ReportsSqlsrc029NamingEachApart(string factory, string members)
+    {
+        var source =
+            "using System.Data.Common;\nusing Npgsql;\nusing SqlSource;\n\nnamespace App\n{\n"
+            + factory
+            + "\n    [SqlSourceGenerate(Source = \".\")]\n    public partial class Sample(DatabaseFactory dbf);\n}\n";
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], source);
+
+        var problem = run.Problems().ShouldHaveSingleItem();
+        problem.ShouldStartWith("SQLSRC029 ");
+        problem.ShouldContain(
+            "'App.Sample' has more than one connection for the database 'postgres': " + members + ".  Mark only "
+        );
+    }
+
     // A token of the holder's name would hide it, as it would hide a parameter that gives the connection.
     [Fact]
     public void Run_TokenNamedLikeTheHolder_ReportsSqlsrc275()

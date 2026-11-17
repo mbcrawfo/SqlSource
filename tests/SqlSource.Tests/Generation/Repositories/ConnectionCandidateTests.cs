@@ -26,6 +26,33 @@ public sealed class ConnectionCandidateTests
         candidate.DisplayName.ShouldBe("dbf.Open");
     }
 
+    // A held member reached through a cast of its holder is named with its interface, so that a member of two
+    // interfaces, called directly through one and through a cast to the other, gives two names.  A generic interface
+    // keeps its type arguments.
+    [Theory]
+    [InlineData("global::App.IAuditOpener", "IAuditOpener", "dbf.IAuditOpener.Open")]
+    [InlineData(
+        "global::App.IFactory<global::Npgsql.NpgsqlConnection>",
+        "IFactory<NpgsqlConnection>",
+        "dbf.IFactory<NpgsqlConnection>.Open"
+    )]
+    public void DisplayName_HeldMemberReachedThroughACast_IsHolderDotInterfaceDotName(
+        string castText,
+        string castName,
+        string displayName
+    )
+    {
+        var candidate = Candidate("Open") with
+        {
+            Tier = CandidateTier.Held,
+            Holder = new CandidateHolder("dbf", CandidateMember.Parameter, false, "DatabaseFactory", Location, true),
+            CastTypeText = castText,
+            CastTypeName = castName,
+        };
+
+        candidate.DisplayName.ShouldBe(displayName);
+    }
+
     [Fact]
     public void DisplayName_Global_IsTypeDotName()
     {

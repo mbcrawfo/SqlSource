@@ -541,7 +541,9 @@ internal static class ConnectionCandidateReader
         return null;
     }
 
-    private static ISymbol? OverriddenOf(ISymbol symbol) =>
+    /// <summary>The member that the member overrides, or null when it overrides none.</summary>
+    /// <param name="symbol">The member.</param>
+    internal static ISymbol? OverriddenOf(ISymbol symbol) =>
         symbol switch
         {
             IMethodSymbol method => method.OverriddenMethod,

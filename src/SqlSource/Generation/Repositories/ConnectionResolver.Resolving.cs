@@ -61,10 +61,15 @@ internal static partial class ConnectionResolver
 
         // The name that the member's problem gives it, inside the descriptor's quotes: its own for the type's member,
         // the factory type's and its own, then the holder's, for a held one, which closes and opens the quotes to read
-        // 'IDatabaseFactory.Open' reached through 'dbf', and the type's and its own for a global.
+        // 'IDatabaseFactory.Open' reached through 'dbf', with the interface in place of the factory type for one
+        // reached through a cast, and the type's and its own for a global.
         public static string MessageNameOf(ConnectionCandidate candidate) =>
             candidate.Holder is { } holder
-                ? holder.TypeName + "." + candidate.Name + "' reached through '" + holder.Name
+                ? (candidate.CastTypeName ?? holder.TypeName)
+                    + "."
+                    + candidate.Name
+                    + "' reached through '"
+                    + holder.Name
                 : candidate.DisplayName;
 
         // Where the member's problem is reported: at the member of the type, at the holder of a held one, which the
@@ -204,6 +209,7 @@ internal static partial class ConnectionResolver
             var holderAccess = AccessTextOf(holder.Name, holder.Member, holder.IsStatic);
             return source with
             {
+                MemberName = holder.Name + "." + candidate.Name,
                 AccessText = holderAccess + "." + Escaped(candidate.Name),
                 LeadingName = LeadingNameOf(holder.Name, holder.Member, holder.IsStatic),
                 HolderAccessText = holderAccess,

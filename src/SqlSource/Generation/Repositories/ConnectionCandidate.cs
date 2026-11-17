@@ -39,7 +39,13 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="CastTypeText">
 /// The fully qualified interface, such as <c>global::App.IDatabaseFactory</c>, that a held candidate's holder is cast
 /// to before the member is reached, when the holder's class or struct cannot be called by the member's name: it
-/// implements the member explicitly, or leaves it to the interface's default.  Null for any other candidate.
+/// implements the member explicitly, hides its implementation with a new member, or leaves it to the interface's
+/// default.  Null for any other candidate.
+/// </param>
+/// <param name="CastTypeName">
+/// The interface of <paramref name="CastTypeText" /> as a message names it: its own name and its type arguments, such
+/// as <c>IFactory&lt;NpgsqlConnection&gt;</c>, without its namespace or the <c>@</c> of an escaped keyword.  Null when
+/// <paramref name="CastTypeText" /> is.
 /// </param>
 internal sealed record ConnectionCandidate(
     string Name,
@@ -56,18 +62,25 @@ internal sealed record ConnectionCandidate(
     CandidateTier Tier = CandidateTier.Own,
     CandidateHolder? Holder = null,
     string? GlobalTypeText = null,
-    string? CastTypeText = null
+    string? CastTypeText = null,
+    string? CastTypeName = null
 )
 {
     /// <summary>
     /// The name that a message gives the candidate: its own for an own one, the holder's then a dot then its own for a
-    /// held one, and the declaring type's simple name, without the <c>@</c> of an escaped keyword, then a dot then its
-    /// own for a global one.
+    /// held one, with <see cref="CastTypeName" /> and a dot before its own for one reached through a cast, so that a
+    /// member of one name of two interfaces is named apart, and the declaring type's simple name, without the
+    /// <c>@</c> of an escaped keyword, then a dot then its own for a global one.
     /// </summary>
     public string DisplayName =>
         Tier switch
         {
             CandidateTier.Own => Name,
+            CandidateTier.Held when Holder is not null && CastTypeName is not null => Holder.Name
+                + "."
+                + CastTypeName
+                + "."
+                + Name,
             CandidateTier.Held when Holder is not null => Holder.Name + "." + Name,
             CandidateTier.Global when GlobalTypeText is not null => SimpleNameOf(GlobalTypeText) + "." + Name,
             _ => Name,

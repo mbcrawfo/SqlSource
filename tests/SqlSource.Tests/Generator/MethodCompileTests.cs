@@ -898,6 +898,65 @@ public sealed class MethodCompileTests
             .ShouldContain("((global::App.IFactory<global::Npgsql.NpgsqlConnection>)source).Open()");
     }
 
+    // A factory whose base class implements the marked members of its interface, each of which the factory hides with
+    // a new member, a method of its signature and a property of its name, gives each engine the base class's member
+    // through a cast of the holder to the interface: through a parameter, a type parameter that the class and the
+    // interface constrain, and in a struct repository, whose streaming methods cast a copy of the holder.
+    [Fact]
+    public void Run_HeldImplementationThatANewMemberHides_Compiles()
+    {
+        var source =
+            "#nullable enable\n"
+            + SourcesUsings
+            + """
+                    public interface IFactory
+                    {
+                        [SqlSourceConnection(Database = "postgres")]
+                        NpgsqlConnection Postgres();
+
+                        [SqlSourceConnection(Database = "mssql")]
+                        ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken);
+                    }
+
+                    public class FactoryBase : IFactory
+                    {
+                        public NpgsqlConnection Postgres() => new();
+
+                        public ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken) =>
+                            new(new SqlConnection());
+                    }
+
+                    public class Factory : FactoryBase
+                    {
+                        public new NpgsqlConnection Postgres() => new();
+
+                        public new string SqlServer => "";
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Parameters(Factory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Constrained<T>(T factory)
+                        where T : Factory, IFactory;
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct InAStruct(Factory factory);
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        var parameters = run.Sources["App.Parameters-Methods.g.cs"];
+        parameters.ShouldContain("((global::App.IFactory)(factory ?? throw ");
+        parameters.ShouldContain(")).Postgres()");
+        parameters.ShouldContain(")).SqlServer(cancellationToken)");
+        run.Sources["App.Constrained-1-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
+        run.Sources["App.InAStruct-Methods.g.cs"].ShouldContain("((global::App.IFactory)source).");
+    }
+
     // A static of the project of each kind of connection source, for each engine, reached through its type in full.
     [Theory]
     [InlineData("connection string")]

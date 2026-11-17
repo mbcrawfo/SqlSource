@@ -171,13 +171,14 @@ public sealed class ConnectionResolverTierTests
     }
 
     // A held member that the holder's class implements explicitly is reached through a cast of the holder to its
-    // interface, which the access leaves to the emitter; any other is reached through the holder as it is.
+    // interface, which the access leaves to the emitter; any other is reached through the holder as it is.  The
+    // member's name, which the message of a null member gives, is the holder's and its own, without the interface.
     [Theory]
-    [InlineData("global::App.IDatabaseFactory")]
-    [InlineData(null)]
-    public void Resolve_HeldSource_CarriesTheInterfaceItIsCastTo(string? cast)
+    [InlineData("global::App.IDatabaseFactory", "IDatabaseFactory")]
+    [InlineData(null, null)]
+    public void Resolve_HeldSource_CarriesTheInterfaceItIsCastTo(string? cast, string? castName)
     {
-        var held = Held("dbf", "Open") with { CastTypeText = cast };
+        var held = Held("dbf", "Open") with { CastTypeText = cast, CastTypeName = castName };
 
         var resolution = Resolve(Tiers([], held: [held]), Main);
 
@@ -402,6 +403,49 @@ public sealed class ConnectionResolverTierTests
         diagnostic.Arguments.ShouldBe(["App.UserRepository", "IDatabaseFactory.Open' reached through 'dbf"]);
         resolution.FailedDatabases.ShouldBe(["main", "reports"]);
         resolution.Sources.ShouldBeEmpty();
+    }
+
+    // Two members of one name, of two interfaces of the holder's class, are told apart: a member reached through a
+    // cast is named by its interface, in SQLSRC029's list and in the messages of SQLSRC032 and SQLSRC033, and any
+    // other by the holder's type.
+    [Fact]
+    public void Resolve_TwoHeldMembersOfOneNameThroughACast_ReportsSqlsrc029NamingTheInterface()
+    {
+        var direct = Held("dbf", "Open");
+        var cast = Held("dbf", "Open") with
+        {
+            CastTypeText = "global::App.IAuditOpener",
+            CastTypeName = "IAuditOpener",
+        };
+
+        var resolution = Resolve(Tiers([], held: [direct, cast]), Main);
+
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.RepositoryHasManyConnections);
+        diagnostic.Arguments.ShouldBe(["App.UserRepository", "main", "'dbf.Open', 'dbf.IAuditOpener.Open'"]);
+    }
+
+    [Theory]
+    [InlineData("unsupported")]
+    [InlineData("other engine")]
+    public void Resolve_HeldProblemReachedThroughACast_NamesTheInterface(string problem)
+    {
+        var held =
+            problem == "unsupported"
+                ? Held("dbf", "Open", CandidateType.Unsupported)
+                : Held("dbf", "Open", database: "sales", declared: "Npgsql.NpgsqlConnection");
+        var cast = held with { CastTypeText = "global::App.IAuditOpener", CastTypeName = "IAuditOpener" };
+
+        var resolution = Resolve(Tiers([], held: [cast]), Sales);
+
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(
+            problem == "unsupported"
+                ? SqlDiagnostics.ConnectionMemberNotSupported
+                : SqlDiagnostics.ConnectionOfAnotherEngine
+        );
+        diagnostic.Location.ShouldBe(cast.Holder!.Location);
+        diagnostic.Arguments[1].ShouldBe("IAuditOpener.Open' reached through 'dbf");
     }
 
     // An unsupported held member for a database fails that one alone, and the default serves the other.
