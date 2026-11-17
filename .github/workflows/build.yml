@@ -9,6 +9,8 @@
 # Every test run's summary lists its failed and skipped tests and leaves out the passed ones.  A step's summary holds
 # 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of it.  The passed tests of the
 # solution alone are past that, and so are some hundreds of failed tests: see .github/workflows/README.md.
+# The templater job checks and builds the sqlfluff templater.  Its run on the lowest sqlfluff, like the floor images, is
+# CI's alone: pre-commit-validation.sh has no counterpart for it.
 name: Build
 
 on:
@@ -61,6 +63,70 @@ jobs:
       - name: Lint workflows
         if: ${{ !cancelled() }}
         run: tools/actionlint.sh
+
+  # The sqlfluff templater, a Python project, checked as pre-commit-validation.sh checks it, then tested again on the
+  # lowest sqlfluff it allows, which that script does not, as the floor images are CI's alone, and built with the
+  # run's version into the wheel and sdist that publish.yml will publish.
+  templater:
+    name: Templater
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: src/sqlfluff-templater-sqlsource
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: 0.12.19
+          enable-cache: true
+          cache-dependency-glob: src/sqlfluff-templater-sqlsource/uv.lock
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: uv run ruff check
+
+      - name: Check formatting
+        if: ${{ !cancelled() }}
+        run: uv run ruff format --check
+
+      - name: Test
+        if: ${{ !cancelled() }}
+        run: uv run pytest
+
+      # The lock holds the newest sqlfluff, so this puts the floor of pyproject.toml in a fresh environment.  The first
+      # command shows which sqlfluff it is, and fails when it is not the floor.
+      - name: Test on the oldest sqlfluff
+        if: ${{ !cancelled() }}
+        run: |
+          floor=(uv run --isolated --no-project --with-editable . --with 'sqlfluff==4.5.0' --with pytest==9.2.0)
+          version="$("${floor[@]}" sqlfluff --version)"
+          echo "$version"
+          [[ "$version" == 'sqlfluff, version 4.5.0' ]]
+          "${floor[@]}" pytest
+
+      # The version is set in the checkout only: --frozen leaves uv.lock alone, and nothing commits the file.
+      - name: Build
+        run: |
+          uv version "$(../../tools/templater-version.sh)" --frozen
+          uv build
+
+      - name: Upload the wheel and sdist
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: templater
+          path: |
+            src/sqlfluff-templater-sqlsource/dist/*.whl
+            src/sqlfluff-templater-sqlsource/dist/*.tar.gz
+          if-no-files-found: error
 
   # The manual's site, built by docfx with warnings as errors, so that a link docfx cannot follow fails here and not
   # when the site is published.  It restores the tools alone, so its cache is keyed on dotnet-tools.json alone.

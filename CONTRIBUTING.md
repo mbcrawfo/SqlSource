@@ -50,7 +50,7 @@ uv run --directory src/sqlfluff-templater-sqlsource ruff format --check
 uv run --directory src/sqlfluff-templater-sqlsource pytest
 ```
 
-Its corpus is written by a test of the solution, and [`tests/README.md`](tests/README.md#the-templaters-corpus) has the command that writes it.
+CI also tests it on the lowest sqlfluff it allows and on the newest, which a run of the script does not; the command of the lowest is in [its `AGENTS.md`](src/sqlfluff-templater-sqlsource/AGENTS.md).  Its corpus is written by a test of the solution, and [`tests/README.md`](tests/README.md#the-templaters-corpus) has the command that writes it.
 
 `site/` is the user manual, which docfx builds into the site published at `https://mbcrawfo.github.io/SqlSource/`: the landing page, `site/index.md`, the errors, `site/diagnostics.md`, and three folders, `site/start/`, `site/guides/` and `site/reference/`, each with the `toc.yml` that is its sidebar.  `tools/build-site.sh` builds it into `artifacts/site`, and docfx serves it at `http://localhost:8080` to read it before a pull request:
 

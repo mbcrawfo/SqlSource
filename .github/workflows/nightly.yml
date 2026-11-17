@@ -7,6 +7,7 @@
 # between them, so that the two cover every supported major: see the rule in .github/AGENTS.md.
 # The two allocation jobs and the two sync-async jobs run the default images only.
 # roslyn-floor runs the tests of tests/SqlSource.Tests.RoslynFloor on Linux, which build.yml compiles but does not run.
+# templater-newest-sqlfluff runs the templater's tests on the newest sqlfluff 4.x, which build.yml's lock does not.
 # It is no required check.  A pull request that changes this file runs it, so that a change to it is tried.
 # Every test run's summary lists its failed and skipped tests and leaves out the passed ones.  A step's summary holds
 # 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of it.  The passed tests of the Test
@@ -120,6 +121,37 @@ jobs:
         run: >-
           dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
           --report-github --report-github-summary-include-passed false
+
+  # The templater's tests on the newest sqlfluff 4.x, whatever uv.lock holds, so that a release of sqlfluff that breaks
+  # the templater fails a night's run before it fails a user's.
+  templater-newest-sqlfluff:
+    name: Test the templater on the newest sqlfluff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: src/sqlfluff-templater-sqlsource
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: 0.12.19
+          enable-cache: true
+          cache-dependency-glob: src/sqlfluff-templater-sqlsource/uv.lock
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Test
+        run: |
+          newest=(uv run --isolated --no-project --with-editable . --with 'sqlfluff<5' --with pytest==9.2.0)
+          "${newest[@]}" sqlfluff --version
+          "${newest[@]}" pytest
 
   # build.yml runs every test of tests/DatabaseTests/Postgres on PostgreSQL 14, the floor, and 18, the default.  This
   # runs them on every supported major between the two, each image pinned as rule 5 of AGENTS.md says.  The steps are
