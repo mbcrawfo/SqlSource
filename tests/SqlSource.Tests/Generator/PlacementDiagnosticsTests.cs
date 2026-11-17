@@ -422,14 +422,23 @@ public sealed class PlacementDiagnosticsTests
     }
 
     // Another file's header makes the class Sql public, which its constant can be, and the method of the query that
-    // writes no visibility would be public in it too.  The error is at that query, whose file alone is left out, and
-    // names the query that wrote the visibility.
-    [Fact]
-    public void Run_NestedClassMadePublicByAnotherFileOfATypeReachableAsProtected_ReportsSqlsrc123AtTheMethod()
+    // writes no visibility would be public in it too.  The error is at that query, or at the query's own
+    // -- member-location: marker when it writes one; the query's file alone is left out, and the error names the query
+    // that wrote the visibility.
+    [Theory]
+    // where GetUser's -- member-location: is written, the span of the error
+    [InlineData(true, "(3,10)-(3,17)")]
+    [InlineData(false, "(2,1)-(2,33)")]
+    public void Run_NestedClassMadePublicByAnotherFileOfATypeReachableAsProtected_ReportsSqlsrc123AtTheMethodOrMarker(
+        bool inHeader,
+        string span
+    )
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- member-location: nested-class\n\n-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
+            inHeader
+                ? "-- member-location: nested-class\n\n-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
+                : "-- name: GetUser\n-- member-location: nested-class\nSELECT id FROM users WHERE id = @id;\n"
         );
         var constants = new SqlFile(
             "/app/Repo/A.sql",
@@ -445,51 +454,12 @@ public sealed class PlacementDiagnosticsTests
 
         run.Problems()
             .ShouldBe([
-                Sqlsrc123AsProtected(
-                    "(3,10)-(3,17)",
-                    "",
-                    "public",
-                    "the file header for the query 'GetName'",
-                    "nested-class"
-                ),
+                Sqlsrc123AsProtected(span, "", "public", "the file header for the query 'GetName'", "nested-class"),
             ]);
         run.Sources.Keys.ShouldNotContain(source => source.EndsWith("-Methods.g.cs", StringComparison.Ordinal));
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources["App.Outer.Sample.g.cs"].ShouldContain("            public static partial class Sql\n");
         run.Sources["App.Outer.Sample.g.cs"].ShouldContain("                public const string GetName = ");
-    }
-
-    // The marker that makes a nested class public is on the query that wrote it, so the refusal of another query's
-    // method names that marker.
-    [Fact]
-    public void Run_NestedClassMadePublicByAMarkerOfATypeReachableAsProtected_ReportsSqlsrc123AtTheMarker()
-    {
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            "-- name: GetUser\n-- member-location: nested-class\nSELECT id FROM users WHERE id = @id;\n"
-        );
-        var constants = new SqlFile(
-            "/app/Repo/A.sql",
-            "-- visibility: public\n-- output: sql\n\n-- name: GetName\nSELECT 1;\n"
-        );
-
-        var run = MethodRuns.Run(
-            file,
-            [UserEntry(file)],
-            GeneratorHarness.NestedSampleSource("public", "", "protected"),
-            otherFiles: [constants]
-        );
-
-        run.Problems()
-            .ShouldBe([
-                Sqlsrc123AsProtected(
-                    "(2,1)-(2,33)",
-                    "",
-                    "public",
-                    "the file header for the query 'GetName'",
-                    "nested-class"
-                ),
-            ]);
     }
 
     // The same method with no parameters and no rows takes no models, so it is public in the public class Sql.
