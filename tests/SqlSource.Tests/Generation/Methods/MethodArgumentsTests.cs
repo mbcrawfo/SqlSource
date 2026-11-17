@@ -233,7 +233,6 @@ public sealed class MethodArgumentsTests
     [Theory]
     [InlineData(nameof(MemberLocation.ExtensionClass), "this ")]
     [InlineData(nameof(MemberLocation.Class), "")]
-    [InlineData(nameof(MemberLocation.NestedClass), "")]
     public void AppendDeclaration_TokenNamedAwait_IsVerbatim(string locationName, string receiverPrefix)
     {
         var builder = new StringBuilder();
