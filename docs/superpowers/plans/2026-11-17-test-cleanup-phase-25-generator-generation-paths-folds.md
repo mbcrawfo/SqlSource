@@ -35,7 +35,7 @@ The kept row becomes the fact `FindFiles_SourceThatLeavesTheRootAndNamesNoSqlFil
 - Modify: `tests/SqlSource.Tests/Generation/Paths/PathResolverTests.cs`
 - Modify: `docs/superpowers/specs/2026-11-13-test-cleanup-epic-design.md` (row 25's state)
 
-- [x] **Step 1:** Replace the theory with the fact `FindFiles_SourceThatLeavesTheRootAndNamesNoSqlFile_GivesNone`, which calls `PathResolver.FindFiles("/app/Repo/UserRepository.cs", "../../..", "UserRepository", SqlPaths)` and asserts it is empty.
+- [x] **Step 1:** Replace the theory with the fact `FindFiles_SourceThatLeavesTheRootAndNamesNoSqlFile_GivesNone`, which calls `PathResolver.FindFiles("/app/Repo/UserRepository.cs", "../../..", "UserRepository", ...)` and asserts it is empty.  Its list is its own, `TestSidecars.Of("Root.sql", "app/Root.sql")`, with a file at the root, so a resolver that read a source leaving the root as the root would fail it (review finding R1-F1; `SqlPaths` has no file at the root).
 - [x] **Step 2:** Set row 25 of the epic's table to `done`.
 - [x] **Step 3:** `./format.sh`, then the scope's tests: every test passes.
 - [x] **Step 4:** `./pre-commit-validation.sh`, then commit.

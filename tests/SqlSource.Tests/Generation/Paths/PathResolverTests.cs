@@ -270,9 +270,17 @@ public sealed class PathResolverTests
                 )
             );
 
+    // The list holds a file at the root, so reading a source that leaves the root as the root would find it.
     [Fact]
     public void FindFiles_SourceThatLeavesTheRootAndNamesNoSqlFile_GivesNone() =>
-        PathResolver.FindFiles("/app/Repo/UserRepository.cs", "../../..", "UserRepository", SqlPaths).ShouldBeEmpty();
+        PathResolver
+            .FindFiles(
+                "/app/Repo/UserRepository.cs",
+                "../../..",
+                "UserRepository",
+                TestSidecars.Of("Root.sql", "app/Root.sql")
+            )
+            .ShouldBeEmpty();
 
     [Fact]
     public void FindFiles_SourceFileWhosePathLeavesTheRoot_GivesNone() =>
