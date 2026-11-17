@@ -262,6 +262,50 @@ public sealed class SynchronousRepositoryTests(PostgresDatabases postgres)
     }
 
     [Fact]
+    public void HeldFactory_SyncFactoryReturnsNull_ThrowsNamingTheHoldersMember()
+    {
+        var repository = new HeldFactoryRepository(new DataSourceConnectionFactory(null));
+
+        ShouldThrowNullSource(
+            () => repository.GetNoteSync(new GetNoteSyncArgs(1)),
+            "The connection source 'factory.Open' of "
+                + "'SqlSource.DatabaseTests.Postgres.EndToEnd.HeldFactoryRepository' is null."
+        );
+    }
+
+    // The collection's tests run one at a time, so the global is the source of the test that is running.
+    [Fact]
+    public void GetNoteSync_Global_ReadsTheRowThroughTheGlobal()
+    {
+        using var dataSource = EndToEndSources.App(postgres);
+        EndToEndConnections.Main = dataSource;
+
+        try
+        {
+            var note = new GlobalRepository().GetNoteSync(new GetNoteSyncArgs(3));
+
+            note.ShouldBe(Notes[2]);
+        }
+        finally
+        {
+            EndToEndConnections.Main = null;
+        }
+    }
+
+    [Fact]
+    public void GetNoteSync_NullGlobal_ThrowsNamingTheGlobal()
+    {
+        EndToEndConnections.Main = null;
+        var repository = new GlobalRepository();
+
+        ShouldThrowNullSource(
+            () => repository.GetNoteSync(new GetNoteSyncArgs(1)),
+            "The connection source 'EndToEndConnections.Main' of "
+                + "'SqlSource.DatabaseTests.Postgres.EndToEnd.GlobalRepository' is null."
+        );
+    }
+
+    [Fact]
     public void GetNoteSync_NullBorrowedConnection_ThrowsNamingTheMember()
     {
         var repository = new BorrowedRepository(null!);

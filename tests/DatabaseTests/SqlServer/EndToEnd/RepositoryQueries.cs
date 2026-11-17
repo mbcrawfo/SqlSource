@@ -138,6 +138,7 @@ internal sealed partial class GlobalRepository;
 // The global of GlobalRepository, a connection string, which a test sets to the one of "app" and sets back to null.
 internal static class EndToEndConnections
 {
+    // Only tests of one collection may set it, since xUnit runs collections in parallel.
     [SqlSourceConnection(Database = "app")]
     public static string? Main { get; set; }
 }

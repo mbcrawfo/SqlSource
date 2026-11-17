@@ -13,9 +13,8 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // RepositoryQueries.cs, which take no connection: each reads through its own source, a connection string, a factory
 // whose connection the method disposes, even at a break out of a stream, and a borrowed connection, which the method
 // leaves as it found it; a repository with none of its own reads through a factory it holds or a global.  A source
-// that is null throws before the method opens anything, and the generated interface
-// runs the same methods.  A repository method takes no transaction, so TouchNote writes the body it reads and leaves
-// the seed as it was.
+// that is null throws before the method opens anything, and the generated interface runs the same methods.  A
+// repository method takes no transaction, so TouchNote writes the body it reads and leaves the seed as it was.
 [Collection(UsesSqlServer.Name)]
 public sealed class RepositoryQueryTests(SqlServerDatabases sqlServer)
 {

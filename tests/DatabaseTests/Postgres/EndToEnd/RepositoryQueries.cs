@@ -128,6 +128,7 @@ internal sealed partial class GlobalRepository;
 // The global of GlobalRepository, which a test sets to a data source of its own and sets back to null.
 internal static class EndToEndConnections
 {
+    // Only tests of one collection may set it, since xUnit runs collections in parallel.
     [SqlSourceConnection(Database = "app")]
     public static NpgsqlDataSource? Main { get; set; }
 }
