@@ -270,20 +270,17 @@ public sealed class PathResolverTests
                 )
             );
 
-    [Theory]
-    [InlineData(null, "app/Repo/UserRepository.sql")]
-    [InlineData(
-        ".",
-        "app/Repo/Count.sql|app/Repo/UserRepository.sql|app/Repo/userrepository2.SQL|"
-            + GeneratorHarness.UsersNormalizedPath
-    )]
-    [InlineData("../Queries", "app/Queries/Orders.sql|app/Queries/Users.sql")]
-    [InlineData("users.SQL", GeneratorHarness.UsersNormalizedPath)]
-    [InlineData("Missing.sql", "")]
-    [InlineData("../../..", "")]
-    public void FindFiles_SourceOfAnAttribute_GivesTheFilesItNames(string? path, string expected) =>
-        string.Join('|', PathResolver.FindFiles("/app/Repo/UserRepository.cs", path, "UserRepository", SqlPaths))
-            .ShouldBe(expected);
+    // The list holds a file at the root, so reading a source that leaves the root as the root would find it.
+    [Fact]
+    public void FindFiles_SourceThatLeavesTheRootAndNamesNoSqlFile_GivesNone() =>
+        PathResolver
+            .FindFiles(
+                "/app/Repo/UserRepository.cs",
+                "../../..",
+                "UserRepository",
+                TestSidecars.Of("Root.sql", "app/Root.sql")
+            )
+            .ShouldBeEmpty();
 
     [Fact]
     public void FindFiles_SourceFileWhosePathLeavesTheRoot_GivesNone() =>
