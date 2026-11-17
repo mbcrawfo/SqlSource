@@ -11,6 +11,8 @@ A theory is clearest when its rows share one arrangement and one set of assertio
   - `DatabaseTests/SqlServer/EndToEnd/RunTimeArgumentTests.cs`, `GetAccountInRange_TokenCancelledBeforeTheCall_ThrowsTaskCanceledException` (`open`);
   - `SqlSource.Tests/Generation/Types/Maps/PostgresTypeMapTests.cs`, `Map_EveryRowOfTheTable_GivesItsType`;
   - `SqlSource.Tests/Generator/MethodTests.cs`, `Run_MethodsQueryNamedLikeTheNestedClass_IsAMethodOfTheExtensionClass`;
+  - `SqlSource.Tests/Generator/ModelNameTests.cs`, `Run_ModelNameWithAContextualKeywordThatCSharpRefusesAsATypeName_IsAnError` (`place`);
+  - `SqlSource.Tests/Generator/NestedClassTests.cs`, `Run_ContextualKeywordThatCannotNameTheNestedClass_IsAnError` (`inSettingsFile`);
   - `SqlSource.Tests/Snapshot/Reading/SidecarReaderTests.cs`, `Read_ColumnsWithoutRows_IsMalformedAtTheColumnsKey`;
   - `SqlSource.Tests/Snapshot/Reading/SidecarTokenizerTests.cs`, `Next_BlockCommentNotClosed_IsInvalidAtTheEnd` and `Next_SlashThatStartsNoComment_IsInvalidAtTheSlash`;
   - `SqlSource.Tests/Snapshot/SidecarWriterTests.cs`, `Write_PostgresType_WritesTheNestedTypeItsKindNames`;
