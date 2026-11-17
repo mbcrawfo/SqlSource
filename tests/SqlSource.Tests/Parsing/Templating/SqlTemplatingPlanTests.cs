@@ -301,6 +301,21 @@ public sealed class SqlTemplatingPlanTests
         plan.Lexemes.ShouldNotBeEmpty();
     }
 
+    // The first comment in the file that crosses a token stops the plan, and the second is another error.
+    [Fact]
+    public void PlanTemplating_TwoCommentsCrossTokens_ReportsTheFirst()
+    {
+        const string Text =
+            "-- name: A\nSELECT 1 {{f:AND a = 1 -- one}}\n-- name: B\nSELECT 2 {{g:AND b = 2 -- two}}\n";
+
+        var plan = Plan(Text);
+
+        plan.Error.ShouldBe(
+            SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, TextSpans.Of(Text, "-- one}}"), "f")
+        );
+        plan.HasOtherErrors.ShouldBeTrue();
+    }
+
     [Fact]
     public void PlanTemplating_OtherError_IsBestEffort()
     {
@@ -347,6 +362,25 @@ public sealed class SqlTemplatingPlanTests
             )
         );
         plan.Spans.ShouldBeEmpty();
+    }
+
+    // The first invalid marker of the header stops the plan, and the second is another error.
+    [Fact]
+    public void PlanTemplating_TwoInvalidDialectMarkers_ReportsTheFirst()
+    {
+        const string Text = "-- dialect: nonsense\n-- dialect: rubbish\nSELECT 1";
+
+        var plan = Plan(Text);
+
+        plan.Error.ShouldBe(
+            SqlParseError.Create(
+                SqlParseErrorKind.InvalidMarkerValue,
+                TextSpans.Of(Text, "nonsense"),
+                "dialect: nonsense",
+                string.Empty
+            )
+        );
+        plan.HasOtherErrors.ShouldBeTrue();
     }
 
     [Fact]

@@ -264,6 +264,14 @@ def test_comment_holding_close_braces_is_sqlsrc120():
     assert plan.lexemes != []
 
 
+def test_two_comments_cross_tokens_reports_the_first():
+    text = "-- name: A\nSELECT 1 {{f:AND a = 1 -- one}}\n-- name: B\nSELECT 2 {{g:AND b = 2 -- two}}\n"
+    plan = plan_of(text)
+
+    assert plan.error == ParseError("SQLSRC120", *at(text, "-- one}}"))
+    assert plan.has_other_errors
+
+
 @pytest.mark.parametrize(
     ("text", "comment"),
     [
@@ -355,6 +363,14 @@ def test_invalid_dialect_marker_after_a_valid_one_is_error_under_the_valid_one()
     assert plan.dialect == DialectChoice(Dialect.POSTGRESQL)
     assert plan.error == ParseError("SQLSRC111", *at(text, "nonsense"))
     assert plan.spans == []
+
+
+def test_two_invalid_dialect_markers_reports_the_first():
+    text = "-- dialect: nonsense\n-- dialect: rubbish\nSELECT 1"
+    plan = plan_of(text)
+
+    assert plan.error == ParseError("SQLSRC111", *at(text, "nonsense"))
+    assert plan.has_other_errors
 
 
 def test_dialect_marker_is_the_resolved_dialect():
