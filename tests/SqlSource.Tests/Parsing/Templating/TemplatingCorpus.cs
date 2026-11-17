@@ -81,11 +81,11 @@ internal static class TemplatingCorpus
 
         var problem = committed is null
             ? $"There is no corpus file at {path}."
-            : $"The plan differs from the corpus file {path} at {GoldenFiles.FirstDifference(committed, actual)}.";
+            : $"The corpus file {path} differs at {GoldenFiles.FirstDifference(committed, actual)}.";
         throw new ShouldAssertException(
             problem
-                + $"  Run the test with {UpdateVariable}=1 to write it, change the templater to match, and read the "
-                + "diff of the file."
+                + $"  Run the test with {UpdateVariable}=1 to write it and read the diff of the file.  If the plan "
+                + "changed, and not only the text of the case or of its settings files, change the templater to match."
         );
     }
 
@@ -108,11 +108,22 @@ internal static class TemplatingCorpus
     }
 
     // The case as its corpus file holds it: what the settings chain gives, then the plan, with every offset counted in
-    // code points.
+    // code points.  A lexer row or a fidelity case with an error that does not stop its plan fails here, since the spec
+    // promises nothing for one, and so does a fidelity case that does not name its dialect first.
     public static string Render(TemplatingCase @case)
     {
         var start = StartDialect(@case);
         var plan = SqlFileParser.PlanTemplating(@case.Input, @case.FileName, start);
+        if (SourceOf(@case.Name) is Lexer or Fidelity)
+        {
+            plan.HasOtherErrors.ShouldBeFalse($"{@case.Name} has an error that does not stop its plan.");
+        }
+
+        if (SourceOf(@case.Name) is Fidelity)
+        {
+            @case.Input.ShouldStartWith("-- dialect:", customMessage: $"{@case.Name} names its dialect first.");
+        }
+
         var codePoints = CodePointOffsets(@case.Input);
 
         var json = new StringBuilder().Append("{\n  \"fileName\": ");
@@ -301,14 +312,14 @@ internal static class TemplatingCorpus
         File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
 
     // Each row of Lex_Construct_IsReadByTheRulesOfTheDialect, once for each dialect it names, numbered from 1 in the
-    // order of the rows and given its dialect by a settings file.
+    // order of the rows and given its dialect by a settings file.  A row that is not found leaves its files without a
+    // case, which Corpus_HasNoOrphanFiles reports.
     private static IEnumerable<TemplatingCase> LexerCases()
     {
         var rows = typeof(SqlLexerTests)
             .GetMethod(nameof(SqlLexerTests.Lex_Construct_IsReadByTheRulesOfTheDialect))!
             .GetCustomAttributes<InlineDataAttribute>()
             .ToList();
-        rows.ShouldNotBeEmpty();
         for (var row = 0; row < rows.Count; row++)
         {
             var data = rows[row].Data;
@@ -355,25 +366,18 @@ internal static class TemplatingCorpus
     }
 
     // The .sql files of Cases/, each read as it is, with its line endings, and without settings: each names its
-    // dialect with a marker.  The spec promises nothing for a file with an error that does not stop the plan, so a case
-    // must not have one.
+    // dialect with a marker, which Render checks.
     private static IEnumerable<TemplatingCase> FidelityCases()
     {
         var folder = RepositoryRoot.Path("tests", "SqlSource.Tests", "Parsing", "Templating", "Cases");
         foreach (var file in Directory.EnumerateFiles(folder, "*.sql").OrderBy(file => file, StringComparer.Ordinal))
         {
-            var fileName = Path.GetFileName(file);
-            var @case = new TemplatingCase(
+            yield return new TemplatingCase(
                 $"{Fidelity}/{Path.GetFileNameWithoutExtension(file)}",
-                fileName,
+                Path.GetFileName(file),
                 [],
                 File.ReadAllText(file)
             );
-            @case.Input.ShouldStartWith("-- dialect:", customMessage: $"{fileName} names its dialect first.");
-            SqlFileParser
-                .PlanTemplating(@case.Input, fileName, StartDialect(@case))
-                .HasOtherErrors.ShouldBeFalse($"{fileName} has an error that does not stop its plan.");
-            yield return @case;
         }
     }
 

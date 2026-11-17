@@ -1,3 +1,4 @@
 -- dialect: mysql
+-- A token inside a quoted region is still a token.
 -- name: Escaped
-SELECT 'it\'s {{no}}', "a\" -- {{no}}", {{col:name}} FROM users;
+SELECT 'it\'s {{q}}', "a\" -- {{q}}", {{col:name}} FROM users;

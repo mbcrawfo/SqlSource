@@ -19,6 +19,8 @@
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
     <ItemGroup>
+        <!-- The templater's fidelity cases are test data, some with errors, read from the repository, not queries. -->
+        <AdditionalFiles Remove="Parsing/Templating/Cases/**" />
         <!-- Snapshot/SidecarExamples.cs reads the sample sidecars from the output folder. -->
         <None Update="Snapshot/Examples/*.json" CopyToOutputDirectory="PreserveNewest" />
         <!-- Snapshot/SidecarSchemaTests.cs reads the schema from the output folder. -->

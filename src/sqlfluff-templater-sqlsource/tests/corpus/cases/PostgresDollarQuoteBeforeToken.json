@@ -1,7 +1,7 @@
 {
   "fileName": "PostgresDollarQuoteBeforeToken.sql",
   "settings": [],
-  "input": "-- dialect: postgres\n-- name: Dollar\nSELECT $$ -- x $$ AS a, $tag$ {{no}} $tag$ AS b, {{col:name}} FROM users;\n",
+  "input": "-- dialect: postgres\n-- A token inside a quoted region is still a token.\n-- name: Dollar\nSELECT $$ -- x $$ AS a, $tag$ {{q}} $tag$ AS b, {{col:name}} FROM users;\n",
   "expected": {
     "startDialect": "ansi",
     "startOptions": [],
@@ -10,18 +10,20 @@
     "lexemes": [
       ["LineComment", 0, 20],
       ["Text", 20, 21],
-      ["LineComment", 21, 36],
-      ["Text", 36, 44],
-      ["Quoted", 44, 54],
-      ["Text", 54, 61],
-      ["Quoted", 61, 79],
-      ["Text", 79, 111]
+      ["LineComment", 21, 72],
+      ["Text", 72, 73],
+      ["LineComment", 73, 88],
+      ["Text", 88, 96],
+      ["Quoted", 96, 106],
+      ["Text", 106, 113],
+      ["Quoted", 113, 130],
+      ["Text", 130, 162]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
-      { "kind": "markerComment", "start": 21, "end": 36, "name": null, "default": null },
-      { "kind": "token", "start": 67, "end": 73, "name": "no", "default": null },
-      { "kind": "token", "start": 86, "end": 98, "name": "col", "default": "name" }
+      { "kind": "markerComment", "start": 73, "end": 88, "name": null, "default": null },
+      { "kind": "token", "start": 119, "end": 124, "name": "q", "default": null },
+      { "kind": "token", "start": 137, "end": 149, "name": "col", "default": "name" }
     ],
     "error": null,
     "hasOtherErrors": false

@@ -1,7 +1,7 @@
 {
   "fileName": "PostgresEscapeString.sql",
   "settings": [],
-  "input": "-- dialect: postgres\n-- name: Escaped\nSELECT E'it\\'s -- {{no}}' AS a, 'it''s' AS b, {{col:name}} FROM users WHERE id = @id;\n",
+  "input": "-- dialect: postgres\n-- A token inside a quoted region is still a token.\n-- name: Escaped\nSELECT E'it\\'s -- {{q}}' AS a, 'it''s' AS b, {{col:name}} FROM users WHERE id = @id;\n",
   "expected": {
     "startDialect": "ansi",
     "startOptions": [],
@@ -10,21 +10,23 @@
     "lexemes": [
       ["LineComment", 0, 20],
       ["Text", 20, 21],
-      ["LineComment", 21, 37],
-      ["Text", 37, 46],
-      ["Quoted", 46, 63],
-      ["Text", 63, 70],
-      ["Quoted", 70, 77],
-      ["Text", 77, 119],
-      ["Parameter", 119, 122],
-      ["Text", 122, 124]
+      ["LineComment", 21, 72],
+      ["Text", 72, 73],
+      ["LineComment", 73, 89],
+      ["Text", 89, 98],
+      ["Quoted", 98, 114],
+      ["Text", 114, 121],
+      ["Quoted", 121, 128],
+      ["Text", 128, 170],
+      ["Parameter", 170, 173],
+      ["Text", 173, 175]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
-      { "kind": "markerComment", "start": 21, "end": 37, "name": null, "default": null },
-      { "kind": "token", "start": 56, "end": 62, "name": "no", "default": null },
-      { "kind": "token", "start": 84, "end": 96, "name": "col", "default": "name" },
-      { "kind": "parameter", "start": 119, "end": 122, "name": "id", "default": null }
+      { "kind": "markerComment", "start": 73, "end": 89, "name": null, "default": null },
+      { "kind": "token", "start": 108, "end": 113, "name": "q", "default": null },
+      { "kind": "token", "start": 135, "end": 147, "name": "col", "default": "name" },
+      { "kind": "parameter", "start": 170, "end": 173, "name": "id", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false
