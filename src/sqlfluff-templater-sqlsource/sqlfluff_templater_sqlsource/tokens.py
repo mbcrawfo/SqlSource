@@ -212,7 +212,9 @@ class OpenDefaultFinder:
         self._open: str | None = None
         # The offset of the last call.
         self._offset = 0
-        # Where the opener of the default that the last call found starts, or -1 when it found none.
+        # Where the opener of the default that the last call found starts, or -1 when it found none.  Only the form
+        # that keeps comments reads it, which a plan never builds; it mirrors the C# so that the finder's tests, which
+        # check it at each offset, hold here too.
         self.opener_start = -1
 
     def at(self, offset: int) -> str | None:

@@ -22,7 +22,7 @@ def test_plan_of_the_case_is_the_one_the_corpus_recorded(case):
 
     # A file with another error has a best-effort plan: the corpus promises nothing for it.
     if expected["hasOtherErrors"]:
-        assert isinstance(plan.spans, list)
+        assert plan.error is not None or plan.spans
         return
     assert canonical_name(plan.dialect.dialect) == expected["dialect"]
     assert option_names(plan.dialect.options) == expected["options"]

@@ -117,6 +117,24 @@ def test_reserved_name_is_no_token():
         ("SELECT * FROM t JOIN @a", ANSI, [(PARAMETER, "@a")]),
         ("SELECT * FROM t WHERE id IN 'x' @a", ANSI, [(PARAMETER, "@a")]),
         ("SELECT * FROM t WHERE x#IN @a", DialectChoice(Dialect.SQL_SERVER), [(PARAMETER, "@a")]),
+        # An operator runs on over T-SQL's name characters @ and #, so the word after it is IN.
+        ("SELECT * FROM t WHERE x =#IN @a OR y IN @b", DialectChoice(Dialect.SQL_SERVER), [(LIST, "@a"), (LIST, "@b")]),
+        (
+            "SELECT * FROM t WHERE x =@@IN @a OR y IN @b",
+            DialectChoice(Dialect.SQL_SERVER),
+            [(LIST, "@a"), (LIST, "@b")],
+        ),
+        (
+            "SELECT * FROM t WHERE x <>#in @a AND y IN @b",
+            DialectChoice(Dialect.SQL_SERVER),
+            [(LIST, "@a"), (LIST, "@b")],
+        ),
+        (
+            "SELECT * FROM t WHERE x `@@IN @a OR y IN @b",
+            DialectChoice(Dialect.SQL_SERVER),
+            [(LIST, "@a"), (LIST, "@b")],
+        ),
+        ("SELECT * FROM t WHERE x =-IN @a OR y IN @b", ANSI, [(LIST, "@a"), (LIST, "@b")]),
     ],
 )
 def test_list_is_a_list_span(text, dialect, expected):

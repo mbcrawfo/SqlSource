@@ -1,8 +1,8 @@
 """Recognises marker comments.
 
 Mirrors `Markers/SqlMarker.cs`, `Markers/SqlMarkerKind.cs` and `Markers/SqlMarkerReader.cs` in
-`src/SqlSource/Parsing/`, but for the words and descriptions that messages name, and the `PlaceOf` that
-`SqlFileParser` and `Markers/SqlMarkerScope.cs` share.
+`src/SqlSource/Parsing/`, without `WordOf` and `Describe`, which only messages need.  It also mirrors the `PlaceOf`
+that `SqlFileParser` and `Markers/SqlMarkerScope.cs` share.
 """
 
 import enum

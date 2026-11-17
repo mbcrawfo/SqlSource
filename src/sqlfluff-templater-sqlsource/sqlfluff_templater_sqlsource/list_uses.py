@@ -6,9 +6,9 @@ that `IN` stands directly inside the parentheses of a call to `position`, as in 
 value after it.  Words are runs of the dialect's name characters, so `JOIN` and T-SQL's `x#IN` are not `IN`, and a
 quoted region is never a word.  A comment or a hint between two words is passed over as white space.
 
-What `NOT`, `IS`, `AND`, `OR` and commas do decides only whether a list is negated, so it is not read here.  Nor is
-`SqlListUses`'s run of operator characters, which, like any character that is neither a name character nor a
-parenthesis, only stands between `IN` and what follows it.
+A character that is not a name character but is an operator character starts a run of operator characters, which is
+read whole, name characters included: T-SQL's `@` and `#` are both, so `x =#IN @a` is the operator `=#` and the word
+`IN`.  What `NOT`, `IS`, `AND`, `OR` and commas do decides only whether a list is negated, so it is not read here.
 """
 
 import enum
@@ -21,6 +21,12 @@ from sqlfluff_templater_sqlsource.text import equals_ascii_ignoring_case
 # The word IN, as an ordinal search ignoring case finds it: only ASCII letters fold.
 _IN = re.compile("in", re.IGNORECASE | re.ASCII)
 
+# The characters of an operator, as PostgreSQL reads one.
+_OPERATOR_CHARACTERS = frozenset("+-*/<>=~!@#%^&|`?")
+
+# The characters of an operator that only these make up may not end it: "=-1" is "=" and "-".
+_PLAIN_OPERATOR_CHARACTERS = frozenset("+-*/<>=")
+
 
 class _Item(enum.Enum):
     """What the cursor over a query's lexemes meets next."""
@@ -30,7 +36,7 @@ class _Item(enum.Enum):
     OPEN = enum.auto()
     CLOSE = enum.auto()
     PARAMETER = enum.auto()
-    # A quoted region, or any other character that is not white space.
+    # A quoted region, a run of operator characters, or any other character that is not white space.
     OTHER = enum.auto()
 
 
@@ -124,6 +130,10 @@ class _Cursor:
                 return _Item.WORD
 
             value = text[self._offset]
+            if value in _OPERATOR_CHARACTERS:
+                self._read_operator(lexeme.end)
+                return _Item.OTHER
+
             self._word = (self._offset, self._offset + 1)
             self._offset += 1
             if value == "(":
@@ -131,6 +141,19 @@ class _Cursor:
             return _Item.CLOSE if value == ")" else _Item.OTHER
 
         return _Item.END
+
+    # An operator is a run of operator characters, which, as PostgreSQL reads it, ends in no "+" or "-" unless it holds
+    # one of ~ ! @ # % ^ & | ` ?, so that "=-1" is "=" and "-".
+    def _read_operator(self, text_end: int) -> None:
+        text = self._text
+        operator_start = self._offset
+        unusual = False
+        while self._offset < text_end and text[self._offset] in _OPERATOR_CHARACTERS:
+            unusual |= text[self._offset] not in _PLAIN_OPERATOR_CHARACTERS
+            self._offset += 1
+        while not unusual and self._offset - operator_start > 1 and text[self._offset - 1] in "+-":
+            self._offset -= 1
+        self._word = (operator_start, self._offset)
 
     def _move_to_next_lexeme(self) -> None:
         self._lexeme += 1
