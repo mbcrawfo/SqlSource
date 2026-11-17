@@ -37,7 +37,7 @@ A theory is clearest when its rows share one arrangement and one set of assertio
   - `SqlSource.Tool.Tests/Watching/WatchSetTests.cs`, `Classify_NamedEnvFileUnderAnIgnoredFolder_Describes` (`path`) and `Folders_AssetsFolderThatDoesNotExistYet_IsBoundByTheBuildProps` (`watched`).
 - A branch that only supplies an input the row gives, or picks how the row's input is supplied, after which every row runs the same steps and assertions, which may be acceptable as it stands:
   - `SqlSource.Tests/Generator/ArrayPoolParameterTests.cs`, `Run_ArrayPool_ComesFromTheMostSpecificLevelThatNamesIt` (`folderFile`);
-  - `SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/SqlServerErrorRenamingTests.cs`, `RenameAsync_AnAliasOfAColumnOfTheServers_IsRenamed` (`first`);
+  - `SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/SqlServerErrorRenamingTests.cs`, `RenameAsync_AnAliasOfAColumnOfTheServers_IsRenamed` (`first`) and `RenameAsync_AColumnOfTheServersUnderItsOwnName_KeepsTheServersNames` (`variant`);
   - `SqlSource.Tool.Tests/Commands/DiagnoseTests.cs`, `Diagnose_AnotherFileWithAnErrorOfThePlan_WritesTheBundleAndLogsTheError` (`latin1`) and `Diagnose_AnErrorThatMayChangeTheQuery_IsPrintedAndWritesNoBundle` (`at`);
   - `SqlSource.Tool.Tests/Commands/OnlineRunTests.cs`, `Run_AutoWithAVariableTwoDatabasesShare_IsSqlsrc214AndNotOffline` (`inDotEnv`);
   - `SqlSource.Tool.Tests/Commands/SecretTests.cs`, three tests over `debug` and `Diagnose_ConnectionStringWherePathsStand_IsNeverPrintedOrLogged` (`fromVariable`), and `SqlSource.Tool.Tests/Describing/DatabaseRunsFaultTests.cs`, `Run_DescriberThatThrows_IsAFaultWithoutTheConnection` (`debug`);
@@ -51,7 +51,7 @@ A theory is clearest when its rows share one arrangement and one set of assertio
   - `SqlSource.Tool.Tests/Projects/OnlineBuildTests.cs`, `Build_AfterAnInputIsTouched_RunsTheToolOnceMore` (`input`);
   - `SqlSource.Tool.Tests/Projects/ProjectEvaluatorTests.cs`, `Evaluate_Project_RunsTheDotnetThatStartedTheToolOrTheOneOnThePath` (`hostPath`);
   - `SqlSource.Tool.Tests/Watching/WatchSetTests.cs`, `Folders_AssetsFolderBelowTheProject_AddsNoFolder` (`restored`), `Folders_AssetsFolderThatDoesNotExistAboveTheRepository_IsNotWatched` and `Folders_FolderAboveEachWatchedFolder_IsWatchedOutsideARepository` (`repository`).
-- About 130 more theories derive an expected value or a piece of the arrangement from the row with a `?:`, a `switch` expression or an `if` that only picks a value, as `nullable is null ? … : …`, and then run the same calls and assertions on every row.  These state one rule over rows that differ only in data, and need no change; the same scan lists them.
+- About 170 more theories derive an expected value or a piece of the arrangement from the row with a `?:`, a `switch` expression or an `if` that only picks a value, as `nullable is null ? … : …`, and then run the same calls and assertions on every row.  These state one rule over rows that differ only in data, and need no change; the same scan lists them.
 
 ## Why it exists
 
