@@ -46,19 +46,6 @@ public sealed class ColumnTypeMapTests
         ColumnTypeMap.Find(map, "public", "users", "id")!.Type.ShouldBe("UserId");
     }
 
-    [Fact]
-    public void Find_HigherPlaceWins_OverASchemaBelow()
-    {
-        var map = ColumnTypeMap
-            .Over(
-                TestSidecars.Of(Entry("users.id", "UserId", SettingPlace.FileHeader)),
-                TestSidecars.Of(Entry("auth.users.id", "AuthUserId", RootSettingsFile))
-            )!
-            .Value;
-
-        ColumnTypeMap.Find(map, "auth", "users", "id")!.Type.ShouldBe("UserId");
-    }
-
     // The header's entry wins by its place, though the settings file's key names the schema.
     [Fact]
     public void Find_HeaderWins_OverASchemaInASettingsFile()

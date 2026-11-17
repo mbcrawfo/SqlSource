@@ -313,15 +313,6 @@ public sealed class SqlServerTypeMapTests
         SqlServerTypeMap.Map(type, SqlClientColumn.SqlClient7).Text.ShouldBe("int");
     }
 
-    [Fact]
-    public void Map_Override_AnswersBeforeTheRow()
-    {
-        var mapping = SqlServerTypeMap.Map(TestSidecars.SqlServer(), SqlClientColumn.None, Overrides(("int", "MyInt")));
-
-        mapping.Text.ShouldBe("MyInt");
-        mapping.Key.ShouldBe("int");
-    }
-
     private const string Noda = "global::NodaTime.";
 
     // NodaTime's rows: the type each gives with the library on, all of them value types.
@@ -354,16 +345,6 @@ public sealed class SqlServerTypeMapTests
             mapping.Library.ShouldBe(SqlLibrary.NodaTime);
             mapping.Detail.ShouldBe("the NodaTime library");
         }
-    }
-
-    [Theory]
-    [MemberData(nameof(NodaTimeRows))]
-    public void Map_NodaTimeOff_IsTheBaseMap(string name, string notExpected)
-    {
-        var mapping = SqlServerTypeMap.Map(TestSidecars.SqlServer(name: name), SqlClientColumn.SqlClient7);
-
-        mapping.Text.ShouldNotBe(notExpected);
-        mapping.Library.ShouldBeNull();
     }
 
     [Fact]

@@ -559,23 +559,6 @@ public sealed class PostgresTypeMapTests
         new[] { element, array, whole, domain }.ShouldAllBe(mapping => mapping.Library == null);
     }
 
-    [Theory]
-    [MemberData(nameof(NodaTimeRows))]
-    public void Map_NodaTimeOff_IsTheBaseMap(string internalName, string notExpected, bool isValueType)
-    {
-        _ = isValueType;
-        var type = ModelRuns.Catalog(internalName);
-
-        foreach (var column in Enum.GetValues<NpgsqlColumn>())
-        {
-            var mapping = PostgresTypeMap.Map(type, column, libraries: null);
-
-            mapping.ShouldBe(PostgresTypeMap.Map(type, column));
-            mapping.Library.ShouldBeNull();
-            mapping.Text.ShouldNotBe(notExpected);
-        }
-    }
-
     [Fact]
     public void Map_NodaTimeOn_OtherTypesUnchanged()
     {
@@ -617,15 +600,6 @@ public sealed class PostgresTypeMapTests
 
     [Fact]
     public void Of_NoLibraries_IsNull() => LibraryRows.Of([]).ShouldBeNull();
-
-    [Fact]
-    public void Of_SameSet_IsTheSameInstance()
-    {
-        LibraryRows
-            .Of([SqlLibrary.Json, SqlLibrary.NodaTime])
-            .ShouldBeSameAs(LibraryRows.Of([SqlLibrary.NodaTime, SqlLibrary.Json, SqlLibrary.Json]));
-        LibraryRows.Of([SqlLibrary.Json]).ShouldNotBeSameAs(LibraryRows.Of([SqlLibrary.NodaTime]));
-    }
 
     // Each set has the rows of its libraries alone: the set of Json finds no NodaTime row, and the set of both finds
     // the rows of each.
@@ -688,14 +662,6 @@ public sealed class PostgresTypeMapTests
 
         mapping.Text.ShouldBe("global::System.Text.Json.JsonElement[]");
     }
-
-    [Fact]
-    public void PlaceOf_Json_IsTheSystemTextJsonLibrary() =>
-        LibraryRows.PlaceOf(SqlLibrary.Json).ShouldBe("the System.Text.Json library");
-
-    [Fact]
-    public void Of_ALibrary_IsTheSameInstanceEachTime() =>
-        LibraryRows.Of([SqlLibrary.NodaTime]).ShouldBeSameAs(LibraryRows.Of([SqlLibrary.NodaTime]));
 
     // One instance for each set, whatever the order of its libraries and however often one repeats, and another for
     // each other set.

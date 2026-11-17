@@ -627,24 +627,6 @@ public sealed class SharedModelTests
         );
     }
 
-    [Fact]
-    public void Run_InternalMappedTypeInAPublicModel_IsSqlsrc251AtTheQuery()
-    {
-        var run = Run(
-            Source + "\n\nnamespace MyApp\n{\n    internal readonly struct Inner;\n}\n",
-            [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])],
-            settings: /*lang=json,strict*/
-            """{"typeOverrides": {"int4": "MyApp.Inner"}}"""
-        );
-
-        AssertUnusable(
-            run,
-            $"SQLSRC251 {GetUserName}: 'int4' is mapped to 'MyApp.Inner' for column 'id', in {TheProjectFilePlace}, "
-                + "and that type is not public, and the model 'App.GetUserDto' is.  Make the type public, or make "
-                + "each type that claims the query's file internal."
-        );
-    }
-
     // Each property whose type is not public is an error of its own.
     [Fact]
     public void Run_TwoInternalMappedTypesInAPublicModel_AreTwoSqlsrc251AtTheQuery()

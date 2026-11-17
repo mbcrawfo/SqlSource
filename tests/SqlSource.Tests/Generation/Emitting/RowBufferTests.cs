@@ -19,6 +19,7 @@ public sealed class RowBufferTests
         Collection = CollectionKind.Array,
     };
 
+    // IAsyncEnumerable is left out: a streaming method yields each row as it reads it, so it has nothing to buffer.
     private static readonly HashSet<CollectionKind> Pooled =
     [
         CollectionKind.Array,
@@ -50,22 +51,6 @@ public sealed class RowBufferTests
             }
         }
     }
-
-    // A streaming method yields each row as it reads it, so it has nothing to buffer.
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void IsUsedBy_ManyOfIAsyncEnumerable_IsFalse(bool useArrayPool) =>
-        RowBuffer
-            .IsUsedBy(
-                ListUsers with
-                {
-                    Shape = ResultShape.Many,
-                    Collection = CollectionKind.IAsyncEnumerable,
-                    UseArrayPool = useArrayPool,
-                }
-            )
-            .ShouldBeFalse();
 
     // A collection method collects the rows of one and one-optional too, into the buffer a many method reads into.
     [Theory]
