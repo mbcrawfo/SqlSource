@@ -388,9 +388,10 @@ step 'shellcheck' shell tools/shellcheck.sh || true
 step 'shfmt' shell tools/shfmt.sh --check || true
 step 'actionlint' workflow tools/actionlint.sh || true
 templater_dir='src/sqlfluff-templater-sqlsource'
-step 'templater lint' templater uv run --directory "$templater_dir" ruff check || true
-step 'templater format' templater uv run --directory "$templater_dir" ruff format --check || true
-step 'templater tests' templater uv run --directory "$templater_dir" pytest || true
+# --locked makes a stale uv.lock fail the validation instead of being rewritten by it, as a restore's locked mode does.
+step 'templater lint' templater uv run --locked --directory "$templater_dir" ruff check || true
+step 'templater format' templater uv run --locked --directory "$templater_dir" ruff format --check || true
+step 'templater tests' templater uv run --locked --directory "$templater_dir" pytest || true
 step 'site' site tools/build-site.sh || true
 if step 'build' always dotnet build "$SOLUTION"; then
     step 'test' always dotnet test --solution "$test_solution" --no-build || true

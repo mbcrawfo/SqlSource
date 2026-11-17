@@ -45,9 +45,9 @@ The eleven test projects, the four libraries they share and a stand-in of the to
 `src/sqlfluff-templater-sqlsource` is the sqlfluff templater, a Python project that is published to PyPI and is not part of the solution.  Run its checks in its folder; the first `uv run` creates its virtual environment:
 
 ```bash
-uv run --directory src/sqlfluff-templater-sqlsource ruff check
-uv run --directory src/sqlfluff-templater-sqlsource ruff format --check
-uv run --directory src/sqlfluff-templater-sqlsource pytest
+uv run --locked --directory src/sqlfluff-templater-sqlsource ruff check
+uv run --locked --directory src/sqlfluff-templater-sqlsource ruff format --check
+uv run --locked --directory src/sqlfluff-templater-sqlsource pytest
 ```
 
 CI also tests it on the lowest sqlfluff it allows and on the newest, which a run of the script does not; the command of the lowest is in [its `AGENTS.md`](src/sqlfluff-templater-sqlsource/AGENTS.md).  Its corpus is written by a test of the solution, and [`tests/README.md`](tests/README.md#the-templaters-corpus) has the command that writes it.

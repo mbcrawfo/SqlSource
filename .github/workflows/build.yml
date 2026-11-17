@@ -92,15 +92,15 @@ jobs:
 
       - name: Lint
         if: ${{ !cancelled() }}
-        run: uv run ruff check
+        run: uv run --locked ruff check
 
       - name: Check formatting
         if: ${{ !cancelled() }}
-        run: uv run ruff format --check
+        run: uv run --locked ruff format --check
 
       - name: Test
         if: ${{ !cancelled() }}
-        run: uv run pytest
+        run: uv run --locked pytest
 
       # The floor of pyproject.toml, in a fresh environment.  When the lock moves past the floor, this step is what
       # keeps the floor tested.  The first command shows which sqlfluff it is, and fails when it is not the floor.

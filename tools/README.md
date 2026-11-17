@@ -78,7 +78,7 @@ Last, it runs `sqlsource --version` again with `DOTNET_ROLL_FORWARD` set to `Lat
 ./format.sh [--check] [style|analyzers|csharpier|ruff ...] [-- file ...]
 ```
 
-Without `--check` it rewrites files in place.  The part names choose which of `dotnet format style`, `dotnet format analyzers`, CSharpier and `ruff` run, always in that order, and all four run when none is given.  The `ruff` part runs `uv run ruff check --fix` and `uv run ruff format` in `src/sqlfluff-templater-sqlsource`, or with `--check` `ruff check` and `ruff format --check`, so it needs uv.  Files after `--`, as paths from the repository root, limit the three C# parts to those files: the two `dotnet format` parts take them as `--include`, and CSharpier checks them in place of the tree; `ruff` ignores them.  That is how a pre-commit run checks only the `.cs` files that changed.  `--` with no file after it is a usage error.
+Without `--check` it rewrites files in place.  The part names choose which of `dotnet format style`, `dotnet format analyzers`, CSharpier and `ruff` run, always in that order, and all four run when none is given.  The `ruff` part runs `uv run --locked ruff check --fix` and `uv run --locked ruff format` in `src/sqlfluff-templater-sqlsource`, or with `--check` `ruff check` and `ruff format --check`, so it needs uv, and fails on a stale `uv.lock` instead of rewriting it.  Files after `--`, as paths from the repository root, limit the three C# parts to those files: the two `dotnet format` parts take them as `--include`, and CSharpier checks them in place of the tree; `ruff` ignores them.  That is how a pre-commit run checks only the `.cs` files that changed.  `--` with no file after it is a usage error.
 
 ## Test scopes
 

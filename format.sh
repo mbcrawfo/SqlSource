@@ -86,10 +86,11 @@ if [[ "$check" == false ]]; then
     if [[ "$csharpier" == true ]]; then
         dotnet csharpier format "${targets[@]}"
     fi
-    # uv runs in the project's folder, so that it reads .python-version and uv.lock, and creates a missing .venv.
+    # uv runs in the project's folder, so that it reads .python-version and uv.lock, and creates a missing .venv;
+    # --locked fails on a stale uv.lock instead of rewriting it.
     if [[ "$ruff" == true ]]; then
-        uv run --directory "$TEMPLATER" ruff check --fix
-        uv run --directory "$TEMPLATER" ruff format
+        uv run --locked --directory "$TEMPLATER" ruff check --fix
+        uv run --locked --directory "$TEMPLATER" ruff format
     fi
     exit 0
 fi
@@ -112,7 +113,7 @@ if [[ "$csharpier" == true ]]; then
     dotnet csharpier check "${targets[@]}" || status=1
 fi
 if [[ "$ruff" == true ]]; then
-    uv run --directory "$TEMPLATER" ruff check || status=1
-    uv run --directory "$TEMPLATER" ruff format --check || status=1
+    uv run --locked --directory "$TEMPLATER" ruff check || status=1
+    uv run --locked --directory "$TEMPLATER" ruff format --check || status=1
 fi
 exit "$status"
