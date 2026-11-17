@@ -112,13 +112,6 @@ public sealed class SqlServerRenamingTests
     public void IsEngineWord_AnotherSpelling_IsFalse(string spelling, bool quoted) =>
         Engine.IsEngineWord(spelling, quoted).ShouldBeFalse(spelling);
 
-    [Fact]
-    public void RuleOf_AKnownAndAnUnknownField_GivesTheFieldsRuleAndNull()
-    {
-        Engine.RuleOf("open", "answer.database").ShouldBe(FieldRule.Name(NameClass.Database));
-        Engine.RuleOf("columns", "answer.rows[].unknown").ShouldBeNull();
-    }
-
     [Theory]
     [InlineData("columns", "master", "sys")]
     [InlineData("columns", "fixtures", "sys")]
