@@ -44,6 +44,6 @@ None: the change removes two tests and adds no behaviour.  Checked against the s
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows the removed test did not make.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-09/coverage-after/SqlSource.Tool.Tests`: no file of `src/SqlSource.Tool/*.cs` falls.
-- [ ] **Step 3:** The pull request lists each removed test beside its cover, the compare result, the coverage figures and the run times.
+- [x] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows the removed test did not make.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-09/coverage-after/SqlSource.Tool.Tests`: no file of `src/SqlSource.Tool/*.cs` falls.
+- [x] **Step 3:** The pull request lists each removed test beside its cover, the compare result, the coverage figures and the run times.
