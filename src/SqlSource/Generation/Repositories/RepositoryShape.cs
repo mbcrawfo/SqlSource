@@ -15,10 +15,10 @@ namespace SqlSource.Generation.Repositories;
 /// </param>
 /// <param name="HeldCandidates">
 /// The marked members of the types of the fields, properties and parameters that the repository holds, which only a
-/// repository with no candidate of its own uses.
+/// database that <paramref name="Candidates" /> neither give a candidate nor fail uses.
 /// </param>
 /// <param name="GlobalCandidates">
-/// The marked static members of the types of the project, which are the last resort.
+/// The marked static members of the types of the project, which are the last resort of a database.
 /// </param>
 /// <param name="HeldParameters">
 /// The names of the primary constructor's parameters that the conventions would take, but that an argument of the base

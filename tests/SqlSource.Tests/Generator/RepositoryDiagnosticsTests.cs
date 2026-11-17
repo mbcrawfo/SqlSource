@@ -43,8 +43,9 @@ public sealed class RepositoryDiagnosticsTests
                 "SQLSRC028 /app/Repo/Sample.cs(5,6)-(5,37): 'App.Sample' has no connection for the database "
                     + "'postgres', which its repository queries use.  Add a string field, property or "
                     + "primary-constructor parameter named connectionString, or one of a DbDataSource type, or "
-                    + "mark the member that gives the connection [SqlSourceConnection].  Or set the output of its "
-                    + "repository queries to methods.",
+                    + "mark the member that gives the connection [SqlSourceConnection], whether a member of the type, "
+                    + "an instance member of a type it holds in a field, property or primary-constructor parameter, "
+                    + "or a static member of the project.  Or set the output of its repository queries to methods.",
             ]);
 
         // The file holds the type's interface alone, empty.
