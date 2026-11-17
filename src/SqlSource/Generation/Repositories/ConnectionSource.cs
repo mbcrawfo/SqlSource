@@ -36,6 +36,10 @@ namespace SqlSource.Generation.Repositories;
 /// reached from; else null.
 /// </param>
 /// <param name="HolderName">The holder's name, as a value, for a held candidate; else null.</param>
+/// <param name="HolderCanBeNull">
+/// Whether the holder of a held candidate can be null, so that a method checks it before it reads the member; false
+/// for a struct's, and for a candidate that is not held.
+/// </param>
 internal sealed record ConnectionSource(
     ConnectionSourceKind Kind,
     CandidateMember Member,
@@ -47,5 +51,6 @@ internal sealed record ConnectionSource(
     string TypeName,
     bool InStruct,
     string? HolderAccessText = null,
-    string? HolderName = null
+    string? HolderName = null,
+    bool HolderCanBeNull = false
 );

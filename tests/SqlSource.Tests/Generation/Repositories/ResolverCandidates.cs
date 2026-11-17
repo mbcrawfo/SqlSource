@@ -71,7 +71,8 @@ internal static class ResolverCandidates
         bool isAsync = false,
         CandidateMember holderMember = CandidateMember.Parameter,
         bool holderIsStatic = false,
-        string? declared = null
+        string? declared = null,
+        bool holderCanBeNull = true
     ) =>
         Candidate(name, type, member, isMarked: true, database: database, declared: declared) with
         {
@@ -83,7 +84,8 @@ internal static class ResolverCandidates
                 holderMember,
                 holderIsStatic,
                 "IDatabaseFactory",
-                new LocationInfo(TestModels.SourceFile, new TextSpan(300 + holder.Length, holder.Length), default)
+                new LocationInfo(TestModels.SourceFile, new TextSpan(300 + holder.Length, holder.Length), default),
+                holderCanBeNull
             ),
         };
 

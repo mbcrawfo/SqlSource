@@ -23,6 +23,9 @@ public sealed class CachingRepositoryTests
 
     private const string ConnectionString = "    private readonly string connectionString = \"\";\n";
 
+    // The file of the project's marked static, which no edit of the repository's own files touches.
+    private const string GlobalsPath = "/app/Db.cs";
+
     private const string RepositoryPath = "/app/Repo/UserRepository.cs";
 
     // The file the repository claims by its name, and the file of its methods.
@@ -36,6 +39,16 @@ public sealed class CachingRepositoryTests
             public abstract class RepositoryBase
             {
                 protected string Name { get; } = "";
+            }
+        }
+        """;
+
+    private const string Globals = """
+        namespace App
+        {
+            public static class Db
+            {
+                [SqlSource.SqlSourceConnection] public static string Reports { get; set; } = "";
             }
         }
         """;
@@ -285,14 +298,64 @@ public sealed class CachingRepositoryTests
         );
     }
 
+    // An edit of a file without a global mark reads no mark again, and the check over the compilation gives an equal
+    // value, so nothing after either runs again.
+    [Fact]
+    public void Run_EditUnrelatedToAGlobalMark_LeavesTheMarksEqual()
+    {
+        var compilation = RepositoryCompilation(Globals);
+        var driver = FirstRunOfRepository(compilation);
+        CachingScene.MethodsOf(driver.GetRunResult(), RepositoryMethods).ShouldContain("global::App.Db.Reports ?? ");
+
+        var edited = Base.Replace("= \"\";", "= \"name\";", System.StringComparison.Ordinal);
+        var result = Run(driver, WithTree(compilation, BasePath, edited));
+
+        AllReasons(result, TrackingNames.GlobalConnectionMarks)
+            .ShouldAllBe(reason =>
+                reason == IncrementalStepRunReason.Unchanged || reason == IncrementalStepRunReason.Cached
+            );
+        AllReasons(result, TrackingNames.GlobalConnectionChecks)
+            .ShouldAllBe(reason =>
+                reason == IncrementalStepRunReason.Unchanged || reason == IncrementalStepRunReason.Cached
+            );
+        AllReasons(result, TrackingNames.RepositoryShapes).ShouldBe([IncrementalStepRunReason.Unchanged]);
+    }
+
+    // A repository with no source of its own gets its method once a static of the project is marked.
+    [Fact]
+    public void Run_GlobalMarkAdded_ResolvesTheRepositoryAgain()
+    {
+        var unmarked = Globals.Replace("[SqlSource.SqlSourceConnection] ", "", System.StringComparison.Ordinal);
+        var compilation = RepositoryCompilation(unmarked);
+        var driver = FirstRunOfRepository(compilation);
+        driver.GetRunResult().Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC028");
+
+        var result = Run(driver, WithTree(compilation, GlobalsPath, Globals));
+
+        result.Diagnostics.ShouldBeEmpty();
+        AllReasons(result, TrackingNames.GlobalConnectionMarks).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.RepositoryShapes).ShouldBe([IncrementalStepRunReason.Modified]);
+        CachingScene
+            .MethodsOf(result, RepositoryMethods)
+            .ShouldContain("var connection = new global::Npgsql.NpgsqlConnection(global::App.Db.Reports ?? ");
+    }
+
     // UserQueries of the namespace App, with these members.
     private static string UserQueries(string members) =>
         CachingScene.TypeSource("App", "UserQueries", members: members);
 
-    // RepositoryBase and UserRepository, which derives from it, with the reference to Npgsql 10.
-    private static CSharpCompilation RepositoryCompilation() =>
+    // RepositoryBase and UserRepository, which derives from it, and the file of the project's statics when it is
+    // given, with the reference to Npgsql 10.
+    private static CSharpCompilation RepositoryCompilation(string? globals = null) =>
         GeneratorHarness.CreateCompilation(
-            [new SourceFile(BasePath, Base), new SourceFile(RepositoryPath, Repository)],
+            globals is null
+                ? [new SourceFile(BasePath, Base), new SourceFile(RepositoryPath, Repository)]
+                :
+                [
+                    new SourceFile(BasePath, Base),
+                    new SourceFile(RepositoryPath, Repository),
+                    new SourceFile(GlobalsPath, globals),
+                ],
             references: [NpgsqlReferences.Npgsql10]
         );
 

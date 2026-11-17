@@ -79,9 +79,12 @@ internal static class HeldFactoryReader
             return null;
         }
 
+        // A Nullable<T> is a value type that can be null.
+        var canBeNull = !type.IsValueType;
         if (type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
         {
             type = nullable.TypeArguments[0];
+            canBeNull = true;
         }
 
         if (FactoryTypesOf(type).Count == 0)
@@ -90,7 +93,7 @@ internal static class HeldFactoryReader
         }
 
         var location = ConnectionCandidateReader.SourceLocationOr(symbol, fallback);
-        return (new CandidateHolder(symbol.Name, member, symbol.IsStatic, type.Name, location), type);
+        return (new CandidateHolder(symbol.Name, member, symbol.IsStatic, type.Name, location, canBeNull), type);
     }
 
     // The types whose members a value of the type has: the type, or each type a type parameter is constrained to.  Not

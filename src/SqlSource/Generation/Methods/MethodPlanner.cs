@@ -984,8 +984,10 @@ internal static class MethodPlanner
         return true;
     }
 
-    // What a token of the name would hide of the source, as SQLSRC275 says it: the primary-constructor parameter, or
-    // the type a static member is reached through.  Null when it hides nothing.
+    // What a token of the name would hide of the source, as SQLSRC275 says it: the primary-constructor parameter that
+    // gives the connection or holds the factory that does, or the type a static member, or a static holder, is reached
+    // through.  Null when it hides nothing.  A member never has its type's name, so a leading name that is the holder's
+    // is a parameter's.
     private static string? HiddenSourceReason(ConnectionSource? source, string name)
     {
         if (source?.LeadingName is not { } leadingName || !string.Equals(leadingName, name, StringComparison.Ordinal))
@@ -993,31 +995,46 @@ internal static class MethodPlanner
             return null;
         }
 
-        return source.Member == CandidateMember.Parameter
-            ? "the primary-constructor parameter '"
+        if (source.Member == CandidateMember.Parameter)
+        {
+            return "the primary-constructor parameter '"
                 + leadingName
                 + "', which gives the repository methods of '"
                 + source.TypeName
-                + "' their connection"
-            : "the type '"
-                + leadingName
-                + "', through which the repository methods of '"
-                + source.TypeName
-                + "' reach their connection '"
-                + source.MemberName
-                + "'";
+                + "' their connection";
+        }
+
+        var through = string.Equals(source.HolderName, leadingName, StringComparison.Ordinal)
+            ? "the primary-constructor parameter '"
+            : "the type '";
+        return through
+            + leadingName
+            + "', through which the repository methods of '"
+            + source.TypeName
+            + "' reach their connection '"
+            + source.MemberName
+            + "'";
     }
 
-    // What SQLSRC274 says takes the name of a repository's method that is its source's: a member of a base type or a
-    // parameter, which the method would hide from itself.  A member of the type's own is found as any member is.
-    private static string? FindTakenBySource(ConnectionSource? source, string name) =>
-        source is not null && string.Equals(source.MemberName, name, StringComparison.Ordinal)
-            ? "the repository methods of '"
-                + source.TypeName
-                + "' get their connection from '"
-                + source.MemberName
-                + "'"
+    // What SQLSRC274 says takes the name of a repository's method that is its source's, or its source's holder's: a
+    // member of a base type or a parameter, which the method would hide from itself.  A member of the type's own is
+    // found as any member is.
+    private static string? FindTakenBySource(ConnectionSource? source, string name)
+    {
+        if (source is null)
+        {
+            return null;
+        }
+
+        if (string.Equals(source.MemberName, name, StringComparison.Ordinal))
+        {
+            return "the repository methods of '" + source.TypeName + "' get their connection from '" + name + "'";
+        }
+
+        return string.Equals(source.HolderName, name, StringComparison.Ordinal)
+            ? "the repository methods of '" + source.TypeName + "' get their connection through '" + name + "'"
             : null;
+    }
 
     // The input model, or null when the query has no parameters.  False when it needs one and has none, when its
     // properties do not match its parameters, which is never thrown on, or when a parameter's converter blocks it.

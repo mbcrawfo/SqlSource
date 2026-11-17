@@ -4728,7 +4728,7 @@ The name is taken in each of these cases:
 
 - **Under the [member location](reference/member-placement.md#locations) `extension-class`, it is the name of the extension class that holds the method.**  It is also taken by a member of `DbConnection` or of `object`, such as `Open` or `ToString`.  A call on a connection would find that member before the extension method.  `extension-class` is the default of the output `methods`.
 - **Under `class`, it is the name of a member of the type, of the type itself, or of one of its type parameters.**  It is also taken by the constant or token method of another query of the type, when that method is on the type too.  A nested class that the queries of the type put members in also takes it.
-- **For a `repository` query, it is also the name of the member that its method gets its connection from.**  That is the member of a base type, or the primary-constructor parameter, which the method would hide.
+- **For a `repository` query, it is also the name of the member that its method gets its connection from, or of the field, property or parameter that holds the factory it comes from.**  That is the member of a base type, or the primary-constructor parameter, which the method would hide.
 - **For a synchronous method of a `repository` query that takes no argument, it is also the name `Finalize`.**  Such a method has no parameters and no tokens.  A method of that name and no argument would be taken for the finalizer of the type, and the compiler warns of it.  The asynchronous method of the query, which takes a cancellation token, is not refused.  Nor is a synchronous method that takes a parameter or a token.
 - **For a public method of a `repository` query, it is also the name of the [interface](#sqlsrc035) of the type.**  The interface holds the method too, and a member of it cannot have its name.  The interface is still generated, without the method.
 - **Under `nested-class`, it is the name of the constant, token method or method of another query of the type in the same class.**  That query may come from another file of the type.
@@ -4767,7 +4767,7 @@ A token of a query whose output is `repository` or `methods` has the name of an 
 
 A token is an argument of the method too, so it cannot take one of these names.  That holds even in a query without parameters, whose method has no `parameters`.  So the method is not generated.
 
-A token of a `repository` query also cannot take the name of what its method gets its connection through.  The argument of the token would hide it.  That is the primary-constructor parameter that gives the connection, or the type, when the connection comes from a `static` member of the type.
+A token of a `repository` query also cannot take the name of what its method gets its connection through.  The argument of the token would hide it.  That is the primary-constructor parameter that gives the connection or holds the factory it comes from, or the type, when the connection comes from a `static` member of the type or a factory in one.
 
 The first sample is a token with the name of an argument.  The second is a token with the name of the primary-constructor parameter:
 

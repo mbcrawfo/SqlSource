@@ -208,6 +208,7 @@ internal static partial class ConnectionResolver
                 LeadingName = LeadingNameOf(holder.Name, holder.Member, holder.IsStatic),
                 HolderAccessText = holderAccess,
                 HolderName = holder.Name,
+                HolderCanBeNull = holder.CanBeNull,
             };
         }
 

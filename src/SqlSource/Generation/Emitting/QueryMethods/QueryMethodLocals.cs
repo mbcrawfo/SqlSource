@@ -65,7 +65,7 @@ internal sealed class QueryMethodLocals
         ConnectionScope = source is null or { Kind: ConnectionSourceKind.Borrowed }
             ? string.Empty
             : names.Take("connectionScope");
-        (SourceLocal, SourceValue, SourceAccess) = SourceOf(source, streams, names);
+        (SourceLocal, SourceValue, SourceAccess, SourceHolder) = SourceOf(source, streams, names);
 
         Sql = names.Take("sql");
         WasClosed = names.Take("wasClosed");
@@ -135,16 +135,23 @@ internal sealed class QueryMethodLocals
     public string ConnectionScope { get; }
 
     // The local that a struct repository's streaming method declares before its iterator, since a local function of a
-    // struct reaches neither this nor a primary-constructor parameter: the source's value, or a copy of the struct for
-    // an instance method, through which overloads resolve as written.  Empty, as SourceValue is, for any other method.
+    // struct reaches neither this nor a primary-constructor parameter: the holder of a held source, the source's value,
+    // or a copy of the struct for an instance method, through which overloads resolve as written.  Empty, as
+    // SourceValue is, for any other method.
     public string SourceLocal { get; }
 
-    // What SourceLocal is set to: the source's access, or this.
+    // What SourceLocal is set to: the holder's access, which the declaration checks for null when it can be, the
+    // source's access, or this.
     public string SourceValue { get; }
 
     // The source as the body reaches it: its access, or through SourceLocal.  Empty for a method that takes its
     // connection.
     public string SourceAccess { get; }
+
+    // The start of SourceAccess that the body checks for null before it reads the member after it: a held source's
+    // holder.  Empty for a source that is not held, for one whose holder cannot be null, and for one whose holder
+    // SourceLocal holds, checked where it is declared.
+    public string SourceHolder { get; }
 
     public string Sql { get; }
 
@@ -199,9 +206,10 @@ internal sealed class QueryMethodLocals
     // The names of what a collection method declares to run its items in batches, or null for a query method.
     public BatchLocals? Batch { get; }
 
-    // The local of a struct repository's streaming method, its value, and the source as the body reaches it.  A static
-    // method is reached through its type, which the iterator can reach.
-    private static (string Local, string Value, string Access) SourceOf(
+    // The local of a struct repository's streaming method, its value, the source as the body reaches it, and the
+    // holder the body checks.  A held source's holder is copied, so that its check runs before the iterator, and its
+    // member is reached through the copy.  A static method is reached through its type, which the iterator can reach.
+    private static (string Local, string Value, string Access, string Holder) SourceOf(
         ConnectionSource? source,
         bool streams,
         LocalNames names
@@ -209,28 +217,35 @@ internal sealed class QueryMethodLocals
     {
         if (source is null)
         {
-            return (string.Empty, string.Empty, string.Empty);
+            return (string.Empty, string.Empty, string.Empty, string.Empty);
         }
 
         if (!streams || !source.InStruct)
         {
-            return (string.Empty, string.Empty, source.AccessText);
+            var checkedHolder = source is { HolderAccessText: { } held, HolderCanBeNull: true } ? held : string.Empty;
+            return (string.Empty, string.Empty, source.AccessText, checkedHolder);
+        }
+
+        if (source.HolderAccessText is { } holder)
+        {
+            var local = names.Take("source");
+            return (local, holder, local + source.AccessText.Substring(holder.Length), string.Empty);
         }
 
         if (source.Member != CandidateMember.Method)
         {
             var local = names.Take("source");
-            return (local, source.AccessText, local);
+            return (local, source.AccessText, local, string.Empty);
         }
 
         // An instance member's access is this, a dot and its name; a static one's starts with its type.
         if (!source.AccessText.StartsWith(This, StringComparison.Ordinal))
         {
-            return (string.Empty, string.Empty, source.AccessText);
+            return (string.Empty, string.Empty, source.AccessText, string.Empty);
         }
 
         var self = names.Take("self");
-        return (self, "this", self + source.AccessText.Substring(This.Length - 1));
+        return (self, "this", self + source.AccessText.Substring(This.Length - 1), string.Empty);
     }
 
     // Whether a parameter's binding matches its value as one that can be null: one bound through a converter, or an

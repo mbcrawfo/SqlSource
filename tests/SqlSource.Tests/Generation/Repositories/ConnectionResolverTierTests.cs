@@ -156,6 +156,19 @@ public sealed class ConnectionResolverTierTests
         resolved.LeadingName.ShouldBeNull();
     }
 
+    // A holder of a struct cannot be null, so a method reads its member unchecked; any other holder is checked.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Resolve_HeldSource_ChecksAHolderThatCanBeNull(bool canBeNull)
+    {
+        var held = Held("dbf", "Open", holderCanBeNull: canBeNull);
+
+        var resolution = Resolve(Tiers([], held: [held]), Main);
+
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.HolderCanBeNull.ShouldBe(canBeNull);
+    }
+
     [Fact]
     public void Resolve_EachDatabaseFromItsOwnTier()
     {

@@ -13,10 +13,15 @@ namespace SqlSource.Generation.Repositories;
 /// The holder type's simple name, such as <c>IDatabaseFactory</c>, which a message gives.
 /// </param>
 /// <param name="Location">Where the holder is declared.</param>
+/// <param name="CanBeNull">
+/// Whether its value can be null: false for a struct, or a type parameter constrained to one, which <c>??</c> cannot
+/// test, and true for a <c>Nullable&lt;T&gt;</c> and anything else.
+/// </param>
 internal sealed record CandidateHolder(
     string Name,
     CandidateMember Member,
     bool IsStatic,
     string TypeName,
-    LocationInfo Location
+    LocationInfo Location,
+    bool CanBeNull
 );

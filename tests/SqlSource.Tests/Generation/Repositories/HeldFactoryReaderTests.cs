@@ -497,6 +497,42 @@ public sealed class HeldFactoryReaderTests
         candidate.Holder.ShouldNotBeNull().TypeName.ShouldBe("DatabaseFactory");
     }
 
+    // A holder of a struct, or of a type parameter constrained to one, can never be null; a Nullable<T> of a struct, a
+    // class, an interface and a type parameter that may be a class can.
+    [Theory]
+    [InlineData("UserRepository(DatabaseFactory dbf)", false)]
+    [InlineData("UserRepository<T>(T dbf) where T : struct, IDatabaseFactory", false)]
+    [InlineData("UserRepository(DatabaseFactory? dbf)", true)]
+    [InlineData("UserRepository(IDatabaseFactory dbf)", true)]
+    [InlineData("UserRepository<T>(T dbf) where T : IDatabaseFactory", true)]
+    public void Read_Holder_SaysWhetherItCanBeNull(string declaration, bool canBeNull)
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public struct DatabaseFactory : IDatabaseFactory
+                {
+                    public DbConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class
+            """
+                + " "
+                + declaration
+                + ";\n}\n"
+        );
+
+        shape.HeldCandidates.ShouldHaveSingleItem().Holder.ShouldNotBeNull().CanBeNull.ShouldBe(canBeNull);
+    }
+
     [Fact]
     public void Read_TypeParameterHolder_ReadsItsConstraint()
     {

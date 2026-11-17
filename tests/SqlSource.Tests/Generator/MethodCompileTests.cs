@@ -17,6 +17,20 @@ namespace SqlSource.Tests.Generator;
 // warning wave, so a method compiles with no error and no warning in what is generated.
 public sealed class MethodCompileTests
 {
+    // The usings of a source whose members of each kind MembersOf gives, and the namespace it opens.
+    private const string SourcesUsings = """
+        using System.Data.Common;
+        using System.Threading;
+        using System.Threading.Tasks;
+        using Microsoft.Data.SqlClient;
+        using Npgsql;
+        using SqlSource;
+
+        namespace App
+        {
+
+        """;
+
     private static readonly SqlFile Postgres = new(
         GeneratorHarness.UsersPath,
         """
@@ -567,6 +581,233 @@ public sealed class MethodCompileTests
         methods.ShouldContain(contract);
         methods.ShouldContain(" FindUser(\n");
         methods.ShouldContain(" StreamDocuments(\n");
+    }
+
+    // A repository that holds a factory of each kind of connection source, for each engine, through a parameter and
+    // through a field, reached through the holder, which each method checks for null first.
+    [Theory]
+    [InlineData("connection string", "parameter")]
+    [InlineData("connection string", "field")]
+    [InlineData("data source", "parameter")]
+    [InlineData("data source", "field")]
+    [InlineData("factory", "parameter")]
+    [InlineData("factory", "field")]
+    [InlineData("borrowed", "parameter")]
+    [InlineData("borrowed", "field")]
+    public void Run_HeldFactoryOfEachKind_Compiles(string kind, string holder)
+    {
+        var repository =
+            holder == "parameter"
+                ? "    public partial class Repo(Factory factory);\n"
+                : "    public partial class Repo\n    {\n        private readonly Factory _factory = new();\n    }\n";
+        var source =
+            SourcesUsings
+            + "    public class Factory\n    {\n"
+            + MembersOf(kind, string.Empty)
+            + "    }\n\n    [SqlSourceGenerate(Source = \".\")]\n"
+            + repository
+            + "}\n";
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources["App.Repo-Methods.g.cs"];
+        methods.ShouldContain(holder == "parameter" ? "(factory ?? throw " : "(this._factory ?? throw ");
+        methods.ShouldContain("\"The connection source '" + (holder == "parameter" ? "factory" : "_factory"));
+    }
+
+    // A holder that can be null, of an interface and of a struct, whose value a method reads after its check, in a
+    // project whose code has nullable annotations on.
+    [Fact]
+    public void Run_NullableHolder_CompilesWithoutWarnings()
+    {
+        const string Source = """
+            #nullable enable
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Microsoft.Data.SqlClient;
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    Task<NpgsqlConnection> Open(CancellationToken cancellationToken);
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    string SqlServer { get; }
+                }
+
+                public struct StructFactory
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    public readonly NpgsqlConnection Open() => new();
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    public readonly ValueTask<SqlConnection?> OpenAsync(CancellationToken cancellationToken) =>
+                        new(new SqlConnection());
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Interfaces(IDatabaseFactory? dbf);
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Structs(StructFactory? dbf);
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial struct StructsInAStruct(StructFactory? dbf);
+            }
+            """;
+
+        var run = RunRepositories(Source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Interfaces-Methods.g.cs"].ShouldContain("(dbf ?? throw ");
+        run.Sources["App.Structs-Methods.g.cs"].ShouldContain("(dbf ?? throw ");
+        run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("var source = dbf ?? throw ");
+    }
+
+    // A holder of a struct, or of a type parameter constrained to one, can never be null, so a method reads its member
+    // with no check, which ?? could not apply to: in a class, and copied before a struct's iterator.
+    [Fact]
+    public void Run_HolderThatCannotBeNull_CompilesWithoutWarnings()
+    {
+        var source =
+            SourcesUsings
+            + """
+                    public interface IFactory
+                    {
+                        [SqlSourceConnection(Database = "postgres")]
+                        NpgsqlConnection Postgres();
+
+                        [SqlSourceConnection(Database = "mssql")]
+                        ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken);
+                    }
+
+                    public struct Factory : IFactory
+                    {
+
+                """
+            + MembersOf("factory", "readonly ")
+            + """
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Structs(Factory dbf);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Constrained<T>(T dbf)
+                        where T : struct, IFactory;
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct StructsInAStruct(Factory dbf);
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Structs-Methods.g.cs"].ShouldContain("= dbf.Postgres() ?? throw ");
+        run.Sources["App.Constrained-1-Methods.g.cs"].ShouldContain("= dbf.Postgres() ?? throw ");
+        run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("var source = dbf;\n");
+        run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("= source.Postgres() ?? throw ");
+    }
+
+    // A static of the project of each kind of connection source, for each engine, reached through its type in full.
+    [Theory]
+    [InlineData("connection string")]
+    [InlineData("data source")]
+    [InlineData("factory")]
+    [InlineData("borrowed")]
+    public void Run_GlobalOfEachKind_Compiles(string kind)
+    {
+        var source =
+            SourcesUsings
+            + "    public static class Connections\n    {\n"
+            + MembersOf(kind, "static ")
+            + "    }\n\n    [SqlSourceGenerate(Source = \".\")]\n    public partial class Repo;\n\n"
+            + "    [SqlSourceGenerate(Source = \".\")]\n    public partial struct StructRepo;\n}\n";
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Repo-Methods.g.cs"].ShouldContain("global::App.Connections.Postgres");
+        run.Sources["App.StructRepo-Methods.g.cs"].ShouldContain("global::App.Connections.SqlServer");
+    }
+
+    // A struct repository whose streaming methods reach a held member through a copy of the holder, checked before
+    // their iterator, which cannot reach this or a primary-constructor parameter of a struct: a parameter, a field and
+    // a static field.
+    [Fact]
+    public void Run_StructRepositoryStreamingThroughHolder_Compiles()
+    {
+        var source =
+            SourcesUsings
+            + "    public class Factory\n    {\n"
+            + MembersOf("factory", string.Empty)
+            + """
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct Parameters(Factory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct Fields
+                    {
+                        private readonly Factory? _factory;
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial record struct Statics
+                    {
+                        private static readonly Factory Shared = new();
+                    }
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("var source = factory ?? throw ");
+        run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("= source.Postgres() ?? throw ");
+        run.Sources["App.Fields-Methods.g.cs"].ShouldContain("var source = this._factory ?? throw ");
+        run.Sources["App.Statics-Methods.g.cs"].ShouldContain("var source = Statics.Shared ?? throw ");
+        run.Sources["App.Statics-Methods.g.cs"]
+            .ShouldContain("= await source.SqlServer(cancellationToken).ConfigureAwait(false) ?? throw ");
+    }
+
+    // A marked member of each engine, of the kind of connection source, instance or static as the modifier says, at
+    // the indent of a type's members in a namespace.
+    private static string MembersOf(string kind, string modifier)
+    {
+        var (postgres, sqlServer) = kind switch
+        {
+            "connection string" => (
+                "string Postgres { get; } = \"\";",
+                "string? SqlServer(CancellationToken cancellationToken) => null;"
+            ),
+            "data source" => (
+                "NpgsqlDataSource Postgres { get; } = NpgsqlDataSource.Create(\"\");",
+                "DbDataSource? SqlServer { get; set; }"
+            ),
+            "factory" => (
+                "NpgsqlConnection Postgres() => new();",
+                "ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken) => new(new SqlConnection());"
+            ),
+            "borrowed" => ("DbConnection? Postgres { get; set; }", "SqlConnection SqlServer = new();"),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+        return "        [SqlSourceConnection(Database = \"postgres\")]\n        public "
+            + modifier
+            + postgres
+            + "\n\n        [SqlSourceConnection(Database = \"mssql\")]\n        public "
+            + modifier
+            + sqlServer
+            + "\n";
     }
 
     // The repositories of the source, at Repository, claiming a postgres file and an mssql file of a query that reads

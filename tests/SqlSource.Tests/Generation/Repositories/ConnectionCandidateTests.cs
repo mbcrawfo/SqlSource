@@ -20,7 +20,7 @@ public sealed class ConnectionCandidateTests
         var candidate = Candidate("Open") with
         {
             Tier = CandidateTier.Held,
-            Holder = new CandidateHolder("dbf", CandidateMember.Parameter, false, "IDatabaseFactory", Location),
+            Holder = new CandidateHolder("dbf", CandidateMember.Parameter, false, "IDatabaseFactory", Location, true),
         };
 
         candidate.DisplayName.ShouldBe("dbf.Open");
