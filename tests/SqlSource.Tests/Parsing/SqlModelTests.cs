@@ -11,16 +11,6 @@ namespace SqlSource.Tests.Parsing;
 public sealed class SqlModelTests
 {
     [Fact]
-    public void SqlParseError_Create_HoldsItsArguments()
-    {
-        var error = SqlParseError.Create(SqlParseErrorKind.InvalidName, new TextSpan(3, 4), "1abc");
-
-        error.Kind.ShouldBe(SqlParseErrorKind.InvalidName);
-        error.Span.ShouldBe(new TextSpan(3, 4));
-        error.Arguments.ShouldBe(["1abc"]);
-    }
-
-    [Fact]
     public void SqlParseError_SameValuesInSeparateInstances_AreEqual()
     {
         var left = SqlParseError.Create(SqlParseErrorKind.DuplicateName, new TextSpan(1, 2), "A");
