@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -49,6 +50,12 @@ internal static class RepositoryShapes
             .Single<EquatableArray<RepositoryShape>>(run, TrackingNames.RepositoryShapes)
             .ShouldHaveSingleItem();
     }
+
+    // The line, from 0, of the file that Of compiles that holds the first line of the source with the text.
+    public static int LineOf(string source, string text) =>
+        Usings.Split('\n').Length
+        - 1
+        + source.Split('\n').ToList().FindIndex(line => line.Contains(text, StringComparison.Ordinal));
 
     // The name of the type that carries the attribute, which names the .sql file it claims.
     private static string MarkedTypeNameOf(string source) =>

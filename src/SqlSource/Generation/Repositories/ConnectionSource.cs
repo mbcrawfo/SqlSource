@@ -46,6 +46,10 @@ namespace SqlSource.Generation.Repositories;
 /// What kind of member the holder of a held candidate is, which says what a token of its leading name would hide;
 /// else null.
 /// </param>
+/// <param name="HolderCastText">
+/// The candidate's <see cref="ConnectionCandidate.CastTypeText" />: the interface that a method casts the holder to,
+/// after its null check, before it reaches the member; else null.
+/// </param>
 internal sealed record ConnectionSource(
     ConnectionSourceKind Kind,
     CandidateMember Member,
@@ -59,5 +63,6 @@ internal sealed record ConnectionSource(
     string? HolderAccessText = null,
     string? HolderName = null,
     bool HolderCanBeNull = false,
-    CandidateMember? HolderMember = null
+    CandidateMember? HolderMember = null,
+    string? HolderCastText = null
 );

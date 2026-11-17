@@ -170,6 +170,24 @@ public sealed class ConnectionResolverTierTests
         resolution.Sources.ShouldHaveSingleItem().Asynchronous.HolderCanBeNull.ShouldBe(canBeNull);
     }
 
+    // A held member that the holder's class implements explicitly is reached through a cast of the holder to its
+    // interface, which the access leaves to the emitter; any other is reached through the holder as it is.
+    [Theory]
+    [InlineData("global::App.IDatabaseFactory")]
+    [InlineData(null)]
+    public void Resolve_HeldSource_CarriesTheInterfaceItIsCastTo(string? cast)
+    {
+        var held = Held("dbf", "Open") with { CastTypeText = cast };
+
+        var resolution = Resolve(Tiers([], held: [held]), Main);
+
+        var resolved = resolution.Sources.ShouldHaveSingleItem().Asynchronous;
+        resolved.HolderCastText.ShouldBe(cast);
+        resolved.AccessText.ShouldBe("dbf.Open");
+        resolved.HolderAccessText.ShouldBe("dbf");
+        resolved.MemberName.ShouldBe("dbf.Open");
+    }
+
     [Fact]
     public void Resolve_EachDatabaseFromItsOwnTier()
     {

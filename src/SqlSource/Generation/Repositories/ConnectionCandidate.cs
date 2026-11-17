@@ -22,7 +22,7 @@ namespace SqlSource.Generation.Repositories;
 /// </param>
 /// <param name="DeclaredTypeName">
 /// The metadata name, with its namespace, of the member's type, of a method's return type, or of the connection type
-/// of a factory's task.
+/// of a method's task.
 /// </param>
 /// <param name="Location">
 /// Where the member is declared, or where the type's attribute is for a member of a base type in metadata.
@@ -35,6 +35,11 @@ namespace SqlSource.Generation.Repositories;
 /// </param>
 /// <param name="GlobalTypeText">
 /// The fully qualified type that declares a global candidate, such as <c>global::App.Outer.Db</c>; else null.
+/// </param>
+/// <param name="CastTypeText">
+/// The fully qualified interface, such as <c>global::App.IDatabaseFactory</c>, that a held candidate's holder is cast
+/// to before the member is reached, when the holder's class or struct cannot be called by the member's name: it
+/// implements the member explicitly, or leaves it to the interface's default.  Null for any other candidate.
 /// </param>
 internal sealed record ConnectionCandidate(
     string Name,
@@ -50,7 +55,8 @@ internal sealed record ConnectionCandidate(
     LocationInfo Location,
     CandidateTier Tier = CandidateTier.Own,
     CandidateHolder? Holder = null,
-    string? GlobalTypeText = null
+    string? GlobalTypeText = null,
+    string? CastTypeText = null
 )
 {
     /// <summary>

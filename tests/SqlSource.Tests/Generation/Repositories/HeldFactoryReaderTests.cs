@@ -128,6 +128,7 @@ public sealed class HeldFactoryReaderTests
         candidate.Name.ShouldBe("Open");
         candidate.IsMarked.ShouldBeTrue();
         candidate.Database.ShouldBe("audit");
+        candidate.CastTypeText.ShouldBeNull();
         candidate.Holder.ShouldNotBeNull().TypeName.ShouldBe("DatabaseFactory");
     }
 
@@ -656,17 +657,17 @@ public sealed class HeldFactoryReaderTests
         candidate.IsMarked.ShouldBeTrue();
     }
 
-    // A call through a holder of the class cannot name an explicit implementation.
+    // A call through a holder of the class cannot name an explicit implementation, so the candidate is the interface's
+    // member, marked as it is and reached through the interface, located at the implementation.
     [Fact]
-    public void Read_ExplicitImplementationOnAClassHolder_IsNotACandidate()
+    public void Read_ExplicitImplementationOnAClassHolder_IsReachedThroughTheInterface()
     {
-        var shape = RepositoryShapes.Of(
-            """
+        const string Source = """
             namespace App
             {
                 public interface IDatabaseFactory
                 {
-                    [SqlSourceConnection]
+                    [SqlSourceConnection(Database = "audit")]
                     Task<DbConnection> Open(CancellationToken ct);
                 }
 
@@ -677,6 +678,463 @@ public sealed class HeldFactoryReaderTests
 
                 [SqlSourceGenerate]
                 public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """;
+
+        var shape = RepositoryShapes.Of(Source);
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.Member.ShouldBe(CandidateMember.Method);
+        candidate.Type.ShouldBe(CandidateType.Factory);
+        candidate.IsAsync.ShouldBeTrue();
+        candidate.TakesCancellationToken.ShouldBeTrue();
+        candidate.IsMarked.ShouldBeTrue();
+        candidate.Database.ShouldBe("audit");
+        candidate.CastTypeText.ShouldBe("global::App.IDatabaseFactory");
+        candidate.Holder.ShouldNotBeNull().TypeName.ShouldBe("DatabaseFactory");
+        candidate.Location.LineSpan.Start.Line.ShouldBe(RepositoryShapes.LineOf(Source, "IDatabaseFactory.Open("));
+    }
+
+    // Each kind of member that a factory implements explicitly is read as the interface's member is.
+    [Theory]
+    [InlineData(
+        "string ConnectionString { get; }",
+        "string IDatabaseFactory.ConnectionString => \"\";",
+        "ConnectionString"
+    )]
+    [InlineData("string Connect();", "string IDatabaseFactory.Connect() => \"\";", "ConnectionString")]
+    [InlineData("NpgsqlDataSource Source { get; }", "NpgsqlDataSource IDatabaseFactory.Source => null!;", "DataSource")]
+    [InlineData("DbConnection Connection { get; }", "DbConnection IDatabaseFactory.Connection => null!;", "Connection")]
+    [InlineData("DbConnection Open();", "DbConnection IDatabaseFactory.Open() => null!;", "Factory")]
+    public void Read_ExplicitImplementationOfEachKind_IsReachedThroughTheInterface(
+        string member,
+        string implementation,
+        string type
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    {{member}}
+                }
+
+                public sealed class DatabaseFactory : IDatabaseFactory
+                {
+                    {{implementation}}
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Type.ShouldBe(Enum.Parse<CandidateType>(type));
+        candidate.CastTypeText.ShouldBe("global::App.IDatabaseFactory");
+    }
+
+    // The interface is written in full from global::, as the method's code can name it: closed over the factory's type
+    // arguments, with a nullable annotation's ?, a keyword's @ and the types it is nested in.  A member that the class
+    // cannot be called by is reached so too: one its base class implements explicitly, one a derived interface
+    // implements explicitly, and an interface's default that the class does not implement.
+    [Theory]
+    [InlineData(
+        "public interface IFactory<TConnection> { [SqlSourceConnection] TConnection Open(); }\n"
+            + "public sealed class DatabaseFactory : IFactory<NpgsqlConnection>"
+            + " { NpgsqlConnection IFactory<NpgsqlConnection>.Open() => null!; }",
+        "DatabaseFactory",
+        "global::App.IFactory<global::Npgsql.NpgsqlConnection>"
+    )]
+    [InlineData(
+        "public interface IFactory<TConnection> { [SqlSourceConnection] TConnection Open(); }\n"
+            + "public sealed class DatabaseFactory<TConnection> : IFactory<TConnection>"
+            + " { TConnection IFactory<TConnection>.Open() => default!; }",
+        "DatabaseFactory<NpgsqlConnection>",
+        "global::App.IFactory<global::Npgsql.NpgsqlConnection>"
+    )]
+    [InlineData(
+        "#nullable enable\npublic interface IFactory<TConnection> { [SqlSourceConnection] TConnection Open(); }\n"
+            + "public sealed class DatabaseFactory : IFactory<NpgsqlConnection?>"
+            + " { NpgsqlConnection? IFactory<NpgsqlConnection?>.Open() => null; }",
+        "DatabaseFactory",
+        "global::App.IFactory<global::Npgsql.NpgsqlConnection?>"
+    )]
+    [InlineData(
+        "public interface @event { [SqlSourceConnection] DbConnection Open(); }\n"
+            + "public sealed class DatabaseFactory : @event { DbConnection @event.Open() => null!; }",
+        "DatabaseFactory",
+        "global::App.@event"
+    )]
+    [InlineData(
+        "public static class Outer { public interface IFactory { [SqlSourceConnection] DbConnection Open(); } }\n"
+            + "public sealed class DatabaseFactory : Outer.IFactory { DbConnection Outer.IFactory.Open() => null!; }",
+        "DatabaseFactory",
+        "global::App.Outer.IFactory"
+    )]
+    [InlineData(
+        "public interface IDatabaseFactory { [SqlSourceConnection] DbConnection Open(); }\n"
+            + "public class FactoryBase : IDatabaseFactory { DbConnection IDatabaseFactory.Open() => null!; }\n"
+            + "public sealed class DatabaseFactory : FactoryBase;",
+        "DatabaseFactory",
+        "global::App.IDatabaseFactory"
+    )]
+    [InlineData(
+        "public interface IOpener { [SqlSourceConnection] DbConnection Open(); }\n"
+            + "public interface IDatabaseFactory : IOpener { DbConnection IOpener.Open() => null!; }\n"
+            + "public sealed class DatabaseFactory : IDatabaseFactory;",
+        "DatabaseFactory",
+        "global::App.IOpener"
+    )]
+    [InlineData(
+        "public interface IDatabaseFactory { [SqlSourceConnection] DbConnection Open() => null!; }\n"
+            + "public sealed class DatabaseFactory : IDatabaseFactory;",
+        "DatabaseFactory",
+        "global::App.IDatabaseFactory"
+    )]
+    public void Read_MemberTheClassCannotBeCalledBy_IsCastToTheInterfaceInFull(
+        string declarations,
+        string holderType,
+        string cast
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            "namespace App\n{\n"
+                + declarations
+                + "\n\n[SqlSourceGenerate]\npublic partial class UserRepository("
+                + holderType
+                + " dbf);\n}\n"
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.IsMarked.ShouldBeTrue();
+        candidate.CastTypeText.ShouldBe(cast);
+    }
+
+    // Every holder of the class reaches an explicit implementation through the interface: a struct, which cannot be
+    // null, a Nullable<T> of one, and a type parameter constrained to the class, alone or with the interface, which
+    // gives the one candidate.  A holder of the interface, or of a type parameter that only the interface constrains,
+    // calls the interface's member directly.
+    [Theory]
+    [InlineData("UserRepository(DatabaseFactory dbf)", "global::App.IDatabaseFactory", true)]
+    [InlineData("UserRepository(StructFactory dbf)", "global::App.IDatabaseFactory", false)]
+    [InlineData("UserRepository(StructFactory? dbf)", "global::App.IDatabaseFactory", true)]
+    [InlineData("UserRepository<T>(T dbf) where T : DatabaseFactory", "global::App.IDatabaseFactory", true)]
+    [InlineData(
+        "UserRepository<T>(T dbf) where T : DatabaseFactory, IDatabaseFactory",
+        "global::App.IDatabaseFactory",
+        true
+    )]
+    [InlineData("UserRepository<T>(T dbf) where T : struct, IDatabaseFactory", null, false)]
+    [InlineData("UserRepository(IDatabaseFactory dbf)", null, true)]
+    public void Read_ExplicitImplementation_IsCastFromEachHolderOfItsClass(
+        string declaration,
+        string? cast,
+        bool canBeNull
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public class DatabaseFactory : IDatabaseFactory
+                {
+                    DbConnection IDatabaseFactory.Open() => null!;
+                }
+
+                public struct StructFactory : IDatabaseFactory
+                {
+                    readonly DbConnection IDatabaseFactory.Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class
+            """
+                + " "
+                + declaration
+                + ";\n}\n"
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.CastTypeText.ShouldBe(cast);
+        candidate.Holder.ShouldNotBeNull().CanBeNull.ShouldBe(canBeNull);
+    }
+
+    // A class that implements again, implicitly, an interface its base class implements explicitly is called directly.
+    [Fact]
+    public void Read_ImplicitImplementationOverAnExplicitBase_IsCalledDirectly()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public class FactoryBase : IDatabaseFactory
+                {
+                    DbConnection IDatabaseFactory.Open() => null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase, IDatabaseFactory
+                {
+                    public DbConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.CastTypeText.ShouldBeNull();
+    }
+
+    // A public member of the interface member's name that a call through the class would bind is not the member that
+    // implements it, so the interface does not mark it, and the explicit implementation is the candidate.
+    [Fact]
+    public void Read_PublicMemberBesideAnExplicitImplementation_IsNotMarkedByTheInterface()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public sealed class DatabaseFactory : IDatabaseFactory
+                {
+                    public DbConnection Open() => null!;
+
+                    DbConnection IDatabaseFactory.Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.CastTypeText.ShouldBe("global::App.IDatabaseFactory");
+    }
+
+    // A public member that implements one marked interface, beside an explicit implementation of another's member of
+    // its signature, is called directly, and the explicit one through its interface: two candidates.
+    [Fact]
+    public void Read_ImplicitAndExplicitImplementationsOfTwoInterfaces_AreBothCandidates()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IMainOpener
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public interface IAuditOpener
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public sealed class DatabaseFactory : IMainOpener, IAuditOpener
+                {
+                    public DbConnection Open() => null!;
+
+                    DbConnection IAuditOpener.Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape
+            .HeldCandidates.Select(static candidate => (candidate.Name, candidate.CastTypeText))
+            .ShouldBe([("Open", null), ("Open", "global::App.IAuditOpener")]);
+    }
+
+    // A marked member that is no connection source is unsupported, implemented explicitly as implicitly, so that the
+    // build reports it at the holder: a method that takes an argument, and an indexer.
+    [Theory]
+    [InlineData("DbConnection Open(string name);", "DbConnection IDatabaseFactory.Open(string name) => null!;", "Open")]
+    [InlineData(
+        "DbConnection this[int index] { get; }",
+        "DbConnection IDatabaseFactory.this[int index] => null!;",
+        "this[]"
+    )]
+    public void Read_ExplicitImplementationOfAnUnsupportedMember_IsAnUnsupportedCandidate(
+        string member,
+        string implementation,
+        string name
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    {{member}}
+                }
+
+                public sealed class DatabaseFactory : IDatabaseFactory
+                {
+                    {{implementation}}
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe(name);
+        candidate.Type.ShouldBe(CandidateType.Unsupported);
+        candidate.CastTypeText.ShouldBe("global::App.IDatabaseFactory");
+    }
+
+    // An explicit implementation that bears the mark itself is unsupported, as on a repository, so that the build
+    // reports it at the holder, though no call can reach it.
+    [Fact]
+    public void Read_MarkedExplicitImplementation_IsAnUnsupportedCandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    DbConnection Open();
+                }
+
+                public sealed class DatabaseFactory : IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection IDatabaseFactory.Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("App.IDatabaseFactory.Open");
+        candidate.Type.ShouldBe(CandidateType.Unsupported);
+        candidate.CastTypeText.ShouldBeNull();
+        candidate.Holder.ShouldNotBeNull().Name.ShouldBe("dbf");
+    }
+
+    // Only a marked interface member is a factory's: an explicit implementation of an unmarked data source, which the
+    // conventions would take on the repository, is none.
+    [Fact]
+    public void Read_ExplicitImplementationOfAnUnmarkedMember_IsNotACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    NpgsqlDataSource Source { get; }
+                }
+
+                public sealed class DatabaseFactory : IDatabaseFactory
+                {
+                    NpgsqlDataSource IDatabaseFactory.Source => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
+    // A static interface member is no instance member of the factory, even when the class implements it explicitly.
+    [Fact]
+    public void Read_ExplicitImplementationOfAStaticMember_IsNotHeld()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    static abstract DbConnection Open();
+                }
+
+                public sealed class DatabaseFactory : IDatabaseFactory
+                {
+                    static DbConnection IDatabaseFactory.Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
+    // The method could not name an interface that the repository cannot reach.
+    [Fact]
+    public void Read_ExplicitImplementationOfAnUnreachableInterface_IsNotACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public static class Outer
+                {
+                    private interface IHidden
+                    {
+                        [SqlSourceConnection]
+                        DbConnection Open();
+                    }
+
+                    public sealed class DatabaseFactory : IHidden
+                    {
+                        DbConnection IHidden.Open() => null!;
+                    }
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(Outer.DatabaseFactory dbf);
             }
             """
         );
@@ -965,6 +1423,7 @@ public sealed class HeldFactoryReaderTests
 
         var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
         candidate.Name.ShouldBe("Open");
+        candidate.CastTypeText.ShouldBeNull();
         candidate.Holder.ShouldNotBeNull().TypeName.ShouldBe("TFactory");
     }
 }

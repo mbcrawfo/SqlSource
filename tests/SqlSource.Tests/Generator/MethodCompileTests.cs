@@ -775,6 +775,129 @@ public sealed class MethodCompileTests
         run.Sources["App.PropertiesInAStruct-Methods.g.cs"].ShouldContain("var source = this.Holder ?? throw ");
     }
 
+    // A factory of each kind of connection source, for each engine, that implements the marked members of its
+    // interface explicitly, in a class and in a struct, reached through a cast of the holder to the interface:
+    // through a parameter, a field, a property, a static field, a Nullable<T> of the struct, the struct, which cannot
+    // be null, a type parameter constrained to the class, and in a struct repository, whose streaming methods cast a
+    // copy of the holder, of the class and of the struct, in a project whose code has nullable annotations on.
+    [Theory]
+    [InlineData("connection string")]
+    [InlineData("data source")]
+    [InlineData("factory")]
+    [InlineData("borrowed")]
+    public void Run_HeldExplicitImplementationOfEachKind_Compiles(string kind)
+    {
+        var (members, implementations) = ExplicitMembersOf(kind);
+        var source =
+            "#nullable enable\n"
+            + SourcesUsings
+            + "    public interface IFactory\n    {\n"
+            + members
+            + "    }\n\n    public class Factory : IFactory\n    {\n"
+            + implementations
+            + "    }\n\n    public struct StructFactory : IFactory\n    {\n"
+            + implementations.Replace("        ", "        readonly ", StringComparison.Ordinal)
+            + """
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Parameters(Factory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Fields
+                    {
+                        private readonly Factory? _factory = new();
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Properties
+                    {
+                        private Factory Holder { get; } = new();
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Statics
+                    {
+                        private static readonly Factory Shared = new();
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class NullableStructs(StructFactory? factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Structs(StructFactory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Constrained<T>(T factory)
+                        where T : Factory;
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct InAStruct(Factory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct StructsInAStruct(StructFactory factory);
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
+        run.Sources["App.Fields-Methods.g.cs"].ShouldContain("((global::App.IFactory)(this._factory ?? throw ");
+        run.Sources["App.Properties-Methods.g.cs"].ShouldContain("((global::App.IFactory)(this.Holder ?? throw ");
+        run.Sources["App.Statics-Methods.g.cs"].ShouldContain("((global::App.IFactory)(Statics.Shared ?? throw ");
+        run.Sources["App.NullableStructs-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
+        run.Sources["App.Structs-Methods.g.cs"].ShouldContain("((global::App.IFactory)factory).");
+        run.Sources["App.Constrained-1-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
+        run.Sources["App.InAStruct-Methods.g.cs"].ShouldContain("var source = factory ?? throw ");
+        run.Sources["App.InAStruct-Methods.g.cs"].ShouldContain("((global::App.IFactory)source).");
+        run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("var source = factory;\n");
+        run.Sources["App.StructsInAStruct-Methods.g.cs"].ShouldContain("((global::App.IFactory)source).");
+    }
+
+    // A factory that implements one generic interface twice, explicitly, once for each engine's connection, and once
+    // with a nullable annotation, gives each engine its own member, reached through the interface closed as the class
+    // implements it.
+    [Fact]
+    public void Run_HeldExplicitImplementationOfAGenericInterface_Compiles()
+    {
+        var source =
+            "#nullable enable\n"
+            + SourcesUsings
+            + """
+                    public interface IFactory<TConnection>
+                    {
+                        [SqlSourceConnection]
+                        TConnection Open();
+                    }
+
+                    public class Factory : IFactory<NpgsqlConnection>, IFactory<SqlConnection?>
+                    {
+                        NpgsqlConnection IFactory<NpgsqlConnection>.Open() => new();
+
+                        SqlConnection? IFactory<SqlConnection?>.Open() => new();
+                    }
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Repo(Factory factory);
+
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial struct StructRepo(Factory factory);
+                }
+
+                """;
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources["App.Repo-Methods.g.cs"];
+        methods.ShouldContain("((global::App.IFactory<global::Npgsql.NpgsqlConnection>)(factory ?? throw ");
+        methods.ShouldContain("((global::App.IFactory<global::Microsoft.Data.SqlClient.SqlConnection?>)(factory ?? ");
+        run.Sources["App.StructRepo-Methods.g.cs"]
+            .ShouldContain("((global::App.IFactory<global::Npgsql.NpgsqlConnection>)source).Open()");
+    }
+
     // A static of the project of each kind of connection source, for each engine, reached through its type in full.
     [Theory]
     [InlineData("connection string")]
@@ -867,6 +990,66 @@ public sealed class MethodCompileTests
             + modifier
             + sqlServer
             + "\n";
+    }
+
+    // The marked members of an interface, of each engine, of the kind of connection source, and the explicit
+    // implementation of each, at the indent of a type's members in a namespace.
+    private static (string Members, string Implementations) ExplicitMembersOf(string kind)
+    {
+        var (postgres, sqlServer, postgresBody, sqlServerBody) = kind switch
+        {
+            "connection string" => (
+                "string Postgres { get; }",
+                "string? SqlServer(CancellationToken cancellationToken)",
+                " => \"\";",
+                " => null;"
+            ),
+            "data source" => (
+                "NpgsqlDataSource Postgres { get; }",
+                "DbDataSource? SqlServer { get; }",
+                " => NpgsqlDataSource.Create(\"\");",
+                " => null;"
+            ),
+            "factory" => (
+                "NpgsqlConnection Postgres()",
+                "ValueTask<SqlConnection?> SqlServer(CancellationToken cancellationToken)",
+                " => new();",
+                " => new(new SqlConnection());"
+            ),
+            "borrowed" => (
+                "DbConnection? Postgres { get; }",
+                "SqlConnection SqlServer { get; }",
+                " => null;",
+                " => new();"
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+        var members =
+            "        [SqlSourceConnection(Database = \"postgres\")]\n        "
+            + postgres
+            + (postgres.EndsWith('}') ? "\n\n" : ";\n\n")
+            + "        [SqlSourceConnection(Database = \"mssql\")]\n        "
+            + sqlServer
+            + (sqlServer.EndsWith('}') ? "\n" : ";\n");
+        var implementations =
+            "        "
+            + ExplicitOf(postgres)
+            + postgresBody
+            + "\n\n        "
+            + ExplicitOf(sqlServer)
+            + sqlServerBody
+            + "\n";
+        return (members, implementations);
+    }
+
+    // The member's declaration as an explicit implementation of IFactory's: its name after IFactory., and a property's
+    // accessors left for the body's =>.
+    private static string ExplicitOf(string declaration)
+    {
+        var withoutAccessors = declaration.Replace(" { get; }", string.Empty, StringComparison.Ordinal);
+        var open = withoutAccessors.IndexOf('(', StringComparison.Ordinal);
+        var name = withoutAccessors.LastIndexOf(' ', open >= 0 ? open : withoutAccessors.Length - 1) + 1;
+        return withoutAccessors[..name] + "IFactory." + withoutAccessors[name..];
     }
 
     // The repositories of the source, at Repository, claiming a postgres file and an mssql file of a query that reads

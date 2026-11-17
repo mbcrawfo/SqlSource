@@ -227,7 +227,7 @@ internal static class CommandWriter
     // The source's value, or the exception that says it is null: its member, as the method reaches it, read, or called
     // with the token when it takes one, the method's or default, and awaited when it is an asynchronous factory.  The
     // holder that the access starts with, when the locals give one to check, is checked first, in parentheses, and the
-    // member is read from what the check gives.
+    // member is read from what the check gives, cast to the interface when the source has one to cast it to.
     private static void AppendSourceOrThrow(
         StringBuilder builder,
         CallSpelling spelling,
@@ -245,9 +245,16 @@ internal static class CommandWriter
 
         if (holder.Length > 0)
         {
-            _ = builder.Append('(').Append(holder);
+            var cast = source.HolderCastText;
+            _ = builder.Append('(');
+            if (cast is not null)
+            {
+                _ = builder.Append('(').Append(cast).Append(")(");
+            }
+
+            _ = builder.Append(holder);
             AppendThrowIfNull(builder, locals.SourceHolderName, source.TypeName);
-            _ = builder.Append(')').Append(access, holder.Length, access.Length - holder.Length);
+            _ = builder.Append(cast is null ? ")" : "))").Append(access, holder.Length, access.Length - holder.Length);
         }
         else
         {

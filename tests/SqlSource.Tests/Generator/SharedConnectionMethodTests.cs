@@ -213,6 +213,154 @@ public sealed class SharedConnectionMethodTests
         open.ShouldBeGreaterThan(iterator);
     }
 
+    // The factory and its struct, which implement the marked member explicitly, and the attribute of the repository
+    // that a test declares after them.
+    private const string ExplicitFactory = """
+        using System.Threading;
+        using System.Threading.Tasks;
+        using Npgsql;
+        using SqlSource;
+
+        namespace App
+        {
+            public interface IDatabaseFactory
+            {
+                [SqlSourceConnection]
+                Task<NpgsqlConnection> Open(CancellationToken ct);
+            }
+
+            public class DatabaseFactory : IDatabaseFactory
+            {
+                Task<NpgsqlConnection> IDatabaseFactory.Open(CancellationToken ct) => null!;
+            }
+
+            public struct StructFactory : IDatabaseFactory
+            {
+                readonly Task<NpgsqlConnection> IDatabaseFactory.Open(CancellationToken ct) => null!;
+            }
+
+            [SqlSourceGenerate(Source = ".")]
+
+        """;
+
+    private const string CastOpen = ")).Open(cancellationToken).ConfigureAwait(false) ?? throw ";
+
+    // A member that the holder's class implements explicitly is called through a cast of the holder, checked for null
+    // first, to the interface, from a holder of each kind: a parameter, a Nullable<T> of a struct, a static field and a
+    // property; a struct's holder, which cannot be null, is cast unchecked.  The member's message names it through the
+    // holder.
+    [Theory]
+    [InlineData(
+        "public partial class Sample(DatabaseFactory dbf);",
+        "await ((global::App.IDatabaseFactory)(dbf ?? " + HolderIsNull + CastOpen
+    )]
+    [InlineData(
+        "public partial class Sample(StructFactory? dbf);",
+        "await ((global::App.IDatabaseFactory)(dbf ?? " + HolderIsNull + CastOpen
+    )]
+    [InlineData(
+        "public partial class Sample { private static readonly DatabaseFactory dbf = new(); }",
+        "await ((global::App.IDatabaseFactory)(Sample.dbf ?? " + HolderIsNull + CastOpen
+    )]
+    [InlineData(
+        "public partial class Sample { private DatabaseFactory dbf { get; } = new(); }",
+        "await ((global::App.IDatabaseFactory)(this.dbf ?? " + HolderIsNull + CastOpen
+    )]
+    [InlineData(
+        "public partial class Sample(StructFactory dbf);",
+        "await ((global::App.IDatabaseFactory)dbf).Open(cancellationToken).ConfigureAwait(false) ?? throw "
+    )]
+    public void Run_HeldExplicitImplementation_CastsTheHolderToTheInterface(string repository, string open)
+    {
+        var source = ExplicitFactory + "    " + repository + "\n}\n";
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodsFile];
+        methods.ShouldContain("var connection = " + open);
+        methods.ShouldContain("\"The connection source 'dbf.Open' of 'App.Sample' is null.\"");
+    }
+
+    // A data source that a factory implements explicitly is read through the cast, then opened, and a synchronous
+    // factory of a generic interface is called through the interface closed as the class implements it, with its ?.
+    [Theory]
+    [InlineData(
+        """
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    NpgsqlDataSource? DataSource { get; }
+                }
+
+                public sealed class DatabaseFactory : IDatabaseFactory
+                {
+                    NpgsqlDataSource? IDatabaseFactory.DataSource => null;
+                }
+            """,
+        "await (((global::App.IDatabaseFactory)(dbf ?? "
+            + HolderIsNull
+            + ")).DataSource ?? throw new global::System.InvalidOperationException("
+            + "\"The connection source 'dbf.DataSource' of 'App.Sample' is null.\"))"
+            + ".OpenConnectionAsync(cancellationToken)"
+    )]
+    [InlineData(
+        """
+                public interface IFactory<TConnection>
+                {
+                    [SqlSourceConnection]
+                    TConnection Open();
+                }
+
+                public sealed class DatabaseFactory : IFactory<NpgsqlConnection?>
+                {
+                    NpgsqlConnection? IFactory<NpgsqlConnection?>.Open() => null;
+                }
+            """,
+        "((global::App.IFactory<global::Npgsql.NpgsqlConnection?>)(dbf ?? " + HolderIsNull + ")).Open() ?? throw "
+    )]
+    public void Run_HeldExplicitImplementationOfAnotherKind_CastsTheHolder(string factory, string open)
+    {
+        var source =
+            "#nullable enable\nusing Npgsql;\nusing SqlSource;\n\nnamespace App\n{\n"
+            + factory
+            + "\n    [SqlSourceGenerate(Source = \".\")]\n    public partial class Sample(DatabaseFactory dbf);\n}\n";
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], source);
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain("var connection = " + open);
+    }
+
+    // A struct's streaming method copies the holder, checked when it can be null, before its iterator, which casts the
+    // copy to the interface.
+    [Theory]
+    [InlineData("DatabaseFactory", "var source = dbf ?? " + HolderIsNull + ";\n")]
+    [InlineData("StructFactory", "var source = dbf;\n")]
+    public void Run_StructStreamingThroughAnExplicitImplementation_CastsTheCopy(string holderType, string copy)
+    {
+        var source = ExplicitFactory + "    public partial struct Sample(" + holderType + " dbf);\n}\n";
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: StreamUsers -> many\n-- collection-type: IAsyncEnumerable\nSELECT id FROM users;\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "StreamUsers", [], [Column("id")])], source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodsFile];
+        var copied = methods.IndexOf(copy, StringComparison.Ordinal);
+        var iterator = methods.IndexOf(" ReadRows(", StringComparison.Ordinal);
+        var open = methods.IndexOf(
+            "var connection = await ((global::App.IDatabaseFactory)source).Open(cancellationToken)"
+                + ".ConfigureAwait(false) ?? throw ",
+            StringComparison.Ordinal
+        );
+        copied.ShouldBeGreaterThan(0);
+        copied.ShouldBeLessThan(iterator);
+        open.ShouldBeGreaterThan(iterator);
+    }
+
     // A token of the holder's name would hide it, as it would hide a parameter that gives the connection.
     [Fact]
     public void Run_TokenNamedLikeTheHolder_ReportsSqlsrc275()

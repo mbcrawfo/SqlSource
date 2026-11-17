@@ -144,8 +144,9 @@ internal sealed class QueryMethodLocals
     // set, the source's access, or this.
     public string SourceValue { get; }
 
-    // The source as the body reaches it: its access, or through SourceLocal.  Empty for a method that takes its
-    // connection.
+    // The source as the body reaches it: its access, or through SourceLocal.  A held source whose member the holder's
+    // class cannot be called by reaches it through the holder, or SourceLocal, cast to the interface, unless the body
+    // checks the holder, whose check the cast then wraps.  Empty for a method that takes its connection.
     public string SourceAccess { get; }
 
     // The start of SourceAccess that the body checks for null before it reads the member after it: a held source's
@@ -231,14 +232,27 @@ internal sealed class QueryMethodLocals
         var checkedName = source is { HolderName: { } name, HolderCanBeNull: true } ? name : empty;
         if (!streams || !source.InStruct)
         {
-            var checkedHolder = checkedName.Length > 0 ? source.HolderAccessText ?? empty : empty;
-            return (empty, empty, source.AccessText, checkedHolder, checkedName);
+            if (checkedName.Length > 0 && source.HolderAccessText is { } checkedHolder)
+            {
+                return (empty, empty, source.AccessText, checkedHolder, checkedName);
+            }
+
+            var access = source.HolderAccessText is { } uncheckedHolder
+                ? CastOf(source, uncheckedHolder) + source.AccessText.Substring(uncheckedHolder.Length)
+                : source.AccessText;
+            return (empty, empty, access, empty, empty);
         }
 
         if (source.HolderAccessText is { } holder)
         {
             var local = names.Take("source");
-            return (local, holder, local + source.AccessText.Substring(holder.Length), empty, checkedName);
+            return (
+                local,
+                holder,
+                CastOf(source, local) + source.AccessText.Substring(holder.Length),
+                empty,
+                checkedName
+            );
         }
 
         if (source.Member != CandidateMember.Method)
@@ -256,6 +270,11 @@ internal sealed class QueryMethodLocals
         var self = names.Take("self");
         return (self, "this", self + source.AccessText.Substring(This.Length - 1), empty, empty);
     }
+
+    // The holder, or the local that holds it, cast to the interface in parentheses when the source has one to cast it
+    // to, else as it is.
+    private static string CastOf(ConnectionSource source, string holder) =>
+        source.HolderCastText is { } cast ? "((" + cast + ")" + holder + ")" : holder;
 
     // Whether a parameter's binding matches its value as one that can be null: one bound through a converter, or an
     // array that its property holds as any sequence.

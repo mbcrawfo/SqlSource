@@ -14,6 +14,13 @@ namespace SqlSource.Generation.Repositories;
 /// </summary>
 internal static class HeldFactoryReader
 {
+    // An interface as a cast in the method's code writes it: from global::, with its type arguments, a nullable
+    // annotation's ? and a keyword's @.
+    private static readonly SymbolDisplayFormat CastFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat.AddMiscellaneousOptions(
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
+        );
+
     /// <summary>
     /// The marked instance members of the factories that the type holds, each with its <see cref="CandidateHolder" />,
     /// in the order the holders are declared: the type's own fields and properties first, then each base type's, then
@@ -111,10 +118,12 @@ internal static class HeldFactoryReader
     }
 
     // The marked instance members of the factory that the type can reach through the holder, as held candidates, in
-    // the order of the types the call looks in, each derived type's before its base's.  The members are tested
-    // cheapest first: a member that is static, or that bears no mark and implements no marked interface member, is
-    // never asked whether the type reaches it or whether a member hides it.  An interface's member that the factory's
-    // class or struct implements is its implementation: one candidate.
+    // the order of the types the call looks in, each derived type's before its base's, then those of the interfaces of
+    // the factory's class or struct that a call through it cannot name.  The members are tested cheapest first: a
+    // member that is static, or that bears no mark and implements no marked interface member, is never asked whether
+    // the type reaches it or whether a member hides it.  An interface's member that the factory's class or struct
+    // implements is its implementation: one candidate.  An explicit implementation that bears the mark itself, which
+    // nothing hides or reaches by name, is read as an unsupported candidate, as a repository's own one is.
     private static List<ConnectionCandidate> ReadFactory(
         ITypeSymbol factory,
         CandidateHolder holder,
@@ -135,8 +144,13 @@ internal static class HeldFactoryReader
                     !member.IsStatic
                     && ConnectionCandidateReader.FindMarking(member, implementer) is not null
                     && !IsImplementedBy(member, implementer)
-                    && ConnectionCandidateReader.IsReachable(member, type, compilation, factory)
-                    && !IsHidden(member, current, lookedIn, type, compilation, factory)
+                    && (
+                        IsExplicitImplementation(member)
+                        || (
+                            ConnectionCandidateReader.IsReachable(member, type, compilation, factory)
+                            && !IsHidden(member, current, lookedIn, type, compilation, factory)
+                        )
+                    )
                     && ConnectionCandidateReader.ReadMarkedMember(member, isInherited, holder.Location, implementer)
                         is { } candidate
                 )
@@ -146,8 +160,83 @@ internal static class HeldFactoryReader
             }
         }
 
+        if (implementer is not null)
+        {
+            candidates.AddRange(ReadCastMembers(implementer, lookedIn, holder, isInherited, type, compilation));
+        }
+
         return candidates;
     }
+
+    // The marked instance members of the interfaces of the factory's class or struct that a call through it cannot
+    // name, as held candidates reached through a cast of the holder to the interface: one that the class implements
+    // explicitly, itself or in a base type, or that a derived interface implements explicitly, and an interface's
+    // default that nothing implements, unless a type parameter's constraint is the interface, through which the call
+    // already reaches it.  A member that the class implements implicitly is its own member's candidate.  Each is the
+    // interface's member, located at its implementation.
+    private static IEnumerable<ConnectionCandidate> ReadCastMembers(
+        INamedTypeSymbol implementer,
+        List<INamedTypeSymbol> lookedIn,
+        CandidateHolder holder,
+        bool isInherited,
+        INamedTypeSymbol type,
+        Compilation compilation
+    )
+    {
+        foreach (var @interface in implementer.AllInterfaces)
+        {
+            foreach (var member in @interface.GetMembers())
+            {
+                if (
+                    !member.IsStatic
+                    && ConnectionCandidateReader.FindMarking(member) is not null
+                    && implementer.FindImplementationForInterfaceMember(member) is { } implementation
+                    && (
+                        IsExplicitImplementation(implementation, member)
+                        || (
+                            SymbolEqualityComparer.Default.Equals(implementation, member)
+                            && !lookedIn.Contains(@interface, SymbolEqualityComparer.Default)
+                        )
+                    )
+                    && ConnectionCandidateReader.IsReachable(member, type, compilation, @interface)
+                    && ConnectionCandidateReader.ReadMarkedMember(member, isInherited, holder.Location) is { } candidate
+                )
+                {
+                    yield return candidate with
+                    {
+                        Location = ConnectionCandidateReader.SourceLocationOr(implementation, holder.Location),
+                        Tier = CandidateTier.Held,
+                        Holder = holder,
+                        CastTypeText = @interface.ToDisplayString(CastFormat),
+                    };
+                }
+            }
+        }
+    }
+
+    // Whether the member is an explicit implementation of an interface's member, which no call can name.
+    private static bool IsExplicitImplementation(ISymbol member) =>
+        member switch
+        {
+            IMethodSymbol method => !method.ExplicitInterfaceImplementations.IsEmpty,
+            IPropertySymbol property => !property.ExplicitInterfaceImplementations.IsEmpty,
+            _ => false,
+        };
+
+    // Whether the implementation implements the interface member explicitly.
+    private static bool IsExplicitImplementation(ISymbol implementation, ISymbol member) =>
+        implementation switch
+        {
+            IMethodSymbol method => method.ExplicitInterfaceImplementations.Contains(
+                member,
+                SymbolEqualityComparer.Default
+            ),
+            IPropertySymbol property => property.ExplicitInterfaceImplementations.Contains(
+                member,
+                SymbolEqualityComparer.Default
+            ),
+            _ => false,
+        };
 
     // The types that a call through a value of the factory's types looks in, each once: a class or struct and its base
     // types, whose interfaces' members it reaches only through their implementations, and an interface and every
