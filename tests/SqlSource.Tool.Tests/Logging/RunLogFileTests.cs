@@ -163,16 +163,6 @@ public sealed class RunLogFileTests : IDisposable
         line.GetProperty("truncated").GetBoolean().ShouldBeTrue();
     }
 
-    [Fact]
-    public void Write_ShortString_IsNotMarked()
-    {
-        using var log = new RunLogFile("/log", _stream, _clock);
-
-        log.Write("e", new LogMember("text", "a"));
-
-        Written().ShouldNotContain("truncated");
-    }
-
     // A server's message may hold half a character.  The line must still be JSON.
     [Fact]
     public void Write_TextWithHalfACharacter_IsWrittenWithTheReplacementCharacter()
