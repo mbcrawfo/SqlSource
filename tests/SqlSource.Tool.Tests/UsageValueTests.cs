@@ -16,10 +16,6 @@ public sealed class UsageValueTests
         new UsageValue(null, text, 2).MayBePrintedAsPath.ShouldBe(expected);
 
     [Fact]
-    public void NamedAsPath_PrintableToken_IsTheFullPathInQuotes() =>
-        new UsageValue(null, "App", 2).NamedAsPath("/work/App").ShouldBe("'/work/App'");
-
-    [Fact]
     public void NamedAsPath_FullPathWithALineBreak_IsOnOneLine() =>
         new UsageValue(null, "App", 2).NamedAsPath("/work/a\r\nb/App").ShouldBe("'/work/a b/App'");
 

@@ -98,7 +98,7 @@ Counts are of findings.  The guard is **mutation** (the scope's run before and a
 | 06 | [generator-parsing-deletes](2026-11-13-test-cleanup-phase-06-generator-parsing-deletes-design.md) | `tests/SqlSource.Tests/Parsing` | 8 |  |  |  |  | mutation: `generator-parsing`; covers and run time for 3 | done |
 | 07 | [generator-settings-deletes](2026-11-13-test-cleanup-phase-07-generator-settings-deletes-design.md) | `tests/SqlSource.Tests/Settings` | 1 |  |  |  |  | mutation: `generator-settings` | done |
 | 08 | [generator-snapshot-deletes](2026-11-13-test-cleanup-phase-08-generator-snapshot-deletes-design.md) | `tests/SqlSource.Tests/Snapshot` | 2 |  |  |  |  | mutation: `generator-snapshot` | done |
-| 09 | [tool-root-deletes](2026-11-13-test-cleanup-phase-09-tool-root-deletes-design.md) | `tests/SqlSource.Tool.Tests (root files)` | 2 |  |  |  |  | mutation: `tool-root`; covers and run time for 1 | not started |
+| 09 | [tool-root-deletes](2026-11-13-test-cleanup-phase-09-tool-root-deletes-design.md) | `tests/SqlSource.Tool.Tests (root files)` | 2 |  |  |  |  | mutation: `tool-root`; covers and run time for 1 | done |
 | 10 | [tool-commands-deletes](2026-11-13-test-cleanup-phase-10-tool-commands-deletes-design.md) | `tests/SqlSource.Tool.Tests/Commands` | 6 |  |  |  |  | mutation: `tool-root` | not started |
 | 11 | [tool-bundles-renaming-deletes](2026-11-13-test-cleanup-phase-11-tool-bundles-renaming-deletes-design.md) | `tests/SqlSource.Tool.Tests/Bundles/Renaming` | 2 |  |  |  |  | mutation: `tool-bundles-renaming` | not started |
 | 12 | [tool-describing-deletes](2026-11-13-test-cleanup-phase-12-tool-describing-deletes-design.md) | `tests/SqlSource.Tool.Tests/Describing` | 1 |  |  |  |  | mutation: `tool-describing` | not started |
