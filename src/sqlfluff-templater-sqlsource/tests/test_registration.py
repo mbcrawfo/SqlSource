@@ -1,4 +1,4 @@
-from corpus import corpus_cases
+from corpus_reader import corpus_cases
 
 
 def test_sqlfluff_finds_the_templater():
