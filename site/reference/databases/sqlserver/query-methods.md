@@ -22,7 +22,7 @@ AddOrderDto order = await orders.AddOrder(
 
 A described query whose output is `repository` or `methods` gets a method that runs it through Microsoft.Data.SqlClient: see [query methods](../../query-methods.md#query-methods).  The project must reference Microsoft.Data.SqlClient 6.1 or later ([SQLSRC273](../../../diagnostics.md#sqlsrc273), [SQLSRC267](../../../diagnostics.md#sqlsrc267)).
 
-- **A repository's [connection source](../../repository-connections.md#repository-connection) is a connection string, a factory method or a connection that the repository borrows.**  Microsoft.Data.SqlClient has no data source.  From a connection string, as above, each call makes a `SqlConnection`, opens it and disposes it.
+- **A repository's [connection source](../../repository-connections.md#repository-connection) is a connection string, a method that returns a connection, or a connection that the repository borrows.**  Microsoft.Data.SqlClient has no data source.  From a connection string, as above, each call makes a `SqlConnection`, opens it and disposes it.
 - **A `methods` method runs on the `DbConnection` that you give it**, such as a `SqlConnection`.
 - **A value that fits its type never changes how it is sent.**  Above, `placed_at` is a `datetime2(7)`, `total` a `decimal(12,2)` and `status` an `nvarchar(20)`.  So the method sends `@placedAt` as a `datetime2`, with all seven digits of its time, `@total` as a `decimal(12,2)` and `@status` as an `nvarchar(20)`.  What happens to a value that does not fit is in [how a parameter is sent](#method-parameters).
 

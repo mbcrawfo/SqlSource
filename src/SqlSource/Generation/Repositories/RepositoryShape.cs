@@ -13,6 +13,13 @@ namespace SqlSource.Generation.Repositories;
 /// is one, and then only those that no argument of the base type and no initializer of a field, property or event of
 /// the type reads.  Empty for a static type.
 /// </param>
+/// <param name="HeldCandidates">
+/// The marked members of the types of the fields, properties and parameters that the repository holds, which only a
+/// database that <paramref name="Candidates" /> neither give a candidate nor fail uses.
+/// </param>
+/// <param name="GlobalCandidates">
+/// The marked static members of the types of the project, which are the last resort of a database.
+/// </param>
 /// <param name="HeldParameters">
 /// The names of the primary constructor's parameters that the conventions would take, but that an argument of the base
 /// type or an initializer reads, in the order they are declared, which <c>SQLSRC028</c> names.  Empty unless
@@ -31,6 +38,8 @@ namespace SqlSource.Generation.Repositories;
 internal sealed record RepositoryShape(
     string TypeKey,
     EquatableArray<ConnectionCandidate> Candidates,
+    EquatableArray<ConnectionCandidate> HeldCandidates,
+    EquatableArray<ConnectionCandidate> GlobalCandidates,
     EquatableArray<string> HeldParameters,
     bool InterfaceOn,
     string InterfaceName,

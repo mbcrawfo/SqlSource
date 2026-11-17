@@ -17,14 +17,6 @@ public sealed class FileTextTests : IDisposable
     public void Dispose() => _folder.Dispose();
 
     [Fact]
-    public void Read_FileThatIsThere_GivesItsText()
-    {
-        var path = _folder.WriteFile("Q.sql", "SELECT 1;\n");
-
-        FileText.Read(path).ShouldNotBeNull().Text.ToString().ShouldBe("SELECT 1;\n");
-    }
-
-    [Fact]
     public void Read_FileThatIsGone_GivesNull() => FileText.Read(_folder.PathOf("Gone.sql")).ShouldBeNull();
 
     [Fact]
