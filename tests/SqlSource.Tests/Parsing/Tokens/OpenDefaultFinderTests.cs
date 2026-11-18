@@ -51,6 +51,8 @@ public sealed partial class OpenDefaultFinderTests
     [InlineData("{{f:a ", 6, "f", 0)]
     [InlineData("{{f:a}} ", 8, null, -1)]
     [InlineData("{{1:a ", 6, null, -1)]
+    // A name with a format character, which the scanner does not read as a token.
+    [InlineData("{{a​b:x ", 8, null, -1)]
     [InlineData("{{ :a ", 6, null, -1)]
     [InlineData("{{f a ", 6, null, -1)]
     [InlineData("{{f:{{g:a ", 10, "f", 0)]

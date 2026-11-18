@@ -45,6 +45,7 @@ public sealed class SqlDialectNameTests
     [InlineData("mariadb,ansi-quotes", "MariaDb", "AnsiQuotes")]
     // In any order, and one that is repeated counts once.
     [InlineData("mariadb,no-backslash-escapes,ansi-quotes", "MariaDb", "AnsiQuotes, NoBackslashEscapes")]
+    [InlineData("mysql,ansi-quotes,ansi_quotes", "MySql", "AnsiQuotes")]
     [InlineData("mysql,ansi-quotes,ansi_quotes,ANSI-QUOTES", "MySql", "AnsiQuotes")]
     // As the server prints sql_mode.
     [InlineData("mysql,ANSI_QUOTES,NO_BACKSLASH_ESCAPES", "MySql", "AnsiQuotes, NoBackslashEscapes")]
