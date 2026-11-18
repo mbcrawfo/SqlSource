@@ -37,10 +37,10 @@ None: the change widens one test's input.  Checked against the spec on `ecf6dcba
 - [x] **Step 2:** Apply the mutant by hand and see the test fail; revert it.
 - [x] **Step 3:** Set row 39 of the epic's table to `done`.
 - [x] **Step 4:** `./format.sh`, then the Models tests pass.
-- [ ] **Step 5:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 5:** `./pre-commit-validation.sh`, then commit.
 
 ### Task 2: The guard's "after" half
 
 - [x] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST` and nothing `NOT COMPARABLE`, and `ModelsByFile.cs:186:20 Conditional (true)` is `Killed` in the after report.
 - [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-39/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/Generation/Models/**/*.cs` falls.
-- [ ] **Step 3:** The pull request gives the changed input, the compare result, the coverage figures and the run times.
+- [x] **Step 3:** The pull request gives the changed input, the compare result, the coverage figures and the run times.
