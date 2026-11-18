@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Only rows are added; every existing row and assertion stays.  `SqlDialectNameTests.TryParse_NameWithOptions_GivesTheDialectAndItsOptions` is the cover of F-SqlSource.Tests.Generator-2-04 (phase 19).
-- The zero-width space is written `​` in the C# source, never as a literal character.
+- The zero-width space is written `\u200B` in the C# source, never as a literal character.
 - None of the five theories is in TD-0089's lists, and the new rows add no branch on the row, so TD-0089 is not touched.
 - The epic's phase table: change only row 45.
 
@@ -45,7 +45,7 @@ Each row is a boundary the proposal names, and the guard's "after" run shows whe
 - [x] **Step 3 (F-SqlSource.Tests.Parsing-1-04):** in `Parse_ColumnMarkerWithoutANameAndANullability_IsInvalid`, after `"\"total\"x null"`, add `[InlineData("\"total\"\" null")]`.
 - [x] **Step 4 (F-SqlSource.Tests.Parsing-1-06):** in `Parse_InvalidLibraryTypes_IsSQLSRC111`, add `[InlineData("nodatime=maybe json=maybe")]`.
 - [x] **Step 5 (F-SqlSource.Tests.Parsing-2-01):** in `FindEnd_ClosedIdentifier_EndsAfterItsBracket`, add `[InlineData("[a]", "[a]")]`.
-- [x] **Step 6 (F-SqlSource.Tests.Parsing-2-05):** in `At_Offset_GivesTheTokenWhoseDefaultIsOpenThereAndWhereItsOpenerStarts`, after `"{{1:a "`, add `[InlineData("{{a​b:x ", 8, null, -1)]`.
+- [x] **Step 6 (F-SqlSource.Tests.Parsing-2-05):** in `At_Offset_GivesTheTokenWhoseDefaultIsOpenThereAndWhereItsOpenerStarts`, after `"{{1:a "`, add `[InlineData("{{a\u200Bb:x ", 8, null, -1)]`.
 - [x] **Step 7:** Set row 45 of the epic's table to `done`.
 - [x] **Step 8:** `./format.sh`, then `dotnet test --project tests/SqlSource.Tests --filter 'FullyQualifiedName~SqlSource.Tests.Parsing.'` passes.
 - [x] **Step 9:** Hand checks: with each of the eight survivors' mutations made by hand, its new row fails and no other; each change reverted.
