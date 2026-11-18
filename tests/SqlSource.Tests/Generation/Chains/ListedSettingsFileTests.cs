@@ -47,6 +47,7 @@ public sealed class ListedSettingsFileTests
     [InlineData("/app/Queries/sqlsource.json.bak")]
     [InlineData("/app/Queries/my-sqlsource.json")]
     [InlineData("/app/sqlsource.json/Queries.sql")]
+    [InlineData("xsqlsource.json")]
     public void Read_FileNotNamedSettingsFile_IsNull(string path)
     {
         ListedSettingsFile.IsSettingsFile(path).ShouldBeFalse();
@@ -91,19 +92,6 @@ public sealed class ListedSettingsFileTests
             .File.Level.TypeOverrides[DatabaseEngine.PostgreSql]
             .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int4", "long", SettingPlace.OfSettingsFile(QueriesPath, 2))]);
-    }
-
-    [Fact]
-    public void Read_InvalidDatabase_IsReportedByTheToolAndNotByTheBuild()
-    {
-        const string Text = /*lang=json,strict*/
-            """{"database": " a b "}""";
-
-        var build = Read(QueriesPath, Text, SettingsFileSide.Build);
-        var tool = Read(QueriesPath, Text, SettingsFileSide.Tool);
-
-        build.ShouldNotBeNull().Diagnostics.ShouldBeEmpty();
-        tool.ShouldNotBeNull().Diagnostics.ShouldHaveSingleItem().Descriptor.Id.ShouldBe("SQLSRC019");
     }
 
     // A value of each key that gives a setting, of the right JSON type and not valid, with whether the build and the
