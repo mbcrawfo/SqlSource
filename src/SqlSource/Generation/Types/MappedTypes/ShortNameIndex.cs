@@ -66,6 +66,13 @@ internal static class ShortNameIndex
     internal static object? IndexOf(MetadataReference reference) =>
         Indexes.TryGetValue(reference, out var index) ? index : null;
 
+    /// <summary>
+    /// The number of indexes built on the calling thread, kept or not: of one thread, since tests that run beside each
+    /// other build indexes of their own references.  For tests.
+    /// </summary>
+    [field: ThreadStatic]
+    internal static int BuildsOnThisThread { get; private set; }
+
     // The reference's index, built on the first ask.  Null for a reference under an alias, or one the compilation
     // gives no symbol for.
     private static ReferenceIndex? IndexFor(Compilation compilation, MetadataReference reference)
@@ -93,6 +100,7 @@ internal static class ShortNameIndex
         }
 
         var built = ReferenceIndex.Build(root);
+        BuildsOnThisThread++;
         return Indexes.GetValue(reference, _ => built);
     }
 
