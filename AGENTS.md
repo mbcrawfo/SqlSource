@@ -42,8 +42,8 @@
 1. **Validate before you commit.**  Every commit must pass `./pre-commit-validation.sh`, and no hook runs it for you: run it after your last edit and fix what it reports before you commit.
    - It checks only what the uncommitted change can affect and names what it skipped.
    - A run only covers the tree it ran on; an edit made after a passing run, however small, needs another run.
-2. **CI validates the whole branch.**  A pull request runs every check, the floor images and the lowest sqlfluff included, and merges only when its `ci` job passes; no full local run is required before a push or a pull request.
-   - `./pre-commit-validation.sh --full` runs locally what CI runs but those floors.  Run it when you want a failure found before CI, as after a change that reaches many projects.
+2. **CI validates the whole branch.**  A pull request runs every check, the floor images and the lowest sqlfluff included, but RoslynFloor's tests, which a plain run and the nightly run, and one to `main` merges only when its `ci` job passes.  No full local run is required before a push or a pull request.
+   - `./pre-commit-validation.sh --full` runs locally every check but those floors.  Run it when you want a failure found before CI, as after a change that reaches many projects.
    - The floor runs have local commands too: the describers' in [`tests/DatabaseTests/README.md`](tests/DatabaseTests/README.md#running), the templater's in [`src/sqlfluff-templater-sqlsource/AGENTS.md`](src/sqlfluff-templater-sqlsource/AGENTS.md).
    - When CI fails on your branch, fix it there before anything else.
 3. **Never skip a check.**  Do not commit or push past a failure you know of, and do not edit the script to make one go away.  If a check is wrong, tell the user.

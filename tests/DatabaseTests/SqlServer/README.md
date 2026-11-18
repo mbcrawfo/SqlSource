@@ -194,7 +194,7 @@ Every query writes its parameters in camelCase, `@accountId`, so that its input 
 
 `ClrTypeQueryTests` proves the binding of SQL Server's CLR types, through the package Microsoft.SqlServer.Types, which the project references for it alone: a `SqlHierarchyId`, a `SqlGeography` and a `SqlGeometry` written through the parameters of `WriteClrTypes` and read back with their values, and a `NULL` of each, and a `SqlHierarchyId` that `ListDescendants` compares in a `WHERE`.  SqlClient refuses a value of such a type unless its parameter names the type, with `ArgumentException`, "UdtTypeName property must be set for UDT parameters.", so each test but the one of `NULL`s fails on a method that sends the value alone.  It runs on every supported major, since SQL Server 2017 has the three types.  A CLR type of a user's assembly needs CLR enabled and the assembly on the server, so its binding is proved by the generator's tests alone.
 
-A change to these tests is run on both images, as [running](#running) says.
+CI runs these tests on both images, as [running](#running) says.
 
 ### Writing the sidecars
 
