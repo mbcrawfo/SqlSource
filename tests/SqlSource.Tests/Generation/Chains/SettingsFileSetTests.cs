@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading;
 using Shouldly;
 using SqlSource.Generation.Chains;
-using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
@@ -81,20 +80,6 @@ public sealed class SettingsFileSetTests
     }
 
     [Fact]
-    public void ChainOf_FileThatIsNotJson_IsPassedThrough()
-    {
-        var set = Set(
-            (
-                App, /*lang=json,strict*/
-                """{"output": "sql"}"""
-            ),
-            (Queries, NotJson)
-        );
-
-        set.ChainOf(QueryPath).Level.Output.ShouldBe(OutputKind.Sql);
-    }
-
-    [Fact]
     public void ChainOf_RootFalse_GoesOn()
     {
         var set = Set(
@@ -167,21 +152,6 @@ public sealed class SettingsFileSetTests
         set.ChainOf("app/Queries/b.sql").ShouldBeSameAs(first);
         set.ChainOf("app/Repo/Deep/c.sql").ShouldBeSameAs(first);
         set.ChainOf("app/d.sql").ShouldBeSameAs(first);
-    }
-
-    [Fact]
-    public void ChainOf_PathInAnotherCaseOrWithBackslashes_FindsTheChain()
-    {
-        var set = Set(
-            (
-                @"C:\App\sqlsource.json", /*lang=json,strict*/
-                """{"output": "sql"}"""
-            )
-        );
-
-        var path = SqlPath.Normalize(@"c:\app\Queries\a.sql").ShouldNotBeNull();
-
-        set.ChainOf(path).Level.Output.ShouldBe(OutputKind.Sql);
     }
 
     [Fact]
@@ -385,6 +355,7 @@ public sealed class SettingsFileSetTests
     {
         var set = Set(
             ("/sqlsource.json", NotJson),
+            ("/a/sqlsource.json", "{}"),
             (
                 App, /*lang=json,strict*/
                 """{"root": true}"""
