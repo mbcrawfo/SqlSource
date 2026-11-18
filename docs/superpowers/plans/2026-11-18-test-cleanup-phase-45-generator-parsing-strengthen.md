@@ -57,3 +57,17 @@ Each row is a boundary the proposal names, and the guard's "after" run shows whe
 - [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-45/coverage-after/SqlSource.Tests` (9,224 tests, 4 min 57 s): the same lines as before in each file of the scope.
 - [x] **Step 3:** Copy the "after" report to the run's `reports/p45-generator-parsing-after.json`.
 - [x] **Step 4:** The pull request gives the rows, the compare result, the coverage figures, the hand checks and the run times.
+
+### Task 3: The templater's twin rows (review finding R1-F1)
+
+The review found that the templater's Python port, whose modules mirror the C# files and whose tests take the C# cases, missed three of the phase's rows; the owner chose to add them in this pull request.
+
+**Files:**
+- Modify: `src/sqlfluff-templater-sqlsource/tests/test_dialect_names.py`
+- Modify: `src/sqlfluff-templater-sqlsource/tests/test_tokens.py`
+- Modify: `src/sqlfluff-templater-sqlsource/tests/test_lexer.py`
+
+- [x] **Step 1:** `test_white_space_around_a_part_and_a_repeated_option_are_read` gains `("mysql,ansi-quotes,ansi_quotes", DialectChoice(Dialect.MYSQL, DialectOptions.ANSI_QUOTES))`.
+- [x] **Step 2:** `test_finder_opens_no_default_for_a_name_that_is_not_valid`: the finder over `"{{a\u200bb:x "` gives None at 8, with `opener_start` -1.
+- [x] **Step 3:** `test_bracket_reader_of_an_identifier_that_ends_the_text_ends_after_its_bracket`, for both readers: `find_end("[a]", 0) == 3`.
+- [x] **Step 4:** `uv run --locked pytest` and the sqlfluff 4.5.0 floor command each pass 2,986 tests.  Hand checks: `dialects.py:110` `options ^= option`, `tokens.py:251` `return name` and `quoting.py:205` `close + 1 <= len(text)` each fail their new test and no other; each change reverted.
