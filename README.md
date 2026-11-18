@@ -89,7 +89,7 @@ $ dotnet sqlsource describe --connection postgres="Host=localhost;Database=app;U
 postgres (postgres): 1 described, 0 skipped, 0 failed
 ```
 
-Running `dotnet sqlsource describe` from your solution folder will cover all projects in the solution.  Alternatively, you can run it from an individual project's folder.  You can use a `.env` file or environment variables to [provide connection strings to the tool](https://mbcrawfo.github.io/SqlSource/reference/connections.html).  If you set the location of the `.env` in your `.csproj` files (it's recommended to use [Directory.Build.props](https://mbcrawfo.github.io/SqlSource/start/first-query.html?tabs=postgresql#4-give-the-tool-your-connection)), running `dotnet build` will describe your queries automatically.
+Running `dotnet sqlsource describe` from your solution folder will cover all projects in the solution.  Alternatively, you can run it from an individual project's folder.  You can use a `.env` file or environment variables to [provide connection strings to the tool](https://mbcrawfo.github.io/SqlSource/reference/connections.html).  If you set the location of the `.env` in your `.csproj` files (it's recommended to use [Directory.Build.props](https://mbcrawfo.github.io/SqlSource/start/first-query.html#connection)), running `dotnet build` will describe your queries automatically.
 
 ### Use the repository
 

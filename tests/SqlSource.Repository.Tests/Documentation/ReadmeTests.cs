@@ -8,9 +8,9 @@ using Xunit;
 
 namespace SqlSource.Repository.Tests.Documentation;
 
-// The two packed readmes are a brief introduction, and the site owns getting started.  A readme fails when it grows
-// over its cap, in bytes as AgentsFileTests counts an AGENTS.md, and when it gives an install or update command that
-// site/start/install.md does not have.  It holds a size and a set of commands, never words.
+// A packed readme fails when it grows over its cap, in bytes as AgentsFileTests counts an AGENTS.md, and when it gives
+// an install or update command that site/start/install.md does not have.  It holds a size and a set of commands, never
+// words.
 public sealed partial class ReadmeTests
 {
     private const string InstallPage = "site/start/install.md";
@@ -36,15 +36,19 @@ public sealed partial class ReadmeTests
     // The prompts a command line of a block can start with.
     private static readonly IReadOnlyList<string> Prompts = ["$ ", "PS> ", "> "];
 
-    // Fails when a readme is over its cap.  The cure is to move the text to the site and link it, not to raise the cap.
+    // Fails when a readme is over its cap.  The cure is to move text to the site and link it, not to raise the cap; the
+    // owner, who maintains README.md, makes that cut there.
     [Theory]
     [InlineData("README.md", 8000)]
     [InlineData("src/SqlSource.Tool/README.md", 4000)]
     public void Size_OfEachReadme_IsUnderItsCap(string readme, int cap) =>
         new FileInfo(RepositoryRoot.Path(readme)).Length.ShouldBeLessThanOrEqualTo(
             cap,
-            $"{readme} is over its cap of {cap} bytes: move the text to the page of site/ that owns it, and link "
-                + "that page"
+            readme == "README.md"
+                ? $"{readme} is over its cap of {cap} bytes: bring it to the owner, who maintains it, to move text to "
+                    + "the site"
+                : $"{readme} is over its cap of {cap} bytes: move the text to the page of site/ that owns it, and "
+                    + "link that page"
         );
 
     // Fails when an install or update command of a readme is not one of site/start/install.md, so that a command
