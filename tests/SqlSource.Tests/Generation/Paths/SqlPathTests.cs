@@ -45,6 +45,9 @@ public sealed class SqlPathTests
     [InlineData("C:\\app\\Users.sql")]
     [InlineData("c:/app/Users.sql")]
     [InlineData("Z:")]
+    [InlineData("a:/app/Users.sql")]
+    [InlineData("z:/app/Users.sql")]
+    [InlineData("A:\\app\\Users.sql")]
     public void IsRooted_PathFromARoot_IsTrue(string path) => SqlPath.IsRooted(path).ShouldBeTrue();
 
     [Theory]
@@ -201,8 +204,8 @@ public sealed class SqlPathTests
 
     [Fact]
     public void FindRepeated_SeveralRepeatedPaths_AreInTheOrderOfTheSortedPaths() =>
-        FindRepeated(["c/C.sql", "b/B.sql", "b/b.sql", "a/A.sql", "c/C.sql"], ["a/A.sql", "b/B.sql", "c/C.sql"])
-            .ShouldBe(["b/B.sql", "c/C.sql"]);
+        FindRepeated(["C/C.sql", "b/B.sql", "C/C.sql", "b/b.sql", "a/A.sql"], ["a/A.sql", "b/B.sql", "C/C.sql"])
+            .ShouldBe(["b/B.sql", "C/C.sql"]);
 
     private static EquatableArray<string> FindRepeated(string[] files, string[] sortedPaths) =>
         SqlPath.FindRepeated([.. files.Select(path => SqlFilePath.Create(path)!)], TestSidecars.Of(sortedPaths));
