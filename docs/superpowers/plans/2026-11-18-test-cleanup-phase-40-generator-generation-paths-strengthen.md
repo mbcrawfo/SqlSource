@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Add only the rows `"a:/app/Users.sql"`, `"z:/app/Users.sql"` and `"A:\\app\\Users.sql"` to `IsRooted_PathFromARoot_IsTrue`, and keep its other rows.
-- List the files of `FindRepeated_SeveralRepeatedPaths_AreInTheOrderOfTheSortedPaths` as `c/C.sql, b/B.sql, c/C.sql, b/b.sql, a/A.sql`, and keep its expected `b/B.sql, c/C.sql`.
+- List the files of `FindRepeated_SeveralRepeatedPaths_AreInTheOrderOfTheSortedPaths` so that the later path repeats first.  The spec's `c/C.sql, b/B.sql, c/C.sql, b/b.sql, a/A.sql` is written with a capital `C/C.sql`, and the expected paths are `b/B.sql, C/C.sql`, per review finding R1-F1: the ordinal and ignore-case orders then disagree, so the test also fails when the sort is case-sensitive.
 - The epic's phase table: change only row 40.
 
 ## Review Focus
@@ -35,7 +35,7 @@ None: the change adds three rows and reorders one list.  Checked against the spe
 - Modify: `docs/superpowers/specs/2026-11-13-test-cleanup-epic-design.md` (row 40's state)
 
 - [x] **Step 1:** Add the three rows to `IsRooted_PathFromARoot_IsTrue` (F-SqlSource.Tests.Generation-2-10).
-- [x] **Step 2:** Reorder the files of `FindRepeated_SeveralRepeatedPaths_AreInTheOrderOfTheSortedPaths` (F-SqlSource.Tests.Generation-2-11).
+- [x] **Step 2:** Reorder the files of `FindRepeated_SeveralRepeatedPaths_AreInTheOrderOfTheSortedPaths` (F-SqlSource.Tests.Generation-2-11), with the third path in capitals (R1-F1).
 - [x] **Step 3:** Set row 40 of the epic's table to `done`.
 - [x] **Step 4:** `./format.sh`, then the Paths tests pass.
 - [x] **Step 5:** `./pre-commit-validation.sh`, then commit.

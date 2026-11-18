@@ -204,8 +204,8 @@ public sealed class SqlPathTests
 
     [Fact]
     public void FindRepeated_SeveralRepeatedPaths_AreInTheOrderOfTheSortedPaths() =>
-        FindRepeated(["c/C.sql", "b/B.sql", "c/C.sql", "b/b.sql", "a/A.sql"], ["a/A.sql", "b/B.sql", "c/C.sql"])
-            .ShouldBe(["b/B.sql", "c/C.sql"]);
+        FindRepeated(["C/C.sql", "b/B.sql", "C/C.sql", "b/b.sql", "a/A.sql"], ["a/A.sql", "b/B.sql", "C/C.sql"])
+            .ShouldBe(["b/B.sql", "C/C.sql"]);
 
     private static EquatableArray<string> FindRepeated(string[] files, string[] sortedPaths) =>
         SqlPath.FindRepeated([.. files.Select(path => SqlFilePath.Create(path)!)], TestSidecars.Of(sortedPaths));
