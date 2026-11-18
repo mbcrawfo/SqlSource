@@ -37,11 +37,11 @@ None: the change drops rows the covers assert.  Checked against the spec on `6d8
 
 - [x] **Step 1:** Drop the three rows.
 - [x] **Step 2:** Set row 30 of the epic's table to `done`.
-- [ ] **Step 3:** `./format.sh`, then the Describing/Postgres tests pass.
-- [ ] **Step 4:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 3:** `./format.sh`, then the Describing/Postgres tests pass.
+- [x] **Step 4:** `./pre-commit-validation.sh`, then commit.
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** Coverage into `artifacts/test-cleanup/phase-30/coverage-after/SqlSource.Tool.Tests`: no file of `src/SqlSource.Tool/Describing/Postgres/**/*.cs` falls.
-- [ ] **Step 2:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows the changed theories did not make.
-- [ ] **Step 3:** The pull request lists the dropped rows beside their cover, the compare result, the coverage figures and the run times.
+- [x] **Step 1:** Coverage into `artifacts/test-cleanup/phase-30/coverage-after/SqlSource.Tool.Tests`: no file of `src/SqlSource.Tool/Describing/Postgres/**/*.cs` falls.
+- [x] **Step 2:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows the changed theories did not make.
+- [x] **Step 3:** The pull request lists the dropped rows beside their cover, the compare result, the coverage figures and the run times.
