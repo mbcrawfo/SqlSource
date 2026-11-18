@@ -120,7 +120,7 @@ Counts are of findings.  The guard is **mutation** (the scope's run before and a
 | 28 | [tool-commands-folds](2026-11-13-test-cleanup-phase-28-tool-commands-folds-design.md) | `tests/SqlSource.Tool.Tests/Commands` |  | 2 |  |  |  | mutation: `tool-root`; covers and run time for 2 | not started |
 | 29 | [tool-bundles-folds](2026-11-13-test-cleanup-phase-29-tool-bundles-folds-design.md) | `tests/SqlSource.Tool.Tests/Bundles` |  | 2 |  |  |  | mutation: `tool-bundles` | done |
 | 30 | [tool-describing-postgres-folds](2026-11-13-test-cleanup-phase-30-tool-describing-postgres-folds-design.md) | `tests/SqlSource.Tool.Tests/Describing/Postgres` |  | 2 |  |  |  | mutation: `tool-describing-postgres` | not started |
-| 31 | [tool-logging-folds](2026-11-13-test-cleanup-phase-31-tool-logging-folds-design.md) | `tests/SqlSource.Tool.Tests/Logging` |  | 1 |  |  |  | mutation: `tool-logging` | not started |
+| 31 | [tool-logging-folds](2026-11-13-test-cleanup-phase-31-tool-logging-folds-design.md) | `tests/SqlSource.Tool.Tests/Logging` |  | 1 |  |  |  | mutation: `tool-logging` | done |
 | 32 | [tool-logging-mixed](2026-11-13-test-cleanup-phase-32-tool-logging-mixed-design.md) | `tests/SqlSource.Tool.Tests/Logging` | 1 | 1 |  |  |  | mutation: `tool-logging`; covers and run time for 1 | not started |
 | 33 | [generator-root-strengthen](2026-11-13-test-cleanup-phase-33-generator-root-strengthen-design.md) | `tests/SqlSource.Tests (root files)` |  |  | 2 |  |  | mutation: `generator-root` | not started |
 | 34 | [generator-driver-strengthen](2026-11-13-test-cleanup-phase-34-generator-driver-strengthen-design.md) | `tests/SqlSource.Tests/Generator` |  |  | 2 |  |  | mutation: `generator-root`; covers and run time for 2 | not started |
