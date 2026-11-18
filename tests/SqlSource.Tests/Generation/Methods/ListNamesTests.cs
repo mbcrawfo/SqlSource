@@ -20,7 +20,7 @@ public sealed class ListNamesTests
     [Fact]
     public void PrefixOf_AnotherParameterMatchesTheSuffix_AddsAnUnderscore()
     {
-        var parameters = Of(List("ids"), Scalar("ids_0"));
+        var parameters = Of(List("ids"), Scalar("ids_9"));
 
         ListNames.PrefixOf(parameters[0], 0, parameters, None, DatabaseEngine.PostgreSql).ShouldBe("ids__");
     }
