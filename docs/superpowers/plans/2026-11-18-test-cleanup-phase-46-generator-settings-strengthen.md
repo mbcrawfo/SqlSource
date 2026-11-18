@@ -57,11 +57,16 @@ Checked against the spec on `55220289`.  Every finding still reads as the review
 - [x] **Step 9 (1-24):** `TryRead_EscapeOfACharacterOutsideTheBmp_IsItsSurrogates(string text, char high, char low, int next)`: the four rows of U+1F600 pass `'\uD83D', '\uDE00'`, and it gains `("\\+010000", '\uD800', '\uDC00', 8)`, `("\\D800\\DC00", '\uD800', '\uDC00', 10)`, `("\\+10FFFF", '\uDBFF', '\uDFFF', 8)`, `("\\DBFF\\DFFF", '\uDBFF', '\uDFFF', 10)`.
 - [x] **Step 10:** Row 46 of the epic's table is `done`.
 - [x] **Step 11:** `./format.sh`, then the Settings tests pass: `dotnet test --project tests/SqlSource.Tests -- --filter-class 'SqlSource.Tests.Settings.*'` (917 tests).  The "after" mutation run is the check that each changed test fails on its mutant.
-- [ ] **Step 12:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 12:** `./pre-commit-validation.sh`, then commit.
+  Passed on `42c90223`'s tree (19020 tests).
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare`: nothing `LOST` and nothing `NOT COMPARABLE` but known flips (notes: `GeneratorParameterList.cs` 121:20, 122:13; Timeout flips of `ClrTypeName.cs:440:24`, `SortedKeyedList.cs:46:20`, `TypeOverrideGrammar.cs:254:17`, `TypeOverrideMap.cs:134:16`), each hand-checked with `kills`; each survivor the spec names is `Killed`.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-46/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/Settings/**/*.cs` falls.
-- [ ] **Step 3:** The test project's run time before and after, interleaved with `--no-build`, the load beside each.
-- [ ] **Step 4:** Copy the after report to `reports/p46-generator-settings-after.json`; the pull request gives the changes, the compare result, the coverage figures, the run times and the covers of 1-04, 1-05, 1-16 (no test or row is removed).
+- [x] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare`: nothing `LOST` and nothing `NOT COMPARABLE` but known flips (notes: `GeneratorParameterList.cs` 121:20, 122:13; Timeout flips of `ClrTypeName.cs:440:24`, `SortedKeyedList.cs:46:20`, `TypeOverrideGrammar.cs:254:17`, `TypeOverrideMap.cs:134:16`), each hand-checked with `kills`; each survivor the spec names is `Killed`.
+  1075 killed, 113 survived, 28 timeouts, 11 min 49 s at load 10-71.  `compare`: 1077 detected before, 1070 still detected, 1 lost, 6 not comparable, every one a flip `notes.md` predicted: `GeneratorParameterList.cs:121:20` LOST, and `ClrTypeName.cs:440:24`, `SortedKeyedList.cs` 45:21 (x2) and 46:20, `TypeOverrideGrammar.cs:254:17` and `TypeOverrideMap.cs:134:16` Killed to Timeout.  `kills` shows no changed test killed any of them but `TypeOverrideGrammar.cs:254:17` `index--`, which `BracketHelp_KeyInBrackets_ShowsTheFormsThatAreRead` killed in p27's run: an infinite loop on its rows with a plain first part, a fast failure on those that start with a bracket, so Killed or Timeout is a race (Timeout in p07's run, Killed in p27's, Timeout here and in a narrow re-run); asked of the owner as Q1.  All ten named survivors are `Killed`, with 20 other survivors of the same lines.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-46/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/Settings/**/*.cs` falls.
+  1924/1948 lines over the scope's 31 files, before and after; 9218 tests before (6 min 26 s, load 3 to 35), 9230 after (12 min 47 s, load 51 to 73).
+- [x] **Step 3:** The test project's run time before and after, interleaved with `--no-build`, the load beside each.
+  Without coverage, `--no-build`, one after the other: after 4 min 38 s (load 11 to 5), before 4 min 49 s (load 5 to 6), after 4 min 51 s (load 7 to 10).
+- [x] **Step 4:** Copy the after report to `reports/p46-generator-settings-after.json`; the pull request gives the changes, the compare result, the coverage figures, the run times and the covers of 1-04, 1-05, 1-16 (no test or row is removed).
+  Saved at `reports/p46-generator-settings-after.json`.
