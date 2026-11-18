@@ -115,7 +115,7 @@ One writer, with "The writer".  Then check what it wrote, yourself:
 
 ## Finishing
 
-The pull request holds the outline, the phase specs, the appendix and the tech-debt items, and no other change but a correction to a list of the skill, which its description names.  `./pre-commit-validation.sh` before the commit and `./pre-commit-validation.sh --full` before the push; `branch-review:review` until clean; `VersionPrefix` against the highest `v*` tag.  Offer the pull request to the owner and open it when they agree.  Its description is `run-notes.md` in short: the run's folders, the slices, each scope's counts and time, the findings by action and by verdict, and each coverage gap and failed scope exactly, by file, with no rounding.
+The pull request holds the outline, the phase specs, the appendix and the tech-debt items, and no other change but a correction to a list of the skill, which its description names.  `./pre-commit-validation.sh` before the commit; `branch-review:review` until clean; `VersionPrefix` against the highest `v*` tag.  Offer the pull request to the owner and open it when they agree.  Its description is `run-notes.md` in short: the run's folders, the slices, each scope's counts and time, the findings by action and by verdict, and each coverage gap and failed scope exactly, by file, with no rounding.
 
 ## Common mistakes
 
