@@ -493,6 +493,14 @@
         created, the project's patterns list at the next evaluation.  The items are compared by their full paths,
         since an Exclude in a target compares the paths as written, and an item the project lists by a relative path
         would otherwise be added again.
+
+        A sidecar is added by the path of its .sql item with .json after it, relative when the .sql file's is, as the
+        project's patterns list it at the next evaluation, and not by its full path; by the first item's, once, when the
+        project lists the .sql file twice by two paths.  The generator pairs the two by
+        their paths as text, and the compiler makes a relative path full against its working folder, where a symbolic
+        link on the way is resolved, while MSBuild keeps the link in a full path: a project named through a link, as
+        the .NET 11 SDK names one in a folder reached through a link, would give the compiler the .sql file by one
+        path and its sidecar by another, and the query would have no entry until the next build.
     -->
     <Target
         Name="SqlSourceDescribeOnline"
@@ -543,7 +551,14 @@
         <ItemGroup Condition="'$(SqlSourceGoesOnline)' == 'true'">
             <SqlSourceListedFile Include="@(AdditionalFiles->'%(FullPath)')" />
             <SqlSourceSidecarNotListed Include="@(SqlSourceSidecarCreated)" Exclude="@(SqlSourceListedFile)" />
-            <AdditionalFiles Include="@(SqlSourceSidecarNotListed)" />
+            <SqlSourceSidecarOfSqlItem
+                Include="@(AdditionalFiles->'%(FullPath).json')"
+                Condition="'%(Extension)' == '.sql'"
+                SqlSourceItem="%(Identity).json"
+            />
+            <SqlSourceSidecarNotAdded Include="@(SqlSourceSidecarOfSqlItem)" Exclude="@(SqlSourceSidecarNotListed)" />
+            <SqlSourceSidecarOfSqlItem Remove="@(SqlSourceSidecarNotAdded)" />
+            <AdditionalFiles Include="@(SqlSourceSidecarOfSqlItem->Distinct()->'%(SqlSourceItem)')" />
         </ItemGroup>
     </Target>
     <!--
