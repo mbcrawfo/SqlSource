@@ -43,6 +43,6 @@ None: the change only adds.  Checked against the spec on `fd29ad32`: `EquatableA
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows the changed tests did not make; `EquatableArray.cs:31:49` and `TextLines.cs:43:40` are `Killed`.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-33/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/*.cs` falls.
+- [x] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows the changed tests did not make; `EquatableArray.cs:31:49` and `TextLines.cs:43:40` are `Killed`.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-33/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/*.cs` falls.
 - [ ] **Step 3:** The pull request gives the compare result, the two kills, the coverage figures and the run times.
