@@ -420,6 +420,6 @@ printf '  %s\n' "${results[@]}"
 if [[ -n "$full_reason" ]]; then
     printf '\nFull run: %s.\n' "$full_reason"
 else
-    printf '\nPartial run: run ./pre-commit-validation.sh --full before pushing.\n'
+    printf '\nPartial run: ./pre-commit-validation.sh --full runs every check.\n'
 fi
 exit "$failed"

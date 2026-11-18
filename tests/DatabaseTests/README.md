@@ -36,7 +36,7 @@ SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/Databa
 SQLSOURCE_TESTS_SQLSERVER_IMAGE=mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04 dotnet test --project tests/DatabaseTests/SqlServer
 ```
 
-`Postgres.Npgsql8` and `SqlServer.SqlClient61` ignore the variables and run the default image.  A change to a describer project is run on both of its engine's images before it is pushed.
+`Postgres.Npgsql8` and `SqlServer.SqlClient61` ignore the variables and run the default image.  CI runs each describer project on both of its engine's images; run the floor image locally to find a failure there before CI does.
 
 `dotnet test --solution` and the script leave `QueryMethodAllocation`, `Postgres.SyncAsync` and `SqlServer.SyncAsync` out, since only the nightly runs them; [the allocation tests' readme](QueryMethodAllocation/README.md) has the command for one engine, and the readmes of [`Postgres.SyncAsync`](Postgres.SyncAsync/README.md#running) and [`SqlServer.SyncAsync`](SqlServer.SyncAsync/README.md#running) the command for the project and for one scenario.
 
