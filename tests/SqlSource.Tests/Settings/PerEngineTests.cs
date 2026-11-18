@@ -7,6 +7,9 @@ namespace SqlSource.Tests.Settings;
 
 public sealed class PerEngineTests
 {
+    // The first number past the last member, the boundary of the checks that refuse a value of no member.
+    private static readonly DatabaseEngine NoMember = (DatabaseEngine)DatabaseEngines.All.Length;
+
     [Fact]
     public void Of_EachEngine_HoldsItsValue()
     {
@@ -142,7 +145,7 @@ public sealed class PerEngineTests
 
     [Fact]
     public void With_ValueOfNoMember_Throws() =>
-        _ = Should.Throw<UnexpectedEnumValueException>(() => default(PerEngine<string?>).With((DatabaseEngine)7, "a"));
+        _ = Should.Throw<UnexpectedEnumValueException>(() => default(PerEngine<string?>).With(NoMember, "a"));
 
     [Fact]
     public void Only_ValueOfNoMember_Throws() =>
@@ -152,8 +155,8 @@ public sealed class PerEngineTests
     public void Indexer_ValueOfNoMember_Throws()
     {
         _ = Should.Throw<UnexpectedEnumValueException>(() =>
-            PerEngine.Only<string?>(DatabaseEngine.SqlServer, "a")[(DatabaseEngine)7]
+            PerEngine.Only<string?>(DatabaseEngine.SqlServer, "a")[NoMember]
         );
-        _ = Should.Throw<UnexpectedEnumValueException>(() => default(PerEngine<string?>)[(DatabaseEngine)7]);
+        _ = Should.Throw<UnexpectedEnumValueException>(() => default(PerEngine<string?>)[NoMember]);
     }
 }

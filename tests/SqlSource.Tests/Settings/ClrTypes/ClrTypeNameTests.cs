@@ -206,6 +206,7 @@ public sealed class ClrTypeNameTests
         "global::System.Collections.Generic.List<global::UserId>",
         "System.Collections.Generic.List<global::UserId>"
     )]
+    [InlineData("List<global::App.UserId>", "List<App.UserId>")]
     public void AsWritten_Text_LeavesOutGlobalBeforeANameOfSeveralParts(string text, string written) =>
         ClrTypeName.AsWritten(text).ShouldBe(written);
 }

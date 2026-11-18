@@ -14,23 +14,55 @@ public sealed class LibrarySettingsTests
     [Fact]
     public void Over_BothNull_IsNull() => LibrarySettings.Over(null, null).ShouldBeNull();
 
+    // Equality alone would pass a copy of the other: measured on the current thread, after a first call of each, the
+    // two calls allocate nothing, which a merge into a new array would.
     [Fact]
     public void Over_OneNull_IsTheOtherItself()
     {
         var entries = new EquatableArray<LibrarySetting>([Entry(LibraryState.On, SettingsFile)]);
+        _ = LibrarySettings.Over(entries, null);
+        _ = LibrarySettings.Over(null, entries);
 
-        LibrarySettings.Over(entries, null).ShouldBe(entries);
-        LibrarySettings.Over(null, entries).ShouldBe(entries);
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var nearAlone = LibrarySettings.Over(entries, null);
+        var farAlone = LibrarySettings.Over(null, entries);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        nearAlone.ShouldBe(entries);
+        farAlone.ShouldBe(entries);
+        allocated.ShouldBe(0);
     }
 
+    // Each level names a library the other does not: the merge holds both, in the order of the libraries, and the
+    // nearer level's entry for the library both name, whichever of the two is nearer.
     [Fact]
     public void Over_NearAndFarLevels_ReplacesOnlyTheLibrariesTheNearLevelNames()
     {
-        var off = new EquatableArray<LibrarySetting>([Entry(LibraryState.Off, Near)]);
-        var on = new EquatableArray<LibrarySetting>([Entry(LibraryState.On, SettingsFile)]);
+        var offAndJson = new EquatableArray<LibrarySetting>([
+            Entry(SqlLibrary.NodaTime, LibraryState.Off, Near),
+            Entry(SqlLibrary.Json, LibraryState.Off, Near),
+        ]);
+        var onAndNetTopologySuite = new EquatableArray<LibrarySetting>([
+            Entry(SqlLibrary.NodaTime, LibraryState.On, SettingsFile),
+            Entry(SqlLibrary.NetTopologySuite, LibraryState.On, SettingsFile),
+        ]);
 
-        LibrarySettings.Over(off, on).ShouldNotBeNull().ShouldBe([Entry(LibraryState.Off, Near)]);
-        LibrarySettings.Over(on, off).ShouldNotBeNull().ShouldBe([Entry(LibraryState.On, SettingsFile)]);
+        LibrarySettings
+            .Over(offAndJson, onAndNetTopologySuite)
+            .ShouldNotBeNull()
+            .ShouldBe([
+                Entry(SqlLibrary.NodaTime, LibraryState.Off, Near),
+                Entry(SqlLibrary.NetTopologySuite, LibraryState.On, SettingsFile),
+                Entry(SqlLibrary.Json, LibraryState.Off, Near),
+            ]);
+        LibrarySettings
+            .Over(onAndNetTopologySuite, offAndJson)
+            .ShouldNotBeNull()
+            .ShouldBe([
+                Entry(SqlLibrary.NodaTime, LibraryState.On, SettingsFile),
+                Entry(SqlLibrary.NetTopologySuite, LibraryState.On, SettingsFile),
+                Entry(SqlLibrary.Json, LibraryState.Off, Near),
+            ]);
     }
 
     [Fact]
@@ -83,5 +115,8 @@ public sealed class LibrarySettingsTests
     }
 
     private static LibrarySetting Entry(LibraryState state, SettingPlace place) =>
-        new(SqlLibrary.NodaTime, state, place);
+        Entry(SqlLibrary.NodaTime, state, place);
+
+    private static LibrarySetting Entry(SqlLibrary library, LibraryState state, SettingPlace place) =>
+        new(library, state, place);
 }
