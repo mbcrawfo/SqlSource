@@ -1,0 +1,40 @@
+{
+  "fileName": "SqlServerNotParameters.sql",
+  "settings": [],
+  "input": "-- dialect: mssql\n-- name: Count\nDECLARE @n int = 1;\nSELECT @@ROWCOUNT, a@b, 'x@y.z', [p@q], @n /* @c */ FROM t WHERE id = @id; -- @d\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 17],
+      ["Text", 17, 18],
+      ["LineComment", 18, 32],
+      ["Text", 32, 41],
+      ["Parameter", 41, 43],
+      ["Text", 43, 77],
+      ["Quoted", 77, 84],
+      ["Text", 84, 86],
+      ["Quoted", 86, 91],
+      ["Text", 91, 93],
+      ["Parameter", 93, 95],
+      ["Text", 95, 96],
+      ["BlockComment", 96, 104],
+      ["Text", 104, 123],
+      ["Parameter", 123, 126],
+      ["Text", 126, 128],
+      ["LineComment", 128, 133],
+      ["Text", 133, 134]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 17, "name": null, "default": null },
+      { "kind": "markerComment", "start": 18, "end": 32, "name": null, "default": null },
+      { "kind": "parameter", "start": 41, "end": 43, "name": "n", "default": null },
+      { "kind": "parameter", "start": 93, "end": 95, "name": "n", "default": null },
+      { "kind": "parameter", "start": 123, "end": 126, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

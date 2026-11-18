@@ -1,0 +1,22 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"mysql\" }"
+  ],
+  "input": "@a$b c",
+  "expected": {
+    "startDialect": "mysql",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": [],
+    "lexemes": [
+      ["Parameter", 0, 2],
+      ["Text", 2, 6]
+    ],
+    "spans": [
+      { "kind": "parameter", "start": 0, "end": 2, "name": "a", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

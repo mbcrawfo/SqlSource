@@ -1,0 +1,26 @@
+{
+  "fileName": "PostgresNestedBlockComments.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: Nested\nSELECT /* a /* {{b:x}} */ {{c:y}} */ {{col:name}} FROM users;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 36],
+      ["Text", 36, 44],
+      ["BlockComment", 44, 73],
+      ["Text", 73, 99]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 36, "name": null, "default": null },
+      { "kind": "token", "start": 74, "end": 86, "name": "col", "default": "name" }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

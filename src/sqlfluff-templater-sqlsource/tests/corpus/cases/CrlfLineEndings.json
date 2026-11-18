@@ -1,0 +1,32 @@
+{
+  "fileName": "CrlfLineEndings.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\r\n-- name: A\r\nSELECT {{t:users}}\r\n\r\n-- name: B\r\nSELECT * FROM t WHERE 1 = 1 {{f:AND a = 1\r\n    AND b = 2}}\r\n    AND id = @id\r\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 22],
+      ["LineComment", 22, 32],
+      ["Text", 32, 56],
+      ["LineComment", 56, 66],
+      ["Text", 66, 141],
+      ["Parameter", 141, 144],
+      ["Text", 144, 146]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 22, "end": 32, "name": null, "default": null },
+      { "kind": "token", "start": 41, "end": 52, "name": "t", "default": "users" },
+      { "kind": "queryEnd", "start": 52, "end": 52, "name": null, "default": null },
+      { "kind": "markerComment", "start": 56, "end": 66, "name": null, "default": null },
+      { "kind": "token", "start": 96, "end": 126, "name": "f", "default": "AND a = 1\n    AND b = 2" },
+      { "kind": "parameter", "start": 141, "end": 144, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: GetBookingOverlap\nSELECT b.id, b.during * tstzrange(@from, @to) AS overlap\nFROM bookings b\nWHERE b.id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 26],
+      ["Text", 26, 61],
+      ["Parameter", 61, 66],
+      ["Text", 66, 68],
+      ["Parameter", 68, 71],
+      ["Text", 71, 113],
+      ["Parameter", 113, 116],
+      ["Text", 116, 118]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 26, "name": null, "default": null },
+      { "kind": "parameter", "start": 61, "end": 66, "name": "from", "default": null },
+      { "kind": "parameter", "start": 68, "end": 71, "name": "to", "default": null },
+      { "kind": "parameter", "start": 113, "end": 116, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

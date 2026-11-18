@@ -1,0 +1,29 @@
+{
+  "fileName": "schema.sql",
+  "settings": [
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The schema of the database \"billing\", which the end-to-end tests describe the queries that name it against and run\n-- them on.  SqlServerContainer and tools/describe-end-to-end.sh apply it, then seed.sql, batch by batch between the\n-- lines that hold GO alone.  Every batch runs on SQL Server 2017.  A change to it is followed by a run of\n-- tools/describe-end-to-end.sh, which writes the sidecars again.\n\n-- A schema of its own, so that a table model's name has its prefix.\nCREATE SCHEMA billing;\nGO\n\nCREATE TABLE billing.invoices (\n    id int PRIMARY KEY,\n    account_id int NOT NULL,\n    number varchar(20) NOT NULL,\n    amount decimal(12, 2) NOT NULL,\n    issued_on date NOT NULL,\n    paid_at datetime2(0) NULL\n);\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 117],
+      ["Text", 117, 118],
+      ["LineComment", 118, 234],
+      ["Text", 234, 235],
+      ["LineComment", 235, 341],
+      ["Text", 341, 342],
+      ["LineComment", 342, 407],
+      ["Text", 407, 409],
+      ["LineComment", 409, 477],
+      ["Text", 477, 721]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

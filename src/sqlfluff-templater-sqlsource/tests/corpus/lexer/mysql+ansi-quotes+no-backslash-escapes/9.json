@@ -1,0 +1,19 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"mysql,ansi-quotes,no-backslash-escapes\" }"
+  ],
+  "input": "5--3",
+  "expected": {
+    "startDialect": "mysql",
+    "startOptions": ["ansi-quotes", "no-backslash-escapes"],
+    "dialect": "mysql",
+    "options": ["ansi-quotes", "no-backslash-escapes"],
+    "lexemes": [
+      ["Text", 0, 4]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "fileName": "Orders.sql",
+  "settings": [
+    "{\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- generator: default keep-comments\n-- member-location: class\n\n-- name: GetOrder\nSELECT id, total /* in cents */\nFROM orders\nWHERE id = @id;\n\n-- name: OrdersOf\n-- The schema is a token, so this query is a method.\nSELECT o.id FROM {{schema}}.orders AS o INNER JOIN {{schema}}.users AS u ON u.id = o.user_id WHERE {{filter}};\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 35],
+      ["Text", 35, 36],
+      ["LineComment", 36, 61],
+      ["Text", 61, 63],
+      ["LineComment", 63, 80],
+      ["Text", 80, 98],
+      ["BlockComment", 98, 112],
+      ["Text", 112, 136],
+      ["Parameter", 136, 139],
+      ["Text", 139, 142],
+      ["LineComment", 142, 159],
+      ["Text", 159, 160],
+      ["LineComment", 160, 212],
+      ["Text", 212, 324]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 35, "name": null, "default": null },
+      { "kind": "markerComment", "start": 36, "end": 61, "name": null, "default": null },
+      { "kind": "markerComment", "start": 63, "end": 80, "name": null, "default": null },
+      { "kind": "parameter", "start": 136, "end": 139, "name": "id", "default": null },
+      { "kind": "markerComment", "start": 142, "end": 159, "name": null, "default": null },
+      { "kind": "token", "start": 230, "end": 240, "name": "schema", "default": null },
+      { "kind": "token", "start": 264, "end": 274, "name": "schema", "default": null },
+      { "kind": "token", "start": 312, "end": 322, "name": "filter", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

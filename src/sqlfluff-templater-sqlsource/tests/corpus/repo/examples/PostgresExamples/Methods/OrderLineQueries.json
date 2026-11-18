@@ -1,0 +1,60 @@
+{
+  "fileName": "OrderLineQueries.sql",
+  "settings": [
+    "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // The output of every .sql file of this folder: methods, so that each query gets an extension method on a connection\n  // and its models.\n  \"output\": \"methods\",\n}\n",
+    "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // No settings file above this folder applies to the project.\n  \"root\": true,\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  \"typeOverrides\": {\n    // Every timestamptz is a DateTimeOffset, which Dapper reads through UtcDateTimeOffsetHandler.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"columnTypes\": {\n    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.\n    \"order_lines.order_id\": \"OrderId\",\n  },\n}\n"
+  ],
+  "input": "-- The queries of the order lines, at the folder's output, methods.  Each query gets its models and a method that runs\n-- it, which OrderLineQueries calls.  The result shape after the name says what the method returns: many, every row,\n-- as an array of the output model.  The type override gives each numeric of the file the type Price, whose converters\n-- the method calls to read unit_price, and the project's column types give order_lines.order_id the type OrderId.\n-- type-override: numeric=PostgresExamples.Methods.Price\n\n-- name: ListOrderLines -> many\n-- summary: The lines of one order, in order.\n-- A parameter is no column of a table, so its marker gives it the type OrderId.  order_id comes last: the table's\n-- columns in its own order would give the rows the table's model, OrderLinesDto.\n-- param: @orderId -> OrderId\nSELECT line_number, product, quantity, unit_price, order_id\nFROM order_lines\nWHERE order_id = @orderId\nORDER BY line_number;\n\n-- name: ListLatestOrderPerProduct -> many\n-- summary: The latest order that each product is on.\n-- The largest order_id is computed, no column of a table, so the column types do not reach it, and the marker gives\n-- it the type OrderId.\n-- column: latest_order_id -> OrderId\nSELECT product, max(order_id) AS latest_order_id\nFROM order_lines\nGROUP BY product\nORDER BY product;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 118],
+      ["Text", 118, 119],
+      ["LineComment", 119, 235],
+      ["Text", 235, 236],
+      ["LineComment", 236, 354],
+      ["Text", 354, 355],
+      ["LineComment", 355, 469],
+      ["Text", 469, 470],
+      ["LineComment", 470, 526],
+      ["Text", 526, 528],
+      ["LineComment", 528, 559],
+      ["Text", 559, 560],
+      ["LineComment", 560, 605],
+      ["Text", 605, 606],
+      ["LineComment", 606, 720],
+      ["Text", 720, 721],
+      ["LineComment", 721, 802],
+      ["Text", 802, 803],
+      ["LineComment", 803, 832],
+      ["Text", 832, 927],
+      ["Parameter", 927, 935],
+      ["Text", 935, 959],
+      ["LineComment", 959, 1001],
+      ["Text", 1001, 1002],
+      ["LineComment", 1002, 1055],
+      ["Text", 1055, 1056],
+      ["LineComment", 1056, 1172],
+      ["Text", 1172, 1173],
+      ["LineComment", 1173, 1196],
+      ["Text", 1196, 1197],
+      ["LineComment", 1197, 1234],
+      ["Text", 1234, 1336]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 470, "end": 526, "name": null, "default": null },
+      { "kind": "markerComment", "start": 528, "end": 559, "name": null, "default": null },
+      { "kind": "markerComment", "start": 560, "end": 605, "name": null, "default": null },
+      { "kind": "markerComment", "start": 803, "end": 832, "name": null, "default": null },
+      { "kind": "parameter", "start": 927, "end": 935, "name": "orderId", "default": null },
+      { "kind": "markerComment", "start": 959, "end": 1001, "name": null, "default": null },
+      { "kind": "markerComment", "start": 1002, "end": 1055, "name": null, "default": null },
+      { "kind": "markerComment", "start": 1197, "end": 1234, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "fileName": "TokenCrossesComment.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: Q\nSELECT 1 {{f:AND a = 1 -- note}}\nORDER BY {{o:name}};\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 31],
+      ["Text", 31, 55],
+      ["LineComment", 55, 64],
+      ["Text", 64, 86]
+    ],
+    "spans": [],
+    "error": { "code": "SQLSRC120", "start": 55, "end": 64 },
+    "hasOtherErrors": false
+  }
+}

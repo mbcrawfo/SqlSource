@@ -33,3 +33,10 @@ tests/DatabaseTests/SqlServer/Realistic/Cases/** text eol=lf
 
 # An AGENTS.md is held to a size in bytes by AgentsFileTests, which a CRLF checkout would exceed
 AGENTS.md text eol=lf
+
+# The templater's corpus is compared byte for byte with what TemplatingCorpusTests writes, at LF
+src/sqlfluff-templater-sqlsource/tests/corpus/** text eol=lf
+
+# A fidelity case of the templater's corpus is read as it is checked out, so each keeps its line endings
+tests/SqlSource.Tests/Parsing/Templating/Cases/** text eol=lf
+tests/SqlSource.Tests/Parsing/Templating/Cases/CrlfLineEndings.sql text eol=crlf

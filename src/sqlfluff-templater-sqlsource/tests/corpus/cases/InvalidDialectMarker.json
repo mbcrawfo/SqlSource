@@ -1,0 +1,20 @@
+{
+  "fileName": "InvalidDialectMarker.sql",
+  "settings": [],
+  "input": "-- dialect: nonsense\n-- name: Q\nSELECT {{t:users}};\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 31],
+      ["Text", 31, 52]
+    ],
+    "spans": [],
+    "error": { "code": "SQLSRC111", "start": 12, "end": 20 },
+    "hasOtherErrors": false
+  }
+}

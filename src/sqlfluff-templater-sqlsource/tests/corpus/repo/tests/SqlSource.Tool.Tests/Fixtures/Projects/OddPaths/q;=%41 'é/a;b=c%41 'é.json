@@ -1,0 +1,23 @@
+{
+  "fileName": "a;b=c%41 'é.sql",
+  "settings": [
+    "{\n  \"dialect\": \"postgres\"\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: Odd\nSELECT 1;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 12],
+      ["Text", 12, 23]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 12, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

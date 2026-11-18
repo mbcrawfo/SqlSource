@@ -1,0 +1,30 @@
+{
+  "fileName": "ByOption.sql",
+  "settings": [
+    "{\n  // The members of this folder's queries go on the type.\n  \"memberLocation\": \"Class\",\n}\n",
+    "{\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The header of this file says its dialect, with an option.\n-- dialect: mysql, no-backslash-escapes\nSELECT 'C:\\temp\\' AS path; -- a comment\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": ["no-backslash-escapes"],
+    "lexemes": [
+      ["LineComment", 0, 60],
+      ["Text", 60, 61],
+      ["LineComment", 61, 100],
+      ["Text", 100, 108],
+      ["Quoted", 108, 118],
+      ["Text", 118, 128],
+      ["LineComment", 128, 140],
+      ["Text", 140, 141]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 61, "end": 100, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

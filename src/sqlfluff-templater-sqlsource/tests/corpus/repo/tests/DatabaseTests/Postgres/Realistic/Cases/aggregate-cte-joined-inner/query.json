@@ -1,0 +1,31 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for timestamptz.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"timestamptz\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListMonthlySpendWithChange\nWITH monthly AS (\n    SELECT o.account_id, date_trunc('month', o.placed_at) AS month_start, sum(l.quantity * l.unit_price) AS total\n    FROM orders o\n    JOIN order_lines l ON l.order_id = o.id\n    WHERE o.placed_at >= @from\n    GROUP BY o.account_id, date_trunc('month', o.placed_at)\n)\nSELECT\n    a.id,\n    a.name,\n    m.month_start,\n    m.total,\n    m.total - lag(m.total) OVER (PARTITION BY a.id ORDER BY m.month_start) AS change\nFROM accounts a\nJOIN monthly m ON m.account_id = a.id\nORDER BY a.id, m.month_start;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 35],
+      ["Text", 35, 90],
+      ["Quoted", 90, 97],
+      ["Text", 97, 255],
+      ["Parameter", 255, 260],
+      ["Text", 260, 299],
+      ["Quoted", 299, 306],
+      ["Text", 306, 553]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 35, "name": null, "default": null },
+      { "kind": "parameter", "start": 255, "end": 260, "name": "from", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

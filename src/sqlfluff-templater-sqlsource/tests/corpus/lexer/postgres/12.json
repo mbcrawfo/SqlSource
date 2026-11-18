@@ -1,0 +1,24 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"postgres\" }"
+  ],
+  "input": "E'a'\n'b\\'c' -- d'",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["Text", 0, 1],
+      ["Quoted", 1, 4],
+      ["Text", 4, 5],
+      ["Quoted", 5, 11],
+      ["Text", 11, 12],
+      ["LineComment", 12, 17]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

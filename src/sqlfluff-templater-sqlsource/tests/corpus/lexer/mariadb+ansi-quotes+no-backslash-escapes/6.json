@@ -1,0 +1,21 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"mariadb,ansi-quotes,no-backslash-escapes\" }"
+  ],
+  "input": "'a\\'b' -- c'",
+  "expected": {
+    "startDialect": "mariadb",
+    "startOptions": ["ansi-quotes", "no-backslash-escapes"],
+    "dialect": "mariadb",
+    "options": ["ansi-quotes", "no-backslash-escapes"],
+    "lexemes": [
+      ["Quoted", 0, 4],
+      ["Text", 4, 5],
+      ["Quoted", 5, 12]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

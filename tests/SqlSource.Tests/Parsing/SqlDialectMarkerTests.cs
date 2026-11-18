@@ -74,6 +74,19 @@ public sealed class SqlDialectMarkerTests
     }
 
     [Fact]
+    public void Apply_InvalidMarkerAfterAValidOne_GivesBoth()
+    {
+        const string Text = "-- dialect: mysql,ansi-quotes\n-- dialect: nope\n-- dialect: oracle\nSELECT 1";
+        var lexer = new SqlLexer(Text, SqlDialectRules.Ansi);
+
+        _ = SqlDialectMarker.Apply(lexer, Text, out var named, out var invalid);
+
+        named.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes));
+        invalid.ShouldNotBeNull().Span.ShouldBe(TextSpans.Of(Text, "-- dialect: nope"));
+        lexer.Rules.ShouldBeSameAs(SqlDialectRules.For(named.ShouldNotBeNull()));
+    }
+
+    [Fact]
     public void Apply_SeveralMarkers_TakesTheFirstThatNamesADialect()
     {
         const string Text = "-- dialect: nope\n-- dialect: oracle\n-- dialect: mysql\n-- name: A\nSELECT 1";

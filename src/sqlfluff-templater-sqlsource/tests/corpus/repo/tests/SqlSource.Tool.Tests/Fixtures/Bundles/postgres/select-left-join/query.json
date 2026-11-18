@@ -1,0 +1,25 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: GetUserOrders\nSELECT u.id, u.email, o.total, count(*) OVER () AS n\nFROM users u LEFT JOIN orders o ON o.user_id = u.id\nWHERE u.id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 22],
+      ["Text", 22, 141],
+      ["Parameter", 141, 144],
+      ["Text", 144, 146]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 22, "name": null, "default": null },
+      { "kind": "parameter", "start": 141, "end": 144, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

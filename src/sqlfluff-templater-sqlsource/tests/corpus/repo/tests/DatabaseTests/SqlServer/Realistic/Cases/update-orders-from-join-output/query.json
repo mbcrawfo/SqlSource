@@ -1,0 +1,34 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: MarkShippedOrdersDelivered\n-- param: @shipped_before datetime2(0)\nUPDATE o\nSET o.status = 'delivered'\nOUTPUT\n    inserted.id,\n    deleted.status AS previous_status,\n    inserted.status,\n    inserted.shipped_at,\n    inserted.ship_city,\n    c.name AS customer_name,\n    c.email AS customer_email\nFROM dbo.orders AS o\nJOIN dbo.customers AS c ON c.id = o.customer_id\nWHERE o.status = 'shipped'\n    AND o.shipped_at < @shipped_before;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 35],
+      ["Text", 35, 36],
+      ["LineComment", 36, 74],
+      ["Text", 74, 99],
+      ["Quoted", 99, 110],
+      ["Text", 110, 389],
+      ["Quoted", 389, 398],
+      ["Text", 398, 422],
+      ["Parameter", 422, 437],
+      ["Text", 437, 439]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 35, "name": null, "default": null },
+      { "kind": "markerComment", "start": 36, "end": 74, "name": null, "default": null },
+      { "kind": "parameter", "start": 422, "end": 437, "name": "shipped_before", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

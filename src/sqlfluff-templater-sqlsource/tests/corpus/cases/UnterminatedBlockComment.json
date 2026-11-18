@@ -1,0 +1,15 @@
+{
+  "fileName": "UnterminatedBlockComment.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: Q\nSELECT {{t:users}} /* abc;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [],
+    "spans": [],
+    "error": { "code": "SQLSRC102", "start": 51, "end": 53 },
+    "hasOtherErrors": false
+  }
+}

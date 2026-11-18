@@ -1,0 +1,23 @@
+{
+  "fileName": "Widgets.sql",
+  "settings": [
+    "{\n    // Beside the project.\n    \"output\": \"models\",\n}\n",
+    "{\n    // Above the project, in the folder that a test builds the copy through a symbolic link to.  \"root\" ends the chain\n    // at the copy, so that no settings file above the copy applies.\n    \"root\": true,\n    \"dialect\": \"postgres\",\n}\n"
+  ],
+  "input": "-- name: GetWidgets\nSELECT id, name FROM widgets;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 19],
+      ["Text", 19, 50]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 19, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}
