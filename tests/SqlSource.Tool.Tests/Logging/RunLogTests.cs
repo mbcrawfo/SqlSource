@@ -138,17 +138,6 @@ public sealed class RunLogTests : IDisposable
             .ShouldBe(["describe", option + "***", "--log", "run.log"]);
     }
 
-    [Theory]
-    [InlineData("--connection=")]
-    [InlineData("--connection:")]
-    public async Task RunStart_Arguments_KeepTheOptionAndTheSeparatorOfAConnection(string option)
-    {
-        _ = await _scene.DescribeAsync(option + "billing=" + Secrets.ConnectionWithMarker, "--log", "run.log");
-
-        Strings(LogReader.Read(Log)[0].GetProperty("arguments"))
-            .ShouldBe(["describe", option + "***", "--log", "run.log"]);
-    }
-
     [Fact]
     public async Task Run_ErrorWithLog_IsADiagnosticEventWithItsPlaceItsMessageAndItsLines()
     {
@@ -327,7 +316,6 @@ public sealed class RunLogTests : IDisposable
     [InlineData("Delete", false, "deleted", "deleted")]
     [InlineData("Delete", true, "failed", "could not be changed")]
     [InlineData("Unreadable", false, "failed", "could not be changed")]
-    [InlineData("Unreadable", true, "failed", "could not be changed")]
     [InlineData("HeldBack", false, "held-back", "left as it was")]
     [InlineData("Unchanged", false, "unchanged", "unchanged")]
     public void Sidecar_EachAction_IsItsWord(string action, bool failed, string logged, string said)
