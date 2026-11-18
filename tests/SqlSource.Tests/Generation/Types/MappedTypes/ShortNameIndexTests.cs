@@ -61,10 +61,14 @@ public sealed class ShortNameIndexTests
             references: [library]
         );
 
+        var buildsBefore = ShortNameIndex.BuildsOnThisThread;
         ShortNameIndex.MetadataNamesOf(first, "UserId", 0).ShouldBe(["Lib.UserId"]);
         var index = ShortNameIndex.IndexOf(library).ShouldNotBeNull();
+        var builds = ShortNameIndex.BuildsOnThisThread;
+        builds.ShouldBeGreaterThan(buildsBefore);
         ShortNameIndex.MetadataNamesOf(second, "UserId", 0).ShouldBe(["Lib.UserId"]);
 
+        ShortNameIndex.BuildsOnThisThread.ShouldBe(builds);
         ShortNameIndex.IndexOf(library).ShouldBeSameAs(index);
     }
 
