@@ -87,6 +87,7 @@ public sealed class TypeKeysTests
     [InlineData(".int4")]
     [InlineData("public.")]
     [InlineData("pg_catalog.")]
+    [InlineData("int4.")]
     [InlineData("timestamp with time zone")]
     [InlineData("int 4")]
     [InlineData("\"\"")]
@@ -246,9 +247,6 @@ public sealed class TypeKeysTests
     public void TryNormalizePostgres_NameOfSqlServerAlone_IsNotAKey(string key) =>
         TypeKeys.TryNormalizePostgres(key.AsSpan(), out _).ShouldBeFalse();
 
-    [Fact]
-    public void TryNormalizePostgres_SysSchema_IsAUsersSchema() => ShouldNormalize("sys.int", "sys.int");
-
     // TryNormalizeEach gives what each engine's own reading gives, null for an engine that does not read the key.
     [Theory]
     [InlineData("int", "int4", "int")]
@@ -258,7 +256,9 @@ public sealed class TypeKeysTests
     [InlineData("pg_catalog.text", "text", null)]
     [InlineData("\"sys\".\"int\"", "\"sys\".\"int\"", "int")]
     [InlineData("dbo.Email", "dbo.Email", "dbo.Email")]
+    // An escaped part is written in its quoted form for each engine.
     [InlineData("dbo.U&\"Em\\0061il\"", "dbo.\"Email\"", "dbo.\"Email\"")]
+    // An array is PostgreSQL's alone in a user's schema too, since SQL Server has none.
     [InlineData("dbo.Email[]", "dbo.Email[]", null)]
     [InlineData("_int4", "int4[]", null)]
     public void TryNormalizeEach_Key_IsWhatEachEnginesReadingGives(string key, string? postgreSql, string? sqlServer)
@@ -283,26 +283,6 @@ public sealed class TypeKeysTests
 
         keys[DatabaseEngine.PostgreSql].ShouldBeNull();
         keys[DatabaseEngine.SqlServer].ShouldBeNull();
-    }
-
-    // An array is PostgreSQL's alone in a user's schema too, since SQL Server has none.
-    [Fact]
-    public void TryNormalizeEach_ArrayOfAUsersSchema_IsPostgreSqlsAlone()
-    {
-        TypeKeys.TryNormalizeEach("public.tag[]".AsSpan(), out var keys).ShouldBeTrue();
-
-        keys[DatabaseEngine.PostgreSql].ShouldBe("public.tag[]");
-        keys[DatabaseEngine.SqlServer].ShouldBeNull();
-    }
-
-    // An escaped part is written in its quoted form for each engine.
-    [Fact]
-    public void TryNormalizeEach_EscapedKeyOfAUsersSchema_IsRewrittenForEachEngine()
-    {
-        TypeKeys.TryNormalizeEach("public.U&\"st\\0061tus\"".AsSpan(), out var keys).ShouldBeTrue();
-
-        keys[DatabaseEngine.PostgreSql].ShouldBe("public.\"status\"");
-        keys[DatabaseEngine.SqlServer].ShouldBe("public.\"status\"");
     }
 
     private static void ShouldNormalizeSqlServer(string key, string expected)
