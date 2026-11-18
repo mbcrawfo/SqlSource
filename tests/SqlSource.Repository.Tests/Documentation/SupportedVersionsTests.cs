@@ -325,6 +325,10 @@ public sealed partial class SupportedVersionsTests
         postgres.ShouldBe([12]);
         sqlServer.ShouldBe([2019]);
 
+        (postgres, sqlServer) = RestatedMinimums("PostgreSQL 18 and SQL Server 2022 add features.");
+        postgres.ShouldBeEmpty();
+        sqlServer.ShouldBeEmpty();
+
         (postgres, sqlServer) = RestatedMinimums("Visual Studio 2022 17.14 or later, and Npgsql 8 or later.");
         postgres.ShouldBeEmpty();
         sqlServer.ShouldBeEmpty();
