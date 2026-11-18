@@ -393,7 +393,7 @@ public sealed class SettingsLevelReaderTests
             SettingsFile,
             members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
             {
-                [SettingId.LibraryTypes] = [new(" NodaTime ", " Default ")],
+                [SettingId.LibraryTypes] = [new(" json ", " On "), new(" NodaTime ", " Default ")],
             }
         );
 
@@ -401,8 +401,11 @@ public sealed class SettingsLevelReaderTests
 
         level
             .LibraryTypes.ShouldNotBeNull()
-            .ShouldBe([new LibrarySetting(SqlLibrary.NodaTime, LibraryState.Default, SettingsFile)]);
-        source.LibraryEntries.ShouldBe([(SqlLibrary.NodaTime, 0)]);
+            .ShouldBe([
+                new LibrarySetting(SqlLibrary.NodaTime, LibraryState.Default, SettingsFile),
+                new LibrarySetting(SqlLibrary.Json, LibraryState.On, SettingsFile),
+            ]);
+        source.LibraryEntries.ShouldBe([(SqlLibrary.Json, 0), (SqlLibrary.NodaTime, 1)]);
         source.Invalids.ShouldBeEmpty();
         source.InvalidParts.ShouldBeEmpty();
     }
