@@ -47,7 +47,7 @@
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows the changed tests did not make.
-- [ ] **Step 2:** The run on `HintName.cs` with output `artifacts/test-cleanup/phase-34/hintname/after`: `HintName.cs:96:17` is `Killed`.
-- [ ] **Step 3:** Coverage into `artifacts/test-cleanup/phase-34/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/*.cs` falls; the test project's run time; RoslynFloor passes.
+- [x] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` shows the changed tests did not make.
+- [x] **Step 2:** The run on `HintName.cs` with output `artifacts/test-cleanup/phase-34/hintname/after`: `HintName.cs:96:17` is `Killed`.
+- [x] **Step 3:** Coverage into `artifacts/test-cleanup/phase-34/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/*.cs` falls; the test project's run time; RoslynFloor passes.
 - [ ] **Step 4:** The pull request gives the compare result, the kills, the coverage figures, the covers and the run times.
