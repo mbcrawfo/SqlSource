@@ -101,6 +101,7 @@ public sealed class BuildFoldersTests
     [InlineData("/repo/a%20b/obj/", "repo/a%20b/obj")]
     [InlineData("/repo/a%3/obj/", "repo/a%3/obj")]
     [InlineData("/repo/a%/obj/", "repo/a%/obj")]
+    [InlineData("/repo/a%/", "repo/a%")]
     public void Of_OtherPercentSign_IsKept(string value, string expected) =>
         BuildFolders.Of(value).ShouldBe(Of(expected));
 
