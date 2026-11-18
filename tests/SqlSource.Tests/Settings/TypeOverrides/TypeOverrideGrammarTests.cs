@@ -383,7 +383,8 @@ public sealed class TypeOverrideGrammarTests
     }
 
     // A key written in brackets, as T-SQL writes a name, gets the forms that are read: plain, which matches ignoring
-    // case, and quoted, which matches it exactly.  A part that cannot be plain has the quoted form alone.
+    // case, and quoted, which matches it exactly.  A part that cannot be plain has the quoted form alone.  A settings
+    // file's key comes alone, so its closing bracket can be the last character.
     [Theory]
     [InlineData(
         "[dbo].[Email]=X",
@@ -407,6 +408,14 @@ public sealed class TypeOverrideGrammarTests
     [InlineData(
         "[dbo].[Email] = X",
         ".  A key is not written in brackets: write dbo.Email, or \"dbo\".\"Email\" to match its case exactly"
+    )]
+    [InlineData(
+        "[dbo].[Email]",
+        ".  A key is not written in brackets: write dbo.Email, or \"dbo\".\"Email\" to match its case exactly"
+    )]
+    [InlineData(
+        "dbo.[Email]",
+        ".  A key is not written in brackets: write dbo.Email, or dbo.\"Email\" to match its case exactly"
     )]
     public void BracketHelp_KeyInBrackets_ShowsTheFormsThatAreRead(string entry, string help) =>
         TypeOverrideGrammar.BracketHelp(entry.AsSpan()).ShouldBe(help);
