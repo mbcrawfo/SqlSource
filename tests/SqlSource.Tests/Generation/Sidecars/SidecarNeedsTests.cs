@@ -52,10 +52,11 @@ public sealed class SidecarNeedsTests
         SidecarNeeds
             .Merge([
                 Needs("app/B.sql", new QueryNeed("Q", OutputKind.Models)),
-                Needs("app/a.sql", new QueryNeed("Q", OutputKind.Models)),
+                Needs("app/a_b.sql", new QueryNeed("Q", OutputKind.Models)),
+                Needs("app/aa.sql", new QueryNeed("Q", OutputKind.Models)),
             ])
             .Select(file => file.NormalizedPath)
-            .ShouldBe(["app/a.sql", "app/B.sql"]);
+            .ShouldBe(["app/aa.sql", "app/a_b.sql", "app/B.sql"]);
 
     private static FileNeeds Needs(string path, params QueryNeed[] queries) =>
         new(path, new EquatableArray<QueryNeed>([.. queries]));
