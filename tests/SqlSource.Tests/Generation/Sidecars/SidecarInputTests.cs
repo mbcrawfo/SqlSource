@@ -11,16 +11,17 @@ public sealed class SidecarInputTests
     private static readonly EquatableArray<string> Claimed = TestSidecars.Of("app/Orders.sql", "app/Users.sql");
 
     [Theory]
-    [InlineData("/app/Users.sql.json")]
-    [InlineData("/app/users.SQL.json")]
-    public void Create_SidecarOfAClaimedFile_HoldsTheFileAndThePathOfItsSqlFileAsClaimed(string path)
+    [InlineData("/app/Orders.sql.json", "app/Orders.sql")]
+    [InlineData("/app/Users.sql.json", "app/Users.sql")]
+    [InlineData("/app/users.SQL.json", "app/Users.sql")]
+    public void Create_SidecarOfAClaimedFile_HoldsTheFileAndThePathOfItsSqlFileAsClaimed(string path, string sqlPath)
     {
         var file = new InMemoryAdditionalText(path, "{}");
 
         var input = SidecarInput.Create(file, Claimed).ShouldNotBeNull();
 
         input.File.ShouldBeSameAs(file);
-        input.SqlPath.ShouldBe("app/Users.sql");
+        input.SqlPath.ShouldBe(sqlPath);
     }
 
     [Theory]
