@@ -161,7 +161,15 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.RunSqlServer(file, []);
 
-        run.Problems().ShouldContain(RefusedEmpty);
+        run.Problems()
+            .ShouldBe(
+                [
+                    "SQLSRC241 /app/Repo/Users.sql(1,10)-(1,21): The query 'CountOthers' has no entry in the sidecar of "
+                        + "its file, and its output 'methods' needs one.  Run 'sqlsource describe'.",
+                    RefusedEmpty,
+                ],
+                ignoreOrder: true
+            );
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
