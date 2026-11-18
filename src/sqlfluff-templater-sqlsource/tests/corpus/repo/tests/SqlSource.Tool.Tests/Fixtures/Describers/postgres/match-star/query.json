@@ -1,0 +1,25 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: GetUser\nSELECT * FROM users WHERE id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 16],
+      ["Text", 16, 48],
+      ["Parameter", 48, 51],
+      ["Text", 51, 53]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 16, "name": null, "default": null },
+      { "kind": "parameter", "start": 48, "end": 51, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

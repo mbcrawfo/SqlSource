@@ -1,0 +1,35 @@
+{
+  "fileName": "DefaultsPerQuery.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: ByA\n-- token: {{cond:a = 1}}\nSELECT * FROM t WHERE {{cond}};\n\n-- name: ByB\nSELECT * FROM t WHERE 1 = 1 {{cond:AND b = 2}};\n\n-- name: ByC\nSELECT * FROM t WHERE {{cond}};\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 33],
+      ["Text", 33, 34],
+      ["LineComment", 34, 58],
+      ["Text", 58, 92],
+      ["LineComment", 92, 104],
+      ["Text", 104, 154],
+      ["LineComment", 154, 166],
+      ["Text", 166, 199]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 33, "name": null, "default": null },
+      { "kind": "markerComment", "start": 34, "end": 58, "name": null, "default": null },
+      { "kind": "token", "start": 81, "end": 89, "name": "cond", "default": "a = 1" },
+      { "kind": "markerComment", "start": 92, "end": 104, "name": null, "default": null },
+      { "kind": "token", "start": 133, "end": 151, "name": "cond", "default": "AND b = 2" },
+      { "kind": "markerComment", "start": 154, "end": 166, "name": null, "default": null },
+      { "kind": "token", "start": 189, "end": 197, "name": "cond", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

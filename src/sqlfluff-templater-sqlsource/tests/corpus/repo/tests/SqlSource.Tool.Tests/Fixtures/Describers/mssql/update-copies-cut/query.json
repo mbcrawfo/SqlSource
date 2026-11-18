@@ -1,0 +1,28 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: RetireCut\nUPDATE dbo.users SET deleted_at = SYSUTCDATETIME() WHERE created_at < @retire_before_ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt OR deleted_at < @retire_before_ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 18],
+      ["Text", 18, 89],
+      ["Parameter", 89, 217],
+      ["Text", 217, 234],
+      ["Parameter", 234, 362],
+      ["Text", 362, 364]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 18, "name": null, "default": null },
+      { "kind": "parameter", "start": 89, "end": 217, "name": "retire_before_ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt", "default": null },
+      { "kind": "parameter", "start": 234, "end": 362, "name": "retire_before_ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "fileName": "Linked.sql",
+  "settings": [
+    "{\n    // Beside a .sql file that the project links from outside its folder.\n    \"database\": \"shared\"\n}\n",
+    "{\n    // Above the project: found for every file of it, and listed by the project itself too.\n    \"root\": true,\n    \"dialect\": \"postgres\",\n}\n"
+  ],
+  "input": "SELECT 1 AS one;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["Text", 0, 17]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

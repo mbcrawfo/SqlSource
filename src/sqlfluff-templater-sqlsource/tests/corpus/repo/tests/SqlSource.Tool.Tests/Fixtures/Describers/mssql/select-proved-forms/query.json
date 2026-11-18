@@ -1,0 +1,28 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: OrderSummaries\n-- param: @minimum_total decimal(18,2)\nSELECT\n    o.user_id AS user_id,\n    COUNT(*) AS order_count,\n    SUM(o.total) AS total_spent,\n    MAX(o.total * u.credit) AS largest_weighted,\n    COALESCE(u.nickname, u.name) AS shown_name,\n    CAST(o.user_id AS bigint) AS user_key,\n    RANK() OVER (ORDER BY COUNT(*) DESC) AS order_rank\nFROM dbo.orders AS o\nJOIN dbo.users AS u ON u.id = o.user_id\nWHERE o.total >= @minimum_total\nGROUP BY o.user_id, u.nickname, u.name;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 23],
+      ["Text", 23, 24],
+      ["LineComment", 24, 62],
+      ["Text", 62, 431],
+      ["Parameter", 431, 445],
+      ["Text", 445, 486]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 23, "name": null, "default": null },
+      { "kind": "markerComment", "start": 24, "end": 62, "name": null, "default": null },
+      { "kind": "parameter", "start": 431, "end": 445, "name": "minimum_total", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

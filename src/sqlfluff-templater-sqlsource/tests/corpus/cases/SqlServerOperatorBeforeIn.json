@@ -1,0 +1,38 @@
+{
+  "fileName": "SqlServerOperatorBeforeIn.sql",
+  "settings": [],
+  "input": "-- dialect: mssql\n-- name: ByOperators\nSELECT * FROM t\nWHERE x =#IN @a\n    OR x =@@IN @b\n    OR x <>#in @c\n    OR x `@@IN @d\n    OR y IN @e;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 17],
+      ["Text", 17, 18],
+      ["LineComment", 18, 38],
+      ["Text", 38, 68],
+      ["Parameter", 68, 70],
+      ["Text", 70, 86],
+      ["Parameter", 86, 88],
+      ["Text", 88, 104],
+      ["Parameter", 104, 106],
+      ["Text", 106, 122],
+      ["Parameter", 122, 124],
+      ["Text", 124, 137],
+      ["Parameter", 137, 139],
+      ["Text", 139, 141]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 17, "name": null, "default": null },
+      { "kind": "markerComment", "start": 18, "end": 38, "name": null, "default": null },
+      { "kind": "list", "start": 68, "end": 70, "name": "a", "default": null },
+      { "kind": "list", "start": 86, "end": 88, "name": "b", "default": null },
+      { "kind": "list", "start": 104, "end": 106, "name": "c", "default": null },
+      { "kind": "list", "start": 122, "end": 124, "name": "d", "default": null },
+      { "kind": "list", "start": 137, "end": 139, "name": "e", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

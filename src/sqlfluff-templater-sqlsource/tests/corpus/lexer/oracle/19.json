@@ -1,0 +1,20 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"oracle\" }"
+  ],
+  "input": "`a -- b` c",
+  "expected": {
+    "startDialect": "oracle",
+    "startOptions": [],
+    "dialect": "oracle",
+    "options": [],
+    "lexemes": [
+      ["Text", 0, 3],
+      ["LineComment", 3, 10]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

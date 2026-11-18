@@ -1,0 +1,26 @@
+{
+  "fileName": "ByProject.sql",
+  "settings": [
+    "{\n  // tools/check-package-install.sh copies the project to a temporary folder, and \"root\" ends the chain at the copy,\n  // so that no settings file above the copy applies.\n  \"root\": true,\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Their members are on the type itself, Queries, which Program.cs reads, in place of its nested class Sql.\n  \"memberLocation\": \"class\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n"
+  ],
+  "input": "-- The settings file of the project says postgres, which reads the second line as part of the escape string.\nSELECT E'it'\n    '\\'s -- not a comment' AS note; -- a comment\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 108],
+      ["Text", 108, 117],
+      ["Quoted", 117, 121],
+      ["Text", 121, 126],
+      ["Quoted", 126, 148],
+      ["Text", 148, 158],
+      ["LineComment", 158, 170],
+      ["Text", 170, 171]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

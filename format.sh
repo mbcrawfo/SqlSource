@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Formats the C# code and the project files: `dotnet format style`, `dotnet format analyzers`, then CSharpier.
+# Formats the C# code and the project files: `dotnet format style`, `dotnet format analyzers`, then CSharpier, and the
+# Python of the sqlfluff templater with ruff, through uv.
 # Builds the generator first, because `dotnet format` needs its assembly.
-# Usage: format.sh [--check] [style|analyzers|csharpier ...] [-- file ...]   Without --check, files are rewritten in
-# place.  The parts name which of the three run, always in that order; without any, all three run.  CI runs the parts
-# in separate jobs.  Files after -- limit all three to those files, which is how pre-commit-validation.sh checks only
-# the C# files that changed.
+# Usage: format.sh [--check] [style|analyzers|csharpier|ruff ...] [-- file ...]   Without --check, files are rewritten
+# in place.  The parts name which of the four run, always in that order; without any, all four run.  CI runs the parts
+# in separate jobs.  Files after -- limit the three C# parts to those files, which is how pre-commit-validation.sh
+# checks only the C# files that changed; ruff ignores them and takes the whole templater project.
 set -euo pipefail
 
 SOLUTION='SqlSource.slnx'
 GENERATOR='src/SqlSource/SqlSource.csproj'
 
 usage() {
-    echo 'Usage: format.sh [--check] [style|analyzers|csharpier ...] [-- file ...]' >&2
+    echo 'Usage: format.sh [--check] [style|analyzers|csharpier|ruff ...] [-- file ...]' >&2
     exit 2
 }
 
@@ -24,12 +25,14 @@ fi
 style=false
 analyzers=false
 csharpier=false
+ruff=false
 parts=0
 while [[ $# -gt 0 && "$1" != '--' ]]; do
     case "$1" in
     style) style=true ;;
     analyzers) analyzers=true ;;
     csharpier) csharpier=true ;;
+    ruff) ruff=true ;;
     *) usage ;;
     esac
     parts=$((parts + 1))
@@ -39,6 +42,7 @@ if [[ "$parts" -eq 0 ]]; then
     style=true
     analyzers=true
     csharpier=true
+    ruff=true
 fi
 
 # The files are paths from the repository root, where the script runs.  Without any, dotnet format takes the whole
@@ -54,6 +58,8 @@ if [[ $# -gt 0 ]]; then
     include=(--include "$@")
     targets=("$@")
 fi
+
+TEMPLATER='src/sqlfluff-templater-sqlsource'
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
@@ -80,6 +86,12 @@ if [[ "$check" == false ]]; then
     if [[ "$csharpier" == true ]]; then
         dotnet csharpier format "${targets[@]}"
     fi
+    # uv runs in the project's folder, so that it reads .python-version and uv.lock, and creates a missing .venv;
+    # --locked fails on a stale uv.lock instead of rewriting it.
+    if [[ "$ruff" == true ]]; then
+        uv run --locked --directory "$TEMPLATER" ruff check --fix
+        uv run --locked --directory "$TEMPLATER" ruff format
+    fi
     exit 0
 fi
 
@@ -99,5 +111,9 @@ if [[ "$analyzers" == true ]]; then
 fi
 if [[ "$csharpier" == true ]]; then
     dotnet csharpier check "${targets[@]}" || status=1
+fi
+if [[ "$ruff" == true ]]; then
+    uv run --locked --directory "$TEMPLATER" ruff check || status=1
+    uv run --locked --directory "$TEMPLATER" ruff format --check || status=1
 fi
 exit "$status"

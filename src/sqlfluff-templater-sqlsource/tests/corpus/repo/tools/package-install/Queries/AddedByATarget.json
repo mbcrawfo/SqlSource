@@ -1,0 +1,28 @@
+{
+  "fileName": "AddedByATarget.sql",
+  "settings": [
+    "{\n  // tools/check-package-install.sh copies the project to a temporary folder, and \"root\" ends the chain at the copy,\n  // so that no settings file above the copy applies.\n  \"root\": true,\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Their members are on the type itself, Queries, which Program.cs reads, in place of its nested class Sql.\n  \"memberLocation\": \"class\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n"
+  ],
+  "input": "-- A target of Directory.Build.targets adds this file, and its header says its dialect.\n-- dialect: mssql\nSELECT [it's] FROM #orders; -- a comment\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 87],
+      ["Text", 87, 88],
+      ["LineComment", 88, 105],
+      ["Text", 105, 113],
+      ["Quoted", 113, 119],
+      ["Text", 119, 134],
+      ["LineComment", 134, 146],
+      ["Text", 146, 147]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 88, "end": 105, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -38,6 +38,8 @@
       href: describe-on-save.md
     - name: Check the sidecars in CI
       href: ci.md
+    - name: Lint and format SQL with sqlfluff
+      href: sqlfluff.md
     - name: Report a wrong model
       href: report-a-bug.md
     - name: "Troubleshooting: it built, but something is wrong"

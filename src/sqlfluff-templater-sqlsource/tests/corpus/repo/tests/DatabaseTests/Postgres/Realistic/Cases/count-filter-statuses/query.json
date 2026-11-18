@@ -1,0 +1,33 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for timestamptz.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"timestamptz\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: GetAccountStatusSummary\nSELECT\n    count(*) AS total,\n    count(*) FILTER (WHERE a.status = 'active') AS active,\n    count(*) FILTER (WHERE a.status <> 'active') AS inactive,\n    count(a.email) AS with_email,\n    max(a.created_at) AS newest_created_at,\n    avg(cardinality(a.tags)) FILTER (WHERE a.status = 'active') AS avg_active_tags\nFROM accounts a\nWHERE a.created_at >= @since;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 32],
+      ["Text", 32, 101],
+      ["Quoted", 101, 109],
+      ["Text", 109, 161],
+      ["Quoted", 161, 169],
+      ["Text", 169, 316],
+      ["Quoted", 316, 324],
+      ["Text", 324, 383],
+      ["Parameter", 383, 389],
+      ["Text", 389, 391]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 32, "name": null, "default": null },
+      { "kind": "parameter", "start": 383, "end": 389, "name": "since", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

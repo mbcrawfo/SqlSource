@@ -1,0 +1,51 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: IssueInvoiceForOrder\n-- param: @order_id int\n-- param: @issued_at date\n-- param: @terms_days int null\n-- param: @tax_rate decimal(5, 4) null\nINSERT INTO billing.invoices (number, order_id, issued_at, due_at, amount, tax)\nOUTPUT\n    inserted.id,\n    inserted.number,\n    inserted.order_id,\n    inserted.issued_at,\n    inserted.due_at,\n    inserted.amount,\n    inserted.tax,\n    inserted.voided_at\nSELECT\n    NEXT VALUE FOR billing.invoice_numbers,\n    o.id,\n    @issued_at,\n    DATEADD(day, @terms_days, @issued_at),\n    t.total,\n    ROUND(t.total * @tax_rate, 2)\nFROM dbo.orders AS o\nCROSS APPLY (\n    SELECT SUM(ol.quantity * ol.unit_price) AS total\n    FROM dbo.order_lines AS ol\n    WHERE ol.order_id = o.id\n) AS t\nWHERE o.id = @order_id\n    AND t.total IS NOT NULL\n    AND NOT EXISTS (SELECT 1 FROM billing.invoices AS i WHERE i.order_id = o.id);\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 29],
+      ["Text", 29, 30],
+      ["LineComment", 30, 53],
+      ["Text", 53, 54],
+      ["LineComment", 54, 79],
+      ["Text", 79, 80],
+      ["LineComment", 80, 110],
+      ["Text", 110, 111],
+      ["LineComment", 111, 149],
+      ["Text", 149, 470],
+      ["Parameter", 470, 480],
+      ["Text", 480, 499],
+      ["Parameter", 499, 510],
+      ["Text", 510, 512],
+      ["Parameter", 512, 522],
+      ["Text", 522, 558],
+      ["Parameter", 558, 567],
+      ["Text", 567, 740],
+      ["Parameter", 740, 749],
+      ["Text", 749, 860]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 29, "name": null, "default": null },
+      { "kind": "markerComment", "start": 30, "end": 53, "name": null, "default": null },
+      { "kind": "markerComment", "start": 54, "end": 79, "name": null, "default": null },
+      { "kind": "markerComment", "start": 80, "end": 110, "name": null, "default": null },
+      { "kind": "markerComment", "start": 111, "end": 149, "name": null, "default": null },
+      { "kind": "parameter", "start": 470, "end": 480, "name": "issued_at", "default": null },
+      { "kind": "parameter", "start": 499, "end": 510, "name": "terms_days", "default": null },
+      { "kind": "parameter", "start": 512, "end": 522, "name": "issued_at", "default": null },
+      { "kind": "parameter", "start": 558, "end": 567, "name": "tax_rate", "default": null },
+      { "kind": "parameter", "start": 740, "end": 749, "name": "order_id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -20,9 +20,16 @@ internal static class SqlDialectMarker
     /// lexer to the dialect that the first valid <c>-- dialect:</c> marker among them names.  Returns the offset
     /// where the header ends: a <c>-- dialect:</c> marker that starts at or after it is misplaced.
     /// </summary>
-    public static int Apply(SqlLexer lexer, string text)
+    public static int Apply(SqlLexer lexer, string text) => Apply(lexer, text, out _, out _);
+
+    /// <summary>
+    /// As <see cref="Apply(SqlLexer, string)" />, and gives the dialect that the marker put into effect names, or null
+    /// when none did, and the first <c>-- dialect:</c> marker of the header whose value is not a dialect, or null.
+    /// </summary>
+    public static int Apply(SqlLexer lexer, string text, out SqlDialectChoice? named, out SqlMarker? invalid)
     {
-        var switched = false;
+        named = null;
+        invalid = null;
         while (lexer.TryReadLeadingComment(out var comment))
         {
             if (SqlMarkerReader.Read(text, comment) is not { } marker)
@@ -35,10 +42,19 @@ internal static class SqlDialectMarker
                 return marker.Span.Start;
             }
 
-            if (!switched && marker.Kind == SqlMarkerKind.Dialect && TryRead(text, marker, out var dialect))
+            if (marker.Kind != SqlMarkerKind.Dialect)
+            {
+                continue;
+            }
+
+            if (!TryRead(text, marker, out var dialect))
+            {
+                invalid ??= marker;
+            }
+            else if (named is null)
             {
                 lexer.Rules = SqlDialectRules.For(dialect);
-                switched = true;
+                named = dialect;
             }
         }
 

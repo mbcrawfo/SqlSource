@@ -1,0 +1,38 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListBestSellers\n-- param: @top int\n-- param: @since datetime2(0)\nSELECT TOP (@top) WITH TIES\n    p.id,\n    p.sku,\n    p.name,\n    c.name AS category_name,\n    SUM(ol.quantity) AS units_sold,\n    SUM(ol.quantity * ol.unit_price) AS revenue\nFROM dbo.order_lines AS ol\nJOIN dbo.orders AS o ON o.id = ol.order_id\nJOIN dbo.products AS p ON p.id = ol.product_id\nLEFT JOIN dbo.categories AS c ON c.id = p.category_id\nWHERE o.placed_at >= @since\n    AND o.status <> 'cancelled'\nGROUP BY p.id, p.sku, p.name, c.name\nORDER BY units_sold DESC;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 24],
+      ["Text", 24, 25],
+      ["LineComment", 25, 43],
+      ["Text", 43, 44],
+      ["LineComment", 44, 73],
+      ["Text", 73, 86],
+      ["Parameter", 86, 90],
+      ["Text", 90, 440],
+      ["Parameter", 440, 446],
+      ["Text", 446, 467],
+      ["Quoted", 467, 478],
+      ["Text", 478, 542]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 24, "name": null, "default": null },
+      { "kind": "markerComment", "start": 25, "end": 43, "name": null, "default": null },
+      { "kind": "markerComment", "start": 44, "end": 73, "name": null, "default": null },
+      { "kind": "parameter", "start": 86, "end": 90, "name": "top", "default": null },
+      { "kind": "parameter", "start": 440, "end": 446, "name": "since", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

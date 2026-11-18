@@ -151,7 +151,8 @@ internal static partial class GoldenFiles
     private static partial Regex DiagnosticShape();
 
     // "line 2: the golden file has `b`, the output `B`", counted from one; a text that has ended has "(end of text)".
-    private static string FirstDifference(string golden, string actual)
+    // The templater's corpus, in tests/SqlSource.Tests/Parsing/Templating/, says where its files differ with it too.
+    internal static string FirstDifference(string golden, string actual)
     {
         var goldenLines = golden.Split('\n');
         var actualLines = actual.Split('\n');

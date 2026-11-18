@@ -1,0 +1,31 @@
+{
+  "fileName": "UnclosedTokenInComment.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: ActiveUsers\nSELECT * FROM users -- TODO: add {{filter: ...\nWHERE {{cond:active}} /* {{note: */ AND id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 41],
+      ["Text", 41, 62],
+      ["LineComment", 62, 88],
+      ["Text", 88, 111],
+      ["BlockComment", 111, 124],
+      ["Text", 124, 134],
+      ["Parameter", 134, 137],
+      ["Text", 137, 139]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 41, "name": null, "default": null },
+      { "kind": "token", "start": 95, "end": 110, "name": "cond", "default": "active" },
+      { "kind": "parameter", "start": 134, "end": 137, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

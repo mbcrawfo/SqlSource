@@ -1,0 +1,41 @@
+{
+  "fileName": "seed.sql",
+  "settings": [
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The rows of the database \"billing\": three invoices, the third of them unpaid.  Every value is written out, so that\n-- a test can name it.  SqlServerContainer and tools/describe-end-to-end.sh apply this after schema.sql, and a change\n-- to it is followed by a run of tools/describe-end-to-end.sh.\n\nINSERT INTO billing.invoices (id, account_id, number, amount, issued_on, paid_at) VALUES\n    (1, 1, 'INV-0001', 120.50, '2024-01-15', '2024-01-20 10:30:00'),\n    (2, 1, 'INV-0002', 80.00, '2024-02-15', '2024-02-18 08:15:00'),\n    (3, 2, 'INV-0003', 45.25, '2024-03-15', NULL);\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 117],
+      ["Text", 117, 118],
+      ["LineComment", 118, 235],
+      ["Text", 235, 236],
+      ["LineComment", 236, 298],
+      ["Text", 298, 400],
+      ["Quoted", 400, 410],
+      ["Text", 410, 420],
+      ["Quoted", 420, 432],
+      ["Text", 432, 434],
+      ["Quoted", 434, 455],
+      ["Text", 455, 469],
+      ["Quoted", 469, 479],
+      ["Text", 479, 488],
+      ["Quoted", 488, 500],
+      ["Text", 500, 502],
+      ["Quoted", 502, 523],
+      ["Text", 523, 537],
+      ["Quoted", 537, 547],
+      ["Text", 547, 556],
+      ["Quoted", 556, 568],
+      ["Text", 568, 577]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

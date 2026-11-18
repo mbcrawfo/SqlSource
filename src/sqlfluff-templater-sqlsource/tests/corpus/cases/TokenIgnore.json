@@ -1,0 +1,29 @@
+{
+  "fileName": "TokenIgnore.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: Greeting\n-- token-ignore: name\nSELECT 'Hello, {{name}}' AS greeting FROM {{t:users}};\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 38],
+      ["Text", 38, 39],
+      ["LineComment", 39, 60],
+      ["Text", 60, 68],
+      ["Quoted", 68, 85],
+      ["Text", 85, 116]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 38, "name": null, "default": null },
+      { "kind": "markerComment", "start": 39, "end": 60, "name": null, "default": null },
+      { "kind": "token", "start": 103, "end": 114, "name": "t", "default": "users" }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

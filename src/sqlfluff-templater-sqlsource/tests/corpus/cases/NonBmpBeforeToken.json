@@ -1,0 +1,29 @@
+{
+  "fileName": "NonBmpBeforeToken.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: Smile\nSELECT '😀' AS face, {{col:name}} FROM users WHERE id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 35],
+      ["Text", 35, 43],
+      ["Quoted", 43, 46],
+      ["Text", 46, 91],
+      ["Parameter", 91, 94],
+      ["Text", 94, 96]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 35, "name": null, "default": null },
+      { "kind": "token", "start": 56, "end": 68, "name": "col", "default": "name" },
+      { "kind": "parameter", "start": 91, "end": 94, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

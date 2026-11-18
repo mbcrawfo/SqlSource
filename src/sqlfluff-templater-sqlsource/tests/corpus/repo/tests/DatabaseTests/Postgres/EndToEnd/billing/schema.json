@@ -1,0 +1,25 @@
+{
+  "fileName": "schema.sql",
+  "settings": [
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The schema of the database \"billing\", which the end-to-end tests describe the queries that name it against and run\n-- them on.  PostgresContainer and tools/describe-end-to-end.sh apply it, then seed.sql.  A change to it is followed by\n-- a run of tools/describe-end-to-end.sh, which writes the sidecars again.\n\nCREATE SCHEMA billing;\n\nCREATE TABLE billing.invoices (\n    id integer PRIMARY KEY,\n    account_id integer NOT NULL,\n    number text NOT NULL,\n    amount numeric(12, 2) NOT NULL,\n    issued_on date NOT NULL,\n    paid_at timestamptz\n);\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 117],
+      ["Text", 117, 118],
+      ["LineComment", 118, 237],
+      ["Text", 237, 238],
+      ["LineComment", 238, 312],
+      ["Text", 312, 549]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "fileName": "MySqlBackslashEscapes.sql",
+  "settings": [],
+  "input": "-- dialect: mysql\n-- A token inside a quoted region is still a token.\n-- name: Escaped\nSELECT 'it\\'s {{q}}', \"a\\\" -- {{q}}\", {{col:name}} FROM users;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 17],
+      ["Text", 17, 18],
+      ["LineComment", 18, 69],
+      ["Text", 69, 70],
+      ["LineComment", 70, 86],
+      ["Text", 86, 94],
+      ["Quoted", 94, 107],
+      ["Text", 107, 109],
+      ["Quoted", 109, 123],
+      ["Text", 123, 150]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 17, "name": null, "default": null },
+      { "kind": "markerComment", "start": 70, "end": 86, "name": null, "default": null },
+      { "kind": "token", "start": 101, "end": 106, "name": "q", "default": null },
+      { "kind": "token", "start": 117, "end": 122, "name": "q", "default": null },
+      { "kind": "token", "start": 125, "end": 137, "name": "col", "default": "name" }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "fileName": "OrderRepository.sql",
+  "settings": [
+    "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // No settings file above this folder applies to the project.\n  \"root\": true,\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  \"typeOverrides\": {\n    // Every timestamptz is a DateTimeOffset, which Dapper reads through UtcDateTimeOffsetHandler.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"columnTypes\": {\n    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.\n    \"order_lines.order_id\": \"OrderId\",\n  },\n}\n"
+  ],
+  "input": "-- The queries of the orders, at the default output, repository: each query gets its models, an instance method of\n-- OrderRepository, which opens its connection with the factory that the repository holds, and a member of the\n-- interface IOrderRepository.\n\n-- name: ListOrdersOfUser\n-- summary: The orders of one user, in the order of their ids.\nSELECT id, status\nFROM orders\nWHERE user_id = @userId\nORDER BY id;\n\n-- name: CancelOrder -> rowcount\n-- summary: Cancels an order that has not shipped.\n-- rowcount: the method returns 1 when it cancels the order, and 0 when the order has shipped or does not exist.\nUPDATE orders\nSET status = 'cancelled'\nWHERE id = @orderId AND shipped_at IS NULL;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 114],
+      ["Text", 114, 115],
+      ["LineComment", 115, 225],
+      ["Text", 225, 226],
+      ["LineComment", 226, 256],
+      ["Text", 256, 258],
+      ["LineComment", 258, 283],
+      ["Text", 283, 284],
+      ["LineComment", 284, 346],
+      ["Text", 346, 393],
+      ["Parameter", 393, 400],
+      ["Text", 400, 415],
+      ["LineComment", 415, 447],
+      ["Text", 447, 448],
+      ["LineComment", 448, 498],
+      ["Text", 498, 499],
+      ["LineComment", 499, 611],
+      ["Text", 611, 639],
+      ["Quoted", 639, 650],
+      ["Text", 650, 662],
+      ["Parameter", 662, 670],
+      ["Text", 670, 695]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 258, "end": 283, "name": null, "default": null },
+      { "kind": "markerComment", "start": 284, "end": 346, "name": null, "default": null },
+      { "kind": "parameter", "start": 393, "end": 400, "name": "userId", "default": null },
+      { "kind": "markerComment", "start": 415, "end": 447, "name": null, "default": null },
+      { "kind": "markerComment", "start": 448, "end": 498, "name": null, "default": null },
+      { "kind": "parameter", "start": 662, "end": 670, "name": "orderId", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

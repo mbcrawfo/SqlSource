@@ -1,0 +1,25 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: WalkReturning\nUPDATE users u SET name = @name\nFROM orders o LEFT JOIN billing.invoices i ON i.order_id = o.id\nWHERE o.user_id = u.id\nRETURNING u.id, o.total, i.amount;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 22],
+      ["Text", 22, 49],
+      ["Parameter", 49, 54],
+      ["Text", 54, 177]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 22, "name": null, "default": null },
+      { "kind": "parameter", "start": 49, "end": 54, "name": "name", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

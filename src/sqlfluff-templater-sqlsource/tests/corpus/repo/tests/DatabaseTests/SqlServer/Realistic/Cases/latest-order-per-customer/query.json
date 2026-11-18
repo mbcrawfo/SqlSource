@@ -1,0 +1,26 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListLatestOrderPerCustomer\nWITH ranked AS (\n    SELECT\n        o.id,\n        o.customer_id,\n        o.placed_at,\n        o.status,\n        o.ship_city,\n        o.shipped_at,\n        ROW_NUMBER() OVER (PARTITION BY o.customer_id ORDER BY o.placed_at DESC, o.id DESC) AS rn\n    FROM dbo.orders AS o\n    WHERE o.status <> 'cancelled'\n)\nSELECT\n    r.customer_id,\n    c.name AS customer_name,\n    r.id AS order_id,\n    r.placed_at,\n    r.status,\n    r.ship_city,\n    r.shipped_at,\n    i.number AS invoice_number\nFROM ranked AS r\nJOIN dbo.customers AS c ON c.id = r.customer_id\nLEFT JOIN billing.invoices AS i ON i.order_id = r.id\nWHERE r.rn = 1\nORDER BY r.placed_at DESC, r.customer_id;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 35],
+      ["Text", 35, 328],
+      ["Quoted", 328, 339],
+      ["Text", 339, 691]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 35, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

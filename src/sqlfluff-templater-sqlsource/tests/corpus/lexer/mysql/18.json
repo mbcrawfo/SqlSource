@@ -1,0 +1,20 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"mysql\" }"
+  ],
+  "input": "`a -- b` c",
+  "expected": {
+    "startDialect": "mysql",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": [],
+    "lexemes": [
+      ["Quoted", 0, 8],
+      ["Text", 8, 10]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

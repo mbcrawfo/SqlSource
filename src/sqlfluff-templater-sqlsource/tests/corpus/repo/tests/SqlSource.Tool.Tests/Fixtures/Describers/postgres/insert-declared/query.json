@@ -1,0 +1,37 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: AddUser\n-- param: @name varchar(50)\n-- param: @email email_t\nINSERT INTO users (name, email, status) VALUES (@name, @email, @status);\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 16],
+      ["Text", 16, 17],
+      ["LineComment", 17, 44],
+      ["Text", 44, 45],
+      ["LineComment", 45, 69],
+      ["Text", 69, 118],
+      ["Parameter", 118, 123],
+      ["Text", 123, 125],
+      ["Parameter", 125, 131],
+      ["Text", 131, 133],
+      ["Parameter", 133, 140],
+      ["Text", 140, 143]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 16, "name": null, "default": null },
+      { "kind": "markerComment", "start": 17, "end": 44, "name": null, "default": null },
+      { "kind": "markerComment", "start": 45, "end": 69, "name": null, "default": null },
+      { "kind": "parameter", "start": 118, "end": 123, "name": "name", "default": null },
+      { "kind": "parameter", "start": 125, "end": 131, "name": "email", "default": null },
+      { "kind": "parameter", "start": 133, "end": 140, "name": "status", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

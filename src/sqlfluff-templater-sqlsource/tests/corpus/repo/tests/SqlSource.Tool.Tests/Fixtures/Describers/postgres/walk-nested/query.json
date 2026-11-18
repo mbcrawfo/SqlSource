@@ -1,0 +1,22 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: WalkNested\nSELECT u.id, o.total, i.amount\nFROM users u\nLEFT JOIN (orders o JOIN billing.invoices i ON i.order_id = o.id) ON o.user_id = u.id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 19],
+      ["Text", 19, 151]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 19, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

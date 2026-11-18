@@ -1,0 +1,28 @@
+{
+  "fileName": "MySqlAnsiQuotes.sql",
+  "settings": [],
+  "input": "-- dialect: mysql,ansi_quotes\n-- name: Quoted\nSELECT \"col\\\", {{col:name}}, 'it\\'s' FROM users;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": ["ansi-quotes"],
+    "lexemes": [
+      ["LineComment", 0, 29],
+      ["Text", 29, 30],
+      ["LineComment", 30, 45],
+      ["Text", 45, 53],
+      ["Quoted", 53, 59],
+      ["Text", 59, 75],
+      ["Quoted", 75, 82],
+      ["Text", 82, 95]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 29, "name": null, "default": null },
+      { "kind": "markerComment", "start": 30, "end": 45, "name": null, "default": null },
+      { "kind": "token", "start": 61, "end": 73, "name": "col", "default": "name" }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

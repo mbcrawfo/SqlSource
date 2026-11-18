@@ -1,0 +1,30 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListPriceBounds\n-- param: @campaign_pct decimal(5, 2) null\nSELECT\n    p.id,\n    p.sku,\n    p.list_price,\n    pr.price AS current_price,\n    h.lowest_previous,\n    h.highest_previous,\n    LEAST(p.list_price, pr.price, h.lowest_previous) AS lowest_price,\n    GREATEST(p.list_price, pr.price, h.highest_previous) AS highest_price,\n    GREATEST(p.discount_pct, @campaign_pct) AS best_discount_pct\nFROM dbo.products AS p\nJOIN dbo.prices AS pr ON pr.product_id = p.id\nOUTER APPLY (\n    SELECT MIN(ph.price) AS lowest_previous, MAX(ph.price) AS highest_previous\n    FROM dbo.prices_history AS ph\n    WHERE ph.product_id = p.id\n) AS h\nORDER BY p.sku;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 24],
+      ["Text", 24, 25],
+      ["LineComment", 25, 67],
+      ["Text", 67, 366],
+      ["Parameter", 366, 379],
+      ["Text", 379, 652]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 24, "name": null, "default": null },
+      { "kind": "markerComment", "start": 25, "end": 67, "name": null, "default": null },
+      { "kind": "parameter", "start": 366, "end": 379, "name": "campaign_pct", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: GetUserFlags\nSELECT deleted_at AS \"deleted_at!\", name AS \"name?\" FROM users WHERE id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 21],
+      ["Text", 21, 43],
+      ["Quoted", 43, 56],
+      ["Text", 56, 66],
+      ["Quoted", 66, 73],
+      ["Text", 73, 96],
+      ["Parameter", 96, 99],
+      ["Text", 99, 101]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 21, "name": null, "default": null },
+      { "kind": "parameter", "start": 96, "end": 99, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

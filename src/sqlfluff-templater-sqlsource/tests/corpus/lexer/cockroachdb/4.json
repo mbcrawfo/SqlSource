@@ -1,0 +1,21 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"cockroachdb\" }"
+  ],
+  "input": "\"a\\\"b\" -- c\"",
+  "expected": {
+    "startDialect": "cockroachdb",
+    "startOptions": [],
+    "dialect": "cockroachdb",
+    "options": [],
+    "lexemes": [
+      ["Quoted", 0, 4],
+      ["Text", 4, 5],
+      ["Quoted", 5, 12]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

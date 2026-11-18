@@ -1,0 +1,28 @@
+{
+  "fileName": "ByMarker.sql",
+  "settings": [
+    "{\n  // tools/check-package-install.sh copies the project to a temporary folder, and \"root\" ends the chain at the copy,\n  // so that no settings file above the copy applies.\n  \"root\": true,\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Their members are on the type itself, Queries, which Program.cs reads, in place of its nested class Sql.\n  \"memberLocation\": \"class\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n"
+  ],
+  "input": "/* The marker is below this comment, which the project's dialect reads. */\n-- dialect: mssql\nSELECT [it's] FROM #staged; -- a comment\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["BlockComment", 0, 74],
+      ["Text", 74, 75],
+      ["LineComment", 75, 92],
+      ["Text", 92, 100],
+      ["Quoted", 100, 106],
+      ["Text", 106, 121],
+      ["LineComment", 121, 133],
+      ["Text", 133, 134]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 75, "end": 92, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

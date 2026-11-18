@@ -1,0 +1,22 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: WalkOrderByUnselected\nSELECT u.id, o.total\nFROM users u LEFT JOIN orders o ON o.user_id = u.id\nORDER BY o.placed_at;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 30],
+      ["Text", 30, 126]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 30, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -49,4 +49,5 @@ none tests/SqlSource.Tests/*
 none tests/SqlSource.Tests.RoslynFloor/*
 none tests/SqlSource.Tool.Tests/*
 none tests/SqlSource.Tool.StandIn/*
+none src/sqlfluff-templater-sqlsource/*
 none *.md

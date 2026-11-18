@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs the validations that the uncommitted change could break: formatting, linting, the manual's site, build, tests
-# and the three package checks.  A step or a pair of container test projects is skipped when nothing in the change
-# reaches them.
+# and the three package checks, and for the sqlfluff templater in src/sqlfluff-templater-sqlsource/ its three checks,
+# ruff check, ruff format --check and pytest, through uv.  A step or a pair of container test projects is skipped when
+# nothing in the change reaches them.
 # --full runs everything, as a clean tree, a change to this script and a changed path of no known kind do.
 # Rewrites nothing.  Every step runs even when an earlier one fails, except that the tests and the package checks are
 # skipped when the build fails, and the package checks when the pack fails.
@@ -43,6 +44,7 @@ cd "$repo_root"
 is_known_kind() {
     known=true
     case "$1" in
+    src/sqlfluff-templater-sqlsource/*) return ;;
     *.cs | *.csproj | *.props | *.targets | *.slnx | *.md | *.sql | *.json | *.sh | *.txt) return ;;
     .github/workflows/*.yml | .github/workflows/*.yaml | examples/*/docker-compose.yml | site/*.yml) return ;;
     esac
@@ -106,10 +108,12 @@ scope_of() {
 # tools/check-package-install.sh copies the example's Users.sql and its sidecar, and replays the bundle of
 # tests/SqlSource.Tool.Tests/Fixtures/Bundles/postgres/select-left-join with the packed tool.  Every .props and .targets
 # file at the root counts, since MSBuild imports the Directory.Build files and Directory.Packages.props on its own, and
-# any of them can import another.
+# any of them can import another.  The templater's project, with the corpus that a change to the parser writes, is
+# Python, which dotnet pack does not pack.
 needs_packages() {
     packages=false
     case "$1" in
+    src/sqlfluff-templater-sqlsource/*) ;;
     src/* | tools/package-install/* | tools/check-*.sh | examples/PostgresExamples/Models/Users.sql* | \
         tests/SqlSource.Tool.Tests/Fixtures/Bundles/postgres/select-left-join/*)
         packages=true
@@ -182,6 +186,7 @@ site_trigger=''
 postgres_trigger=''
 sqlserver_trigger=''
 packages_trigger=''
+templater_trigger=''
 for path in ${changes[@]+"${changes[@]}"}; do
     is_known_kind "$path"
     formats_everything "$path"
@@ -203,6 +208,9 @@ for path in ${changes[@]+"${changes[@]}"}; do
     if [[ "$scope" == postgres || "$scope" == both ]]; then first postgres_trigger; fi
     if [[ "$scope" == sqlserver || "$scope" == both ]]; then first sqlserver_trigger; fi
     if [[ "$packages" == true ]]; then first packages_trigger; fi
+    # uv runs ruff and pytest in the project's folder, from its .python-version and uv.lock.
+    # format.sh runs the templater's ruff steps too, so a change to it sets off the templater's checks.
+    if [[ "$path" == src/sqlfluff-templater-sqlsource/* || "$path" == format.sh ]]; then first templater_trigger; fi
     # A deleted file has nothing to format, but its scopes still apply.
     if [[ "$path" == *.cs && -f "$path" ]]; then
         format_files+=("$path")
@@ -219,7 +227,7 @@ if [[ -n "$unknown" && -z "$full_reason" ]]; then
 fi
 
 format_trigger=''
-format_args=(--check)
+format_args=(--check style analyzers csharpier)
 if [[ -n "$format_all" ]]; then
     format_trigger="everything, for $format_all"
 elif [[ ${#format_files[@]} -gt 0 ]]; then
@@ -246,9 +254,18 @@ decide format "$format_trigger" "$no_format"
 decide shell "$shell_trigger" 'no .sh file or .editorconfig changed'
 decide workflow "$workflow_trigger" 'no workflow or tools/actionlint.sh changed'
 decide site "$site_trigger" 'nothing under site/ changed'
+decide templater "$templater_trigger" 'nothing under src/sqlfluff-templater-sqlsource/ changed'
 decide postgres "$postgres_trigger" "$no_scope"
 decide sqlserver "$sqlserver_trigger" "$no_scope"
 decide packages "$packages_trigger" 'no change reaches the packages'
+
+# The templater's checks need uv, which installs the project's Python and creates its virtual environment on the first
+# run.  A missing tool fails the run here, and not as three failed steps.
+# shellcheck disable=SC2154 # decide sets templater_go, through printf -v.
+if [[ "$plan" == false && "$templater_go" == true ]] && ! command -v uv >/dev/null 2>&1; then
+    echo 'pre-commit-validation.sh: uv is not installed, which the templater needs: https://docs.astral.sh/uv/' >&2
+    exit 1
+fi
 
 # Every restore below runs in locked mode, as it does in CI, so that a stale packages.lock.json fails the validation
 # instead of being rewritten by it.
@@ -370,6 +387,11 @@ step 'editorconfig-checker' always tools/editorconfig-checker.sh || true
 step 'shellcheck' shell tools/shellcheck.sh || true
 step 'shfmt' shell tools/shfmt.sh --check || true
 step 'actionlint' workflow tools/actionlint.sh || true
+templater_dir='src/sqlfluff-templater-sqlsource'
+# --locked makes a stale uv.lock fail the validation instead of being rewritten by it, as a restore's locked mode does.
+step 'templater lint' templater uv run --locked --directory "$templater_dir" ruff check || true
+step 'templater format' templater uv run --locked --directory "$templater_dir" ruff format --check || true
+step 'templater tests' templater uv run --locked --directory "$templater_dir" pytest || true
 step 'site' site tools/build-site.sh || true
 if step 'build' always dotnet build "$SOLUTION"; then
     step 'test' always dotnet test --solution "$test_solution" --no-build || true

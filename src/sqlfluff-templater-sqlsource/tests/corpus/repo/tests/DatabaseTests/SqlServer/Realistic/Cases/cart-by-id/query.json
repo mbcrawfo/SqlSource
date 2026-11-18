@@ -1,0 +1,30 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: GetCart\n-- param: @cart_id uniqueidentifier\nSELECT\n    c.id AS cart_id,\n    c.customer_id,\n    c.created_at,\n    c.checked_out_at,\n    ci.product_id,\n    p.sku,\n    p.name AS product_name,\n    ci.quantity,\n    ci.added_at\nFROM dbo.carts AS c\nLEFT JOIN dbo.cart_items AS ci ON ci.cart_id = c.id\nLEFT JOIN dbo.products AS p ON p.id = ci.product_id\nWHERE c.id = @cart_id\nORDER BY ci.added_at;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 16],
+      ["Text", 16, 17],
+      ["LineComment", 17, 52],
+      ["Text", 52, 368],
+      ["Parameter", 368, 376],
+      ["Text", 376, 399]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 16, "name": null, "default": null },
+      { "kind": "markerComment", "start": 17, "end": 52, "name": null, "default": null },
+      { "kind": "parameter", "start": 368, "end": 376, "name": "cart_id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

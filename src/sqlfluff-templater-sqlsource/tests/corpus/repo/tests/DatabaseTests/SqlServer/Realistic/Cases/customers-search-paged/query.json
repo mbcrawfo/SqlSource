@@ -1,0 +1,42 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: SearchCustomers\n-- param: @status varchar(10) null\nSELECT c.id, c.name, c.email, c.phone, c.status\nFROM dbo.customers AS c\nWHERE c.name LIKE @q\n    AND (@status IS NULL OR c.status = @status)\nORDER BY c.name, c.id\nOFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 24],
+      ["Text", 24, 25],
+      ["LineComment", 25, 59],
+      ["Text", 59, 150],
+      ["Parameter", 150, 152],
+      ["Text", 152, 162],
+      ["Parameter", 162, 169],
+      ["Text", 169, 192],
+      ["Parameter", 192, 199],
+      ["Text", 199, 230],
+      ["Parameter", 230, 235],
+      ["Text", 235, 252],
+      ["Parameter", 252, 257],
+      ["Text", 257, 269]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 24, "name": null, "default": null },
+      { "kind": "markerComment", "start": 25, "end": 59, "name": null, "default": null },
+      { "kind": "parameter", "start": 150, "end": 152, "name": "q", "default": null },
+      { "kind": "parameter", "start": 162, "end": 169, "name": "status", "default": null },
+      { "kind": "parameter", "start": 192, "end": 199, "name": "status", "default": null },
+      { "kind": "parameter", "start": 230, "end": 235, "name": "skip", "default": null },
+      { "kind": "parameter", "start": 252, "end": 257, "name": "take", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}
