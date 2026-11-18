@@ -1,0 +1,35 @@
+{
+  "fileName": "MarkerForms.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: Q\n-- token: {{a:x}}\n-- just a note\nSELECT {{a}} -- summary: inline\n    , {{f:a = 1 -- summary: inside\n    AND b = 2}}\nFROM t;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 31],
+      ["Text", 31, 32],
+      ["LineComment", 32, 49],
+      ["Text", 49, 50],
+      ["LineComment", 50, 64],
+      ["Text", 64, 78],
+      ["LineComment", 78, 96],
+      ["Text", 96, 113],
+      ["LineComment", 113, 131],
+      ["Text", 131, 156]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 31, "name": null, "default": null },
+      { "kind": "markerComment", "start": 32, "end": 49, "name": null, "default": null },
+      { "kind": "token", "start": 72, "end": 77, "name": "a", "default": "x" },
+      { "kind": "markerComment", "start": 78, "end": 96, "name": null, "default": null },
+      { "kind": "token", "start": 103, "end": 147, "name": "f", "default": "a = 1\n    AND b = 2" }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

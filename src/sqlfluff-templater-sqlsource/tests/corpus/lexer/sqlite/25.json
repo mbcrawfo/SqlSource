@@ -1,0 +1,20 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"sqlite\" }"
+  ],
+  "input": "$$ -- x $$ y",
+  "expected": {
+    "startDialect": "sqlite",
+    "startOptions": [],
+    "dialect": "sqlite",
+    "options": [],
+    "lexemes": [
+      ["Text", 0, 3],
+      ["LineComment", 3, 12]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

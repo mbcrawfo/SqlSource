@@ -1,0 +1,26 @@
+{
+  "fileName": "NonAsciiTokenName.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: Outer\nSELECT * FROM {{Äußere:users}} WHERE {{Ä:1 = 1}} AND {{naïve}};\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 35],
+      ["Text", 35, 100]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 35, "name": null, "default": null },
+      { "kind": "token", "start": 50, "end": 66, "name": "Äußere", "default": "users" },
+      { "kind": "token", "start": 73, "end": 84, "name": "Ä", "default": "1 = 1" },
+      { "kind": "token", "start": 89, "end": 98, "name": "naïve", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

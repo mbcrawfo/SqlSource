@@ -1,0 +1,46 @@
+{
+  "fileName": "Users.sql",
+  "settings": [
+    "{\n  // tools/check-package-install.sh copies the project to a temporary folder, and \"root\" ends the chain at the copy,\n  // so that no settings file above the copy applies.\n  \"root\": true,\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Their members are on the type itself, Queries, which Program.cs reads, in place of its nested class Sql.\n  \"memberLocation\": \"class\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n"
+  ],
+  "input": "-- name: GetUser\nSELECT id, name FROM users /* by key */ WHERE id = @id;\n\n-- name: ListUsers -> many\n-- param: @since timestamptz not null\n-- token: {{whereClause:WHERE created_at > @since}}\nSELECT id, name FROM {{table:users}} {{whereClause}};\n\n-- name: ListChecked\n-- generator: default\nSELECT id, name FROM {{table}} {{whereClause}};\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 16],
+      ["Text", 16, 44],
+      ["BlockComment", 44, 56],
+      ["Text", 56, 68],
+      ["Parameter", 68, 71],
+      ["Text", 71, 74],
+      ["LineComment", 74, 100],
+      ["Text", 100, 101],
+      ["LineComment", 101, 138],
+      ["Text", 138, 139],
+      ["LineComment", 139, 190],
+      ["Text", 190, 246],
+      ["LineComment", 246, 266],
+      ["Text", 266, 267],
+      ["LineComment", 267, 288],
+      ["Text", 288, 337]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 16, "name": null, "default": null },
+      { "kind": "parameter", "start": 68, "end": 71, "name": "id", "default": null },
+      { "kind": "markerComment", "start": 74, "end": 100, "name": null, "default": null },
+      { "kind": "markerComment", "start": 101, "end": 138, "name": null, "default": null },
+      { "kind": "markerComment", "start": 139, "end": 190, "name": null, "default": null },
+      { "kind": "token", "start": 212, "end": 227, "name": "table", "default": "users" },
+      { "kind": "token", "start": 228, "end": 243, "name": "whereClause", "default": "WHERE created_at > @since" },
+      { "kind": "markerComment", "start": 246, "end": 266, "name": null, "default": null },
+      { "kind": "markerComment", "start": 267, "end": 288, "name": null, "default": null },
+      { "kind": "token", "start": 310, "end": 319, "name": "table", "default": null },
+      { "kind": "token", "start": 320, "end": 335, "name": "whereClause", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

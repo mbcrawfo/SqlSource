@@ -1,0 +1,25 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: WalkRemoved\nSELECT o.id, o.total\nFROM orders o LEFT JOIN users u ON u.id = o.user_id\nWHERE o.total > @min;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 110],
+      ["Parameter", 110, 114],
+      ["Text", 114, 116]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "parameter", "start": 110, "end": 114, "name": "min", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

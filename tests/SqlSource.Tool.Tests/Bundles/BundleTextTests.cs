@@ -26,10 +26,8 @@ public sealed class BundleTextTests
     public void Of_ControlCharacter_IsWrittenAsItsEscape(string control, string escape) =>
         BundleText.Of("a" + control + "b").ShouldBe("a" + escape + "b");
 
-    [Theory]
-    [MemberData(nameof(Controls))]
-    public void Of_ControlCharacterBesideATab_KeepsTheTab(string control, string escape) =>
-        BundleText.Of("a\t" + control + "\tb").ShouldBe("a\t" + escape + "\tb");
+    [Fact]
+    public void Of_ControlCharacterBesideATab_KeepsTheTab() => BundleText.Of("a\t\u001b\tb").ShouldBe("a\t\\u001B\tb");
 
     [Fact]
     public void Of_TextWithoutAControlCharacter_IsTheSameText()

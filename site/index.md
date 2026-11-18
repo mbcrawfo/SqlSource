@@ -51,6 +51,7 @@ You use Dapper: start with [Use Dapper](guides/dapper.md).  Your database is not
 | Describe as I save | [Describe queries as you save (watch)](guides/describe-on-save.md) |
 | Choose a table name at run time | [Choose a table or a clause at run time](guides/dynamic-sql.md) |
 | Use Dapper | [Use Dapper or your own ADO.NET code](guides/dapper.md) |
+| Lint or format my SQL | [Lint and format SQL with sqlfluff](guides/sqlfluff.md) |
 | Look up a setting and where to write it | [All settings](reference/settings.md#all-settings) |
 | Look up a `-- word:` line | [The marker index](reference/sql-files.md#marker-index) |
 | Look up a command or an option | [The command reference](reference/cli.md#command-reference) |

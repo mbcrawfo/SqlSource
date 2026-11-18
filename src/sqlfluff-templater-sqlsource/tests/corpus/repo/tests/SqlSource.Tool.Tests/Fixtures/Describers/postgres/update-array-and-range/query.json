@@ -1,0 +1,31 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: MoveBooking\nUPDATE bookings SET during = @during, tags = @tags WHERE id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 50],
+      ["Parameter", 50, 57],
+      ["Text", 57, 66],
+      ["Parameter", 66, 71],
+      ["Text", 71, 83],
+      ["Parameter", 83, 86],
+      ["Text", 86, 88]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "parameter", "start": 50, "end": 57, "name": "during", "default": null },
+      { "kind": "parameter", "start": 66, "end": 71, "name": "tags", "default": null },
+      { "kind": "parameter", "start": 83, "end": 86, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "fileName": "ByProject.sql",
+  "settings": [
+    "{\n  // The members of this folder's queries go on the type.\n  \"memberLocation\": \"Class\",\n}\n",
+    "{\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The settings file of the project says postgres, which reads the third line as part of the escape string.\nSELECT E'it' -- a comment between the parts\n    '\\'s -- not a comment' AS note; -- a comment\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 107],
+      ["Text", 107, 116],
+      ["Quoted", 116, 120],
+      ["Text", 120, 121],
+      ["LineComment", 121, 151],
+      ["Text", 151, 156],
+      ["Quoted", 156, 178],
+      ["Text", 178, 188],
+      ["LineComment", 188, 200],
+      ["Text", 200, 201]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

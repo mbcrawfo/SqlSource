@@ -41,38 +41,23 @@ internal static class SqlMarkerReader
     /// </summary>
     public static SqlMarker? Read(string text, SqlLexeme lexeme)
     {
-        // A line comment can start with a # in some dialects.  A marker always starts with two dashes.
-        if (
-            lexeme.Kind != SqlLexemeKind.LineComment
-            || text[lexeme.Span.Start] != '-'
-            || !StartsLine(text, lexeme.Span.Start)
-        )
+        if (!IsDashComment(text, lexeme) || !StartsLine(text, lexeme.Span.Start))
         {
             return null;
         }
 
-        var end = lexeme.Span.End;
-        var keywordStart = lexeme.Span.Start + 2;
-        while (keywordStart < end && text[keywordStart] is ' ' or '\t')
-        {
-            keywordStart++;
-        }
-
-        foreach (var (keyword, kind) in Keywords)
-        {
-            var valueStart = keywordStart + keyword.Length;
-            if (
-                valueStart <= end
-                && string.Compare(text, keywordStart, keyword, 0, keyword.Length, StringComparison.OrdinalIgnoreCase)
-                    == 0
-            )
-            {
-                return new SqlMarker(kind, lexeme.Span, SqlText.Trim(text, valueStart, end));
-            }
-        }
-
-        return null;
+        var index = FindKeyword(text, lexeme.Span, out var valueStart);
+        return index < 0
+            ? null
+            : new SqlMarker(Keywords[index].Kind, lexeme.Span, SqlText.Trim(text, valueStart, lexeme.Span.End));
     }
+
+    /// <summary>
+    /// True for a line comment in the form of a marker, wherever it stands: <c>--</c>, optional blanks, a keyword, a
+    /// colon.  One that is not the first thing on its line is no marker, but a line break before it would make it one.
+    /// </summary>
+    public static bool HasMarkerForm(string text, SqlLexeme lexeme) =>
+        IsDashComment(text, lexeme) && FindKeyword(text, lexeme.Span, out _) >= 0;
 
     /// <summary>The word of a marker, without its colon: <c>token</c>.</summary>
     public static string WordOf(SqlMarkerKind kind)
@@ -124,6 +109,38 @@ internal static class SqlMarkerReader
         }
 
         return (TextSpan.FromBounds(value.Start, nameEnd), arrow);
+    }
+
+    // A line comment can start with a # in some dialects.  A marker always starts with two dashes.
+    private static bool IsDashComment(string text, SqlLexeme lexeme) =>
+        lexeme.Kind == SqlLexemeKind.LineComment && text[lexeme.Span.Start] == '-';
+
+    // The index in Keywords of the keyword after the comment's dashes and blanks, and where its value starts, or -1.
+    private static int FindKeyword(string text, TextSpan comment, out int valueStart)
+    {
+        var end = comment.End;
+        var keywordStart = comment.Start + 2;
+        while (keywordStart < end && text[keywordStart] is ' ' or '\t')
+        {
+            keywordStart++;
+        }
+
+        for (var index = 0; index < Keywords.Length; index++)
+        {
+            var keyword = Keywords[index].Keyword;
+            valueStart = keywordStart + keyword.Length;
+            if (
+                valueStart <= end
+                && string.Compare(text, keywordStart, keyword, 0, keyword.Length, StringComparison.OrdinalIgnoreCase)
+                    == 0
+            )
+            {
+                return index;
+            }
+        }
+
+        valueStart = -1;
+        return -1;
     }
 
     // Only blanks may come before the comment on its line.  The lexer guarantees that a line break found this way is

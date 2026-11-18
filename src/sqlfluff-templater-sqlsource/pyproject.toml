@@ -1,0 +1,41 @@
+[build-system]
+# Not 1.26 or older, which write `License: MIT` and leave out `License-File` for the two keys below.
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sqlfluff-templater-sqlsource"
+# Never edit this: CI sets the real version when it publishes.
+version = "0.0.0.dev0"
+description = "A sqlfluff templater for SqlSource queries"
+readme = "README.md"
+license = "MIT"
+# A copy of the repository's LICENSE, which a test keeps equal to it, since hatchling packs only files of this folder.
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+# Not 4.4 or older: through 4.4.0 fix moves an inline `-- token:` comment onto a line of its own under LT05, which makes
+# it a marker, or skips the patch around it.  4.5.0 is the first release whose fix keeps every token, default and marker.
+dependencies = ["sqlfluff>=4.5,<5"]
+
+[project.entry-points.sqlfluff]
+sqlfluff_templater_sqlsource = "sqlfluff_templater_sqlsource"
+
+[dependency-groups]
+dev = ["pytest==9.2.0", "ruff==0.17.5"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["sqlfluff_templater_sqlsource"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["sqlfluff_templater_sqlsource", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]

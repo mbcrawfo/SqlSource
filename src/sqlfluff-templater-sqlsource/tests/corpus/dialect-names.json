@@ -1,0 +1,22 @@
+{
+  "names": [
+    ["ansi", "Ansi"],
+    ["mssql", "SqlServer"],
+    ["sqlserver", "SqlServer"],
+    ["tsql", "SqlServer"],
+    ["postgres", "PostgreSql"],
+    ["postgresql", "PostgreSql"],
+    ["cockroachdb", "CockroachDb"],
+    ["cockroach", "CockroachDb"],
+    ["mysql", "MySql"],
+    ["mariadb", "MariaDb"],
+    ["sqlite", "Sqlite"],
+    ["oracle", "Oracle"]
+  ],
+  "options": [
+    ["ansi-quotes", 1],
+    ["ansi_quotes", 1],
+    ["no-backslash-escapes", 2],
+    ["no_backslash_escapes", 2]
+  ]
+}

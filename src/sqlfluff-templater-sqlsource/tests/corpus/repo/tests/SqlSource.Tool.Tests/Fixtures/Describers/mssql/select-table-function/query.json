@@ -1,0 +1,25 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: OrdersOfUser\nSELECT * FROM dbo.orders_of(@userId);\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 21],
+      ["Text", 21, 50],
+      ["Parameter", 50, 57],
+      ["Text", 57, 60]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 21, "name": null, "default": null },
+      { "kind": "parameter", "start": 50, "end": 57, "name": "userId", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

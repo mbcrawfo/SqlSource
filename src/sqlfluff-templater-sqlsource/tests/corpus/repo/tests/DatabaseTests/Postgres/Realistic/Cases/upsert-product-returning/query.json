@@ -1,0 +1,48 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for timestamptz.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"timestamptz\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: UpsertProduct\n-- param: @category_id int null\n-- param: @discontinued_on date null\nINSERT INTO products (id, category_id, sku, name, price, discontinued_on)\nVALUES (@id, @category_id, @sku, @name, @price, @discontinued_on)\nON CONFLICT (sku) DO UPDATE\nSET category_id = EXCLUDED.category_id,\n    name = EXCLUDED.name,\n    price = EXCLUDED.price,\n    discontinued_on = EXCLUDED.discontinued_on\nRETURNING id, category_id, sku, name, price, discontinued_on, (xmax = 0) AS inserted;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 22],
+      ["Text", 22, 23],
+      ["LineComment", 23, 54],
+      ["Text", 54, 55],
+      ["LineComment", 55, 91],
+      ["Text", 91, 174],
+      ["Parameter", 174, 177],
+      ["Text", 177, 179],
+      ["Parameter", 179, 191],
+      ["Text", 191, 193],
+      ["Parameter", 193, 197],
+      ["Text", 197, 199],
+      ["Parameter", 199, 204],
+      ["Text", 204, 206],
+      ["Parameter", 206, 212],
+      ["Text", 212, 214],
+      ["Parameter", 214, 230],
+      ["Text", 230, 487]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 22, "name": null, "default": null },
+      { "kind": "markerComment", "start": 23, "end": 54, "name": null, "default": null },
+      { "kind": "markerComment", "start": 55, "end": 91, "name": null, "default": null },
+      { "kind": "parameter", "start": 174, "end": 177, "name": "id", "default": null },
+      { "kind": "parameter", "start": 179, "end": 191, "name": "category_id", "default": null },
+      { "kind": "parameter", "start": 193, "end": 197, "name": "sku", "default": null },
+      { "kind": "parameter", "start": 199, "end": 204, "name": "name", "default": null },
+      { "kind": "parameter", "start": 206, "end": 212, "name": "price", "default": null },
+      { "kind": "parameter", "start": 214, "end": 230, "name": "discontinued_on", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

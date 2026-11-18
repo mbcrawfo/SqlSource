@@ -1,0 +1,30 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: MarkByName\nUPDATE dbo.users SET nickname = N'x' WHERE (@name IS NULL OR name = @name);\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 19],
+      ["Text", 19, 53],
+      ["Quoted", 53, 56],
+      ["Text", 56, 64],
+      ["Parameter", 64, 69],
+      ["Text", 69, 88],
+      ["Parameter", 88, 93],
+      ["Text", 93, 96]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 19, "name": null, "default": null },
+      { "kind": "parameter", "start": 64, "end": 69, "name": "name", "default": null },
+      { "kind": "parameter", "start": 88, "end": 93, "name": "name", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: WalkSubqueryFlattened\nSELECT s.id, s.total\nFROM (SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id) s\nWHERE s.id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 30],
+      ["Text", 30, 147],
+      ["Parameter", 147, 150],
+      ["Text", 150, 152]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 30, "name": null, "default": null },
+      { "kind": "parameter", "start": 147, "end": 150, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

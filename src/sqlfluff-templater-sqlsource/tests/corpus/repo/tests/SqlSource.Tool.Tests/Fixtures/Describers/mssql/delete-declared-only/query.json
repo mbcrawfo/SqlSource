@@ -1,0 +1,29 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: PurgeOrders\n-- param: @tenant int\nDELETE FROM dbo.orders WHERE user_id = @userId {{filter:AND note IS NOT NULL}};\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 42],
+      ["Text", 42, 82],
+      ["Parameter", 82, 89],
+      ["Text", 89, 123]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 42, "name": null, "default": null },
+      { "kind": "parameter", "start": 82, "end": 89, "name": "userId", "default": null },
+      { "kind": "token", "start": 90, "end": 121, "name": "filter", "default": "AND note IS NOT NULL" }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: SyncOrders\nMERGE dbo.orders AS t\nUSING dbo.users AS s ON t.user_id = s.id\nWHEN MATCHED THEN UPDATE SET total = @total\nWHEN NOT MATCHED THEN INSERT (user_id, total) VALUES (s.id, 0)\nWHEN NOT MATCHED BY SOURCE THEN DELETE\nOUTPUT $action AS action, inserted.id AS inserted_id, inserted.total AS inserted_total,\n    deleted.id AS deleted_id, deleted.total AS deleted_total;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 19],
+      ["Text", 19, 120],
+      ["Parameter", 120, 126],
+      ["Text", 126, 379]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 19, "name": null, "default": null },
+      { "kind": "parameter", "start": 120, "end": 126, "name": "total", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

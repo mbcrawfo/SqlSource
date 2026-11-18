@@ -1,0 +1,40 @@
+{
+  "fileName": "QueryEnds.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: A\nSELECT 1 -- note\n\n-- name: B\nSELECT 'b' /* c */\n-- name: C\nSELECT 3;\n-- name: D\nSELECT 4\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 31],
+      ["Text", 31, 41],
+      ["LineComment", 41, 48],
+      ["Text", 48, 50],
+      ["LineComment", 50, 60],
+      ["Text", 60, 68],
+      ["Quoted", 68, 71],
+      ["Text", 71, 72],
+      ["BlockComment", 72, 79],
+      ["Text", 79, 80],
+      ["LineComment", 80, 90],
+      ["Text", 90, 101],
+      ["LineComment", 101, 111],
+      ["Text", 111, 121]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 31, "name": null, "default": null },
+      { "kind": "queryEnd", "start": 40, "end": 40, "name": null, "default": null },
+      { "kind": "markerComment", "start": 50, "end": 60, "name": null, "default": null },
+      { "kind": "queryEnd", "start": 71, "end": 71, "name": null, "default": null },
+      { "kind": "markerComment", "start": 80, "end": 90, "name": null, "default": null },
+      { "kind": "markerComment", "start": 101, "end": 111, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

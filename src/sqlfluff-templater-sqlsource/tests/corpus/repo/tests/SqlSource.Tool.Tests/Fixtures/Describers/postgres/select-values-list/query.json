@@ -1,0 +1,29 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: GetUsersWithLabels\nSELECT u.id, u.name, v.label\nFROM users u JOIN (VALUES (1, 'a'), (2, 'b')) AS v(id, label) ON v.id = u.id\nWHERE u.id > @min_id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 27],
+      ["Text", 27, 87],
+      ["Quoted", 87, 90],
+      ["Text", 90, 97],
+      ["Quoted", 97, 100],
+      ["Text", 100, 147],
+      ["Parameter", 147, 154],
+      ["Text", 154, 156]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 27, "name": null, "default": null },
+      { "kind": "parameter", "start": 147, "end": 154, "name": "min_id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "titles": [
+    ["SQLSRC101", "Quote is not closed"],
+    ["SQLSRC102", "Comment is not closed"],
+    ["SQLSRC111", "Marker value is not valid"],
+    ["SQLSRC120", "Token crosses a comment"]
+  ]
+}

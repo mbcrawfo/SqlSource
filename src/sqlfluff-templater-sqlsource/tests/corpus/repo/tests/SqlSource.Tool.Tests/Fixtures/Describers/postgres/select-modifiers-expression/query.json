@@ -1,0 +1,26 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ModifierExpressions\nSELECT\n    '1 day'::interval day to second(3) AS span,\n    CASE m.names[1] WHEN '' THEN m.names[2] ELSE m.names[1] END AS first_name\nFROM modifiers AS m;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 28],
+      ["Text", 28, 40],
+      ["Quoted", 40, 47],
+      ["Text", 47, 109],
+      ["Quoted", 109, 111],
+      ["Text", 111, 183]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 28, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "fileName": "NamedQueries.sql",
+  "settings": [
+    "{\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- member-location: class\n-- name: GetNamed\nSELECT id FROM users WHERE name = @name;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 25],
+      ["Text", 25, 26],
+      ["LineComment", 26, 43],
+      ["Text", 43, 78],
+      ["Parameter", 78, 83],
+      ["Text", 83, 85]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 25, "name": null, "default": null },
+      { "kind": "markerComment", "start": 26, "end": 43, "name": null, "default": null },
+      { "kind": "parameter", "start": 78, "end": 83, "name": "name", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

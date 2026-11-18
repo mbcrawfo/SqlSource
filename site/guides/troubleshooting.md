@@ -85,6 +85,14 @@ Find the message of the exception in this list.  Each entry gives the cause, wha
 - **SQLSRC209 on MySQL, SQLite, Oracle or another database.**  Only PostgreSQL and SQL Server queries can be described, so give the file the output `sql`.  See [Use MySQL, SQLite, Oracle or another database](other-databases.md).
 - **SQLSRC241 or SQLSRC244 after you pull.**  A query changed, and its sidecar was not described with it.  Run `dotnet sqlsource describe` and commit the sidecars.  See [Describing again](../reference/sidecars.md#describing-again).
 
+<a id="sqlfluff"></a>
+
+## sqlfluff does not do what you expect
+
+- **`CV06` at the end of a query, and `sqlfluff fix` does not fix it.**  With `multiline_newline = True`, a query of several lines without `;` is reported.  End it with `;`.  See [CV06 on a query without `;`](sqlfluff.md#limit-cv06-without-semicolon).
+- **sqlfluff reports nothing on the white space or comments after a query.**  The white space and comments between a query without `;` and the next query are neither reported nor fixed.  End the query with `;`.  See [white space and comments after a query without `;`](sqlfluff.md#limit-text-after-query).
+- **pip upgrades sqlfluff when it installs the templater, or a pre-commit hook of sqlfluff fails to install.**  The templater needs sqlfluff 4.5 or later.  See [sqlfluff 4.4 or older](sqlfluff.md#limit-sqlfluff-version).
+
 <a id="watch"></a>
 
 ## The watch does nothing
