@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Shouldly;
@@ -53,6 +54,9 @@ public sealed class VerboseTests : IDisposable
     public void Dispose() => _scene.Dispose();
 
     private static string Line(string text) => "sqlsource: " + text + "\n";
+
+    // Every file under the run's folder, whatever wrote it.
+    private string[] FilesOfTheRun() => Directory.GetFiles(_scene.Run.Folder.Path, "*", SearchOption.AllDirectories);
 
     // A connection from the .env file is said with the variable and the file, and never with its value.
     [Fact]
@@ -234,9 +238,15 @@ public sealed class VerboseTests : IDisposable
     [Fact]
     public async Task Run_VerboseWithoutLog_WritesNoFileButTheSidecars()
     {
+        var before = FilesOfTheRun();
+
         _ = await _scene.DescribeAsync("All.slnx", "--verbose");
 
-        Directory.GetFiles(_scene.Run.Folder.Path, "*.log", SearchOption.AllDirectories).ShouldBeEmpty();
+        // The scene's build writes each project's settings file, which a user's project has on the disk before a run.
+        FilesOfTheRun()
+            .Except(before)
+            .Except([_scene.Project.SettingsPath, _lib.SettingsPath])
+            .ShouldBe([_users + ".json", _items + ".json"], ignoreOrder: true);
     }
 
     [Fact]
