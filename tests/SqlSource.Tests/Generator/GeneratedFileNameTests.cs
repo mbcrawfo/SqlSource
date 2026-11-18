@@ -73,6 +73,12 @@ public sealed class GeneratedFileNameTests
 
                 [SqlSourceGenerate(Source = ".")]
                 public partial class Other { public static string Value => Sql.GetUser; }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Extra { public static string Value => Sql.GetUser; }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class extra { public static string Value => Sql.GetUser; }
             }
 
             namespace APP
@@ -86,12 +92,12 @@ public sealed class GeneratedFileNameTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources.Count.ShouldBe(7);
-        run.Sources.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count().ShouldBe(7);
+        run.Sources.Count.ShouldBe(9);
+        run.Sources.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count().ShouldBe(9);
         run.Sources.Keys.ShouldContain("App.Other.g.cs");
         run.Sources.Keys.ShouldNotContain("App.Sample.g.cs");
         run.Sources.Values.Count(source => source.Contains("public const string GetUser", StringComparison.Ordinal))
-            .ShouldBe(4);
+            .ShouldBe(6);
     }
 
     [Fact]
