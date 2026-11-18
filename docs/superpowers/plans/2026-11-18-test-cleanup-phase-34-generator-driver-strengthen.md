@@ -43,7 +43,7 @@
 - [x] **Step 2:** Check by hand that the MethodDiagnostics test fails when its new SQLSRC241 line is removed.
 - [x] **Step 3:** Set row 34 of the epic's table to `done`.
 - [x] **Step 4:** `./format.sh`, then both classes' tests pass, on the test project and on RoslynFloor.
-- [ ] **Step 5:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 5:** `./pre-commit-validation.sh`, then commit.
 
 ### Task 2: The guard's "after" half
 
