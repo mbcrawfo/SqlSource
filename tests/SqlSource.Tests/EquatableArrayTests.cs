@@ -24,6 +24,7 @@ public sealed class EquatableArrayTests
     public void Equals_DifferentItems_ReturnsFalse()
     {
         Of("a", "b").Equals(Of("a", "c")).ShouldBeFalse();
+        Of("a", "b").Equals((object)Of("a", "c")).ShouldBeFalse();
         Of("a").Equals(Of("a", "b")).ShouldBeFalse();
         (Of("a") != Of("b")).ShouldBeTrue();
     }
