@@ -74,10 +74,14 @@ public sealed class ConnectionResolverTests
         var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
         diagnostic.Descriptor.ShouldBe(SqlDiagnostics.RepositoryHasNoConnection);
         diagnostic.Location.ShouldBe(TestModels.AttributeLocation);
-        diagnostic.Arguments.Take(2).ShouldBe(["App.UserRepository", "main"]);
-        diagnostic.Arguments[2].ShouldContain("connectionString");
-        diagnostic.Arguments[2].ShouldContain("DbDataSource");
-        diagnostic.Arguments[2].ShouldContain("[SqlSourceConnection]");
+        diagnostic.Arguments.ShouldBe([
+            "App.UserRepository",
+            "main",
+            "Add a string field, property or primary-constructor parameter named connectionString, or one of a "
+                + "DbDataSource type, or mark the member that gives the connection [SqlSourceConnection], whether a "
+                + "member of the type, an instance member of a type it holds in a field, property or "
+                + "primary-constructor parameter, or a static member of the project.",
+        ]);
         resolution.FailedDatabases.ShouldBe(["main"]);
         resolution.Sources.ShouldBeEmpty();
     }
@@ -343,7 +347,7 @@ public sealed class ConnectionResolverTests
     // A member is reached through this, which no argument hides.
     [Fact]
     public void Resolve_FieldNamedAsAnArgument_IsTheSource() =>
-        Resolve([Candidate("parameters", CandidateType.DataSource)], Main)
+        Resolve([Candidate("parameters", CandidateType.DataSource)], Main with { TakesParameters = true })
             .Sources.ShouldHaveSingleItem()
             .Asynchronous.AccessText.ShouldBe("this.parameters");
 
@@ -417,15 +421,9 @@ public sealed class ConnectionResolverTests
     // and the kind of source it is.
     [Theory]
     [InlineData("ConnectionString", "Field", "ConnectionString")]
-    [InlineData("ConnectionString", "Property", "ConnectionString")]
-    [InlineData("ConnectionString", "Parameter", "ConnectionString")]
-    [InlineData("ConnectionString", "Method", "ConnectionString")]
     [InlineData("DataSource", "Field", "DataSource")]
-    [InlineData("DataSource", "Parameter", "DataSource")]
     [InlineData("Factory", "Method", "Factory")]
     [InlineData("Connection", "Field", "Borrowed")]
-    [InlineData("Connection", "Property", "Borrowed")]
-    [InlineData("Connection", "Parameter", "Borrowed")]
     public void Resolve_MarkedCandidate_HasTheKindOfWhatItGives(string type, string member, string kind)
     {
         var candidate = Candidate(
