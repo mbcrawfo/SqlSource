@@ -279,7 +279,8 @@ public sealed partial class SupportedVersionsTests
             .Headers.ShouldBeEmpty();
 
     // Fails when a page that restates the two minimum server versions, as "PostgreSQL 14 or later" and "SQL Server 2017
-    // or later", names a version that is not the table's minimum, or names no minimum of one of the two databases.
+    // or later", or "PostgreSQL 14+" and "SQL Server 2017+", names a version that is not the table's minimum, or names
+    // no minimum of one of the two databases.
     [Theory]
     [InlineData("site/index.md")]
     [InlineData("site/start/install.md")]
@@ -293,11 +294,13 @@ public sealed partial class SupportedVersionsTests
         sqlServerVersions.ShouldNotBeEmpty($"{page} should restate the minimum SQL Server version of {Page}");
         postgresVersions.ShouldAllBe(
             version => version == postgres,
-            $"{page}: each 'PostgreSQL <n> or later' should name {postgres}, the minimum of {Page}"
+            $"{page}: each 'PostgreSQL <n> or later' or 'PostgreSQL <n>+' should name {postgres}, the minimum of "
+                + Page
         );
         sqlServerVersions.ShouldAllBe(
             version => version == sqlServer,
-            $"{page}: each 'SQL Server <year> or later' should name {sqlServer}, the minimum of {Page}"
+            $"{page}: each 'SQL Server <year> or later' or 'SQL Server <year>+' should name {sqlServer}, the minimum "
+                + $"of {Page}"
         );
     }
 
@@ -318,12 +321,21 @@ public sealed partial class SupportedVersionsTests
         postgres.ShouldBe([13]);
         sqlServer.ShouldBe([2016]);
 
+        (postgres, sqlServer) = RestatedMinimums("PostgreSQL 12+ or SQL Server 2019+.");
+        postgres.ShouldBe([12]);
+        sqlServer.ShouldBe([2019]);
+
+        (postgres, sqlServer) = RestatedMinimums("PostgreSQL 18 and SQL Server 2022 add features.");
+        postgres.ShouldBeEmpty();
+        sqlServer.ShouldBeEmpty();
+
         (postgres, sqlServer) = RestatedMinimums("Visual Studio 2022 17.14 or later, and Npgsql 8 or later.");
         postgres.ShouldBeEmpty();
         sqlServer.ShouldBeEmpty();
     }
 
-    // The versions of each "PostgreSQL <n> or later" and each "SQL Server <year> or later" of a text, in order.
+    // The versions of each "PostgreSQL <n> or later" or "PostgreSQL <n>+" and each "SQL Server <year> or later" or
+    // "SQL Server <year>+" of a text, in order.
     internal static (List<int> Postgres, List<int> SqlServer) RestatedMinimums(string text) =>
         (
             [.. RestatedPostgresPattern().Matches(text).Select(ParsedGroup)],
@@ -479,10 +491,10 @@ public sealed partial class SupportedVersionsTests
 
     private sealed record ImageBuild(string Image, int Year, string Build);
 
-    [GeneratedRegex(@"\bPostgreSQL (\d+) or later\b")]
+    [GeneratedRegex(@"\bPostgreSQL (\d+)(?:\+| or later\b)")]
     private static partial Regex RestatedPostgresPattern();
 
-    [GeneratedRegex(@"\bSQL Server (\d{4}) or later\b")]
+    [GeneratedRegex(@"\bSQL Server (\d{4})(?:\+| or later\b)")]
     private static partial Regex RestatedSqlServerPattern();
 
     [GeneratedRegex(@"\d+(?:\.\d+)*")]

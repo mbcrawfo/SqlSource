@@ -14,7 +14,7 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 | Command, option, environment variable, exit code | `reference/cli.md` | `CliReferenceTests`, for a command, an option and a `SQLSOURCE_` variable; a reviewer, for an exit code and another variable |
 | Diagnostic | A `## SQLSRCnnn` section of `diagnostics.md`, in id order | `DiagnosticsDocumentTests` |
 | Dialect | Its rows in `reference/dialects.md` and `reference/databases/index.md`; the section of `SQLSRC019` | A reviewer |
-| Database that can be described | A folder of the five pages under `reference/databases/`; a row in `reference/databases/index.md`; a tab in every tab group that names a database; the README's list; an example project | `SiteStructureTests`, for the folder and the tabs; a reviewer, for the rest |
+| Database that can be described | A folder of the five pages under `reference/databases/`; a row in `reference/databases/index.md`; a tab in every tab group that names a database; a `README.md` note to the owner; an example project | `SiteStructureTests`, for the folder and the tabs; a reviewer, for the rest |
 | Feature that meets the line for Get started | A part of one `start/` page; its rules in Reference | A reviewer |
 | Any other feature | A reference section; a guide when it is a task; an example, as root rule 4 says | `SiteTocTests`, for a new page |
 | Limit | `## Limits` of the page that owns it, with its own anchor; a row in `guides/troubleshooting.md` | `SiteStructureTests` |
@@ -24,7 +24,7 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 - **Three folders, one job each.**  `start/` is the path of a newcomer, read in order; `guides/` holds one task on each page; `reference/` is look-up, one page for each thing.  The root holds `index.md`, the landing page and the site's root, and `diagnostics.md`.
 - **A fact has one home.**  A rule, a value, a default or a limit is stated in one reference section; every other page restates it in a sentence or two and links there.
 - **A new page** gets an entry in the `toc.yml` of its folder, under its group.  Aim at 600 to 3,500 words for a page and at most nine entries for a group; a reviewer holds both.
-- **The two packed readmes.**  `README.md` holds the outline of root rule 4, and neither readme states anything that a page of this folder does not own.
+- **The two packed readmes.**  `src/SqlSource.Tool/README.md` states nothing that a page of this folder does not own; the owner maintains `README.md`.
 - **The site.**  `tools/build-site.sh` builds it and fails on any docfx warning.  The tests are in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/`; none checks whether a page is true and free of internals.
 
 ## Write effects, never internals
