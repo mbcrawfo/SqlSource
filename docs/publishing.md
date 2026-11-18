@@ -81,7 +81,8 @@ It builds the branch it runs on, so a run on `main` between releases publishes p
 | | Allow administrators to bypass | Off |
 | GitHub Pages | Source | GitHub Actions |
 | GitHub environment `github-pages` | Deployment branches and tags | Branch `main`, tags `v*` |
-| GitHub ruleset `main` | Required status check | `ci` |
+| GitHub ruleset `main` | Target branches | The default branch and `integration/**` |
+| | Required status check | `ci` |
 
 The policy was made when `SqlSource` was the only package.  Before the first release that holds `SqlSource.Tool`, confirm on nuget.org that the policy covers a package id that does not exist yet.  If it does not, the push of the tool fails after the push of the generator has succeeded.
 
