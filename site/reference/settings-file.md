@@ -121,7 +121,7 @@ SqlSource keeps a settings file out of the output and publish folders.  Otherwis
 
 ### A settings file or a `.sql` file is ignored when the project is built through a symbolic link
 
-**What you see.**  If you name the project by a path through a symbolic link, the build can miss a settings file or a `.sql` file.  Take `dotnet build ~/code/App/App.csproj`, where `~/code` leads to `/Volumes/Data/code`:
+**What you see.**  If you name the project by a path through a symbolic link, the build can miss a settings file or a `.sql` file.  With the .NET 11 SDK, a `dotnet build` in a folder that you reached through a link names the project through it too, as `/tmp` on macOS is a link to `/private/tmp`.  Take `dotnet build ~/code/App/App.csproj`, where `~/code` leads to `/Volumes/Data/code`:
 
 - The settings files in the project's folder, and in the folders above it up to the link's own, `~/code`, apply.
 - A settings file in a folder above the link applies only if that folder is also above the folder the link leads to.  So one in `/` applies, and one in `~` does not.
@@ -135,4 +135,4 @@ SqlSource keeps a settings file out of the output and publish folders.  Otherwis
 **What to do.**  Do one of these:
 
 - Name the project by its real path.
-- Build in the folder of the project, without naming it.  For example, run `cd "$(pwd -P)"`, then `dotnet build`.
+- Build in the real folder of the project, without naming it: run `cd "$(pwd -P)"`, then `dotnet build`.
