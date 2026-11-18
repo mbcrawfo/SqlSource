@@ -120,6 +120,7 @@ public sealed class ConnectionCandidateReaderTests
         var candidate = shape.Candidates.ShouldHaveSingleItem();
         candidate.Member.ShouldBe(CandidateMember.Method);
         candidate.Type.ShouldBe(CandidateType.ConnectionString);
+        candidate.IsAsync.ShouldBeFalse();
         candidate.DeclaredTypeName.ShouldBe("System.String");
     }
 
@@ -177,6 +178,7 @@ public sealed class ConnectionCandidateReaderTests
     [InlineData("private NpgsqlConnection Open(ref CancellationToken cancellationToken) => null!;")]
     [InlineData("private int Open() => 0;")]
     [InlineData("private readonly int Open = 0;")]
+    [InlineData("private NpgsqlConnection Open(string name, CancellationToken cancellationToken) => null!;")]
     public void Read_MarkedMemberOfAnotherShape_IsUnsupported(string member)
     {
         var shape = RepositoryShapes.Of(
@@ -593,30 +595,6 @@ public sealed class ConnectionCandidateReaderTests
         );
 
         shape.Candidates.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Read_MarkedMethodWithTwoParameters_IsUnsupported()
-    {
-        var shape = RepositoryShapes.Of(
-            """
-            namespace App
-            {
-                [SqlSourceGenerate]
-                public partial class UserRepository
-                {
-                    [SqlSourceConnection]
-                    private NpgsqlConnection Open(string name, CancellationToken cancellationToken) => null!;
-                }
-            }
-            """
-        );
-
-        var candidate = shape.Candidates.ShouldHaveSingleItem();
-        candidate.Name.ShouldBe("Open");
-        candidate.Member.ShouldBe(CandidateMember.Method);
-        candidate.Type.ShouldBe(CandidateType.Unsupported);
-        candidate.IsMarked.ShouldBeTrue();
     }
 
     [Fact]
