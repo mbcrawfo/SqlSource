@@ -138,6 +138,12 @@ def test_reader_without_a_close_gives_unterminated_or_not_a_quote(reader: QuoteR
     assert reader.find_end(text, text.index(opener)) == expected
 
 
+# The row of FindEnd_ClosedIdentifier_EndsAfterItsBracket whose identifier ends the text.
+@pytest.mark.parametrize("doubled_closer_escapes", [True, False])
+def test_bracket_reader_of_an_identifier_that_ends_the_text_ends_after_its_bracket(doubled_closer_escapes):
+    assert BracketReader(doubled_closer_escapes=doubled_closer_escapes).find_end("[a]", 0) == 3
+
+
 # A code point outside the BMP where a name, a prefix or a delimiter is read, which no corpus case has.  C# reads it
 # as two surrogates, and each row is what SqlFileParser.PlanTemplating gives for it.
 @pytest.mark.parametrize(

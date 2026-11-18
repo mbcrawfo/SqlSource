@@ -353,6 +353,8 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("nodatime")]
     [InlineData("nodatime=maybe")]
     [InlineData("json=maybe")]
+    // The first entry that is not valid is the only one reported.
+    [InlineData("nodatime=maybe json=maybe")]
     [InlineData("netTopologySuites=on")]
     [InlineData("jsons=on")]
     [InlineData("=on")]
@@ -667,6 +669,7 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("Total\tnot \t Null", "Total:not null")]
     // A quoted name, for white space, a name that is a word of nullability, or a quote.
     [InlineData("\"total amount\" not null", "total amount:not null")]
+    [InlineData("\"a\" null", "a:null")]
     [InlineData("\"null\" null", "null:null")]
     [InlineData("\"not\" not null", "not:not null")]
     [InlineData("\"say \"\"hi\"\"\" null", "say \"hi\":null")]
@@ -731,6 +734,7 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("\"total null")]
     [InlineData("\"to\"tal\" null")]
     [InlineData("\"total\"x null")]
+    [InlineData("\"total\"\" null")]
     [InlineData("total\"\" null")]
     [InlineData("total amount null")]
     // A type that is not valid, or an arrow without a name.
