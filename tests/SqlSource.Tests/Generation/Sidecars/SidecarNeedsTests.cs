@@ -40,20 +40,22 @@ public sealed class SidecarNeedsTests
     [Fact]
     public void Merge_NeedsOfOneType_AreInOrdinalOrderOfTheirNames() =>
         SidecarNeeds
-            .Merge([Second])
+            .Merge([
+                Needs("app/Users.sql", new QueryNeed("a", OutputKind.Models), new QueryNeed("B", OutputKind.Models)),
+            ])
             .ShouldHaveSingleItem()
             .Queries.Select(query => query.Name)
-            .ShouldBe(["GetUser", "ListUsers"]);
+            .ShouldBe(["B", "a"]);
 
     [Fact]
     public void Merge_Files_AreSortedByPathIgnoringCase() =>
         SidecarNeeds
             .Merge([
-                Needs("app/b.sql", new QueryNeed("Q", OutputKind.Models)),
-                Needs("app/A.sql", new QueryNeed("Q", OutputKind.Models)),
+                Needs("app/B.sql", new QueryNeed("Q", OutputKind.Models)),
+                Needs("app/a.sql", new QueryNeed("Q", OutputKind.Models)),
             ])
             .Select(file => file.NormalizedPath)
-            .ShouldBe(["app/A.sql", "app/b.sql"]);
+            .ShouldBe(["app/a.sql", "app/B.sql"]);
 
     private static FileNeeds Needs(string path, params QueryNeed[] queries) =>
         new(path, new EquatableArray<QueryNeed>([.. queries]));
