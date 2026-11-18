@@ -21,7 +21,8 @@ Why use SqlSource?
 
 * Your project must target .Net 8+, use C# 12+, and compile using .Net SDK 9.0.300 or newer.
 * If using Visual Studio, VS 2022 17.14 or newer is required.
-* PostgreSQL 14+ or SQL Server 2017+.  Using another database?  You can use SqlSource to [keep your queries in .sql files](https://mbcrawfo.github.io/SqlSource/guides/other-databases.html), but model and method generation is not supported.
+* PostgreSQL 14+ or SQL Server 2017+.
+* Using another database?  You can use SqlSource to [keep your queries in .sql files](https://mbcrawfo.github.io/SqlSource/guides/other-databases.html), but model and method generation is not supported.
 
 ### Installation
 
@@ -51,7 +52,7 @@ Create the file `sqlsource.json` at the root of your repository so that SqlSourc
 }
 ```
 
-The root [sqlsource.json](https://mbcrawfo.github.io/SqlSource/reference/settings-file.html) defines default settings for the projects in your repository.  You can add additional `sqlsource.json` files in nested folder (without the `root` property) for project or folder-specific settings.  Most SqlSource can also be set or overridden in an individual `.sql` file.
+The root [sqlsource.json](https://mbcrawfo.github.io/SqlSource/reference/settings-file.html) defines default settings for the projects in your repository.  You can add additional `sqlsource.json` files in nested folders (without the `root` property) for project or folder-specific settings.  Most SqlSource settings can also be set or overridden in an individual `.sql` file.
 
 ### Create a partial repository class
 
@@ -65,7 +66,7 @@ using SqlSource;
 public sealed partial class UserRepository(NpgsqlDataSource dataSource);
 ```
 
-SqlSource automatically detects fields, properties, or primary-constructor parameters whose type extends `DbDataSource`, as well as `string` members named `ConnectionString`/`connectionString`/`_connectionString`, and use them to open connections.  It can also be [configured to use connection factories and other sources](https://mbcrawfo.github.io/SqlSource/guides/repository-connection.html).
+SqlSource will automatically detect fields, properties, or primary-constructor parameters whose type extends `DbDataSource`, as well as `string` members named `ConnectionString`/`connectionString`/`_connectionString`, and use them to open connections.  It can also be [configured to use connection factories and other sources](https://mbcrawfo.github.io/SqlSource/guides/repository-connection.html).
 
 ### Write your queries
 
