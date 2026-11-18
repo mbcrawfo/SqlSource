@@ -497,6 +497,7 @@ public sealed class SqlServerParameterBinderTests
     [InlineData("newtype", 892, 0, 0)]
     [InlineData("vector", 20, 0, 0)]
     [InlineData("vector(x)", 20, 0, 0)]
+    [InlineData("vector(3", 20, 0, 0)]
     [InlineData("decimal(300,4)", 17, 300, 4)]
     [InlineData("nvarchar(0)", 0, 0, 0)]
     public void Append_TypeWithoutABinding_BindsByValue(string name, int maxLength, int precision, int scale) =>

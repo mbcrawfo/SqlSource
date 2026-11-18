@@ -97,6 +97,8 @@ public sealed class PostgresParameterBinderTests
     [Theory]
     [InlineData("my.schema", "t")]
     [InlineData("public", "a.b")]
+    [InlineData(".schema", "t")]
+    [InlineData("public", ".b")]
     public void Append_DotInTheName_BindsItsBindName(string schema, string internalName) =>
         DataTypeNameOf(TestSidecars.Postgres(name: "t", schema: schema, internalName: internalName, bindName: "x.y"))
             .ShouldBe("    p0.DataTypeName = \"x.y\";\n");

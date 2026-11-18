@@ -6,14 +6,13 @@
 2. **Document tech debt.**  Any problem identified and not resolved, or any intentional choice that is known to be sub-optimal, must be documented in `docs/tech-debt`, in the same PR that discovers or introduces it.
 3. **Deferred minor feedback is not allowed.**  When a review gives valid but minor feedback you should not skip it.  If the fix is large enough that you hesitate to add it, ask for user input about making the change or recording it as tech debt.
 4. **Keep the docs current, each in its own place.**  A change that makes one of these documents wrong updates it in the same PR.
-   - **User documentation describes effects, never internals.**  `README.md`, `src/SqlSource.Tool/README.md` and `site/` say what a user writes, what they get and what they see: the effect on their queries, parameters, generated code and build, never how SqlSource does it.
+   - **User documentation describes effects, never internals.**  `src/SqlSource.Tool/README.md` and `site/` say what a user writes, what they get and what they see: the effect on their queries, parameters, generated code and build, never how SqlSource does it.
      - They state what SqlSource does, as fact.  No page says that a feature is coming, works "today" or is in development.  A sentence that says something is not tested, or was checked on one platform, is a fact about support and stays.
-     - A change to behaviour a user can see updates the page of the site that documents it, and `README.md` too when it changes a command, a step or a database that the README names.
-   - `README.md` is a brief introduction for a reader who arrives through the repository or nuget.org, and the site owns getting started.  It holds what SqlSource does and why, with one sample pair, the supported databases, the install commands, five short steps of use, three other ways to use it, and where the documentation is.  It holds no FAQ, no scenario, and no option but the dialect and three outputs: each step and each need is a link to the site.
-     - Nothing about developing or releasing the project belongs there; link to `CONTRIBUTING.md`.
-     - It is packed as the `SqlSource` package's readme on nuget.org, and `src/SqlSource.Tool/README.md`, the tool's short page, as `SqlSource.Tool`'s, so every link in both is an absolute URL.
-     - `ReadmeTests` in `tests/SqlSource.Repository.Tests/Documentation/` caps the size of both readmes, and fails on an install or update command of one that `site/start/install.md` does not have.
+     - A change to behaviour a user can see updates the page of the site that documents it.
+   - **The owner maintains `README.md`.**  Review it against every change you make.  Update a link into the site that moved, but bring every other change it needs, such as something to add or a statement now outdated or wrong, to the owner instead of editing it.  This holds over any other rule that says to update `README.md`.
    - **The two packed readmes have rules of their own.**
+     - `README.md` is packed as the `SqlSource` package's readme on nuget.org, and `src/SqlSource.Tool/README.md`, the tool's short page, as `SqlSource.Tool`'s, so every link in both is an absolute URL.
+     - `ReadmeTests` in `tests/SqlSource.Repository.Tests/Documentation/` caps the size of both readmes, and fails on an install or update command of one that `site/start/install.md` does not have.
      - nuget.org shows them with HTML turned off, so they hold no raw HTML and no `<a id>` line: their headings are linked by GitHub's slug, and renaming one means updating every link to it, which the link test in `tests/SqlSource.Repository.Tests/Documentation/` catches.
      - They link the manual by its site, `https://mbcrawfo.github.io/SqlSource/<folder>/<page>.html#<anchor>`, which shows the release a reader installed, never by its pages on GitHub.  A page at the root of `site/` has no folder in its address, and the site's root is the landing page.
      - Install and update commands are written for a stable release: no `--prerelease`, and no sentence about previews.  The NuGet badge is `nuget/vpre` until step 3 of `docs/publishing.md` changes it at the first stable release.
@@ -43,13 +42,11 @@
 1. **Validate before you commit.**  Every commit must pass `./pre-commit-validation.sh`, and no hook runs it for you: run it after your last edit and fix what it reports before you commit.
    - It checks only what the uncommitted change can affect and names what it skipped.
    - A run only covers the tree it ran on; an edit made after a passing run, however small, needs another run.
-2. **Never push a branch that has not passed.**  This is the rule that matters most.
-   - Before every push, run `./pre-commit-validation.sh --full` on the tree exactly as it will be pushed and see it pass; a plain run skips checks.
-   - CI runs the same checks but RoslynFloor's tests, which only the nightly runs, and runs each engine's describer tests again on that engine's oldest supported image, which the script does not: after a change to a describer or to its tests, also run that describer's project on its floor image, `SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24` for `tests/DatabaseTests/Postgres` and `SQLSOURCE_TESTS_SQLSERVER_IMAGE=mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04` for `tests/DatabaseTests/SqlServer`.
-   - CI also tests the templater on the lowest sqlfluff it allows, which the script does not: after a change to the templater, run `uv run --isolated --no-project --with-editable . --with sqlfluff==4.5.0 --with pytest==9.2.0 pytest` in `src/sqlfluff-templater-sqlsource/`.
-   - A failure in CI is one you could have found locally, and it costs a full CI run, a fix, another push and another wait.
-   - Do not push on the strength of an earlier run, of a run on another commit, or of the belief that a change is too small to break anything.
-3. **Never skip a check.**  Do not commit or push past a failure, and do not edit the script to make one go away.  If a check is wrong, tell the user.
+2. **CI validates the whole branch.**  A pull request runs every check, the floor images and the lowest sqlfluff included, but RoslynFloor's tests, which a plain run and the nightly run, and it merges only when its `ci` job passes.  No full local run is required before a push or a pull request.
+   - `./pre-commit-validation.sh --full` runs locally every check but those floors.  Run it when you want a failure found before CI, as after a change that reaches many projects.
+   - The floor runs have local commands too: the describers' in [`tests/DatabaseTests/README.md`](tests/DatabaseTests/README.md#running), the templater's in [`src/sqlfluff-templater-sqlsource/AGENTS.md`](src/sqlfluff-templater-sqlsource/AGENTS.md).
+   - When CI fails on your branch, fix it there before anything else.
+3. **Never skip a check.**  Do not commit or push past a failure you know of, and do not edit the script to make one go away.  If a check is wrong, tell the user.
 4. **It needs the full toolchain.**  The script fails when Docker is not running, uv is not installed or the local tools have not been restored.  Fix the environment; see `CONTRIBUTING.md`.
 
 ## Pull requests

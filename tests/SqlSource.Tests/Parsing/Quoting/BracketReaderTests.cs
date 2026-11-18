@@ -12,6 +12,7 @@ public sealed class BracketReaderTests
 
     [Theory]
     [InlineData("[a] x", "[a]")]
+    [InlineData("[a]", "[a]")]
     [InlineData("x.[order details] y", "[order details]")]
     [InlineData("[] x", "[]")]
     [InlineData("[a'b] x", "[a'b]")]

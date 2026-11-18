@@ -7,7 +7,7 @@ namespace SqlSource.Tests;
 public sealed class TextLinesTests
 {
     // Each of Roslyn's line breaks, a span at the start, at a line's start, across a break and inside a two-character
-    // break.
+    // break, and a text that ends in a bare `\r`.
     [Theory]
     [InlineData("a\nb", 0, 1)]
     [InlineData("a\nb", 2, 1)]
@@ -19,6 +19,8 @@ public sealed class TextLinesTests
     [InlineData("a\r\nb", 1, 3)]
     [InlineData("a\rb", 0, 3)]
     [InlineData("a\rb", 2, 1)]
+    [InlineData("a\r", 0, 2)]
+    [InlineData("a\r", 2, 0)]
     [InlineData("a\u0085b", 0, 3)]
     [InlineData("a\u0085b", 2, 1)]
     [InlineData("a\u2028b", 0, 3)]

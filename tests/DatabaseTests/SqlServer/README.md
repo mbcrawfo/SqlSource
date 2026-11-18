@@ -18,7 +18,7 @@ dotnet test --project tests/DatabaseTests/SqlServer
 SQLSOURCE_TESTS_SQLSERVER_IMAGE=mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04 dotnet test --project tests/DatabaseTests/SqlServer
 ```
 
-A change to these tests, or to the SQL Server describer, is run on both images before it is pushed.
+CI runs these tests on both images; run the floor image locally to find a failure there before CI does.
 
 SQL Server's images are built for x64 alone.  On Apple silicon Docker runs them under emulation: the first run takes minutes while the image is pulled, and a start with the image already pulled takes seconds.
 
@@ -99,7 +99,7 @@ A column that can be `NULL` says why, and an `exempt` says why the seed cannot s
 
 ### Adding a case
 
-To add a case, add its folder with a `query.sql`, a SqlSource file of one query, and a `case.json`, which holds the truth, written from the SQL and `schema.sql` and never from what the describer answers.  Add its class to `Realistic/Generation/RealisticMethods.cs`, unless the describer refuses it, which its `refusal` says, or the generator does, which its `models` says, and run `tools/describe-end-to-end.sh`, which writes its sidecar: the project does not build while a claimed query has none.  A `why` says how the `NULL` comes, and names the rows of the seed that show it.  When a column of the truth can be `NULL` and no sample shows it over the seed, add a row to `seed.sql` that makes it so, or a sample that does; `exempt` is for a `NULL` no seed can show.  Run the project on both images, since `pre-commit-validation.sh` runs the default image alone.
+To add a case, add its folder with a `query.sql`, a SqlSource file of one query, and a `case.json`, which holds the truth, written from the SQL and `schema.sql` and never from what the describer answers.  Add its class to `Realistic/Generation/RealisticMethods.cs`, unless the describer refuses it, which its `refusal` says, or the generator does, which its `models` says, and run `tools/describe-end-to-end.sh`, which writes its sidecar: the project does not build while a claimed query has none.  A `why` says how the `NULL` comes, and names the rows of the seed that show it.  When a column of the truth can be `NULL` and no sample shows it over the seed, add a row to `seed.sql` that makes it so, or a sample that does; `exempt` is for a `NULL` no seed can show.  CI runs the project on both images, and `pre-commit-validation.sh` the default image alone.
 
 SQL Server returns no row for a grouping set `()` over empty input, `ROLLUP`'s grand total among them: only an aggregate with no `GROUP BY` returns its one row over no rows.  So every row of a `ROLLUP` or of `GROUPING SETS` aggregates at least one row, and a `SUM` or `MAX` of a column that is not null is not null in it.
 
@@ -194,7 +194,7 @@ Every query writes its parameters in camelCase, `@accountId`, so that its input 
 
 `ClrTypeQueryTests` proves the binding of SQL Server's CLR types, through the package Microsoft.SqlServer.Types, which the project references for it alone: a `SqlHierarchyId`, a `SqlGeography` and a `SqlGeometry` written through the parameters of `WriteClrTypes` and read back with their values, and a `NULL` of each, and a `SqlHierarchyId` that `ListDescendants` compares in a `WHERE`.  SqlClient refuses a value of such a type unless its parameter names the type, with `ArgumentException`, "UdtTypeName property must be set for UDT parameters.", so each test but the one of `NULL`s fails on a method that sends the value alone.  It runs on every supported major, since SQL Server 2017 has the three types.  A CLR type of a user's assembly needs CLR enabled and the assembly on the server, so its binding is proved by the generator's tests alone.
 
-A change to these tests is run on both images, as [running](#running) says.
+CI runs these tests on both images, as [running](#running) says.
 
 ### Writing the sidecars
 

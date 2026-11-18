@@ -13,7 +13,7 @@
 ## Versions
 
 - **A test whose answer depends on the version branches on `PostgresDatabases.Major`, or skips by `SkipBelow` or `SkipUnlessRecordedMajor` of the container**, which call the gates of `EngineImage`.  A realistic case skips by `SkipUnlessRunsOn` and `SkipIfRefused` of `RealisticCase`, in `tests/SqlSource.Tool.Testing/Realistic/`.
-- **A change here is run on both images before it is pushed**, since `pre-commit-validation.sh` runs the default image alone.
+- **`pre-commit-validation.sh` runs the default image alone, and CI the floor image too**, so run a change whose answer depends on the version on the floor image to find its failure before CI does ([the commands](../README.md#running)).
 
 ## Statements and objects
 
