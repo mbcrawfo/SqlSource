@@ -27,7 +27,7 @@ This leaves a limitation of the reporter, which has no option to shorten or cap 
 
 ## Continuous integration
 
-The `ci` job succeeds only when every other job in `ci.yml` succeeded or was skipped.  It is the one status check to require in the `main` ruleset.
+The `ci` job succeeds only when every other job in `ci.yml` succeeded or was skipped.  It is the one status check that the `PR Required` ruleset requires.
 
 `coverage-comment.yml` always runs the version on `main`, never the one a pull request changes.  A change to it takes effect, and can first be tried, after it is merged.  A manual run of `publish.yml` on a branch runs the file but skips every job, because its `build` job runs only for a tag or `main`.  A manual run of `docs.yml` builds the branch it is started on, but the `github-pages` environment deploys from `main` and `v*` tags alone, so from any other branch it fails at the deploy.
 

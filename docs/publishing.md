@@ -81,8 +81,14 @@ It builds the branch it runs on, so a run on `main` between releases publishes p
 | | Allow administrators to bypass | Off |
 | GitHub Pages | Source | GitHub Actions |
 | GitHub environment `github-pages` | Deployment branches and tags | Branch `main`, tags `v*` |
-| GitHub ruleset `main` | Target branches | The default branch and `integration/**` |
-| | Required status check | `ci` |
+| GitHub ruleset `PR Required` | Target branches | The default branch and `refs/heads/integration/**/*` |
+| | Require a pull request before merging | On, no approvals, conversations resolved |
+| | Required status check | `ci`, branch up to date before merging |
+| | Code scanning and code quality | CodeQL errors and high or higher security alerts; code quality errors |
+| | Bypass list | Empty |
+| GitHub ruleset `Protect main` | Target branches | `refs/heads/main` |
+| | Restrict deletions, block force pushes | On |
+| | Bypass list | Empty |
 
 The policy was made when `SqlSource` was the only package.  Before the first release that holds `SqlSource.Tool`, confirm on nuget.org that the policy covers a package id that does not exist yet.  If it does not, the push of the tool fails after the push of the generator has succeeded.
 
