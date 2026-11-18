@@ -1,0 +1,21 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"mysql,ansi-quotes\" }"
+  ],
+  "input": "\"a\\\"b\" -- c\"",
+  "expected": {
+    "startDialect": "mysql",
+    "startOptions": ["ansi-quotes"],
+    "dialect": "mysql",
+    "options": ["ansi-quotes"],
+    "lexemes": [
+      ["Quoted", 0, 4],
+      ["Text", 4, 5],
+      ["Quoted", 5, 12]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

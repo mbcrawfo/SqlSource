@@ -1,0 +1,31 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: AddOrder\nINSERT INTO dbo.orders (user_id, total, note)\nOUTPUT inserted.*\nVALUES (@userId, @total, @note);\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 17],
+      ["Text", 17, 90],
+      ["Parameter", 90, 97],
+      ["Text", 97, 99],
+      ["Parameter", 99, 105],
+      ["Text", 105, 107],
+      ["Parameter", 107, 112],
+      ["Text", 112, 115]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 17, "name": null, "default": null },
+      { "kind": "parameter", "start": 90, "end": 97, "name": "userId", "default": null },
+      { "kind": "parameter", "start": 99, "end": 105, "name": "total", "default": null },
+      { "kind": "parameter", "start": 107, "end": 112, "name": "note", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

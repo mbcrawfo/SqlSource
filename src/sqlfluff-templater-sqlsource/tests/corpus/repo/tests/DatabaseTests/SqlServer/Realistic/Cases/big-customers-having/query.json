@@ -1,0 +1,32 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListBigCustomers\n-- param: @min_total decimal(12,2)\nSELECT\n    c.id,\n    c.name,\n    c.company,\n    COUNT(DISTINCT o.id) AS order_count,\n    SUM(ol.quantity * ol.unit_price) AS total_spent,\n    MAX(o.placed_at) AS last_ordered_at\nFROM dbo.customers AS c\nJOIN dbo.orders AS o ON o.customer_id = c.id\nJOIN dbo.order_lines AS ol ON ol.order_id = o.id\nWHERE o.status <> 'cancelled'\nGROUP BY c.id, c.name, c.company\nHAVING SUM(ol.quantity * ol.unit_price) > @min_total\nORDER BY total_spent DESC;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 25],
+      ["Text", 25, 26],
+      ["LineComment", 26, 60],
+      ["Text", 60, 375],
+      ["Quoted", 375, 386],
+      ["Text", 386, 462],
+      ["Parameter", 462, 472],
+      ["Text", 472, 500]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 25, "name": null, "default": null },
+      { "kind": "markerComment", "start": 26, "end": 60, "name": null, "default": null },
+      { "kind": "parameter", "start": 462, "end": 472, "name": "min_total", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

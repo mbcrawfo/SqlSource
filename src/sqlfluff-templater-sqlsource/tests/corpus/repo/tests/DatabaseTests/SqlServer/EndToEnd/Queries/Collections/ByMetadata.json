@@ -1,0 +1,40 @@
+{
+  "fileName": "ByMetadata.sql",
+  "settings": [
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The query of the collection type of the file header, ImmutableArray.  The header puts its method on the type, public.\n-- collection-type: ImmutableArray\n-- member-location: class\n-- visibility: public\n\n-- name: ListAccountsByMetadata\n-- summary: The id and name of every account, in the collection type of the file header.\n-- output-model: CollectedAccount\nSELECT id, name\nFROM dbo.accounts\nORDER BY id;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 120],
+      ["Text", 120, 121],
+      ["LineComment", 121, 155],
+      ["Text", 155, 156],
+      ["LineComment", 156, 181],
+      ["Text", 181, 182],
+      ["LineComment", 182, 203],
+      ["Text", 203, 205],
+      ["LineComment", 205, 236],
+      ["Text", 236, 237],
+      ["LineComment", 237, 325],
+      ["Text", 325, 326],
+      ["LineComment", 326, 359],
+      ["Text", 359, 407]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 121, "end": 155, "name": null, "default": null },
+      { "kind": "markerComment", "start": 156, "end": 181, "name": null, "default": null },
+      { "kind": "markerComment", "start": 182, "end": 203, "name": null, "default": null },
+      { "kind": "markerComment", "start": 205, "end": 236, "name": null, "default": null },
+      { "kind": "markerComment", "start": 237, "end": 325, "name": null, "default": null },
+      { "kind": "markerComment", "start": 326, "end": 359, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

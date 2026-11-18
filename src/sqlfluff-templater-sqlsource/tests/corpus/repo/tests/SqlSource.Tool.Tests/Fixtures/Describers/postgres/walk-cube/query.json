@@ -1,0 +1,22 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: WalkCube\nSELECT u.status, u.name, count(*) AS n\nFROM users u\nGROUP BY CUBE (u.status, u.name);\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 17],
+      ["Text", 17, 104]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 17, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

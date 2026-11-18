@@ -1,0 +1,22 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"oracle\" }"
+  ],
+  "input": "q'[it's -- x]', q'[y's]'",
+  "expected": {
+    "startDialect": "oracle",
+    "startOptions": [],
+    "dialect": "oracle",
+    "options": [],
+    "lexemes": [
+      ["Text", 0, 1],
+      ["Quoted", 1, 14],
+      ["Text", 14, 17],
+      ["Quoted", 17, 24]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

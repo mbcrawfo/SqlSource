@@ -1,0 +1,41 @@
+{
+  "fileName": "Lists.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: ByIds\nSELECT * FROM t\nWHERE id IN /* c */ @ids\n    AND kind NOT IN @kinds\n    AND tag IN -- c\n        @tags\n    AND position('@' IN @email) > 0;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 35],
+      ["Text", 35, 64],
+      ["BlockComment", 64, 71],
+      ["Text", 71, 72],
+      ["Parameter", 72, 76],
+      ["Text", 76, 97],
+      ["Parameter", 97, 103],
+      ["Text", 103, 119],
+      ["LineComment", 119, 123],
+      ["Text", 123, 132],
+      ["Parameter", 132, 137],
+      ["Text", 137, 155],
+      ["Quoted", 155, 158],
+      ["Text", 158, 162],
+      ["Parameter", 162, 168],
+      ["Text", 168, 175]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 35, "name": null, "default": null },
+      { "kind": "list", "start": 72, "end": 76, "name": "ids", "default": null },
+      { "kind": "list", "start": 97, "end": 103, "name": "kinds", "default": null },
+      { "kind": "list", "start": 132, "end": 137, "name": "tags", "default": null },
+      { "kind": "parameter", "start": 162, "end": 168, "name": "email", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

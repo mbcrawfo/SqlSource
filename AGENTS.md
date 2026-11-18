@@ -25,6 +25,7 @@
    - `docs/architecture/` explains how the components work and hand work to each other, as the code is today, for a developer who needs to understand one before changing it.  A change that makes a page wrong updates it.  Delivering a phase of query generation replaces that phase's placeholder with a description of what was built.  A new component, such as another describer, gets its page or section in the change that adds it.
    - `tests/README.md`, `tests/DatabaseTests/README.md`, `tests/DatabaseTests/Postgres/README.md`, `tests/DatabaseTests/SqlServer/README.md`, `tools/README.md` and `.github/workflows/README.md` each hold the procedures of their area.  A change to a project, script, workflow or procedure they describe updates them in the same PR.
    - **`examples/` shows what a user writes and gets.**  A change to what a user writes, gets or sees updates the example projects that show it, in the same PR, and a phase of query generation that delivers a feature adds an example of it to each example project the feature applies to.  The examples build with the solution, and their sidecars are written by `tools/describe-end-to-end.sh`.
+   - **The sqlfluff templater reads `.sql` files as SqlSource does.**  A change to SqlSource's syntax or to how it parses a file updates `src/sqlfluff-templater-sqlsource/`, its corpus and `site/guides/sqlfluff.md` in the same PR.
    - `docs/publishing.md` covers the version scheme, the release procedure and the configuration outside the repository that releasing depends on.  A change to any of those updates it.
 5. **Pin every test database to its version.**  A PostgreSQL image the tests run names a major and a minor, `postgres:18.6` and never `postgres:18`.
    - A SQL Server image names its update, `<year>-CU<n>` with `-GDR<n>` when the build has one, then `-ubuntu-<version>`, and never `-latest`, a bare year or an on-demand hotfix, and `SqlServerContainer.ImageBuilds` in `tests/DatabaseTests/TestHarness/SqlServerContainer.cs` holds the build its server reports.
@@ -45,10 +46,11 @@
 2. **Never push a branch that has not passed.**  This is the rule that matters most.
    - Before every push, run `./pre-commit-validation.sh --full` on the tree exactly as it will be pushed and see it pass; a plain run skips checks.
    - CI runs the same checks but RoslynFloor's tests, which only the nightly runs, and runs each engine's describer tests again on that engine's oldest supported image, which the script does not: after a change to a describer or to its tests, also run that describer's project on its floor image, `SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24` for `tests/DatabaseTests/Postgres` and `SQLSOURCE_TESTS_SQLSERVER_IMAGE=mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04` for `tests/DatabaseTests/SqlServer`.
+   - CI also tests the templater on the lowest sqlfluff it allows, which the script does not: after a change to the templater, run `uv run --isolated --no-project --with-editable . --with sqlfluff==4.5.0 --with pytest==9.2.0 pytest` in `src/sqlfluff-templater-sqlsource/`.
    - A failure in CI is one you could have found locally, and it costs a full CI run, a fix, another push and another wait.
    - Do not push on the strength of an earlier run, of a run on another commit, or of the belief that a change is too small to break anything.
 3. **Never skip a check.**  Do not commit or push past a failure, and do not edit the script to make one go away.  If a check is wrong, tell the user.
-4. **It needs the full toolchain.**  The script fails when Docker is not running or when the local tools have not been restored.  Fix the environment; see `CONTRIBUTING.md`.
+4. **It needs the full toolchain.**  The script fails when Docker is not running, uv is not installed or the local tools have not been restored.  Fix the environment; see `CONTRIBUTING.md`.
 
 ## Pull requests
 

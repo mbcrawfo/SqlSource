@@ -1,0 +1,20 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"postgres\" }"
+  ],
+  "input": "`a -- b` c",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["Text", 0, 3],
+      ["LineComment", 3, 10]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

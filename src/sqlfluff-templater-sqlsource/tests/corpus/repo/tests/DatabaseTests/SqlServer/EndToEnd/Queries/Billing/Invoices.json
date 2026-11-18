@@ -1,0 +1,46 @@
+{
+  "fileName": "Invoices.sql",
+  "settings": [
+    "{\n  // The queries of billing: sealed class output models, the suffix Row, and date as a DateTime.\n  \"outputModelType\": \"sealed class\",\n  \"outputModelSuffix\": \"Row\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The queries of the database billing, claimed by InvoiceQueries.  The folder's settings file gives them their model\n-- shape, their output suffix and their type override.\n-- database: billing\n-- model-namespace: SqlSource.DatabaseTests.SqlServer.EndToEnd.Billing\n\n-- name: ListInvoices\n-- summary: Every invoice, by SELECT *, in the model of the table, whose name has its schema billing.\nSELECT *\nFROM billing.invoices\nORDER BY id;\n\n-- name: GetInvoice\n-- summary: The number and payment of one invoice.\nSELECT id, number, amount, paid_at\nFROM billing.invoices\nWHERE id = @invoiceId;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 117],
+      ["Text", 117, 118],
+      ["LineComment", 118, 172],
+      ["Text", 172, 173],
+      ["LineComment", 173, 193],
+      ["Text", 193, 194],
+      ["LineComment", 194, 264],
+      ["Text", 264, 266],
+      ["LineComment", 266, 287],
+      ["Text", 287, 288],
+      ["LineComment", 288, 389],
+      ["Text", 389, 435],
+      ["LineComment", 435, 454],
+      ["Text", 454, 455],
+      ["LineComment", 455, 505],
+      ["Text", 505, 574],
+      ["Parameter", 574, 584],
+      ["Text", 584, 586]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 173, "end": 193, "name": null, "default": null },
+      { "kind": "markerComment", "start": 194, "end": 264, "name": null, "default": null },
+      { "kind": "markerComment", "start": 266, "end": 287, "name": null, "default": null },
+      { "kind": "markerComment", "start": 288, "end": 389, "name": null, "default": null },
+      { "kind": "markerComment", "start": 435, "end": 454, "name": null, "default": null },
+      { "kind": "markerComment", "start": 455, "end": 505, "name": null, "default": null },
+      { "kind": "parameter", "start": 574, "end": 584, "name": "invoiceId", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "fileName": "Cancellation.sql",
+  "settings": [
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The query of the cancellation during the read, claimed by CancellationQueries: a file of its own, since its type\n-- override names Types/CancelOnRead.cs, a type of this project alone, and the SqlClient 6.1 project links Methods.sql.\n\n-- name: ListAccountIdsCancellingOnRead\n-- summary: The ids of the accounts, each read as a CancelOnRead, whose converter cancels the token of its test, so\n-- that the read of the second row sees it cancelled.\n-- type-override: int = SqlSource.DatabaseTests.SqlServer.EndToEnd.Types.CancelOnRead\nSELECT id\nFROM dbo.accounts\nORDER BY id;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 115],
+      ["Text", 115, 116],
+      ["LineComment", 116, 235],
+      ["Text", 235, 237],
+      ["LineComment", 237, 276],
+      ["Text", 276, 277],
+      ["LineComment", 277, 392],
+      ["Text", 392, 393],
+      ["LineComment", 393, 446],
+      ["Text", 446, 447],
+      ["LineComment", 447, 532],
+      ["Text", 532, 574]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 237, "end": 276, "name": null, "default": null },
+      { "kind": "markerComment", "start": 277, "end": 392, "name": null, "default": null },
+      { "kind": "markerComment", "start": 447, "end": 532, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

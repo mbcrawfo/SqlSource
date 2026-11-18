@@ -1,0 +1,30 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: GetCustomerOrderSummary\n-- param: @customer_id int\nSELECT\n    COUNT(*) AS order_count,\n    MIN(o.placed_at) AS first_ordered_at,\n    MAX(o.placed_at) AS last_ordered_at,\n    SUM(CASE WHEN o.shipped_at IS NULL THEN 1 ELSE 0 END) AS unshipped_count\nFROM dbo.orders AS o\nWHERE o.customer_id = @customer_id;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 32],
+      ["Text", 32, 33],
+      ["LineComment", 33, 59],
+      ["Text", 59, 299],
+      ["Parameter", 299, 311],
+      ["Text", 311, 313]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 32, "name": null, "default": null },
+      { "kind": "markerComment", "start": 33, "end": 59, "name": null, "default": null },
+      { "kind": "parameter", "start": 299, "end": 311, "name": "customer_id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

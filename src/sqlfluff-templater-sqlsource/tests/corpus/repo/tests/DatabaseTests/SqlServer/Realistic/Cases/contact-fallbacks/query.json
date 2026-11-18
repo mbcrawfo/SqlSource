@@ -1,0 +1,38 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListCustomerContacts\nSELECT\n    c.id,\n    c.name,\n    ISNULL(c.email, N'') AS email,\n    COALESCE(c.company, c.name) AS display_name,\n    COALESCE(c.email, c.phone) AS reach_at,\n    NULLIF(c.phone, '') AS phone,\n    NULLIF(TRIM(c.company), N'') AS company,\n    IIF(c.email IS NOT NULL, 'email', IIF(c.phone IS NOT NULL, 'phone', 'none')) AS preferred_channel,\n    ISNULL(c.time_zone, 'UTC') AS time_zone\nFROM dbo.customers AS c\nORDER BY display_name, c.id;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 29],
+      ["Text", 29, 80],
+      ["Quoted", 80, 82],
+      ["Text", 82, 207],
+      ["Quoted", 207, 209],
+      ["Text", 209, 250],
+      ["Quoted", 250, 252],
+      ["Text", 252, 295],
+      ["Quoted", 295, 302],
+      ["Text", 302, 329],
+      ["Quoted", 329, 336],
+      ["Text", 336, 338],
+      ["Quoted", 338, 344],
+      ["Text", 344, 393],
+      ["Quoted", 393, 398],
+      ["Text", 398, 466]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 29, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

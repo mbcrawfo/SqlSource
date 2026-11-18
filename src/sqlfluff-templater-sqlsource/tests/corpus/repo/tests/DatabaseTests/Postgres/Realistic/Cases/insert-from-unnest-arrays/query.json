@@ -1,0 +1,39 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for timestamptz.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"timestamptz\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ImportProducts\nINSERT INTO products (id, sku, name, price, category_id)\nSELECT u.id, u.sku, u.name, u.price, c.id\nFROM unnest(@ids::int[], @skus::text[], @names::text[], @prices::numeric[], @category_slugs::text[])\n    AS u (id, sku, name, price, category_slug)\nLEFT JOIN categories c ON c.slug = u.category_slug\nRETURNING id, sku, name, price, category_id, discontinued_on;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 23],
+      ["Text", 23, 135],
+      ["Parameter", 135, 139],
+      ["Text", 139, 148],
+      ["Parameter", 148, 153],
+      ["Text", 153, 163],
+      ["Parameter", 163, 169],
+      ["Text", 169, 179],
+      ["Parameter", 179, 186],
+      ["Text", 186, 199],
+      ["Parameter", 199, 214],
+      ["Text", 214, 384]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 23, "name": null, "default": null },
+      { "kind": "parameter", "start": 135, "end": 139, "name": "ids", "default": null },
+      { "kind": "parameter", "start": 148, "end": 153, "name": "skus", "default": null },
+      { "kind": "parameter", "start": 163, "end": 169, "name": "names", "default": null },
+      { "kind": "parameter", "start": 179, "end": 186, "name": "prices", "default": null },
+      { "kind": "parameter", "start": 199, "end": 214, "name": "category_slugs", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

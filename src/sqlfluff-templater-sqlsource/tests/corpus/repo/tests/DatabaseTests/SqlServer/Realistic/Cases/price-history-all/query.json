@@ -1,0 +1,35 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListPriceHistory\n-- param: @product_id int null\nSELECT\n    pr.product_id,\n    p.sku,\n    pr.price,\n    pr.valid_from,\n    NULLIF(pr.valid_to, CAST('9999-12-31 23:59:59.9999999' AS datetime2)) AS replaced_at\nFROM dbo.prices FOR SYSTEM_TIME ALL AS pr\nJOIN dbo.products AS p ON p.id = pr.product_id\nWHERE @product_id IS NULL OR pr.product_id = @product_id\nORDER BY pr.product_id, pr.valid_from;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 25],
+      ["Text", 25, 26],
+      ["LineComment", 26, 56],
+      ["Text", 56, 156],
+      ["Quoted", 156, 185],
+      ["Text", 185, 311],
+      ["Parameter", 311, 322],
+      ["Text", 322, 350],
+      ["Parameter", 350, 361],
+      ["Text", 361, 401]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 25, "name": null, "default": null },
+      { "kind": "markerComment", "start": 26, "end": 56, "name": null, "default": null },
+      { "kind": "parameter", "start": 311, "end": 322, "name": "product_id", "default": null },
+      { "kind": "parameter", "start": 350, "end": 361, "name": "product_id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

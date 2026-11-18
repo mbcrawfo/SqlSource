@@ -1,0 +1,28 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: TypedByEmail\nSELECT id, dbo_email_value, hierarchyid_value\nFROM dbo.all_types\nWHERE dbo_email_value = @email AND hierarchyid_value = @node;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 21],
+      ["Text", 21, 111],
+      ["Parameter", 111, 117],
+      ["Text", 117, 142],
+      ["Parameter", 142, 147],
+      ["Text", 147, 149]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 21, "name": null, "default": null },
+      { "kind": "parameter", "start": 111, "end": 117, "name": "email", "default": null },
+      { "kind": "parameter", "start": 142, "end": 147, "name": "node", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

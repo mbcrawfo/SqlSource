@@ -1,0 +1,34 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: RetireBetween\nUPDATE dbo.users SET deleted_at = SYSUTCDATETIME() WHERE created_at < @since OR deleted_at < @since OR created_at > @since_ OR deleted_at > @since_;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 22],
+      ["Text", 22, 93],
+      ["Parameter", 93, 99],
+      ["Text", 99, 116],
+      ["Parameter", 116, 122],
+      ["Text", 122, 139],
+      ["Parameter", 139, 146],
+      ["Text", 146, 163],
+      ["Parameter", 163, 170],
+      ["Text", 170, 172]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 22, "name": null, "default": null },
+      { "kind": "parameter", "start": 93, "end": 99, "name": "since", "default": null },
+      { "kind": "parameter", "start": 116, "end": 122, "name": "since", "default": null },
+      { "kind": "parameter", "start": 139, "end": 146, "name": "since_", "default": null },
+      { "kind": "parameter", "start": 163, "end": 170, "name": "since_", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

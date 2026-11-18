@@ -1,6 +1,6 @@
 # Tools
 
-This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that builds the manual's site, a script that pulls the test images, two recording scripts and the script and program of mutation testing and of the test review, none of which is a check.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
+This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that builds the manual's site, a script that pulls the test images, the script that gives the templater its version, two recording scripts and the script and program of mutation testing and of the test review, none of which is a check.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
 
 ## Linters
 
@@ -72,13 +72,13 @@ Last, it runs `sqlsource --version` again with `DOTNET_ROLL_FORWARD` set to `Lat
 
 ## Formatting
 
-`format.sh` is at the root of the repository, and `pre-commit-validation.sh` runs it as `format.sh --check`.
+`format.sh` is at the root of the repository, and `pre-commit-validation.sh` runs it as `format.sh --check style analyzers csharpier`, and runs ruff itself, in the steps `templater lint`, `templater format` and `templater tests` (with `pytest`), when a file under `src/sqlfluff-templater-sqlsource/` changed.
 
 ```bash
-./format.sh [--check] [style|analyzers|csharpier ...] [-- file ...]
+./format.sh [--check] [style|analyzers|csharpier|ruff ...] [-- file ...]
 ```
 
-Without `--check` it rewrites files in place.  The part names choose which of `dotnet format style`, `dotnet format analyzers` and CSharpier run, always in that order, and all three run when none is given.  Files after `--`, as paths from the repository root, limit all three parts to those files: the two `dotnet format` parts take them as `--include`, and CSharpier checks them in place of the tree.  That is how a pre-commit run checks only the `.cs` files that changed.  `--` with no file after it is a usage error.
+Without `--check` it rewrites files in place.  The part names choose which of `dotnet format style`, `dotnet format analyzers`, CSharpier and `ruff` run, always in that order, and all four run when none is given.  The `ruff` part runs `uv run --locked ruff check --fix` and `uv run --locked ruff format` in `src/sqlfluff-templater-sqlsource`, or with `--check` `ruff check` and `ruff format --check`, so it needs uv, and fails on a stale `uv.lock` instead of rewriting it.  Files after `--`, as paths from the repository root, limit the three C# parts to those files: the two `dotnet format` parts take them as `--include`, and CSharpier checks them in place of the tree; `ruff` ignores them.  That is how a pre-commit run checks only the `.cs` files that changed.  `--` with no file after it is a usage error.
 
 ## Test scopes
 
@@ -104,6 +104,10 @@ To change it, edit the file and run the tests; `tests/SqlSource.Repository.Tests
 ## Pulling the test images
 
 `tools/pull-test-images.sh [image ...]` is a step of the test legs on PostgreSQL and SQL Server of `build.yml` and of the `allocation-postgres`, `allocation-sqlserver`, `sync-async-postgres` and `sync-async-sqlserver` jobs of `nightly.yml`, and no check, and `pre-commit-validation.sh` does not run it.  It runs `docker pull` once for the default image of each engine, which it reads from the lines of `tests/DatabaseTests/TestHarness/DefaultImages.cs` that declare `Postgres` and `SqlServer`, and once for each image given as an argument, and prints `<image>: <n> s` for each.  Those legs run it with no argument, after their build; each floor job pulls its own floor image with `docker pull`.  A person can run it to have every image before a first run of the tests, which on Apple silicon saves minutes of the first test.
+
+## The templater's version
+
+`tools/templater-version.sh` prints the version of the sqlfluff templater in PEP 440 form, from `VersionPrefix` in `Directory.Build.props` and the `VersionSuffix` environment variable that the workflows set for the packages: an empty suffix gives `X.Y.Z`, `beta.N` gives `X.Y.ZbN` and `pr-P.N` gives `X.Y.Z.devN`, and any other suffix is an error.  The `templater` job of `build.yml` sets the project's version to it, with `uv version --frozen`, before `uv build`; it is no check, and `pre-commit-validation.sh` does not run it.
 
 ## Building the PostGIS image
 

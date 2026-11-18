@@ -1,0 +1,28 @@
+{
+  "fileName": "MySqlNoBackslashEscapes.sql",
+  "settings": [],
+  "input": "-- dialect: mysql,no_backslash_escapes\n-- name: Plain\nSELECT 'a\\', {{col:name}}, \"b\\\" FROM users;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": ["no-backslash-escapes"],
+    "lexemes": [
+      ["LineComment", 0, 38],
+      ["Text", 38, 39],
+      ["LineComment", 39, 53],
+      ["Text", 53, 61],
+      ["Quoted", 61, 65],
+      ["Text", 65, 81],
+      ["Quoted", 81, 85],
+      ["Text", 85, 98]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 38, "name": null, "default": null },
+      { "kind": "markerComment", "start": 39, "end": 53, "name": null, "default": null },
+      { "kind": "token", "start": 67, "end": 79, "name": "col", "default": "name" }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

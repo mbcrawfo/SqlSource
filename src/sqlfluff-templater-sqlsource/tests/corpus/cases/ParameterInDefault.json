@@ -1,0 +1,30 @@
+{
+  "fileName": "ParameterInDefault.sql",
+  "settings": [],
+  "input": "-- dialect: postgres\n-- name: Page\n-- param: @page int\nSELECT * FROM t ORDER BY id {{paging:LIMIT 20 OFFSET @page}};\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 21],
+      ["LineComment", 21, 34],
+      ["Text", 34, 35],
+      ["LineComment", 35, 54],
+      ["Text", 54, 108],
+      ["Parameter", 108, 113],
+      ["Text", 113, 117]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 21, "end": 34, "name": null, "default": null },
+      { "kind": "markerComment", "start": 35, "end": 54, "name": null, "default": null },
+      { "kind": "token", "start": 83, "end": 115, "name": "paging", "default": "LIMIT 20 OFFSET @page" },
+      { "kind": "parameter", "start": 108, "end": 113, "name": "page", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

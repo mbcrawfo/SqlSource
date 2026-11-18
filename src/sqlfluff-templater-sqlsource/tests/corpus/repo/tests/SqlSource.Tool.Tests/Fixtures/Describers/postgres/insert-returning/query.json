@@ -1,0 +1,31 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: PlaceOrder\nINSERT INTO orders (user_id, total, note) VALUES (@user_id, @total, @note) RETURNING id, placed_at;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 19],
+      ["Text", 19, 70],
+      ["Parameter", 70, 78],
+      ["Text", 78, 80],
+      ["Parameter", 80, 86],
+      ["Text", 86, 88],
+      ["Parameter", 88, 93],
+      ["Text", 93, 120]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 19, "name": null, "default": null },
+      { "kind": "parameter", "start": 70, "end": 78, "name": "user_id", "default": null },
+      { "kind": "parameter", "start": 80, "end": 86, "name": "total", "default": null },
+      { "kind": "parameter", "start": 88, "end": 93, "name": "note", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "fileName": "Plain.sql",
+  "settings": [
+    "{\n  // The members of this folder's queries go on the type.\n  \"memberLocation\": \"Class\",\n}\n",
+    "{\n  // The dialect of every query of the project, unless its file names another.\n  \"dialect\": \"postgres\",\n  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models\n  // would need a sidecar beside its file.\n  \"output\": \"Sql\",\n  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.\n  \"generatorParameters\": [\"sort-input\", \"token-validation=off\"],\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- No header names this file's generator parameters, so the settings file's list applies: no keep-comments, so the\n-- comment is left out, and token-validation=off, so the method accepts the blank text of its token.\n\n-- name: Plain\nSELECT 2 /* left out by the settings file's list */ AS two{{suffix}};\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 114],
+      ["Text", 114, 115],
+      ["LineComment", 115, 215],
+      ["Text", 215, 217],
+      ["LineComment", 217, 231],
+      ["Text", 231, 241],
+      ["BlockComment", 241, 283],
+      ["Text", 283, 302]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 217, "end": 231, "name": null, "default": null },
+      { "kind": "token", "start": 290, "end": 300, "name": "suffix", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

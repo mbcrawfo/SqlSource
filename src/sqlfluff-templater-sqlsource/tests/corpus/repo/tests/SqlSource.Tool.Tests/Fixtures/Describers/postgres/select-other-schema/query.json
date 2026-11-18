@@ -1,0 +1,25 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListInvoices\nSELECT id, order_id, amount, issued_on FROM billing.invoices WHERE order_id = @order_id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 21],
+      ["Text", 21, 100],
+      ["Parameter", 100, 109],
+      ["Text", 109, 111]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 21, "name": null, "default": null },
+      { "kind": "parameter", "start": 100, "end": 109, "name": "order_id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

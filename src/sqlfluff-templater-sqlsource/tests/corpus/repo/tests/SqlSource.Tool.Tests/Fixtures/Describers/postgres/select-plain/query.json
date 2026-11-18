@@ -1,0 +1,25 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: GetEverything\nSELECT\n    u.id, u.name, u.email, u.status, u.tags, u.balance, u.created_at, u.deleted_at, u.name_upper,\n    s.flag, s.small, s.big, s.ratio, s.amount, s.code, s.label, s.born, s.at_time, s.at_local, s.span, s.token,\n    s.payload, s.document,\n    b.during, b.slots\nFROM users AS u\nCROSS JOIN samples AS s\nCROSS JOIN bookings AS b\nWHERE u.id = @id;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 22],
+      ["Text", 22, 367],
+      ["Parameter", 367, 370],
+      ["Text", 370, 372]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 22, "name": null, "default": null },
+      { "kind": "parameter", "start": 367, "end": 370, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

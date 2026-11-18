@@ -1,0 +1,44 @@
+{
+  "fileName": "CountQueries.sql",
+  "settings": [
+    "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // No settings file above this folder applies to the project.\n  \"root\": true,\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  \"typeOverrides\": {\n    // Every timestamptz is a DateTimeOffset, which Dapper reads through UtcDateTimeOffsetHandler.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"columnTypes\": {\n    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.\n    \"order_lines.order_id\": \"OrderId\",\n  },\n}\n"
+  ],
+  "input": "-- The queries of Sql/: their output is sql, set by the marker below, so each is only its SQL, a constant or a method,\n-- and needs no description, no sidecar and no connection.  The second marker names the class that holds them, which\n-- is Sql by default.\n-- output: sql\n-- nested-class: Counts\n\n-- name: CountUsers\n-- summary: The number of users.\nSELECT count(*) FROM users;\n\n-- name: CountRows\n-- summary: The number of rows of a table that the code chooses.\nSELECT count(*) FROM {{table}};\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 118],
+      ["Text", 118, 119],
+      ["LineComment", 119, 235],
+      ["Text", 235, 236],
+      ["LineComment", 236, 257],
+      ["Text", 257, 258],
+      ["LineComment", 258, 272],
+      ["Text", 272, 273],
+      ["LineComment", 273, 296],
+      ["Text", 296, 298],
+      ["LineComment", 298, 317],
+      ["Text", 317, 318],
+      ["LineComment", 318, 350],
+      ["Text", 350, 380],
+      ["LineComment", 380, 398],
+      ["Text", 398, 399],
+      ["LineComment", 399, 463],
+      ["Text", 463, 496]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 258, "end": 272, "name": null, "default": null },
+      { "kind": "markerComment", "start": 273, "end": 296, "name": null, "default": null },
+      { "kind": "markerComment", "start": 298, "end": 317, "name": null, "default": null },
+      { "kind": "markerComment", "start": 318, "end": 350, "name": null, "default": null },
+      { "kind": "markerComment", "start": 380, "end": 398, "name": null, "default": null },
+      { "kind": "markerComment", "start": 399, "end": 463, "name": null, "default": null },
+      { "kind": "token", "start": 485, "end": 494, "name": "table", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

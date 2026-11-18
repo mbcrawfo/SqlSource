@@ -1,0 +1,24 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The realistic corpus: the database realistic, and the type map's own C# type for date.\n  \"database\": \"realistic\",\n  \"typeOverrides\": {\n    \"date\": \"default\",\n  },\n}\n",
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListInvoicesWithLatestPayment\nSELECT\n    i.id,\n    i.number,\n    cu.name AS customer_name,\n    i.issued_at,\n    i.due_at,\n    i.amount,\n    lp.paid_at AS last_paid_at,\n    lp.amount AS last_paid_amount,\n    lp.method AS last_method,\n    lp.reference AS last_reference\nFROM billing.invoices AS i\nJOIN dbo.orders AS o ON o.id = i.order_id\nJOIN dbo.customers AS cu ON cu.id = o.customer_id\nOUTER APPLY (\n    SELECT TOP (1) p.paid_at, p.amount, p.method, p.reference\n    FROM billing.payments AS p\n    WHERE p.invoice_id = i.id\n    ORDER BY p.paid_at DESC, p.id DESC\n) AS lp\nWHERE i.voided_at IS NULL\nORDER BY i.issued_at, i.id;\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 38],
+      ["Text", 38, 634]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 38, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

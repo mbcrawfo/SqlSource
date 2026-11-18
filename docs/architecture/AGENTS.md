@@ -19,6 +19,7 @@ Each page is in this folder.
 | `src/SqlSource/Settings`, with `ClrTypes/`, `ColumnTypes/`, `Libraries/` and `TypeOverrides/` | `generator.md` | `## Settings` |
 | `src/SqlSource/SettingsFiles` | `generator.md` | `### Settings files`, under `## Settings` |
 | `src/SqlSource/Parsing`, with `Markers/`, `Quoting/` and `Tokens/` | `generator.md` | `## Parsing` |
+| `src/SqlSource/Parsing/Templating` | `generator.md`, `templater.md` | `### The templating plan`, under `## Parsing`; `## The plan` of `templater.md` |
 | `src/SqlSource/Diagnostics` | `generator.md` | `## Diagnostics` |
 | `src/SqlSource/Snapshot`, with `Reading/` | `generator.md`, `sidecar-format.md` | `## Snapshot`; every section of `sidecar-format.md` |
 | `src/SqlSource/Polyfills` | None | It holds the types that `netstandard2.0` lacks, and no design |
@@ -42,6 +43,7 @@ Each page is in this folder.
 | `src/SqlSource.Tool/Describing/Postgres/Walk` | `postgres-nullability.md` | `## The plan walk` |
 | `src/SqlSource.Tool/Describing/SqlServer`, with `Columns/`, `Statements/` and `Types/` | `sqlserver-describer.md` | Every section |
 | `src/SqlSource.Tool/Describing/SqlServer/Proofs` | `sqlserver-describer.md` | `## Proofs of not null` |
+| `src/sqlfluff-templater-sqlsource` | `templater.md` | Every section |
 
 A new page gets its rows here and its line in the reading guide of `README.md`, in the commit that adds it.  A new folder under `src/` gets its row in the same commit.
 
