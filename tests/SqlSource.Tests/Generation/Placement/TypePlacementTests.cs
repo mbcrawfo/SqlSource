@@ -390,45 +390,50 @@ public sealed class TypePlacementTests
     // class nested in a struct.
     [Theory]
     [InlineData(
-        "Class",
+        "class",
         "class",
         true,
         false,
         "'App.UserRepository' is a static class, which cannot have protected members"
     )]
     [InlineData(
-        "Class",
+        "class",
         "struct",
         false,
         true,
         "'App.UserRepository' is a struct, which cannot have protected members"
     )]
     [InlineData(
-        "Class",
+        "class",
         "record struct",
         false,
         true,
         "'App.UserRepository' is a struct, which cannot have protected members"
     )]
     [InlineData(
-        "NestedClass",
+        "nested-class",
         "struct",
         false,
         true,
         "'App.UserRepository' is a struct, which cannot have protected members"
     )]
-    [InlineData("Class", "class", false, true, null)]
-    [InlineData("Class", "record", false, true, null)]
-    [InlineData("NestedClass", "class", true, false, null)]
+    [InlineData("class", "class", false, true, null)]
+    [InlineData("class", "record", false, true, null)]
+    [InlineData("nested-class", "class", true, false, null)]
     public void Of_Protected_IsAnErrorOnlyWhereCSharpForbidsIt(
-        string locationName,
+        string locationText,
         string keyword,
         bool isStatic,
         bool isSealed,
         string? reason
     )
     {
-        var location = System.Enum.Parse<MemberLocation>(locationName);
+        var location = locationText switch
+        {
+            "class" => MemberLocation.Class,
+            "nested-class" => MemberLocation.NestedClass,
+            _ => throw new System.ArgumentOutOfRangeException(nameof(locationText), locationText, null),
+        };
         var type = TestModels.Type(
             types: [new TypeDeclaration(keyword, "UserRepository", "UserRepository", string.Empty, 0)],
             isStatic: isStatic,
@@ -459,7 +464,7 @@ public sealed class TypePlacementTests
                 "App.UserRepository",
                 "protected",
                 "which the file header sets",
-                PlacementChecks.TextOf(location),
+                locationText,
                 reason,
                 "-- visibility: or -- member-location:"
             ),
@@ -642,7 +647,8 @@ public sealed class TypePlacementTests
             File(
                 "Users.sql",
                 Query("GetUser", output: OutputKind.Sql, nestedClass: "Queries"),
-                Query("ListUsers", output: OutputKind.Sql, nestedClass: "Queries")
+                Query("ListUsers", output: OutputKind.Sql, nestedClass: "Queries"),
+                Query("CountUsers", output: OutputKind.Sql, nestedClass: "Queries")
             ),
             File("Orders.sql", Query("GetOrder", output: OutputKind.Sql, at: At("Orders.sql", 0)))
         );
