@@ -50,16 +50,16 @@ public sealed class ModelsByFileTests
         byFile.Files[0].Slots[1].ShouldBe([byA, byZ]);
     }
 
+    // Seventeen, since Array.Sort sorts sixteen items or fewer by insertion, which keeps equal items in their order.
     [Fact]
     public void Arrange_ModelsOfOneQueryAndRole_KeepTheSetsOrderWhenTheirPlacesAreEqual()
     {
-        var first = Model("App.First", ModelRole.Input);
-        var second = Model("App.Second", ModelRole.Input);
+        var models = Enumerable.Range(0, 17).Select(index => Model($"App.M{index}", ModelRole.Input)).ToArray();
         var place = Place("a/A.sql", 0, ModelRole.Input);
 
-        var byFile = ModelsByFile.Arrange(Set((first, place), (second, place)), TestSidecars.Of<string>());
+        var byFile = ModelsByFile.Arrange(Set([.. models.Select(model => (model, place))]), TestSidecars.Of<string>());
 
-        byFile.Files[0].Slots[0].ShouldBe([first, second]);
+        byFile.Files[0].Slots[0].ShouldBe(models);
     }
 
     [Fact]
