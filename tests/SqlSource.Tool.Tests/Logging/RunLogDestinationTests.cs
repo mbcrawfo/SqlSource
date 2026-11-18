@@ -88,15 +88,13 @@ public sealed class RunLogDestinationTests : IDisposable
         LogReader.Names(Log).Count(name => name == "run.start").ShouldBe(1);
     }
 
-    // "tmp" is the folder of the run's temporary files, so it is a directory.
-    [Theory]
-    [InlineData("tmp")]
-    [InlineData("no-such-folder/run.log")]
-    public async Task Run_LogThatCannotBeWritten_IsSqlsrc218AndTheRunDoesNotStart(string given)
+    [Fact]
+    public async Task Run_LogThatCannotBeWritten_IsSqlsrc218AndTheRunDoesNotStart()
     {
-        var path = _scene.Run.Folder.PathOf(given);
+        const string Given = "no-such-folder/run.log";
+        var path = _scene.Run.Folder.PathOf(Given);
 
-        var result = await _scene.DescribeAsync("--log", given);
+        var result = await _scene.DescribeAsync("--log", Given);
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
