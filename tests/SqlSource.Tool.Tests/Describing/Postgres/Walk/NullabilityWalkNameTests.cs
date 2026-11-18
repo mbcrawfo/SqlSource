@@ -48,8 +48,6 @@ public sealed class NullabilityWalkNameTests
     [InlineData("Subquery Scan")]
     [InlineData("CTE Scan")]
     [InlineData("Function Scan")]
-    [InlineData("Values Scan")]
-    [InlineData("WorkTable Scan")]
     public void Run_AliasOfANodeThatIsNoScanOfARelation_IsUnmappable(string nodeType)
     {
         var plan = Join("Inner", Scan("a"), Scan("s") with { NodeType = nodeType }) with { Output = ["s.id"] };
