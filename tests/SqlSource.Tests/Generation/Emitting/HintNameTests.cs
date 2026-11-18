@@ -60,7 +60,7 @@ public sealed class HintNameTests
     [Fact]
     public void MakeUnique_AmbiguousName_GainsAHashOfItsExactSpelling()
     {
-        var ambiguous = TestSidecars.Of("App.Sample.g.cs", "App.sample.g.cs");
+        var ambiguous = TestSidecars.Of("App.Other.g.cs", "App.other.g.cs", "App.Sample.g.cs", "App.sample.g.cs");
 
         // The values are fixed: a name must not change from one build to the next.
         HintName.MakeUnique("App.Sample.g.cs", ambiguous).ShouldBe("App.Sample.22B482A5.g.cs");
