@@ -37,15 +37,15 @@ No change to `src/SqlSource/Generation/Emitting` or its tests since p21's "after
 - Modify: `tests/SqlSource.Tests/Generation/Emitting/SqlServerParameterBinderTests.cs`
 - Modify: `docs/superpowers/specs/2026-11-13-test-cleanup-epic-design.md` (row 37's state)
 
-- [ ] **Step 1:** In `MakeUnique_AmbiguousName_GainsAHashOfItsExactSpelling`, the ambiguous list becomes `TestSidecars.Of("App.Other.g.cs", "App.other.g.cs", "App.Sample.g.cs", "App.sample.g.cs")`; the expected names stay.
-- [ ] **Step 2:** Add `[InlineData(".schema", "t")]` and `[InlineData("public", ".b")]` to `Append_DotInTheName_BindsItsBindName`.
-- [ ] **Step 3:** Add `[InlineData("vector(3", 20, 0, 0)]` to `Append_TypeWithoutABinding_BindsByValue`.
-- [ ] **Step 4:** Set row 37 of the epic's table to `done`.
-- [ ] **Step 5:** `./format.sh`, then the Emitting tests pass.
-- [ ] **Step 6:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 1:** In `MakeUnique_AmbiguousName_GainsAHashOfItsExactSpelling`, the ambiguous list becomes `TestSidecars.Of("App.Other.g.cs", "App.other.g.cs", "App.Sample.g.cs", "App.sample.g.cs")`; the expected names stay.
+- [x] **Step 2:** Add `[InlineData(".schema", "t")]` and `[InlineData("public", ".b")]` to `Append_DotInTheName_BindsItsBindName`.
+- [x] **Step 3:** Add `[InlineData("vector(3", 20, 0, 0)]` to `Append_TypeWithoutABinding_BindsByValue`.
+- [x] **Step 4:** Set row 37 of the epic's table to `done`.
+- [x] **Step 5:** `./format.sh`, then the Emitting tests pass.
+- [x] **Step 6:** `./pre-commit-validation.sh`, then commit.
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST` and nothing `NOT COMPARABLE`, and each of `HintName.cs:96:17`, `PostgresParameterBinder.cs:144:9`, `PostgresParameterBinder.cs:144:42`, `SqlServerParameterBinder.cs:213:16` and `SqlServerParameterBinder.cs:218:16` (the `end <= name.Length` mutants) is `Killed` in the after report.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-37/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/Generation/Emitting/**/*.cs` falls.
-- [ ] **Step 3:** The pull request gives the added input, the compare result, the coverage figures and the run times.
+- [x] **Step 1:** The mutation run with output `.../after`, then `tools/mutation-test.sh compare` of the two reports: nothing `LOST` and nothing `NOT COMPARABLE`, and each of `HintName.cs:96:17`, `PostgresParameterBinder.cs:144:9`, `PostgresParameterBinder.cs:144:42`, `SqlServerParameterBinder.cs:213:16` and `SqlServerParameterBinder.cs:218:16` (the `end <= name.Length` mutants) is `Killed` in the after report.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-37/coverage-after/SqlSource.Tests`: no file of `src/SqlSource/Generation/Emitting/**/*.cs` falls.
+- [x] **Step 3:** The pull request gives the added input, the compare result, the coverage figures and the run times.
