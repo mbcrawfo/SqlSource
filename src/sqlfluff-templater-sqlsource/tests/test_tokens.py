@@ -193,3 +193,11 @@ def test_finder_refuses_an_offset_less_than_the_last():
 
 def test_finder_gives_the_opener_of_an_ignored_name():
     assert OpenDefaultFinder("{{f:x {{g:a ").at(12) == "f"
+
+
+# A name with a format character, which the scanner does not read as a token.
+def test_finder_opens_no_default_for_a_name_that_is_not_valid():
+    finder = OpenDefaultFinder("{{a\u200bb:x ")
+
+    assert finder.at(8) is None
+    assert finder.opener_start == -1
