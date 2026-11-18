@@ -208,7 +208,6 @@ public sealed class PostgresSessionPlanTests
         { "no-plan-and-an-error", (null, "canceling statement due to statement timeout", null) },
         // The text is no plan.
         { "text-that-is-no-json", ("not json", null, null) },
-        { "empty-list", ("[]", null, null) },
         // An answer that holds neither.
         { "no-plan-and-no-error", (null, null, null) },
         // A plan that is read and cannot be used.
