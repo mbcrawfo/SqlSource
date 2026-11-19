@@ -57,7 +57,10 @@ Its class, in `Methods/OrderQueries.cs`, passes an array:
 
 ```sql postgres
 -- name: ListOrdersByStatuses
-SELECT id, status, placed_at
+SELECT
+    id,
+    status,
+    placed_at
 FROM orders
 WHERE (@statuses IS NULL OR status IN @statuses)
 ORDER BY placed_at DESC;
