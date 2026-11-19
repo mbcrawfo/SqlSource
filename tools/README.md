@@ -12,6 +12,7 @@ Each linter script runs its tool from a pinned Docker image, so they need Docker
 | `tools/shellcheck.sh` | Shell scripts, with ShellCheck |
 | `tools/shfmt.sh --check` | Shell script formatting; without `--check` it rewrites the files |
 | `tools/actionlint.sh` | GitHub Actions workflows |
+| `tools/sqlfluff.sh --check` | The `.sql` files, with sqlfluff and the templater; without `--check` it fixes them, as [sqlfluff](#sqlfluff) says |
 
 ## The site
 
@@ -72,13 +73,13 @@ Last, it runs `sqlsource --version` again with `DOTNET_ROLL_FORWARD` set to `Lat
 
 ## Formatting
 
-`format.sh` is at the root of the repository, and `pre-commit-validation.sh` runs it as `format.sh --check style analyzers csharpier`, and runs ruff itself, in the steps `templater lint`, `templater format` and `templater tests` (with `pytest`), when a file under `src/sqlfluff-templater-sqlsource/` changed.
+`format.sh` is at the root of the repository, and `pre-commit-validation.sh` runs it as `format.sh --check style analyzers csharpier`.  It runs ruff itself, in the steps `templater lint`, `templater format` and `templater tests` (with `pytest`), when a file under `src/sqlfluff-templater-sqlsource/` changed, and sqlfluff, as `tools/sqlfluff.sh --check` in the step `sqlfluff`, when a `.sql` file, a `.sqlfluff`, `.sqlfluffignore`, `tools/sqlfluff.*` or a file of the templater changed.
 
 ```bash
-./format.sh [--check] [style|analyzers|csharpier|ruff ...] [-- file ...]
+./format.sh [--check] [style|analyzers|csharpier|ruff|sql ...] [-- file ...]
 ```
 
-Without `--check` it rewrites files in place.  The part names choose which of `dotnet format style`, `dotnet format analyzers`, CSharpier and `ruff` run, always in that order, and all four run when none is given.  The `ruff` part runs `uv run --locked ruff check --fix` and `uv run --locked ruff format` in `src/sqlfluff-templater-sqlsource`, or with `--check` `ruff check` and `ruff format --check`, so it needs uv, and fails on a stale `uv.lock` instead of rewriting it.  Files after `--`, as paths from the repository root, limit the three C# parts to those files: the two `dotnet format` parts take them as `--include`, and CSharpier checks them in place of the tree; `ruff` ignores them.  That is how a pre-commit run checks only the `.cs` files that changed.  `--` with no file after it is a usage error.
+Without `--check` it rewrites files in place.  The part names choose which of `dotnet format style`, `dotnet format analyzers`, CSharpier, `ruff` and `sql` run, always in that order, and all five run when none is given.  The `sql` part runs [`tools/sqlfluff.sh`](#sqlfluff), or with `--check` `tools/sqlfluff.sh --check`, on every `.sql` file that the sqlfluff settings reach, and ignores the files after `--`.  The `ruff` part runs `uv run --locked ruff check --fix` and `uv run --locked ruff format` in `src/sqlfluff-templater-sqlsource`, or with `--check` `ruff check` and `ruff format --check`, so it needs uv, and fails on a stale `uv.lock` instead of rewriting it.  Files after `--`, as paths from the repository root, limit the three C# parts to those files: the two `dotnet format` parts take them as `--include`, and CSharpier checks them in place of the tree; `ruff` ignores them.  That is how a pre-commit run checks only the `.cs` files that changed.  `--` with no file after it is a usage error.
 
 ## sqlfluff
 

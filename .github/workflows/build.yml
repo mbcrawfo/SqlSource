@@ -64,6 +64,11 @@ jobs:
         if: ${{ !cancelled() }}
         run: tools/actionlint.sh
 
+      # sqlfluff with the templater of this checkout, which the script builds into its image.
+      - name: Lint and check the format of the SQL
+        if: ${{ !cancelled() }}
+        run: tools/sqlfluff.sh --check
+
   # The sqlfluff templater, a Python project, checked as pre-commit-validation.sh checks it, then tested again on the
   # lowest sqlfluff it allows, which that script does not, as the floor images are CI's alone, and built with the
   # run's version into the wheel and sdist that publish.yml will publish.
