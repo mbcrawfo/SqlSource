@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using Microsoft.Data.SqlClient;
@@ -127,9 +128,19 @@ internal static class ConnectionErrors
 
     // The text at open of an error that is no refused login, database or timeout: a TLS handshake that failed, a server
     // that could not be reached, or anything else.  An AuthenticationException comes inside a SqlException whose chain
-    // holds no socket's error, so the order of the two is for clarity alone.
+    // holds no socket's error, so the order of the two is for clarity alone.  On Windows SqlClient's native network layer
+    // throws neither, and its numbers are read first.
     private static string OtherAtOpen(SqlException exception)
     {
+        if (
+            OperatingSystem.IsWindows()
+            && NativeLayerText(exception.Number, ExceptionChain.Find<Win32Exception>(exception)?.NativeErrorCode)
+                is { } native
+        )
+        {
+            return native;
+        }
+
         if (ExceptionChain.Find<AuthenticationException>(exception) is not null)
         {
             return CertificateRefused;
@@ -139,6 +150,54 @@ internal static class ConnectionErrors
             ? ConnectionTexts.Unreachable(UnreachablePrefix, socket)
             : ConnectionTexts.SessionRefused;
     }
+
+    /// <summary>
+    /// The text at <c>open</c> of an error of SqlClient's native network layer, which it uses on Windows, from the
+    /// error's number and the code of the <see cref="Win32Exception" /> in its chain: the text the managed layer of
+    /// Linux and macOS gets for the same failure, or null for an error the layer does not give.
+    /// </summary>
+    /// <remarks>
+    /// The codes are those of <c>winerror.h</c>.  <c>WAIT_TIMEOUT</c> is a connect that ran out of time, and also a port
+    /// where nothing listens, since the native layer retries a refused connection until the connect timeout ends: a
+    /// probe of SqlClient 7.1.1 gave it for both.  A Winsock code is the <see cref="SocketError" /> of the same number.
+    /// </remarks>
+    internal static string? NativeLayerText(int errorNumber, int? win32Code)
+    {
+        if (errorNumber == WaitTimeout || win32Code == WaitTimeout)
+        {
+            return ConnectionTexts.ConnectTimedOut;
+        }
+
+        if (
+            HandshakeFailures.Contains(errorNumber)
+            || (win32Code is { } handshake && HandshakeFailures.Contains(handshake))
+        )
+        {
+            return CertificateRefused;
+        }
+
+        return win32Code is >= FirstWinsockCode and <= LastWinsockCode && Enum.IsDefined((SocketError)win32Code.Value)
+            ? UnreachablePrefix + ": " + (SocketError)win32Code.Value
+            : null;
+    }
+
+    // WAIT_TIMEOUT, and the range of the Winsock codes, WSABASEERR to the last of the WSA errors.
+    private const int WaitTimeout = 258;
+    private const int FirstWinsockCode = 10000;
+    private const int LastWinsockCode = 11999;
+
+    // The SSPI and certificate codes of a TLS handshake that failed: SEC_E_UNTRUSTED_ROOT, SEC_E_WRONG_PRINCIPAL,
+    // SEC_E_CERT_EXPIRED, SEC_E_ILLEGAL_MESSAGE, CERT_E_UNTRUSTEDROOT, CERT_E_EXPIRED and CERT_E_CN_NO_MATCH.
+    private static readonly HashSet<int> HandshakeFailures =
+    [
+        unchecked((int)0x80090325),
+        unchecked((int)0x80090322),
+        unchecked((int)0x80090328),
+        unchecked((int)0x80090326),
+        unchecked((int)0x800B0109),
+        unchecked((int)0x800B0101),
+        unchecked((int)0x800B010F),
+    ];
 
     /// <summary>An error of the describer's own: the text, and 0 for each number.</summary>
     public static SqlServerServerError Own(string text) => new([new SqlServerErrorRow(0, 0, 0, text)]);

@@ -4,7 +4,8 @@
 # that a tool built for .NET 8 starts on a machine whose only runtime is a later one.
 # A describer loads its driver only when it connects, so one run connects through Microsoft.Data.SqlClient to a port
 # that refuses, which loads SqlClient's copy for the platform under runtimes/.  Its native SNI, which only Windows
-# loads, is shown to be in the package by tools/check-package.sh and not shown to load.
+# loads, is shown to be in the package by tools/check-package.sh, and to load by a run on Windows, whose refusal is
+# reported by that layer.
 # It restores from the folder that holds the package and from nowhere else.
 # Usage: check-tool-install.sh [directory]   The directory holds one SqlSource.Tool.<version>.nupkg.  Without it, the
 # package is packed into a temporary directory first.
@@ -19,6 +20,8 @@ if [[ $# -gt 1 ]]; then
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/platform.sh
+source "$repo_root/tools/platform.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
@@ -129,7 +132,9 @@ fi
 
 # A project of one mssql query, and a connection to the port 1 of this machine, which refuses at once.  The tool loads
 # SqlClient to connect, and its copy for the platform must be the one it loads: the copy outside runtimes/ throws
-# PlatformNotSupportedException at the first use, which the tool reports as SQLSRC224 with another text.  The project
+# PlatformNotSupportedException at the first use, which the tool reports as SQLSRC224 with another text.  On Windows
+# SqlClient's native network layer retries a refused port until the connect timeout ends, and the text is that of a
+# connection that timed out; either text shows the copy for the platform loaded.  The project
 # imports SqlSource.props and .targets, copied from src/SqlSource/build/ with SqlSource.AfterSdk.targets, which the
 # props have the SDK import, and the repository's global.json beside them, and is never restored.
 mssql="$work/mssql"
@@ -156,13 +161,17 @@ code=0
 "$tool" describe App/App.csproj --connection 'orders=Data Source=127.0.0.1,1;Connect Timeout=5;Encrypt=False' \
     >"$work/mssql.out" 2>"$work/mssql.err" || code=$?
 summary='orders (mssql): 0 described, 0 skipped, 1 failed'
+unreachable='SqlClient could not reach the server'
+if on_windows; then
+    unreachable='the connection to the server timed out'
+fi
 if [[ "$code" -ne 1 ]] || ! grep --quiet --fixed-strings "$summary" "$work/mssql.out" ||
     ! grep --quiet ': error SQLSRC224: ' "$work/mssql.err" ||
-    ! grep --quiet --fixed-strings 'SqlClient could not reach the server' "$work/mssql.err" ||
+    ! grep --quiet --fixed-strings "$unreachable" "$work/mssql.err" ||
     grep --quiet 'SQLSRC200' "$work/mssql.err"; then
     cat "$work/mssql.out" "$work/mssql.err" >&2
     echo "check-tool-install: $COMMAND describe of an mssql query exited with $code, and not with 1 and SQLSRC224" >&2
-    echo "check-tool-install: that says SqlClient could not reach the server: SqlClient's copy did not load" >&2
+    echo "check-tool-install: that says $unreachable: SqlClient's copy did not load" >&2
     exit 1
 fi
 

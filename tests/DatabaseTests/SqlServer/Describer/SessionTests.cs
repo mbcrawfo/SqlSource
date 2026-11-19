@@ -69,7 +69,8 @@ public sealed class SessionTests(SqlServerDatabases sqlServer)
 
     // The port 1 of this machine refuses at once.  SqlClient's message names the host and the port.  On Linux SqlClient
     // gives the socket's error as Success, which names no reason, and the error the number 0, so the line is the fixed
-    // text alone there.
+    // text alone there.  On Windows SqlClient's native network layer retries a refused port until the connect timeout
+    // ends and reports WAIT_TIMEOUT, 258, which is the text of a connection that timed out.
     [Fact]
     public async Task OpenAsync_UnreachableHost_IsSqlsrc224WithNoPartOfTheValue()
     {
@@ -81,7 +82,11 @@ public sealed class SessionTests(SqlServerDatabases sqlServer)
 
         failure
             .ServerLines.ShouldHaveSingleItem()
-            .ShouldMatch(@"(^|: )SqlClient could not reach the server(: ConnectionRefused)?$");
+            .ShouldMatch(
+                OperatingSystem.IsWindows()
+                    ? "^Msg 258, Level 20, State 0: the connection to the server timed out$"
+                    : @"(^|: )SqlClient could not reach the server(: ConnectionRefused)?$"
+            );
     }
 
     // The container's certificate is its own and signed by no authority this machine trusts, so a string that asks for
