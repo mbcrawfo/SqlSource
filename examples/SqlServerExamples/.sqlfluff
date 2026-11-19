@@ -1,0 +1,3 @@
+# The sqlfluff dialect of the SQL Server queries of this folder.
+[sqlfluff]
+dialect = tsql

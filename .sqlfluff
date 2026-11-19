@@ -1,0 +1,21 @@
+# sqlfluff's settings for the repository's own .sql files, which tools/sqlfluff.sh lints and formats.  sqlfluff takes
+# its templater from the .sqlfluff of the folder it runs from alone, so this one, at the root, sets it.
+# No dialect is set here: the .sqlfluff of each folder of one SqlSource dialect sets the sqlfluff dialect that suits it,
+# so a .sql file in a folder that sets none fails the check until its folder does.
+[sqlfluff]
+templater = sqlsource
+max_line_length = 120
+# Batches.sql of the SQL Server end-to-end queries is over sqlfluff's default limit of 20,000 bytes.
+large_file_skip_byte_limit = 50000
+processes = 0
+# The rules that the test SQL breaks on purpose, or across too many files to mark each line.  examples/.sqlfluff
+# clears this list, since the examples meet every rule.
+# AL01: implicit table aliases, `FROM users u`, which most test queries use.
+# AL03: expressions without an alias, which tests use to check the column names the server gives them.
+# AM03: ORDER BY with mixed implicit and explicit directions, written as the tests need them.
+# AM04: SELECT *, which the tests use to describe every column of a table.
+# AM05: a bare JOIN, which the tests write as an inner join's shortest form.
+# RF04: keywords as names, such as `name`, `status` and `type`, which the test schemas use.
+# ST06: wildcards and simple columns after expressions in a select list, in the order the tests check.
+# ST09: join conditions written as `b.id = a.id`, an order that changes no result.
+exclude_rules = AL01, AL03, AM03, AM04, AM05, RF04, ST06, ST09

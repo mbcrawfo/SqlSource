@@ -1,0 +1,31 @@
+# The paths that tools/sqlfluff.sh never reads.
+
+# The agents' git worktrees, each a checkout of its own.
+.claude/
+
+# Build output and test results, which hold copies of the .sql files.
+bin/
+obj/
+artifacts/
+TestResults/
+
+# The templater's own project, whose corpus is written from the C# tests.
+src/sqlfluff-templater-sqlsource/
+
+# Fixtures whose exact text the tests depend on, including SQL that is invalid on purpose.
+tests/SqlSource.Tool.Tests/Fixtures/
+tests/SqlSource.Tests/Parsing/Templating/Cases/
+
+# A file of each SqlSource dialect in one folder, where one sqlfluff dialect cannot read them all, and mysql with
+# no-backslash-escapes, which no sqlfluff dialect reads.
+tests/SqlSource.Tests/EndToEnd/Dialects/
+tools/package-install/Queries/AddedByATarget.sql
+tools/package-install/Queries/ByHeader.sql
+tools/package-install/Queries/ByMarker.sql
+tools/package-install/Queries/ByOption.sql
+
+# PostgreSQL's TABLE statement, which sqlfluff's postgres dialect does not parse.
+tests/DatabaseTests/Postgres/Realistic/Cases/table-statement/
+
+# Tokens without defaults on purpose, which sqlfluff checks as their names and cannot parse.
+tests/SqlSource.Tests/EndToEnd/Tokens/Search.sql

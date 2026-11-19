@@ -1,0 +1,7 @@
+# The build's context is src/sqlfluff-templater-sqlsource; only what installing the package reads goes in.
+*
+!pyproject.toml
+!README.md
+!LICENSE
+!sqlfluff_templater_sqlsource/
+sqlfluff_templater_sqlsource/**/__pycache__
