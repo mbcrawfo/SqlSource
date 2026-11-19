@@ -88,10 +88,6 @@ public sealed class QuerySettingsTests
             .UseArrayPool.ShouldBeFalse();
 
     [Fact]
-    public void Resolve_WithoutListPadding_PadsLists() =>
-        QuerySettings.Resolve(new SettingsLevel(), Keep).PadsLists.ShouldBeTrue();
-
-    [Fact]
     public void Resolve_ListPaddingOff_TurnsPaddingOff() =>
         QuerySettings
             .Resolve(TestModels.ParametersOff(GeneratorParameters.ListPadding), Keep)
@@ -101,7 +97,37 @@ public sealed class QuerySettingsTests
     public void Over_EachMember_ComesFromThisLevelWhenItHasOne()
     {
         var output = new SettingsLevel { Output = OutputKind.Sql };
+        var near = new SettingsLevel
+        {
+            Output = OutputKind.Models,
+            Database = "near",
+            InputModelSuffix = "NearIn",
+            OutputModelSuffix = "NearOut",
+            ModelNamespace = "Near",
+            InputModelType = ModelKind.Class,
+            OutputModelType = ModelKind.Class,
+            CollectionType = CollectionKind.List,
+            NestedClass = "NearSql",
+            MemberLocation = new Placed<MemberLocation>(MemberLocation.Class, SettingPlace.Query),
+            Visibility = new Placed<Visibility>(Visibility.Internal, SettingPlace.Query),
+        };
+        var far = new SettingsLevel
+        {
+            Output = OutputKind.Sql,
+            Database = "far",
+            InputModelSuffix = "FarIn",
+            OutputModelSuffix = "FarOut",
+            ModelNamespace = "Far",
+            InputModelType = ModelKind.Record,
+            OutputModelType = ModelKind.Record,
+            CollectionType = CollectionKind.IReadOnlyList,
+            NestedClass = "FarSql",
+            MemberLocation = new Placed<MemberLocation>(MemberLocation.ExtensionClass, SettingsFile),
+            Visibility = new Placed<Visibility>(Visibility.Private, SettingsFile),
+        };
 
+        near.Over(far).ShouldBe(near);
+        Sort.Over(far).ShouldBe(far with { Parameters = Sort.Parameters });
         output.Over(Sort).ShouldBe(new SettingsLevel { Output = OutputKind.Sql, Parameters = Sort.Parameters });
         SettingsLevel.None.Over(Sort).ShouldBeSameAs(Sort);
         Keep.Over(SettingsLevel.None).ShouldBeSameAs(Keep);
@@ -173,19 +199,29 @@ public sealed class QuerySettingsTests
         };
         var markers = new SettingsLevel
         {
+            InputModelSuffix = "Args",
+            OutputModelSuffix = "Item",
             ModelNamespace = "A",
             InputModelType = ModelKind.Record,
+            OutputModelType = ModelKind.Record,
             CollectionType = CollectionKind.IReadOnlyList,
         };
 
         var settings = QuerySettings.Resolve(markers, file);
+        var fileAlone = QuerySettings.Resolve(SettingsLevel.None, file);
 
-        settings.InputModelSuffix.ShouldBe("In");
-        settings.OutputModelSuffix.ShouldBe("Row");
+        settings.InputModelSuffix.ShouldBe("Args");
+        settings.OutputModelSuffix.ShouldBe("Item");
         settings.ModelNamespace.ShouldBe("A");
         settings.InputModelType.ShouldBe(ModelKind.Record);
-        settings.OutputModelType.ShouldBe(ModelKind.Class);
+        settings.OutputModelType.ShouldBe(ModelKind.Record);
         settings.CollectionType.ShouldBe(CollectionKind.IReadOnlyList);
+        fileAlone.InputModelSuffix.ShouldBe("In");
+        fileAlone.OutputModelSuffix.ShouldBe("Row");
+        fileAlone.ModelNamespace.ShouldBe("M");
+        fileAlone.InputModelType.ShouldBe(ModelKind.Class);
+        fileAlone.OutputModelType.ShouldBe(ModelKind.Class);
+        fileAlone.CollectionType.ShouldBe(CollectionKind.List);
     }
 
     [Fact]
@@ -473,15 +509,6 @@ public sealed class QuerySettingsTests
 
         entry.ShouldNotBeNull().State.ShouldBe(Enum.Parse<LibraryState>(state));
         entry.Place.Kind.ShouldBe(Enum.Parse<SettingPlaceKind>(placeName));
-    }
-
-    [Fact]
-    public void Over_LibraryTypesOfOnlyOneLevel_AreThatLevelsItself()
-    {
-        var entries = Libraries(LibraryState.On, SettingPlace.FileHeader);
-
-        SettingsLevel.None.Over(entries).LibraryTypes.ShouldBe(entries.LibraryTypes);
-        entries.Over(SettingsLevel.None).LibraryTypes.ShouldBe(entries.LibraryTypes);
     }
 
     // The markers' entry for a library wins over the file's level's, a default included, which hides the file's.

@@ -201,7 +201,7 @@ public sealed partial class BuildFileTests
     // and every framework of a multi-targeted project, the first among them, calls the run in a configuration of its
     // own, adds the files the run wrote to FileWrites, and calls it again for the sidecars the run created.  Then it
     // takes away the sidecars the run deleted, and gives the compiler each sidecar the run created that no item names,
-    // compared by full path.
+    // compared by full path, once, by the path of its first .sql item with .json after it.
     [Fact]
     public void Targets_DescribeOnline_RunsTheToolInABuildAndGivesTheCompilerItsSidecars()
     {
@@ -277,7 +277,17 @@ public sealed partial class BuildFileTests
             .ShouldBe([
                 ("SqlSourceListedFile", "Include=@(AdditionalFiles->'%(FullPath)')"),
                 ("SqlSourceSidecarNotListed", "Include=@(SqlSourceSidecarCreated) Exclude=@(SqlSourceListedFile)"),
-                ("AdditionalFiles", "Include=@(SqlSourceSidecarNotListed)"),
+                (
+                    "SqlSourceSidecarOfSqlItem",
+                    "Include=@(AdditionalFiles->'%(FullPath).json') Condition='%(Extension)' == '.sql' "
+                        + "SqlSourceItem=%(Identity).json"
+                ),
+                (
+                    "SqlSourceSidecarNotAdded",
+                    "Include=@(SqlSourceSidecarOfSqlItem) Exclude=@(SqlSourceSidecarNotListed)"
+                ),
+                ("SqlSourceSidecarOfSqlItem", "Remove=@(SqlSourceSidecarNotAdded)"),
+                ("AdditionalFiles", "Include=@(SqlSourceSidecarOfSqlItem->Distinct()->'%(SqlSourceItem)')"),
             ]);
     }
 
