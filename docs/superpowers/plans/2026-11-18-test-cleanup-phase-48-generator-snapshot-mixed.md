@@ -22,7 +22,7 @@
 - Each new row's `at` must be the first place it is found in the whole file's text, since `ShouldBeMalformed` takes the first `IndexOf`.
 - The comparer rows must each change two keys of one parameter or type, and expect the earlier key's path, so that swapping either side of the `??` chain is seen.
 
-Checked against the spec on `d71714e6`.  Every finding still reads as the review wrote it: `SidecarComparer.cs` lines 72-74 and 144 and `SidecarTypeReader.cs` lines 98, 228, 231, 237, 240, 271, 295 and 320 are the lines the findings name.  No merged phase changed `src/SqlSource/Snapshot` or `tests/SqlSource.Tests/Snapshot` since p08 (`git log 3c6c6f4b..origin/main` on both is empty), so p08's "after" report is this phase's "before".  In that report the named survivors are `Timeout`, not `Survived`, as p08's notes predicted under load; each must be `Killed` after.
+Checked against the spec on `d71714e6`.  Every finding still reads as the review wrote it: `SidecarComparer.cs` lines 72-74 and 144 and `SidecarTypeReader.cs` lines 98, 228, 231, 237, 240, 271, 295 and 320 are the lines the findings name.  No merged phase changed `src/SqlSource/Snapshot` or `tests/SqlSource.Tests/Snapshot` since p08 (`git log 3c6c6f4b..origin/main` on both is empty), so p08's "after" report was taken as this phase's "before".  In it every survivor of the scope, the named ones included, was a `Timeout` (0 survived, 83 timeouts), so `compare` against it listed 38 survivors this phase did not touch as `LOST`; the phase ran its own "before" on this tree with the old tests instead, and keeps p08's report beside it as `before-p08`.
 
 No document names a test of the phase, and the lines that name its classes (`docs/tech-debt/TD-0089-theories-that-branch-on-their-row.md`, `src/SqlSource/Snapshot/AGENTS.md`) describe nothing the phase removes, so no document changes.
 
@@ -30,9 +30,10 @@ No document names a test of the phase, and the lines that name its classes (`doc
 
 ### Task 0: The guard's "before" half
 
-- [ ] Copy `reports/p08-generator-snapshot-after.json` (tree of `3c6c6f4b`) to `artifacts/test-cleanup/phase-48/generator-snapshot/before/reports/mutation-report.json`.
-- [ ] Coverage of `tests/SqlSource.Tests` into `artifacts/test-cleanup/phase-48/coverage-before/SqlSource.Tests`.
-- [ ] `kills` on the before report for each of the six tests: the two deleted ones kill nothing alone (`IsCurrentFor_SameHashDatabaseAndVersion_IsTrue` 0 kills; `Read_EntryWithoutRows_HasNoColumns` 153 kills, 0 alone, 11 timeouts under it).
+- [x] Copy `reports/p08-generator-snapshot-after.json` (tree of `3c6c6f4b`) to `artifacts/test-cleanup/phase-48/generator-snapshot/before-p08/reports/mutation-report.json`.
+- [x] Run the scope on this tree with the two test files of `d71714e6` into `artifacts/test-cleanup/phase-48/generator-snapshot/before`: 849 killed, 32 survived, 42 timeouts, 3 errors, 1 h 4 min, load 27 rising to 165.
+- [x] Coverage of `tests/SqlSource.Tests` into `artifacts/test-cleanup/phase-48/coverage-before/SqlSource.Tests`.
+- [x] `kills` on the before report for each of the six tests: the two deleted ones kill nothing alone (`IsCurrentFor_SameHashDatabaseAndVersion_IsTrue` 0 kills; `Read_EntryWithoutRows_HasNoColumns` 153 kills, 0 alone, 11 timeouts under it, on p08's report).
 
 ### Task 1: Apply the findings
 
@@ -41,18 +42,18 @@ No document names a test of the phase, and the lines that name its classes (`doc
 - Modify: `tests/SqlSource.Tests/Snapshot/Reading/SidecarReaderTests.cs`
 - Modify: `docs/superpowers/specs/2026-11-13-test-cleanup-epic-design.md` (row 48's state)
 
-- [ ] **Step 1 (1-01):** delete `SidecarComparerTests.IsCurrentFor_SameHashDatabaseAndVersion_IsTrue`.
-- [ ] **Step 2 (1-05):** delete `SidecarReaderTests.Read_EntryWithoutRows_HasNoColumns`.
-- [ ] **Step 3 (1-06):** `FindDifference_TwoDifferences_IsTheFirstInTheOrder` gains, before its `parameters[1].nullable` row, four rows on the `status` parameter: name and ordinal (`parameters[1].name`, kills 72:17), ordinal and type (`parameters[1].ordinal`, 73:20), type and nullable (`parameters[1].type.name`, 74:20), and a bind name with the kind (`parameters[1].type.bindName`, 144:16).
-- [ ] **Step 4 (1-07):** `Read_NullUnderEveryKeyAReaderCanDoWithout_ReadsNull`'s file gains a SQL Server entry `R` with two columns: one whose type has `'userType': null`, one whose user type has `'schema'`, `'name'` and `'assemblyQualifiedName'` null; the test asserts both types (271:63, 295:76).
-- [ ] **Step 5 (1-08):** `Read_TypeWithAValueOfAnotherJsonType_IsWrongTypeAtTheValue` gains `mssql` rows with `'name': null`, `'precision': null` and `'scale': null`, each `WrongType` at the null (228:59, 237:63, 240:59).
-- [ ] **Step 6 (1-09):** `Read_BindNameThatIsNotAString_IsWrongTypeAtTheValue` becomes a theory over `(engine, type, at, length)`: the existing PostgreSQL `3`, and `null` under `postgres`, `mssql` and `sqlite` parameter types (98:63, 231:63, 320:63).
-- [ ] **Step 7:** Row 48 of the epic's table is `done`.
-- [ ] **Step 8:** `./format.sh`, then the Snapshot tests pass: `dotnet test --project tests/SqlSource.Tests -- --filter-namespace 'SqlSource.Tests.Snapshot*'`.  The "after" mutation run is the check that each changed test fails on its mutant.
-- [ ] **Step 9:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 1 (1-01):** delete `SidecarComparerTests.IsCurrentFor_SameHashDatabaseAndVersion_IsTrue`.
+- [x] **Step 2 (1-05):** delete `SidecarReaderTests.Read_EntryWithoutRows_HasNoColumns`.
+- [x] **Step 3 (1-06):** `FindDifference_TwoDifferences_IsTheFirstInTheOrder` gains, before its `parameters[1].nullable` row, four rows on the `status` parameter: name and ordinal (`parameters[1].name`, kills 72:17), ordinal and type (`parameters[1].ordinal`, 73:20), type and nullable (`parameters[1].type.name`, 74:20), and a bind name with the kind (`parameters[1].type.bindName`, 144:16).
+- [x] **Step 4 (1-07):** `Read_NullUnderEveryKeyAReaderCanDoWithout_ReadsNull`'s file gains a SQL Server entry `R` with two columns: one whose type has `'userType': null`, one whose user type has `'schema'`, `'name'` and `'assemblyQualifiedName'` null; the test asserts both types (271:63, 295:76).
+- [x] **Step 5 (1-08):** `Read_TypeWithAValueOfAnotherJsonType_IsWrongTypeAtTheValue` gains `mssql` rows with `'name': null`, `'precision': null` and `'scale': null`, each `WrongType` at the null (228:59, 237:63, 240:59).
+- [x] **Step 6 (1-09):** `Read_BindNameThatIsNotAString_IsWrongTypeAtTheValue` becomes a theory over `(engine, type, at, length)`: the existing PostgreSQL `3`, and `null` under `postgres`, `mssql` and `sqlite` parameter types (98:63, 231:63, 320:63).
+- [x] **Step 7:** Row 48 of the epic's table is `done`.
+- [x] **Step 8:** `./format.sh`, then the Snapshot tests pass: `dotnet test --project tests/SqlSource.Tests -- --filter-namespace 'SqlSource.Tests.Snapshot*'`.  The "after" mutation run is the check that each changed test fails on its mutant.
+- [x] **Step 9:** `./pre-commit-validation.sh`, then commit.
 
 ### Task 2: The guard's "after" half
 
-- [ ] `tools/mutation-test.sh generator --output artifacts/test-cleanup/phase-48/generator-snapshot/after --tests 'FullyQualifiedName~SqlSource.Tests.Snapshot.' 'Snapshot/**/*.cs'`, then `compare` against "before": nothing `LOST` or `NOT COMPARABLE` but what the PR names with a hand check; each of the twelve named survivors `Killed`.
-- [ ] Coverage of `tests/SqlSource.Tests` into `artifacts/test-cleanup/phase-48/coverage-after/SqlSource.Tests`; no file of `src/SqlSource/Snapshot` falls.
-- [ ] Copy the "after" report to `reports/p48-generator-snapshot-after.json` and write `p48-notes.md` in the shared notes folder.
+- [x] `tools/mutation-test.sh generator --output artifacts/test-cleanup/phase-48/generator-snapshot/after --tests 'FullyQualifiedName~SqlSource.Tests.Snapshot.' 'Snapshot/**/*.cs'`: 862 killed, 27 survived, 34 timeouts, 3 errors, 1 h 2 min, load 6 rising to 76.  Each of the twelve named survivors is `Killed`.  `compare` lists two `LOST`, `SidecarTypeReader.cs:255:16` Conditional (true) and Logical, each `Timeout` before and `Survived` after, and nothing `NOT COMPARABLE`.  Both are equivalent: the reader keeps no model once `cursor.Error` is set, and `name` is set whenever it is not.  By hand, on the old tests, each mutant passes all 476 Snapshot tests in under 20 s, while its Conditional (false) twin fails 8, as the report's 8 killers say; their twins at 329:16 of `ReadOther` are `Timeout` with no killer in both runs.
+- [x] Coverage of `tests/SqlSource.Tests` into `artifacts/test-cleanup/phase-48/coverage-after/SqlSource.Tests`: 9236 tests before, 9240 after; the 22 files of `src/SqlSource/Snapshot` cover 1578 of 1600 lines before and after, each file unchanged.
+- [x] Copy the "after" report to `reports/p48-generator-snapshot-after.json` and write `p48-notes.md` in the shared notes folder.
