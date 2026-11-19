@@ -4,7 +4,9 @@
 
 -- name: ListOrdersOfUser
 -- summary: The orders of one user, in the order of their ids.
-SELECT id, status
+SELECT
+    id,
+    status
 FROM orders
 WHERE user_id = @userId
 ORDER BY id;

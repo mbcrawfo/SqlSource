@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: ListRestockCandidates\n-- param: @since datetime2(0)\nCREATE TABLE #sold (\n    product_id int NOT NULL PRIMARY KEY,\n    units int NOT NULL\n);\n\nINSERT INTO #sold (product_id, units)\nSELECT ol.product_id, SUM(ol.quantity)\nFROM dbo.order_lines AS ol\nJOIN dbo.orders AS o ON o.id = ol.order_id\nWHERE o.placed_at >= @since\n    AND o.status <> 'cancelled'\nGROUP BY ol.product_id;\n\nSELECT p.id, p.sku, p.name, s.on_hand, s.reorder_at, so.units AS units_sold\nFROM #sold AS so\nJOIN dbo.products AS p ON p.id = so.product_id\nLEFT JOIN dbo.stock AS s ON s.product_id = p.id\nORDER BY so.units DESC, p.sku;\n\nDROP TABLE #sold;\n",
+  "input": "-- name: ListRestockCandidates\n-- param: @since datetime2(0)\nCREATE TABLE #sold (\n    product_id int NOT NULL PRIMARY KEY,\n    units int NOT NULL\n);\n\nINSERT INTO #sold (product_id, units)\nSELECT\n    ol.product_id,\n    SUM(ol.quantity)\nFROM dbo.order_lines AS ol\nJOIN dbo.orders AS o ON o.id = ol.order_id\nWHERE\n    o.placed_at >= @since\n    AND o.status <> 'cancelled'\nGROUP BY ol.product_id;\n\nSELECT\n    p.id,\n    p.sku,\n    p.name,\n    s.on_hand,\n    s.reorder_at,\n    so.units AS units_sold\nFROM #sold AS so\nJOIN dbo.products AS p ON p.id = so.product_id\nLEFT JOIN dbo.stock AS s ON s.product_id = p.id\nORDER BY so.units DESC, p.sku;\n\nDROP TABLE #sold;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -15,16 +15,16 @@
       ["LineComment", 0, 30],
       ["Text", 30, 31],
       ["LineComment", 31, 60],
-      ["Text", 60, 318],
-      ["Parameter", 318, 324],
-      ["Text", 324, 345],
-      ["Quoted", 345, 356],
-      ["Text", 356, 620]
+      ["Text", 60, 330],
+      ["Parameter", 330, 336],
+      ["Text", 336, 357],
+      ["Quoted", 357, 368],
+      ["Text", 368, 656]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 30, "name": null, "default": null },
       { "kind": "markerComment", "start": 31, "end": 60, "name": null, "default": null },
-      { "kind": "parameter", "start": 318, "end": 324, "name": "since", "default": null }
+      { "kind": "parameter", "start": 330, "end": 336, "name": "since", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListAccountSpending": {
-      "hash": "0450cd1a46e79d591576ba02da35168223d7a67b2b4159505fc8791d61541d14",
+      "hash": "5cdcfd7a2b1cf8da7f70153199bc34327b0b1e98ce0a8d27c8c6f5e011eaf43f",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

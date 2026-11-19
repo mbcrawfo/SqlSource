@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListOrdersWithLines": {
-      "hash": "5bccf28cf7ee09b3b22954a756f57d9df3410f05f5c612d3cb534c07d07b467a",
+      "hash": "8b8e1691de59631a34aeee56519bcc7efbb231960f21b7f43757e9aa9abe5385",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "WriteClrTypes": {
-      "hash": "8ab0dc179d1eebc0a8eb04ffa6a7347987013a55609db133454378e61d83864e",
+      "hash": "2e80342703a5334045d0e5fbee0c4aec34fa64f8711a4e1399f684de106b7e53",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "mssql",
@@ -131,7 +131,7 @@
       ]
     },
     "ListDescendants": {
-      "hash": "4c30b33481ec012e70a5a2abe2d0f26deca00467a21d421d6eb65ef827532071",
+      "hash": "c6ec4b64a501258c7995075d0fb8739916f47fa9481871985fdfca362483fef6",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "mssql",

@@ -37,7 +37,9 @@ Use a token when your code chooses a whole clause at run time, such as the order
 
 ```sql postgres
 -- name: ListUsersSortedBy
-SELECT id, name
+SELECT
+    id,
+    name
 FROM users
 ORDER BY {{orderBy:name}};
 ```

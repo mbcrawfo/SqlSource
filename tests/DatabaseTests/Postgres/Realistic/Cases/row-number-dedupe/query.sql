@@ -1,5 +1,10 @@
 -- name: ListLatestOrderPerOpenAccount
-SELECT s.account_id, s.name, s.order_id, s.placed_at, s.shipped_at
+SELECT
+    s.account_id,
+    s.name,
+    s.order_id,
+    s.placed_at,
+    s.shipped_at
 FROM (
     SELECT
         a.id AS account_id,

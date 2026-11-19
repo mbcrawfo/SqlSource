@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "UpsertStock": {
-      "hash": "b8ac3de7b29228271adec6434ce348d9d2eb9fce74da52c89ca35ad12f1aae5a",
+      "hash": "4d1adaba34daf92cc510db5495fe35a37c939fccd5209e5be85843389223d7fa",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

@@ -5,7 +5,10 @@ SqlSource keeps the SQL of your C# project in `.sql` files, out of your code fil
 ```sql postgres
 -- name: GetUser -> one-optional
 -- summary: One user, or null.
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 WHERE id = @userId;
 ```

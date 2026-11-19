@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "FindUserByEmail": {
-      "hash": "f37aec7c9e29ecbd2723c6a5e8339fa2265afac8ea05f9091902cec9430aec5d",
+      "hash": "716a55c163bdc8a76691a70bd8640efb73db82f66f016073c352abd0e3513686",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",
@@ -210,7 +210,7 @@
       ]
     },
     "ListUsersNewestFirst": {
-      "hash": "84d1e954292d7144f20d0cfa0ffdeec99d3f853ff7e14dfb8eb4b225a677ba6b",
+      "hash": "e0629665bddae37d838fc2a51ac78e557b98608a2fd5acc5688b7f76ea119dff",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",
@@ -287,7 +287,7 @@
       ]
     },
     "StreamUsersOldestFirst": {
-      "hash": "59c470c8286054693b6b49faa1468616c503d87c2683b61c4369f55679dfa256",
+      "hash": "1edb1733d3bdba6a9b6f970024792ecf5dd4c3da226f0a59a2a3352a5a5f2b29",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",
@@ -364,7 +364,7 @@
       ]
     },
     "ListUsersSortedBy": {
-      "hash": "b741e0b71d7732f2ecfc31d260ca30b48e202e7a48b0cbce3dffa5a67a5d4590",
+      "hash": "59abdb927ee4ee9a142153181d0381ce9b1739ca9e38731e83ed2c6765d5ec3b",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",

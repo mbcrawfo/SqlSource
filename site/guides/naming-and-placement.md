@@ -14,7 +14,10 @@ If you want `GetUserAsync` in place of `GetUser`, turn on the Async suffix with 
 -- generator: async-method-suffix
 
 -- name: GetUser -> one-optional
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 WHERE id = @userId;
 ```
@@ -113,9 +116,12 @@ If you want a list, such as `List<T>` or `IReadOnlyList<T>`, in place of an arra
 ```sql postgres
 -- name: ListUsersNewestFirst
 -- collection-type: IReadOnlyList
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
-ORDER BY created_at DESC, id;
+ORDER BY created_at DESC, id ASC;
 ```
 
 **What you get.**  The method of `ListUsersNewestFirst` returns `Task<IReadOnlyList<ListUsersNewestFirstDto>>`.  For a `List<T>` that you can add to, write `-- collection-type: List`.
@@ -135,7 +141,10 @@ If you want to know where the methods go, or want them `internal` or on your cla
 -- name: ListOrdersOfUser -> many
 -- member-location: class
 -- visibility: public
-SELECT id, placed_at, shipped_at
+SELECT
+    id,
+    placed_at,
+    shipped_at
 FROM orders
 WHERE user_id = @userId
 ORDER BY placed_at DESC;

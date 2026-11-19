@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListOpenAccountsWithRecentEvents": {
-      "hash": "9ecd812f75466fbd04fb25d30c809d56e3bf7ac7d7294bf3d88ef0ffc50b14ea",
+      "hash": "9a88482a42ebffe11e9f1c26c075d6ab3ed37e0788c384c5414ab4e6961ff17f",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

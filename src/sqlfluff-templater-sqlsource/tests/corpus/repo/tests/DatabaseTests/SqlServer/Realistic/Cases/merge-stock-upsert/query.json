@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: UpsertStock\n-- param: @product_id int\n-- param: @on_hand int\n-- param: @reorder_at int null\nMERGE dbo.stock WITH (HOLDLOCK) AS s\nUSING (VALUES (@product_id, @on_hand, @reorder_at)) AS src (product_id, on_hand, reorder_at)\n    ON s.product_id = src.product_id\nWHEN MATCHED THEN\n    UPDATE SET s.on_hand = src.on_hand, s.reorder_at = src.reorder_at, s.updated_at = SYSUTCDATETIME()\nWHEN NOT MATCHED THEN\n    INSERT (product_id, on_hand, reorder_at, updated_at)\n    VALUES (src.product_id, src.on_hand, src.reorder_at, SYSUTCDATETIME())\nOUTPUT\n    $action AS change,\n    inserted.product_id,\n    inserted.on_hand,\n    inserted.reorder_at,\n    inserted.updated_at,\n    deleted.on_hand AS previous_on_hand,\n    deleted.reorder_at AS previous_reorder_at,\n    deleted.updated_at AS previous_updated_at;\n",
+  "input": "-- name: UpsertStock\n-- param: @product_id int\n-- param: @on_hand int\n-- param: @reorder_at int null\nMERGE dbo.stock WITH (HOLDLOCK) AS s\nUSING (VALUES (@product_id, @on_hand, @reorder_at)) AS src(product_id, on_hand, reorder_at)\n    ON s.product_id = src.product_id\nWHEN MATCHED\n    THEN\n    UPDATE SET s.on_hand = src.on_hand, s.reorder_at = src.reorder_at, s.updated_at = SYSUTCDATETIME()\nWHEN NOT MATCHED\n    THEN\n    INSERT (product_id, on_hand, reorder_at, updated_at)\n    VALUES (src.product_id, src.on_hand, src.reorder_at, SYSUTCDATETIME())\nOUTPUT\n    $action AS change,\n    INSERTED.product_id,\n    INSERTED.on_hand,\n    INSERTED.reorder_at,\n    INSERTED.updated_at,\n    DELETED.on_hand AS previous_on_hand,\n    DELETED.reorder_at AS previous_reorder_at,\n    DELETED.updated_at AS previous_updated_at;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -25,7 +25,7 @@
       ["Parameter", 166, 174],
       ["Text", 174, 176],
       ["Parameter", 176, 187],
-      ["Text", 187, 805]
+      ["Text", 187, 812]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },

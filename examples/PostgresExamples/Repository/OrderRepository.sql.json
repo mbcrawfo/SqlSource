@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListOrdersOfUser": {
-      "hash": "b6eb0993f5ecd6916cb800eec0ba1d061aea1331a92c761af14469b4e569cd4c",
+      "hash": "a11ac724c5d24339c0fd1949f769051b53078c0c30a9456b21b3b7bbcab71fad",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",

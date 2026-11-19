@@ -12,10 +12,16 @@
 -- param: @shape null
 DECLARE @written TABLE (node hierarchyid NULL, place geography NULL, shape geometry NULL);
 INSERT INTO @written (node, place, shape) VALUES (@node, @place, @shape);
-SELECT node, place, shape FROM @written;
+SELECT
+    node,
+    place,
+    shape
+FROM @written;
 
 -- name: ListDescendants
 -- summary: The nodes of a tree that descend from a node, the node itself among them, in the order of the tree.
 DECLARE @tree TABLE (node hierarchyid NOT NULL);
 INSERT INTO @tree (node) VALUES ('/'), ('/1/'), ('/1/1/'), ('/1/2/'), ('/2/');
-SELECT node FROM @tree WHERE node.IsDescendantOf(@ancestor) = 1 ORDER BY node;
+SELECT node FROM @tree
+WHERE node.IsDescendantOf(@ancestor) = 1
+ORDER BY node;

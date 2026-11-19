@@ -137,7 +137,7 @@ Counts are of findings.  The guard is **mutation** (the scope's run before and a
 | 45 | [generator-parsing-strengthen](2026-11-13-test-cleanup-phase-45-generator-parsing-strengthen-design.md) | `tests/SqlSource.Tests/Parsing` |  |  | 6 |  |  | mutation: `generator-parsing` | done |
 | 46 | [generator-settings-strengthen](2026-11-13-test-cleanup-phase-46-generator-settings-strengthen-design.md) | `tests/SqlSource.Tests/Settings` |  |  | 10 |  |  | mutation: `generator-settings`; covers and run time for 3 | done |
 | 47 | [generator-settings-mixed](2026-11-13-test-cleanup-phase-47-generator-settings-mixed-design.md) | `tests/SqlSource.Tests/Settings` | 3 | 1 | 3 |  |  | mutation: `generator-settings` | done |
-| 48 | [generator-snapshot-mixed](2026-11-13-test-cleanup-phase-48-generator-snapshot-mixed-design.md) | `tests/SqlSource.Tests/Snapshot` | 2 |  | 4 |  |  | mutation: `generator-snapshot` | not started |
+| 48 | [generator-snapshot-mixed](2026-11-13-test-cleanup-phase-48-generator-snapshot-mixed-design.md) | `tests/SqlSource.Tests/Snapshot` | 2 |  | 4 |  |  | mutation: `generator-snapshot` | done |
 | 49 | [tool-commands-strengthen](2026-11-13-test-cleanup-phase-49-tool-commands-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Commands` |  |  | 1 |  |  | mutation: `tool-root` | done |
 | 50 | [tool-commands-mixed](2026-11-13-test-cleanup-phase-50-tool-commands-mixed-design.md) | `tests/SqlSource.Tool.Tests/Commands` | 2 | 3 | 1 |  |  | mutation: `tool-root`; covers and run time for 4 | done |
 | 51 | [tool-bundles-renaming-strengthen](2026-11-13-test-cleanup-phase-51-tool-bundles-renaming-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Bundles/Renaming` |  |  | 2 |  |  | mutation: `tool-bundles-renaming` | not started |

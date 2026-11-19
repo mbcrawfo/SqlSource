@@ -413,6 +413,8 @@ public sealed class SidecarReaderTests
         var type =
             "{'name': 'n', 'kind': 'base', 'schema': 's', 'internalName': 'i', 'length': null, 'precision': null"
             + ", 'scale': null, 'element': null, 'base': null, 'labels': null, 'subtype': null}";
+
+        // The SQL Server entry R holds the keys only a SQL Server type has: its user type and that type's keys.
         var text = Q(
             "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', "
                 + "'toolVersion': '1.2.0', 'engine': 'postgres'"
@@ -422,10 +424,20 @@ public sealed class SidecarReaderTests
                 + ", 'columns': [{'ordinal': 0, 'name': 'id', 'type': "
                 + type
                 + ", 'nullable': null, 'nullableSource': null, 'origin': {'schema': null, 'table': null"
-                + ", 'column': null}, 'identity': null, 'computed': null}]}}}"
+                + ", 'column': null}, 'identity': null, 'computed': null}]}"
+                + ", 'R': {'hash': 'h', 'toolVersion': '1.2.0', 'engine': 'mssql', 'resultKind': 'rows'"
+                + ", 'parameters': [], 'columns': [{'ordinal': 0, 'name': 'a', 'type': {'name': 'int'"
+                + ", 'maxLength': 4, 'precision': 10, 'scale': 0, 'userType': null}, 'nullable': null}"
+                + ", {'ordinal': 1, 'name': 'b', 'type': {'name': 'int', 'maxLength': 4, 'precision': 10, 'scale': 0"
+                + ", 'userType': {'schema': null, 'name': null, 'assemblyQualifiedName': null}}, 'nullable': null}]}}}"
         );
 
-        var entry = ShouldBeRead(text).Queries[0];
+        var read = ShouldBeRead(text);
+        var entry = read.Queries[0];
+        var sqlServerColumns = read.Queries[1].Columns.ShouldNotBeNull();
+
+        sqlServerColumns[0].Type.ShouldBe(SqlServer());
+        sqlServerColumns[1].Type.ShouldBe(SqlServer(userType: new SqlServerUserType(null, null, null)));
 
         entry.ShouldBe(
             Entry(
@@ -599,10 +611,31 @@ public sealed class SidecarReaderTests
     )]
     [InlineData(
         "mssql", /*lang=json*/
+        "{'name': null, 'maxLength': 4, 'precision': 10, 'scale': 0}",
+        "null, 'maxLength'",
+        4,
+        "name"
+    )]
+    [InlineData(
+        "mssql", /*lang=json*/
         "{'name': 'int', 'maxLength': null, 'precision': 10, 'scale': 0}",
         "null, 'precision'",
         4,
         "maxLength"
+    )]
+    [InlineData(
+        "mssql", /*lang=json*/
+        "{'name': 'int', 'maxLength': 4, 'precision': null, 'scale': 0}",
+        "null, 'scale'",
+        4,
+        "precision"
+    )]
+    [InlineData(
+        "mssql", /*lang=json*/
+        "{'name': 'int', 'maxLength': 4, 'precision': 10, 'scale': null}",
+        "null}, 'nullable'",
+        4,
+        "scale"
     )]
     [InlineData(
         "mssql", /*lang=json*/
@@ -1105,27 +1138,6 @@ public sealed class SidecarReaderTests
     }
 
     [Fact]
-    public void Read_EntryWithoutRows_HasNoColumns()
-    {
-        var text = Q(
-            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', "
-                + "'toolVersion': '1.2.0', 'engine': 'mssql'"
-                + ", 'database': 'app', 'serverVersion': '16.4', 'resultKind': 'none', 'parameters': []}}}"
-        );
-
-        WithoutSpans(ShouldBeRead(text))
-            .ShouldBe(
-                SidecarOf(
-                    Entry(
-                        toolVersion: "1.2.0",
-                        engine: SidecarValues.Engine.SqlServer,
-                        resultKind: SidecarResultKind.None
-                    )
-                )
-            );
-    }
-
-    [Fact]
     public void Read_NoQueries_IsAnEmptySidecar() =>
         ShouldBeRead(
             Q( /*lang=json*/
@@ -1212,18 +1224,38 @@ public sealed class SidecarReaderTests
         );
     }
 
-    [Fact]
-    public void Read_BindNameThatIsNotAString_IsWrongTypeAtTheValue() =>
-        ShouldBeMalformed(
-            ParameterFileOf(
-                "postgres", /*lang=json*/
-                "{'name': 'integer', 'bindName': 3, 'kind': 'base', 'schema': 'pg_catalog', 'internalName': 'int4'}"
-            ),
-            SidecarErrorKind.WrongType,
-            "3,",
-            1,
-            "bindName"
-        );
+    // null is not a string either: no engine's reader takes a parameter type's bind name as null.
+    [Theory]
+    [InlineData(
+        "postgres", /*lang=json*/
+        "{'name': 'integer', 'bindName': 3, 'kind': 'base', 'schema': 'pg_catalog', 'internalName': 'int4'}",
+        "3,",
+        1
+    )]
+    [InlineData(
+        "postgres", /*lang=json*/
+        "{'name': 'integer', 'bindName': null, 'kind': 'base', 'schema': 'pg_catalog', 'internalName': 'int4'}",
+        "null, 'kind'",
+        4
+    )]
+    [InlineData(
+        "mssql", /*lang=json*/
+        "{'name': 'int', 'bindName': null, 'maxLength': 4, 'precision': 10, 'scale': 0}",
+        "null, 'maxLength'",
+        4
+    )]
+    [InlineData(
+        "sqlite", /*lang=json*/
+        "{'name': 'INTEGER', 'bindName': null}",
+        "null}",
+        4
+    )]
+    public void Read_BindNameThatIsNotAString_IsWrongTypeAtTheValue(
+        string engine,
+        string type,
+        string at,
+        int length
+    ) => ShouldBeMalformed(ParameterFileOf(engine, type), SidecarErrorKind.WrongType, at, length, "bindName");
 
     // A file with one column of one type, under an engine.
     private static string FileOf(string engine, string type) =>

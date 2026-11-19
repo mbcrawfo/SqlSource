@@ -34,7 +34,10 @@ VALUES (@orderId, @deliveredAt, @location, @details);
 -- class.  order_id is left out: the table's columns in its own order would give the rows the table's model,
 -- DeliveriesDto.
 -- column: details -> DeliveryDetails
-SELECT delivered_at, location, details
+SELECT
+    delivered_at,
+    location,
+    details
 FROM deliveries
 WHERE order_id = @orderId;
 ```
@@ -124,7 +127,11 @@ VALUES (@orderId, @deliveredAt, @location, @details, @events);
 -- class.  order_id is left out: the table's columns in its own order would give the rows the table's model,
 -- DeliveriesDto.
 -- column: details -> DeliveryDetails
-SELECT delivered_at, location, details, events
+SELECT
+    delivered_at,
+    location,
+    details,
+    events
 FROM deliveries
 WHERE order_id = @orderId;
 ```
@@ -150,7 +157,10 @@ Reference `Npgsql.NetTopologySuite`, and call `UseNetTopologySuite()` on the dat
 -- class.  order_id is left out: the table's columns in its own order would give the rows the table's model,
 -- DeliveriesDto.
 -- column: details -> DeliveryDetails
-SELECT delivered_at, location, details
+SELECT
+    delivered_at,
+    location,
+    details
 FROM deliveries
 WHERE order_id = @orderId;
 ```
@@ -208,7 +218,11 @@ Reference `NetTopologySuite.IO.SqlServerBytes` and NetTopologySuite 2.5.0 or lat
 -- class.  order_id is left out: the table's columns in its own order would give the rows the table's model,
 -- DeliveriesDto.
 -- column: details -> DeliveryDetails
-SELECT delivered_at, location, details, events
+SELECT
+    delivered_at,
+    location,
+    details,
+    events
 FROM deliveries
 WHERE order_id = @orderId;
 ```

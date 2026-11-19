@@ -4,7 +4,7 @@
     "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // The output of every .sql file of this folder: models, so that each query gets its SQL and its models.\n  \"output\": \"models\",\n}\n",
     "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // No settings file above this folder applies to the project.\n  \"root\": true,\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  \"typeOverrides\": {\n    // Every timestamptz is a DateTimeOffset, which Dapper reads through UtcDateTimeOffsetHandler.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"columnTypes\": {\n    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.\n    \"order_lines.order_id\": \"OrderId\",\n  },\n}\n"
   ],
-  "input": "-- The queries of the users, with the output models of this folder's sqlsource.json.\n\n-- name: GetUser\n-- summary: One user, every column of the table.\nSELECT *\nFROM users\nWHERE id = @userId;\n",
+  "input": "-- The queries of the users, with the output models of this folder's sqlsource.json.\n\n-- name: GetUser\n-- summary: One user, every column of the table.\n-- Every column of the table, which its table model takes as it is.\nSELECT *  -- noqa: AM04\nFROM users\nWHERE id = @userId;\n",
   "expected": {
     "startDialect": "postgres",
     "startOptions": [],
@@ -16,14 +16,18 @@
       ["LineComment", 86, 102],
       ["Text", 102, 103],
       ["LineComment", 103, 151],
-      ["Text", 151, 183],
-      ["Parameter", 183, 190],
-      ["Text", 190, 192]
+      ["Text", 151, 152],
+      ["LineComment", 152, 219],
+      ["Text", 219, 230],
+      ["LineComment", 230, 243],
+      ["Text", 243, 266],
+      ["Parameter", 266, 273],
+      ["Text", 273, 275]
     ],
     "spans": [
       { "kind": "markerComment", "start": 86, "end": 102, "name": null, "default": null },
       { "kind": "markerComment", "start": 103, "end": 151, "name": null, "default": null },
-      { "kind": "parameter", "start": 183, "end": 190, "name": "userId", "default": null }
+      { "kind": "parameter", "start": 266, "end": 273, "name": "userId", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

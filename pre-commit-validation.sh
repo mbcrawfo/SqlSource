@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Runs the validations that the uncommitted change could break: formatting, linting, the manual's site, build, tests
-# and the three package checks, and for the sqlfluff templater in src/sqlfluff-templater-sqlsource/ its three checks,
-# ruff check, ruff format --check and pytest, through uv.  A step or a pair of container test projects is skipped when
-# nothing in the change reaches them.
+# and the three package checks, for the sqlfluff templater in src/sqlfluff-templater-sqlsource/ its three checks,
+# ruff check, ruff format --check and pytest, through uv, and sqlfluff on the .sql files, through tools/sqlfluff.sh.
+# A step or a pair of container test projects is skipped when nothing in the change reaches them.
 # --full runs everything, as a clean tree, a change to this script and a changed path of no known kind do.
 # Rewrites nothing.  Every step runs even when an earlier one fails, except that the tests and the package checks are
 # skipped when the build fails, and the package checks when the pack fails.
@@ -47,9 +47,10 @@ is_known_kind() {
     src/sqlfluff-templater-sqlsource/*) return ;;
     *.cs | *.csproj | *.props | *.targets | *.slnx | *.md | *.sql | *.json | *.sh | *.txt) return ;;
     .github/workflows/*.yml | .github/workflows/*.yaml | examples/*/docker-compose.yml | site/*.yml) return ;;
+    tools/sqlfluff.Dockerfile | tools/sqlfluff.Dockerfile.dockerignore) return ;;
     esac
     case "${1##*/}" in
-    .editorconfig | .gitignore | .worktreeinclude) return ;;
+    .editorconfig | .gitignore | .worktreeinclude | .sqlfluff | .sqlfluffignore) return ;;
     esac
     known=false
 }
@@ -187,6 +188,7 @@ postgres_trigger=''
 sqlserver_trigger=''
 packages_trigger=''
 templater_trigger=''
+sql_trigger=''
 for path in ${changes[@]+"${changes[@]}"}; do
     is_known_kind "$path"
     formats_everything "$path"
@@ -211,6 +213,15 @@ for path in ${changes[@]+"${changes[@]}"}; do
     # uv runs ruff and pytest in the project's folder, from its .python-version and uv.lock.
     # format.sh runs the templater's ruff steps too, so a change to it sets off the templater's checks.
     if [[ "$path" == src/sqlfluff-templater-sqlsource/* || "$path" == format.sh ]]; then first templater_trigger; fi
+    # sqlfluff reads the .sql files with the settings of each folder, and the templater takes each file's SqlSource
+    # dialect from its sqlsource.json, through the image that its script builds with the templater, so a change to any
+    # of them can change its verdict on any file.
+    case "$path" in
+    *.sql | .sqlfluff | */.sqlfluff | .sqlfluffignore | sqlsource.json | */sqlsource.json | tools/sqlfluff.* | \
+        src/sqlfluff-templater-sqlsource/*)
+        first sql_trigger
+        ;;
+    esac
     # A deleted file has nothing to format, but its scopes still apply.
     if [[ "$path" == *.cs && -f "$path" ]]; then
         format_files+=("$path")
@@ -255,6 +266,7 @@ decide shell "$shell_trigger" 'no .sh file or .editorconfig changed'
 decide workflow "$workflow_trigger" 'no workflow or tools/actionlint.sh changed'
 decide site "$site_trigger" 'nothing under site/ changed'
 decide templater "$templater_trigger" 'nothing under src/sqlfluff-templater-sqlsource/ changed'
+decide sql "$sql_trigger" 'no .sql file, sqlfluff or SqlSource setting, tools/sqlfluff.* or templater file changed'
 decide postgres "$postgres_trigger" "$no_scope"
 decide sqlserver "$sqlserver_trigger" "$no_scope"
 decide packages "$packages_trigger" 'no change reaches the packages'
@@ -387,6 +399,7 @@ step 'editorconfig-checker' always tools/editorconfig-checker.sh || true
 step 'shellcheck' shell tools/shellcheck.sh || true
 step 'shfmt' shell tools/shfmt.sh --check || true
 step 'actionlint' workflow tools/actionlint.sh || true
+step 'sqlfluff' sql tools/sqlfluff.sh --check || true
 templater_dir='src/sqlfluff-templater-sqlsource'
 # --locked makes a stale uv.lock fail the validation instead of being rewritten by it, as a restore's locked mode does.
 step 'templater lint' templater uv run --locked --directory "$templater_dir" ruff check || true

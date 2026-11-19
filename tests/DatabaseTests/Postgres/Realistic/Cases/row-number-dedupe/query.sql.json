@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListLatestOrderPerOpenAccount": {
-      "hash": "821d266d4d566a6135fe2c0421544d157303510eed0954ce648131ee84b33aac",
+      "hash": "81b6ce2d5f11f24ef94bbffce3d2be1a8cd3029c98103784c9f113eea6bf5f06",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

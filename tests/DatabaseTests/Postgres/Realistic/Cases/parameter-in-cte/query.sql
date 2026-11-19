@@ -1,10 +1,14 @@
 -- name: ListRecentBuyersWithLastLogin
 WITH recent_orders AS (
-    SELECT o.account_id, count(*) AS order_count, max(o.placed_at) AS last_placed_at
+    SELECT
+        o.account_id,
+        count(*) AS order_count,
+        max(o.placed_at) AS last_placed_at
     FROM orders o
     WHERE o.placed_at >= @since
     GROUP BY o.account_id
 )
+
 SELECT
     a.id,
     a.name,
@@ -15,7 +19,9 @@ SELECT
 FROM recent_orders ro
 JOIN accounts a ON a.id = ro.account_id
 LEFT JOIN LATERAL (
-    SELECT e.at, e.payload ->> 'device' AS device
+    SELECT
+        e.at,
+        e.payload ->> 'device' AS device
     FROM events e
     WHERE e.account_id = a.id AND e.kind = 'login'
     ORDER BY e.at DESC

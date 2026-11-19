@@ -8,11 +8,12 @@ SELECT
     a.ports,
     a.sizes
 FROM dbo.products AS p
-CROSS APPLY OPENJSON(p.attributes) WITH (
-    color nvarchar(30) '$.color',
-    weight_kg decimal(4, 2) '$.weight_kg',
-    ports int '$.ports',
-    sizes nvarchar(max) '$.sizes' AS JSON
-) AS a
+CROSS APPLY
+    OPENJSON (p.attributes) WITH (
+        color nvarchar(30) '$.color',
+        weight_kg decimal(4, 2) '$.weight_kg',
+        ports int '$.ports',
+        sizes nvarchar(MAX) '$.sizes' AS JSON
+    ) AS a
 WHERE p.discontinued_at IS NULL
 ORDER BY p.sku;

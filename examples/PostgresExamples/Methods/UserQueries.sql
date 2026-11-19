@@ -8,7 +8,10 @@
 -- domain column the domain's base type, text, so the marker declares @email as the domain, which the type override
 -- reaches.
 -- param: @email public.email
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 WHERE email = @email;
 
@@ -34,16 +37,22 @@ RETURNING id;
 -- summary: Every user, the newest first.
 -- A query that returns rows is many by default, and the marker gives its rows the collection type IReadOnlyList.
 -- collection-type: IReadOnlyList
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
-ORDER BY created_at DESC, id;
+ORDER BY created_at DESC, id ASC;
 
 -- name: StreamUsersOldestFirst
 -- summary: Every user, the oldest first, each read as the caller's loop asks for it.
 -- The marker gives its rows the collection type IAsyncEnumerable, so its method streams them: it holds no collection,
 -- and the connection stays open until the loop ends.
 -- collection-type: IAsyncEnumerable
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 ORDER BY created_at, id;
 
@@ -51,7 +60,9 @@ ORDER BY created_at, id;
 -- summary: Every user, in the order the caller chooses.
 -- The token orderBy is text that the caller's code chooses, never a user's; its default is the sample the tool
 -- describes the query with.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM users
 ORDER BY {{orderBy:name}};
 

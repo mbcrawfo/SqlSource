@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: ListAccountActivitySince\nWITH activity AS (\n    SELECT o.account_id, o.placed_at AS at, 'order' AS kind, o.id AS ref_id\n    FROM orders o\n    UNION ALL\n    SELECT e.account_id, e.at, e.kind, e.id\n    FROM events e\n)\nSELECT a.id, a.name, a.email, act.at, act.kind, act.ref_id\nFROM accounts a\nLEFT JOIN activity act ON act.account_id = a.id AND act.at >= @since\nWHERE a.closed_at IS NULL\nORDER BY a.id, act.at DESC;\n",
+  "input": "-- name: ListAccountActivitySince\nWITH activity AS (\n    SELECT\n        o.account_id,\n        o.placed_at AS at,\n        'order' AS kind,\n        o.id AS ref_id\n    FROM orders o\n    UNION ALL\n    SELECT\n        e.account_id,\n        e.at,\n        e.kind,\n        e.id\n    FROM events e\n)\n\nSELECT\n    a.id,\n    a.name,\n    a.email,\n    act.at,\n    act.kind,\n    act.ref_id\nFROM accounts a\nLEFT JOIN activity act ON act.account_id = a.id AND act.at >= @since\nWHERE a.closed_at IS NULL\nORDER BY a.id, act.at DESC;\n",
   "expected": {
     "startDialect": "postgres",
     "startOptions": [],
@@ -13,15 +13,15 @@
     "options": [],
     "lexemes": [
       ["LineComment", 0, 33],
-      ["Text", 33, 97],
-      ["Quoted", 97, 104],
-      ["Text", 104, 362],
-      ["Parameter", 362, 368],
-      ["Text", 368, 423]
+      ["Text", 33, 121],
+      ["Quoted", 121, 128],
+      ["Text", 128, 451],
+      ["Parameter", 451, 457],
+      ["Text", 457, 512]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 33, "name": null, "default": null },
-      { "kind": "parameter", "start": 362, "end": 368, "name": "since", "default": null }
+      { "kind": "parameter", "start": 451, "end": 457, "name": "since", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

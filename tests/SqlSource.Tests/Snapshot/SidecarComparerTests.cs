@@ -384,6 +384,35 @@ public sealed class SidecarComparerTests
             "null"
         );
         ShouldDiffer(
+            entry => WithParameter(entry, 1, parameter => parameter with { Name = "x", Ordinal = 9 }),
+            "parameters[1].name",
+            "\"status\"",
+            "\"x\""
+        );
+        ShouldDiffer(
+            entry => WithParameter(entry, 1, parameter => parameter with { Ordinal = 9, Type = Text }),
+            "parameters[1].ordinal",
+            "1",
+            "9"
+        );
+        ShouldDiffer(
+            entry => WithParameter(entry, 1, parameter => parameter with { Type = Text, Nullable = true }),
+            "parameters[1].type.name",
+            "\"public.user_status\"",
+            "\"text\""
+        );
+        ShouldDiffer(
+            entry =>
+                WithParameter(
+                    entry,
+                    1,
+                    parameter => parameter with { Type = Status with { BindName = "s", Kind = "domain" } }
+                ),
+            "parameters[1].type.bindName",
+            "null",
+            "\"s\""
+        );
+        ShouldDiffer(
             entry =>
                 WithColumn(
                     WithParameter(entry, 1, parameter => parameter with { Nullable = true }),
@@ -459,10 +488,6 @@ public sealed class SidecarComparerTests
     [Fact]
     public void IsCurrentFor_EntryWithoutADatabase_DoesNotHold() =>
         Entry(hash: "h", database: null, toolVersion: "1.2.3").IsCurrentFor("h", "app", "1.2.3").ShouldBeFalse();
-
-    [Fact]
-    public void IsCurrentFor_SameHashDatabaseAndVersion_IsTrue() =>
-        Entry(hash: "h", database: "app", toolVersion: "1.2.3").IsCurrentFor("h", "app", "1.2.3").ShouldBeTrue();
 
     // A version is compared ordinally, whole: an older, a newer and a longer one are all another tool's.
     [Theory]

@@ -15,7 +15,8 @@ SELECT
     o.note
 FROM dbo.orders AS o
 JOIN dbo.customers AS c ON c.id = o.customer_id
-WHERE (@customer_id IS NULL OR o.customer_id = @customer_id)
+WHERE
+    (@customer_id IS NULL OR o.customer_id = @customer_id)
     AND (@status IS NULL OR o.status = @status)
     AND (@placed_from IS NULL OR o.placed_at >= @placed_from)
     AND (@placed_to IS NULL OR o.placed_at < @placed_to)

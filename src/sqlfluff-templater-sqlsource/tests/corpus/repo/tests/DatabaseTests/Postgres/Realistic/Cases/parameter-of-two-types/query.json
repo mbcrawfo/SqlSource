@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: FindAccountsByIdOrName\nSELECT a.id, a.name, a.email\nFROM accounts a\nWHERE a.name = @term OR a.id = @term\nORDER BY a.id;\n",
+  "input": "-- name: FindAccountsByIdOrName\nSELECT\n    a.id,\n    a.name,\n    a.email\nFROM accounts a\nWHERE a.name = @term OR a.id = @term\nORDER BY a.id;\n",
   "expected": {
     "startDialect": "postgres",
     "startOptions": [],
@@ -13,16 +13,16 @@
     "options": [],
     "lexemes": [
       ["LineComment", 0, 31],
-      ["Text", 31, 92],
-      ["Parameter", 92, 97],
-      ["Text", 97, 108],
-      ["Parameter", 108, 113],
-      ["Text", 113, 129]
+      ["Text", 31, 104],
+      ["Parameter", 104, 109],
+      ["Text", 109, 120],
+      ["Parameter", 120, 125],
+      ["Text", 125, 141]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 31, "name": null, "default": null },
-      { "kind": "parameter", "start": 92, "end": 97, "name": "term", "default": null },
-      { "kind": "parameter", "start": 108, "end": 113, "name": "term", "default": null }
+      { "kind": "parameter", "start": 104, "end": 109, "name": "term", "default": null },
+      { "kind": "parameter", "start": 120, "end": 125, "name": "term", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

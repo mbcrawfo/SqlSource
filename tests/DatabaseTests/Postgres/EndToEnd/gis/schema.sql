@@ -13,8 +13,8 @@ CREATE TABLE spatial_values (
     id integer PRIMARY KEY,
     geometry_value geometry,
     geography_value geography,
-    point_value geometry(Point, 4326),
-    polygon_value geometry(Polygon, 4326),
+    point_value GEOMETRY (POINT, 4326),
+    polygon_value GEOMETRY (POLYGON, 4326),
     geometry_array_value geometry[],
     shape_value shape
 );

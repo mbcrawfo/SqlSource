@@ -5,5 +5,5 @@
 -- param: @company nvarchar(100) null
 -- param: @time_zone varchar(50) null
 INSERT INTO dbo.customers (name, email, phone, company, status, time_zone)
-OUTPUT inserted.*
+OUTPUT INSERTED.*
 VALUES (@name, @email, @phone, @company, 'active', @time_zone);

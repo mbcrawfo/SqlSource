@@ -31,7 +31,9 @@ WHERE id = @accountId;
 
 -- name: GetAccountInRange -> one
 -- summary: The one account whose id is in a range, which a range of none or of two refuses.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id BETWEEN @firstId AND @lastId
 ORDER BY id;
@@ -39,7 +41,9 @@ ORDER BY id;
 -- name: GetAccountInRangeSync -> one
 -- summary: GetAccountInRange, by a synchronous method.
 -- generator: method-type=sync
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id BETWEEN @firstId AND @lastId
 ORDER BY id;
@@ -47,14 +51,18 @@ ORDER BY id;
 -- name: GetAccountInRangeBoth -> one
 -- summary: GetAccountInRange, by a synchronous method and an asynchronous one, which is named with Async after it.
 -- generator: method-type=both
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id BETWEEN @firstId AND @lastId
 ORDER BY id;
 
 -- name: FindAccountInRange -> one-optional
 -- summary: The account whose id is in a range, or none, which a range of two refuses.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id BETWEEN @firstId AND @lastId
 ORDER BY id;
@@ -62,7 +70,9 @@ ORDER BY id;
 -- name: FindAccountInRangeSync -> one-optional
 -- summary: FindAccountInRange, by a synchronous method.
 -- generator: method-type=sync
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id BETWEEN @firstId AND @lastId
 ORDER BY id;
@@ -70,7 +80,9 @@ ORDER BY id;
 -- name: ListAccountsWhere
 -- summary: The accounts that a filter keeps, by default those up to an id, which a filter of its own need not use.
 -- param: @lastId int
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 {{filter:WHERE id <= @lastId}}
 ORDER BY id;
@@ -79,7 +91,9 @@ ORDER BY id;
 -- summary: ListAccountsWhere, by a synchronous method, which takes the token as the asynchronous one does.
 -- param: @lastId int
 -- generator: method-type=sync
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 {{filter:WHERE id <= @lastId}}
 ORDER BY id;
@@ -92,7 +106,9 @@ VALUES (@accountId, @kind, @body, @writtenAt), (@accountId, @kind, @body, @writt
 
 -- name: CountReadAccounts -> rowcount
 -- summary: A SELECT, whose count is -1.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts;
 
 -- name: TouchAccountsQuietly -> rowcount
@@ -116,7 +132,9 @@ WHERE id = @accountId;
 UPDATE dbo.accounts
 SET status = status
 WHERE id <= @lastId;
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id = @accountId;
 
@@ -125,16 +143,22 @@ WHERE id = @accountId;
 UPDATE dbo.accounts
 SET status = status
 WHERE id <= @lastId;
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id = @accountId;
 
 -- name: GetFirstOfTwoAccounts -> one
 -- summary: Reads one account, then another: the first result set, the first account.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id = @firstId;
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id = @secondId;
 
@@ -144,7 +168,9 @@ WHERE id = @secondId;
 -- method that reads its rows into a collection too.  SET CONTEXT_INFO keeps its value for the session, which the test
 -- reads from the same connection: the mark is there when the batch ran as far as the THROW.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SET CONTEXT_INFO 0x03;
@@ -156,7 +182,9 @@ THROW 50000, 'after the rows', 1;
 -- conversion is thrown, and rolls back a transaction with XACT_ABORT off, for a method that reads its rows into a
 -- collection too.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
@@ -166,7 +194,9 @@ SELECT CAST('x' AS int);
 -- The method throws at the second row, and the reader's disposal reads the failed conversion, which with XACT_ABORT
 -- off rolls back a transaction: its tests pin that the method throws the rollback with the refusal inside it.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id <= 2
 ORDER BY id;
@@ -176,7 +206,9 @@ SELECT CAST('x' AS int);
 -- summary: GetTwoThenFailConversion, by a synchronous method.
 -- output-model: CollectedAccount
 -- generator: method-type=sync
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id <= 2
 ORDER BY id;
@@ -187,7 +219,9 @@ SELECT CAST('x' AS int);
 -- GetTwoThenFailConversion with a THROW in the place of the failed conversion: with XACT_ABORT off the THROW leaves
 -- a transaction open, and under XACT_ABORT ON rolls it back.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id <= 2
 ORDER BY id;
@@ -199,7 +233,9 @@ THROW 50000, 'after the rows', 1;
 -- StreamNullAtThirdThenFailConversion of Streaming.sql, read into the default collection type.
 -- output-model: CollectedAccount
 -- column: name not null
-SELECT id, CASE WHEN id = 3 THEN NULL ELSE name END AS name
+SELECT
+    id,
+    CASE WHEN id = 3 THEN NULL ELSE name END AS name
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
@@ -210,7 +246,9 @@ SELECT CAST('x' AS int);
 -- The divide by zero is the database's error, and the method reads the failed conversion after it, which with
 -- XACT_ABORT off rolls back a transaction: its tests pin that the method reports the rollback, with the divide by
 -- zero inside it.
-SELECT id, 10 / (id - 2) AS quotient
+SELECT
+    id,
+    10 / (id - 2) AS quotient
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
@@ -218,7 +256,9 @@ SELECT CAST('x' AS int);
 -- name: ListFailingAtSecondThenFailConversionSync
 -- summary: ListFailingAtSecondThenFailConversion, by a synchronous method.
 -- generator: method-type=sync
-SELECT id, 10 / (id - 2) AS quotient
+SELECT
+    id,
+    10 / (id - 2) AS quotient
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
@@ -227,7 +267,9 @@ SELECT CAST('x' AS int);
 -- summary: Every account with 10 divided by its id less 2, which fails at the second, and then an overflow.
 -- ListFailingAtSecondThenFailConversion with an overflow in the place of the failed conversion: with XACT_ABORT off
 -- the overflow leaves a transaction open, so the method throws the divide by zero as it is.
-SELECT id, 10 / (id - 2) AS quotient
+SELECT
+    id,
+    10 / (id - 2) AS quotient
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST(300 AS tinyint);
@@ -236,7 +278,9 @@ SELECT CAST(300 AS tinyint);
 -- summary: The accounts, then an overflow, which the method throws, and then a conversion that fails.
 -- The overflow is the error that the drain before the return throws, and the failed conversion after it rolls back a
 -- transaction with XACT_ABORT off: its test pins that the method reports the rollback, with the overflow inside it.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST(300 AS tinyint);
@@ -246,7 +290,9 @@ SELECT CAST('x' AS int);
 -- summary: The first two accounts with 10 divided by its id less 2, which fails at the second, and then a conversion
 -- that fails.
 -- ListFailingAtSecondThenFailConversion under one, which fails at its second read.
-SELECT TOP (2) id, 10 / (id - 2) AS quotient
+SELECT TOP (2)
+    id,
+    10 / (id - 2) AS quotient
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
@@ -259,13 +305,15 @@ SELECT CAST('x' AS int);
 DECLARE @zero int = 0;
 DECLARE @quotient int = 1 / @zero;
 SELECT id
-FROM (VALUES (1), (2), (3)) AS numbers (id)
+FROM (VALUES (1), (2), (3)) AS numbers(id)
 ORDER BY id;
 SELECT CAST('x' AS int);
 
 -- name: RunThenRaise -> none
 -- summary: The accounts, a mark on the session, and then an error, which a method that reads no rows reports.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SET CONTEXT_INFO 0x04;
@@ -274,7 +322,9 @@ THROW 50000, 'after the rows', 1;
 -- name: RunThenRaiseSync -> none
 -- summary: RunThenRaise, by a synchronous method.
 -- generator: method-type=sync
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SET CONTEXT_INFO 0x04;
@@ -285,7 +335,9 @@ THROW 50000, 'after the rows', 1;
 -- ListThenRaise under one, which reads its row and then reads again to see that there is no second: its test pins that
 -- the error is thrown by a method that reads one row too.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id = 1;
 SET CONTEXT_INFO 0x05;
@@ -295,7 +347,9 @@ THROW 50000, 'after the rows', 1;
 -- summary: GetThenRaise, by a synchronous method.
 -- output-model: CollectedAccount
 -- generator: method-type=sync
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id = 1;
 SET CONTEXT_INFO 0x05;
@@ -306,7 +360,9 @@ THROW 50000, 'after the rows', 1;
 -- ListThenRaise under one-optional, which reads its row and then reads again to see that there is no second: its test
 -- pins that the error is thrown by a method that reads at most one row too.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id = 1;
 SET CONTEXT_INFO 0x06;
@@ -316,7 +372,9 @@ THROW 50000, 'after the rows', 1;
 -- summary: No account, a mark on the session, and then an error that the method throws rather than return null.
 -- FindThenRaise with no row: its test pins that the error is thrown by a method that finds no row too.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id = 0;
 SET CONTEXT_INFO 0x08;
@@ -325,7 +383,9 @@ THROW 50000, 'after the rows', 1;
 -- name: CountThenRaise -> rowcount
 -- summary: The accounts, a mark on the session, and then an error, which a method that reads no rows reports.
 -- RunThenRaise under rowcount, which reads no rows either.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SET CONTEXT_INFO 0x07;
@@ -334,7 +394,10 @@ THROW 50000, 'after the rows', 1;
 -- name: MergeAccountStatuses -> rowcount
 -- summary: Sets the status of the accounts up to an id by MERGE, whose OUTPUT the count includes.
 MERGE dbo.accounts AS a
-USING (SELECT id FROM dbo.accounts WHERE id <= @lastId) AS s
-ON a.id = s.id
+USING (
+    SELECT id FROM dbo.accounts
+    WHERE id <= @lastId
+) AS s
+    ON a.id = s.id
 WHEN MATCHED THEN UPDATE SET status = @status
 OUTPUT $action AS change, INSERTED.id;

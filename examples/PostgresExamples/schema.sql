@@ -7,11 +7,12 @@
 CREATE TYPE order_status AS ENUM ('pending', 'shipped', 'cancelled');
 
 -- An email address, a domain over text.  Methods/UserQueries.sql maps it to the C# type EmailAddress.
-CREATE DOMAIN email AS text CHECK (VALUE LIKE '%_@_%');
+CREATE DOMAIN email AS text CHECK (value LIKE '%_@_%');
 
 CREATE TABLE users (
     id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name text NOT NULL,
+    -- A column called name, which PostgreSQL does not reserve, as the manual's examples query it.
+    name text NOT NULL,  -- noqa: RF04
     email email NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -43,7 +44,8 @@ CREATE EXTENSION postgis;
 CREATE TABLE deliveries (
     order_id integer PRIMARY KEY REFERENCES orders (id),
     delivered_at timestamptz NOT NULL,
-    location geography(Point, 4326) NOT NULL,
+    -- A column called location, which PostgreSQL does not reserve.
+    location GEOGRAPHY (POINT, 4326) NOT NULL,  -- noqa: RF04
     details jsonb NOT NULL
 );
 

@@ -13,16 +13,16 @@
 -- -2.25) and its timetz has an offset, so that a test can compare them as they are.
 
 INSERT INTO accounts (id, name, email, status, created_at, closed_at) OVERRIDING SYSTEM VALUE VALUES
-    (1, 'alice', 'alice@example.com', 'active', '2024-01-01 09:00:00+00', NULL),
-    (2, 'bob', 'bob@example.com', 'closed', '2024-02-01 09:30:00+00', '2024-09-01 17:45:00+00'),
-    (3, 'carol', 'carol@example.com', 'suspended', '2024-03-01 10:00:00+00', NULL);
+(1, 'alice', 'alice@example.com', 'active', '2024-01-01 09:00:00+00', NULL),
+(2, 'bob', 'bob@example.com', 'closed', '2024-02-01 09:30:00+00', '2024-09-01 17:45:00+00'),
+(3, 'carol', 'carol@example.com', 'suspended', '2024-03-01 10:00:00+00', NULL);
 
 SELECT setval(pg_get_serial_sequence('accounts', 'id'), 3);
 
 INSERT INTO notes (id, account_id, kind, body, written_at, ref) OVERRIDING SYSTEM VALUE VALUES
-    (1, 1, 'call', 'Asked for a larger plan.', '2024-01-10 11:00:00+00', 5000000001),
-    (2, 1, 'email', 'Sent the quote.', '2024-01-12 14:20:00+00', NULL),
-    (3, 2, 'visit', 'Closed the account on site.', '2024-09-01 17:30:00+00', 5000000003);
+(1, 1, 'call', 'Asked for a larger plan.', '2024-01-10 11:00:00+00', 5000000001),
+(2, 1, 'email', 'Sent the quote.', '2024-01-12 14:20:00+00', NULL),
+(3, 2, 'visit', 'Closed the account on site.', '2024-09-01 17:30:00+00', 5000000003);
 
 SELECT setval(pg_get_serial_sequence('notes', 'id'), 3);
 
@@ -45,7 +45,7 @@ INSERT INTO all_types (
     int4_array_value, text_array_value, date_array_value, status_array_value, email_value, status_value
 ) VALUES (
     1,
-    true, -32768, 2147483647, -9223372036854775808, 1.5, -2.25, 12345678.1234, 1234.56,
+    TRUE, -32768, 2147483647, -9223372036854775808, 1.5, -2.25, 12345678.1234, 1234.56,
     'Grüße, 日本語', 'Ünïcödé', 'héllo', 'a_name', 'A', 'Mixed Case', '\xdeadbeef00ff',
     '2024-03-15', '13:45:30.123456', '13:45:30.123456+02', '2024-03-15 13:45:30.123456',
     '2024-03-15 13:45:30.123456+00', '3 days 04:05:06.789012',

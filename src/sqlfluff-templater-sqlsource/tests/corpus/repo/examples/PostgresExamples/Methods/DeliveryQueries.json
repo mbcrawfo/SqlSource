@@ -4,7 +4,7 @@
     "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // The output of every .sql file of this folder: methods, so that each query gets an extension method on a connection\n  // and its models.\n  \"output\": \"methods\",\n}\n",
     "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // No settings file above this folder applies to the project.\n  \"root\": true,\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  \"typeOverrides\": {\n    // Every timestamptz is a DateTimeOffset, which Dapper reads through UtcDateTimeOffsetHandler.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"columnTypes\": {\n    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.\n    \"order_lines.order_id\": \"OrderId\",\n  },\n}\n"
   ],
-  "input": "-- The queries of the deliveries, at the folder's output, methods, which DeliveryQueries calls.  The project's type\n-- override makes every timestamptz a DateTimeOffset, for Dapper, and would win over NodaTime, so the file's type\n-- override gives timestamptz back to its default, and the file's timestamptz is NodaTime's Instant.  The project\n-- references Npgsql's plugins for NodaTime and NetTopologySuite, so location, a geography, is NetTopologySuite's\n-- Geometry.  details, a jsonb, is the project's class DeliveryDetails, which the methods read and send through\n-- System.Text.Json.\n-- type-override: timestamptz=default\n\n-- name: RecordDelivery -> rowcount\n-- summary: Records where and when an order arrived.\n-- rowcount: the method returns the count of rows inserted.  A parameter written to a column has the column's type,\n-- so @deliveredAt is an Instant and @location a Geometry with no marker; no column type reaches a parameter, so the\n-- marker gives @details the class.\n-- param: @details -> DeliveryDetails\nINSERT INTO deliveries (order_id, delivered_at, location, details)\nVALUES (@orderId, @deliveredAt, @location, @details);\n\n-- name: FindDelivery -> one-optional\n-- summary: The delivery of an order, or null when it has not arrived.\n-- one-optional: the method returns the row, or null when there is none.  The marker gives the column details the\n-- class.  order_id is left out: the table's columns in its own order would give the rows the table's model,\n-- DeliveriesDto.\n-- column: details -> DeliveryDetails\nSELECT delivered_at, location, details\nFROM deliveries\nWHERE order_id = @orderId;\n",
+  "input": "-- The queries of the deliveries, at the folder's output, methods, which DeliveryQueries calls.  The project's type\n-- override makes every timestamptz a DateTimeOffset, for Dapper, and would win over NodaTime, so the file's type\n-- override gives timestamptz back to its default, and the file's timestamptz is NodaTime's Instant.  The project\n-- references Npgsql's plugins for NodaTime and NetTopologySuite, so location, a geography, is NetTopologySuite's\n-- Geometry.  details, a jsonb, is the project's class DeliveryDetails, which the methods read and send through\n-- System.Text.Json.\n-- type-override: timestamptz=default\n\n-- name: RecordDelivery -> rowcount\n-- summary: Records where and when an order arrived.\n-- rowcount: the method returns the count of rows inserted.  A parameter written to a column has the column's type,\n-- so @deliveredAt is an Instant and @location a Geometry with no marker; no column type reaches a parameter, so the\n-- marker gives @details the class.\n-- param: @details -> DeliveryDetails\nINSERT INTO deliveries (order_id, delivered_at, location, details)\nVALUES (@orderId, @deliveredAt, @location, @details);\n\n-- name: FindDelivery -> one-optional\n-- summary: The delivery of an order, or null when it has not arrived.\n-- one-optional: the method returns the row, or null when there is none.  The marker gives the column details the\n-- class.  order_id is left out: the table's columns in its own order would give the rows the table's model,\n-- DeliveriesDto.\n-- column: details -> DeliveryDetails\nSELECT\n    delivered_at,\n    location,\n    details\nFROM deliveries\nWHERE order_id = @orderId;\n",
   "expected": {
     "startDialect": "postgres",
     "startOptions": [],
@@ -56,9 +56,9 @@
       ["LineComment", 1480, 1497],
       ["Text", 1497, 1498],
       ["LineComment", 1498, 1535],
-      ["Text", 1535, 1608],
-      ["Parameter", 1608, 1616],
-      ["Text", 1616, 1618]
+      ["Text", 1535, 1620],
+      ["Parameter", 1620, 1628],
+      ["Text", 1628, 1630]
     ],
     "spans": [
       { "kind": "markerComment", "start": 591, "end": 628, "name": null, "default": null },
@@ -72,7 +72,7 @@
       { "kind": "markerComment", "start": 1148, "end": 1185, "name": null, "default": null },
       { "kind": "markerComment", "start": 1186, "end": 1256, "name": null, "default": null },
       { "kind": "markerComment", "start": 1498, "end": 1535, "name": null, "default": null },
-      { "kind": "parameter", "start": 1608, "end": 1616, "name": "orderId", "default": null }
+      { "kind": "parameter", "start": 1620, "end": 1628, "name": "orderId", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

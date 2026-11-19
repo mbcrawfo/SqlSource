@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "IssueInvoiceForOrder": {
-      "hash": "9c2cf92edf936f669fc7e53f3d4b19eed72272c83884c090e57b8d44bbdc605a",
+      "hash": "01302b9b21b9474cba6f40648505ab30b677916f730d86708f8663558e400853",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

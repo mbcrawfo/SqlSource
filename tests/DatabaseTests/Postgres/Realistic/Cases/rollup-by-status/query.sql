@@ -8,5 +8,5 @@ SELECT
 FROM orders o
 JOIN accounts a ON a.id = o.account_id
 LEFT JOIN order_lines l ON l.order_id = o.id
-GROUP BY ROLLUP (a.status, date_trunc('month', o.placed_at))
+GROUP BY rollup (a.status, date_trunc('month', o.placed_at))
 ORDER BY a.status NULLS LAST, month NULLS LAST;

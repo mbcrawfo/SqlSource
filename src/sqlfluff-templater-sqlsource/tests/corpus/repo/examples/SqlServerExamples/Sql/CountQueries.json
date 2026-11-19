@@ -3,7 +3,7 @@
   "settings": [
     "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // No settings file above this folder applies to the project.\n  \"root\": true,\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  \"typeOverrides\": {\n    // Every date is a DateOnly, which Dapper reads through DateOnlyHandler.\n    \"date\": \"System.DateOnly\",\n  },\n  \"columnTypes\": {\n    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.\n    \"order_lines.order_id\": \"OrderId\",\n  },\n  \"libraryTypes\": {\n    // SQL Server turns a library on only when asked, so the project turns on NodaTime, NetTopologySuite and\n    // System.Text.Json, whose types only the methods of Methods/ get.  The type override above still wins over NodaTime\n    // for every date, which stays a DateOnly.\n    \"nodaTime\": \"on\",\n    \"netTopologySuite\": \"on\",\n    \"json\": \"on\",\n  },\n}\n"
   ],
-  "input": "-- The queries of Sql/: their output is sql, set by the marker below, so each is only its SQL, a constant or a method,\n-- and needs no description, no sidecar and no connection.  The second marker names the class that holds them, which\n-- is Sql by default.\n-- output: sql\n-- nested-class: Counts\n\n-- name: CountUsers\n-- summary: The number of users.\nSELECT COUNT(*) FROM users;\n\n-- name: CountRows\n-- summary: The number of rows of a table that the code chooses.\nSELECT COUNT(*) FROM {{table}};\n",
+  "input": "-- The queries of Sql/: their output is sql, set by the marker below, so each is only its SQL, a constant or a method,\n-- and needs no description, no sidecar and no connection.  The second marker names the class that holds them, which\n-- is Sql by default.\n-- output: sql\n-- nested-class: Counts\n\n-- name: CountUsers\n-- summary: The number of users.\nSELECT COUNT(*) FROM users;\n\n-- name: CountRows\n-- summary: The number of rows of a table that the code chooses.\nSELECT COUNT(*) FROM {{table:users}};\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -27,7 +27,7 @@
       ["LineComment", 380, 398],
       ["Text", 398, 399],
       ["LineComment", 399, 463],
-      ["Text", 463, 496]
+      ["Text", 463, 502]
     ],
     "spans": [
       { "kind": "markerComment", "start": 258, "end": 272, "name": null, "default": null },
@@ -36,7 +36,7 @@
       { "kind": "markerComment", "start": 318, "end": 350, "name": null, "default": null },
       { "kind": "markerComment", "start": 380, "end": 398, "name": null, "default": null },
       { "kind": "markerComment", "start": 399, "end": 463, "name": null, "default": null },
-      { "kind": "token", "start": 485, "end": 494, "name": "table", "default": null }
+      { "kind": "token", "start": 485, "end": 500, "name": "table", "default": "users" }
     ],
     "error": null,
     "hasOtherErrors": false

@@ -14,7 +14,11 @@ FROM billing.invoices AS i
 JOIN dbo.orders AS o ON o.id = i.order_id
 JOIN dbo.customers AS cu ON cu.id = o.customer_id
 OUTER APPLY (
-    SELECT TOP (1) p.paid_at, p.amount, p.method, p.reference
+    SELECT TOP (1)
+        p.paid_at,
+        p.amount,
+        p.method,
+        p.reference
     FROM billing.payments AS p
     WHERE p.invoice_id = i.id
     ORDER BY p.paid_at DESC, p.id DESC

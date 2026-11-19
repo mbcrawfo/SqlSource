@@ -35,7 +35,18 @@ INSERT INTO dbo.json_values (
 -- name: GetJsonValues -> one
 -- summary: The row of json_values with the id, every column but plain_meta read.
 -- column: marker_meta -> json OrderMetadata
-SELECT id, element, document, node, obj, arr, settings_meta, header_meta, tags, marker_meta, camel
+SELECT
+    id,
+    element,
+    document,
+    node,
+    obj,
+    arr,
+    settings_meta,
+    header_meta,
+    tags,
+    marker_meta,
+    camel
 FROM dbo.json_values
 WHERE id = @id;
 
@@ -44,7 +55,9 @@ WHERE id = @id;
 -- A JSON null in either is no SQL NULL, so it reaches the read, which throws for a property that cannot be null.
 -- column: settings_meta not null
 -- column: obj not null
-SELECT settings_meta, obj
+SELECT
+    settings_meta,
+    obj
 FROM dbo.json_values
 WHERE id = @id;
 

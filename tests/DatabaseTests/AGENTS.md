@@ -15,6 +15,11 @@
 - **The allocation tests of the generated methods are in `QueryMethodAllocation` and run only in the nightly's `allocation-postgres` and `allocation-sqlserver` jobs**, never in `dotnet test --solution`, `pre-commit-validation.sh` or `build.yml`: its `.csproj` is a test project only under `RunQueryMethodAllocation=true` ([why](QueryMethodAllocation/README.md)).
 - **The comparisons of each synchronous method with its asynchronous twin are in `Postgres.SyncAsync` and `SqlServer.SyncAsync` and run only in the nightly's `sync-async-postgres` and `sync-async-sqlserver` jobs**, never in `dotnet test --solution`, `pre-commit-validation.sh` or `build.yml`: each `.csproj` is a test project only under `RunSyncAsync=true` ([why](Postgres.SyncAsync/README.md#running)).
 
+## Queries
+
+- **Format a query with `./format.sh sql`, or `tools/sqlfluff.sh -- fix <path>`, before `tools/describe-end-to-end.sh` describes it**, since formatting changes its hash and makes a sidecar described before it stale.
+- **SQL that a test exists for keeps its form**: a sqlfluff finding on it gets `-- noqa: <rule>` with the reason on the line above, or the rule goes in `exclude_rules` of the root `.sqlfluff` when test SQL breaks it widely.  A project that edits a query by its text is in `.sqlfluffignore`.
+
 ## References
 
 - **`Postgres.Npgsql8` and `SqlServer.SqlClient61` reference `src/SqlSource`, `tests/SqlSource.Repository` and `TestHarness` alone**, since they pin the oldest supported driver: a reference to the tool, to `tests/SqlSource.Tool.Testing` or to the engine's describer project is a package downgrade.

@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: ListAccountsWithCouponCodes\nSELECT a.id, a.name, oc.order_id, oc.coupon_code, oc.channel\nFROM accounts a\nLEFT JOIN (\n    SELECT o.account_id, o.id AS order_id, coalesce(o.coupon, 'none') AS coupon_code, 'web' AS channel\n    FROM orders o\n) oc ON oc.account_id = a.id\nORDER BY a.id, oc.order_id;\n",
+  "input": "-- name: ListAccountsWithCouponCodes\nSELECT\n    a.id,\n    a.name,\n    oc.order_id,\n    oc.coupon_code,\n    oc.channel\nFROM accounts a\nLEFT JOIN (\n    SELECT\n        o.account_id,\n        o.id AS order_id,\n        coalesce(o.coupon, 'none') AS coupon_code,\n        'web' AS channel\n    FROM orders o\n) oc ON oc.account_id = a.id\nORDER BY a.id, oc.order_id;\n",
   "expected": {
     "startDialect": "postgres",
     "startOptions": [],
@@ -13,11 +13,11 @@
     "options": [],
     "lexemes": [
       ["LineComment", 0, 36],
-      ["Text", 36, 188],
-      ["Quoted", 188, 194],
-      ["Text", 194, 212],
-      ["Quoted", 212, 217],
-      ["Text", 217, 304]
+      ["Text", 36, 232],
+      ["Quoted", 232, 238],
+      ["Text", 238, 264],
+      ["Quoted", 264, 269],
+      ["Text", 269, 356]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 36, "name": null, "default": null }
