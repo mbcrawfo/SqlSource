@@ -37,6 +37,8 @@ done
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
+# shellcheck source=tools/platform.sh
+source tools/platform.sh
 
 # The decisions, one function each, each taking a path from the repository root and setting its result.  The step
 # rules are positive triggers, so a kind of file that none of them knows makes the run full instead of skipping its
@@ -197,7 +199,7 @@ for path in ${changes[@]+"${changes[@]}"}; do
     if [[ "$path" != "$SCOPES" ]]; then scope_of "$path"; fi
     needs_packages "$path"
     if [[ "$known" == false ]]; then first unknown; fi
-    if [[ "$path" == pre-commit-validation.sh ]]; then first script_trigger; fi
+    if [[ "$path" == pre-commit-validation.sh || "$path" == tools/platform.sh ]]; then first script_trigger; fi
     if [[ "$everything" == true ]]; then first format_all; fi
     # shfmt takes its layout from .editorconfig.
     if [[ "$path" == *.sh || "${path##*/}" == .editorconfig ]]; then first shell_trigger; fi
@@ -229,9 +231,10 @@ for path in ${changes[@]+"${changes[@]}"}; do
         no_format='no changed .cs file exists'
     fi
 done
-# This script makes every decision, and invokes every check, so a change to it can change any verdict.
+# This script makes every decision, and invokes every check, so a change to it can change any verdict, and so can a
+# change to tools/platform.sh, which this script and every check's script source.
 if [[ -n "$script_trigger" && -z "$full_reason" ]]; then
-    full_reason='pre-commit-validation.sh changed'
+    full_reason='pre-commit-validation.sh or tools/platform.sh changed'
 fi
 if [[ -n "$unknown" && -z "$full_reason" ]]; then
     full_reason="$unknown is of no known kind"
@@ -387,7 +390,9 @@ if [[ "$plan" == true ]]; then
         printf 'Partial run of %s changed path(s).\n' "${#changes[@]}"
     fi
 elif [[ "$test_solution" != "$SOLUTION" ]]; then
-    printf '{"solution":{"path":%s,"projects":[%s]}}\n' "$(json_string "$repo_root/$SOLUTION")" "$filter_projects" \
+    # dotnet reads the solution's path from the filter, so it is in the spelling dotnet reads.
+    solution_native="$(native_path "$repo_root")/$SOLUTION"
+    printf '{"solution":{"path":%s,"projects":[%s]}}\n' "$(json_string "$solution_native")" "$filter_projects" \
         >"$test_solution"
 fi
 

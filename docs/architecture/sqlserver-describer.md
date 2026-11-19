@@ -58,7 +58,8 @@ An error keeps each of the exception's errors, in order, with its number, class 
 |----|----|
 | `open`, `18456` | `LoginRefused` |
 | `open`, `4060` or `4064` | `DatabaseRefused` |
-| `open`, `-2`, or a `TimeoutException` in the chain | `ConnectTimedOut` |
+| `open`, `-2` or `258` (`WAIT_TIMEOUT`, which SqlClient gives on Windows and macOS for a refused port too), or a `TimeoutException` in the chain | `ConnectTimedOut` |
+| `open` on Windows, an error number or `Win32Exception` code that `NativeLayerText` knows | SqlClient's native network layer, which it uses on Windows, throws no `SocketException` or `AuthenticationException`, so its codes are read before the two rows below: an SSPI or certificate code of a failed handshake is `CertificateRefused`, and a Winsock code is `UnreachablePrefix` with the name of the `SocketError` of that number |
 | `open`, an `AuthenticationException` in the chain | `CertificateRefused` |
 | `open`, a `SocketException` in the chain | `ConnectionTexts.Unreachable`: `UnreachablePrefix`, then `: ` and the name of its `SocketError` unless that is `Success`, which SqlClient gives on Linux |
 | `open`, anything else | `SessionRefused` |

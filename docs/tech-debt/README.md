@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0120`
+Next id: `TD-0121`
 
 ## Active items
 
@@ -42,6 +42,7 @@ Next id: `TD-0120`
 | [TD-0115](TD-0115-tool-code-its-own-tests-do-not-check.md) | Open | 2026-11-13 | Low | 1,881 mutants of `src/SqlSource.Tool` fail no test of their own folder or are run by none, most in `WatchSession.cs`, `SqlServerLive.cs` and `DiagnoseRun.cs`, though the command tests and the database projects may reach them |
 | [TD-0118](TD-0118-own-candidates-hide-base-members-by-name.md) | Open | 2026-11-16 | Low | A repository's own connection candidates, and its field and property holders, skip a base type's member that any more derived member has the name of, even a method of another signature or a member the repository cannot reach |
 | [TD-0119](TD-0119-static-member-of-the-repositorys-name.md) | Open | 2026-11-16 | Low | A static connection source or factory holder of a base type that has the repository's name is reached as `Sample.Sample`, which binds to the member, so the generated method does not compile |
+| [TD-0120](TD-0120-database-tests-do-not-run-on-windows.md) | Open | 2026-11-18 | Low | The tests against a real database do not run on Windows, where the drivers' network layer differs, since GitHub's Windows runners cannot start the pinned Linux images |
 
 ## Columns
 

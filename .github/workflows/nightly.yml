@@ -3,6 +3,8 @@
 # elsewhere: paths, quoting, exit codes, and how a process and what it started are killed.  That job runs no check that
 # needs Docker, no test that needs a container, and no pack: the lint images and the PostgreSQL and SQL Server images
 # are Linux images, which these runners cannot start, and build.yml has all three.
+# packages packs on Windows and macOS and runs the three package checks there, under Git's bash on Windows, and the
+# templater's tests, which build.yml runs on Linux alone.
 # build.yml tests each engine's floor and default image, and test-postgres and test-sqlserver here every supported major
 # between them, so that the two cover every supported major: see the rule in .github/AGENTS.md.
 # The two allocation jobs and the two sync-async jobs run the default images only.
@@ -43,9 +45,9 @@ jobs:
   test:
     name: Build and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    # A green run takes 15 to 17 minutes on either system, and a cache miss or a slow runner adds minutes: 20 cancelled
-    # a Windows run whose every test had passed.
-    timeout-minutes: 30
+    # A green Windows run took 12 to 28 minutes in November 2026, a cache miss or a slow runner adding minutes, and 30
+    # cancelled one whose every test had passed so far, as 20 did before.
+    timeout-minutes: 45
     strategy:
       # One system's failure says nothing of the other.
       fail-fast: false
@@ -91,6 +93,70 @@ jobs:
                   --report-github --report-github-summary-include-passed false || status=1
           done
           exit "$status"
+
+  # Installs the packages the way a user does, as the package job of build.yml does on Linux, and runs the templater's
+  # tests, on the systems that development does not run on every day, through the same scripts under Git's bash on
+  # Windows.  A job of its own, so that the test job above keeps its time.
+  packages:
+    name: Packages and templater (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      # One system's failure says nothing of the other.
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: 0.12.19
+          enable-cache: true
+          cache-dependency-glob: src/sqlfluff-templater-sqlsource/uv.lock
+
+      - name: Pack
+        id: pack
+        run: |
+          for project in src/SqlSource/SqlSource.csproj src/SqlSource.Tool/SqlSource.Tool.csproj; do
+              dotnet pack "$project" --configuration "$CONFIGURATION" --output artifacts/packages
+          done
+
+      # Every check runs even when an earlier one failed, so that one run reports every problem.
+      - name: Check package
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' }}
+        run: tools/check-package.sh artifacts/packages
+
+      - name: Check package install
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' }}
+        run: tools/check-package-install.sh artifacts/packages
+
+      - name: Check tool install
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' }}
+        run: tools/check-tool-install.sh artifacts/packages
+
+      - name: Test the templater
+        if: ${{ !cancelled() }}
+        working-directory: src/sqlfluff-templater-sqlsource
+        run: |
+          uv python install
+          uv run --locked pytest
 
   # Runs the tests of tests/SqlSource.Tests.RoslynFloor on Linux, the generator's driver tests on the oldest supported
   # Roslyn.  build.yml compiles the project but leaves its tests to this job and the test job above: they are those

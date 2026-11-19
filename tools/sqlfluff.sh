@@ -39,15 +39,18 @@ fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+# shellcheck source=tools/platform.sh
+source tools/platform.sh
 
 # The templater's folder is the build's context, and tools/sqlfluff.Dockerfile.dockerignore keeps out everything the
 # install does not read, so the cached image is rebuilt only when the templater's package changes.
-docker build --quiet --build-arg "SQLFLUFF_IMAGE=$IMAGE" --file tools/sqlfluff.Dockerfile --tag "$TAG" "$TEMPLATER" \
-    >/dev/null
+run_docker build --quiet --build-arg "SQLFLUFF_IMAGE=$IMAGE" --file tools/sqlfluff.Dockerfile --tag "$TAG" \
+    "$TEMPLATER" >/dev/null
 
 if [[ "$check" == true ]]; then
-    docker run --rm --volume "$repo_root:/sql:ro" --workdir /sql "$TAG" "${arguments[@]}"
+    run_docker run --rm --volume "$(native_path "$repo_root"):/sql:ro" --workdir /sql "$TAG" "${arguments[@]}"
 else
     # The user and group of the caller, so that a rewritten file keeps its owner.
-    docker run --rm --user "$(id -u):$(id -g)" --volume "$repo_root:/sql" --workdir /sql "$TAG" "${arguments[@]}"
+    run_docker run --rm --user "$(id -u):$(id -g)" --volume "$(native_path "$repo_root"):/sql" --workdir /sql "$TAG" \
+        "${arguments[@]}"
 fi

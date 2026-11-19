@@ -41,8 +41,13 @@ if [[ $# -gt 1 ]]; then
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/platform.sh
+source "$repo_root/tools/platform.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+# A path written into a file or inside an argument's value is in the spelling dotnet reads, which on Windows is not
+# the one Git Bash gives.
+work_native="$(native_path "$work")"
 
 if [[ $# -eq 1 ]]; then
     # Resolved before the working directory changes, so that a relative path means what the caller meant.
@@ -55,6 +60,7 @@ else
         dotnet pack "$project" --output "$directory" --nologo --verbosity quiet
     done
 fi
+directory_native="$(native_path "$directory")"
 
 # A version starts with a digit, and that is what keeps the pattern of SqlSource from matching
 # SqlSource.Tool.<version>.nupkg.
@@ -95,11 +101,11 @@ cat >"$consumer/nuget.config" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
     <config>
-        <add key="globalPackagesFolder" value="$work/packages" />
+        <add key="globalPackagesFolder" value="$work_native/packages" />
     </config>
     <packageSources>
         <clear />
-        <add key="package-under-test" value="$directory" />
+        <add key="package-under-test" value="$directory_native" />
     </packageSources>
     <packageSourceMapping>
         <clear />
@@ -133,7 +139,8 @@ dotnet run --project "$PROJECT" --no-build >"$work/actual-output.txt" || {
     exit 1
 }
 
-if ! diff "$EXPECTED" "$work/actual-output.txt"; then
+# The consumer prints with the line ending of the platform.
+if ! diff --strip-trailing-cr "$EXPECTED" "$work/actual-output.txt"; then
     echo "check-package-install: a project that references $package does not print $FIXTURE/$EXPECTED" >&2
     exit 1
 fi
@@ -158,8 +165,17 @@ echo "\$*" >>"$stand_in_log"
 echo 'sqlsource: summary: orders (postgres): 0 described, 1 skipped, 0 failed'
 EOF
 chmod +x "$stand_in"
+# MSBuild's Exec runs the command with cmd on Windows, which cannot start a shell script, so there the command is a
+# batch file that hands its arguments to this bash and the script.  The command is quoted, as %22, MSBuild's escape of
+# a quote, since a temporary folder can have a space in its path, as under a user's name on Windows.
+stand_in_command_native="$(native_path "$stand_in")"
+if on_windows; then
+    printf '@"%s" "%s" %%*\r\n' "$(native_path "$BASH")" "$stand_in_command_native" >"$work/stand-in.cmd"
+    stand_in_command_native="$work_native/stand-in.cmd"
+fi
 
-dotnet build "$PROJECT" --nologo --no-incremental "-p:SqlSourceToolCommand=$stand_in" >"$work/offline.log" 2>&1 || {
+dotnet build "$PROJECT" --nologo --no-incremental "-p:SqlSourceToolCommand=%22$stand_in_command_native%22" \
+    >"$work/offline.log" 2>&1 || {
     cat "$work/offline.log" >&2
     echo "check-package-install: a project with no connection that references $package does not build" >&2
     exit 1
@@ -183,7 +199,8 @@ if [[ "$imported" != 'true' ]]; then
 fi
 
 manifest="$work/consumer.manifest"
-dotnet msbuild "$PROJECT" -nologo -t:SqlSourceWriteManifest "-p:SqlSourceManifestFile=$manifest" \
+manifest_native="$(native_path "$manifest")"
+dotnet msbuild "$PROJECT" -nologo -t:SqlSourceWriteManifest "-p:SqlSourceManifestFile=$manifest_native" \
     >"$work/manifest.log" 2>&1 || {
     cat "$work/manifest.log" >&2
     echo "check-package-install: the target SqlSourceWriteManifest of $package fails" >&2
@@ -200,14 +217,21 @@ if [[ "$(head -n 1 "$manifest")" != 'SqlSourceManifest=2' ]]; then
     manifest_fails 'does not start with its version'
 fi
 
-# A path is as MSBuild gives it, which on macOS is not the spelling of the temporary directory that mktemp gave.
-if ! grep -q '^File=.*/Queries/Users\.sql$' "$manifest"; then
+# A path is as MSBuild gives it, which on macOS is not the spelling of the temporary directory that mktemp gave, and on
+# Windows has backslashes.
+if ! grep -q '^File=.*[/\\]Queries[/\\]Users\.sql$' "$manifest"; then
     manifest_fails 'does not list Queries/Users.sql'
 fi
 
-# The settings file of the project, by the physical path of the copy, which is how MSBuild gives it.
+# The settings file of the project, by the physical path of the copy, which is how MSBuild gives it: on Windows in its
+# own spelling, whose case a path does not depend on there.
 settings="$(pwd -P)/sqlsource.json"
-if ! grep -qxF "Settings=$settings" "$manifest"; then
+settings_match=(-qxF)
+if on_windows; then
+    settings="$(windows_path "$(pwd -P)")\\sqlsource.json"
+    settings_match+=(-i)
+fi
+if ! grep "${settings_match[@]}" "Settings=$settings" "$manifest"; then
     manifest_fails "does not hold Settings=$settings"
 fi
 
@@ -290,14 +314,49 @@ cat >"$multi/Multi.csproj" <<EOF
     </ItemGroup>
 </Project>
 EOF
+# An SDK installed by Windows' installer has no reference pack of netstandard2.1, which the archives of the other
+# systems carry.  Then the pack, and only the pack, comes from nuget.org: the mapping keeps SqlSource to the folder.
+sdk_folder="$(dotnet --list-sdks | sed -n "s/^$(dotnet --version) \[\(.*\)\]\$/\1/p")"
+standard_pack="$(dirname "$sdk_folder")/packs/NETStandard.Library.Ref"
+if on_windows; then
+    standard_pack="$(cygpath -u -- "$standard_pack")"
+fi
+if [[ ! -d "$standard_pack" ]]; then
+    cat >"$multi/nuget.config" <<EOF
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+    <config>
+        <add key="globalPackagesFolder" value="$work_native/packages" />
+    </config>
+    <packageSources>
+        <clear />
+        <add key="package-under-test" value="$directory_native" />
+        <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+    </packageSources>
+    <packageSourceMapping>
+        <clear />
+        <packageSource key="package-under-test">
+            <package pattern="*" />
+        </packageSource>
+        <packageSource key="nuget.org">
+            <package pattern="NETStandard.Library.Ref" />
+        </packageSource>
+    </packageSourceMapping>
+    <fallbackPackageFolders>
+        <clear />
+    </fallbackPackageFolders>
+</configuration>
+EOF
+fi
 echo 'public static class Marker { }' >"$multi/Marker.cs"
 echo 'SELECT 1 AS one;' >"$multi/Queries/Users.sql"
 echo '{ "root": true, "dialect": "postgres", "output": "Sql" }' >"$multi/sqlsource.json"
 
 rm -f "$stand_in_log"
 # The console shows the errors alone, and the log of the order of the targets is a file of its own.
-dotnet build "$multi/Multi.csproj" --nologo --verbosity quiet "-flp:v=diag;logfile=$work/multi.log" \
-    -p:SqlSourceOnline=true "-p:SqlSourceToolCommand=$stand_in" >"$work/multi-console.log" 2>&1 || {
+dotnet build "$multi/Multi.csproj" --nologo --verbosity quiet "-flp:v=diag;logfile=$work_native/multi.log" \
+    -p:SqlSourceOnline=true "-p:SqlSourceToolCommand=%22$stand_in_command_native%22" \
+    >"$work/multi-console.log" 2>&1 || {
     cat "$work/multi-console.log" >&2
     echo "check-package-install: a project of two target frameworks that references $package does not build" >&2
     exit 1
@@ -313,8 +372,8 @@ if [[ ! -f "$stand_in_log" ]] || [[ "$(wc -l <"$stand_in_log")" -ne 1 ]]; then
     multi_fails 'did not run the tool exactly once'
 fi
 
-# The manifest of the run is the first framework's, whose folder under obj/ names it.
-manifest_argument='^describe --manifest .*/netstandard2\.1/Multi\.csproj\.SqlSource\.manifest --online true$'
+# The manifest of the run is the first framework's, whose folder under obj/ names it, with backslashes on Windows.
+manifest_argument='^describe --manifest .*[/\\]netstandard2\.1[/\\]Multi\.csproj\.SqlSource\.manifest --online true$'
 if ! grep -q "$manifest_argument" "$stand_in_log"; then
     multi_fails 'did not run the tool for the first framework'
 fi
@@ -380,7 +439,7 @@ cd "$online"
 # dotnet keeps a cache under DOTNET_CLI_HOME, the user's home by default, of where each local tool of a version is,
 # and runs the tool it finds there: a package packed again with the same version, or one installed into another
 # temporary folder, would run in place of this one.  Each run of this script has a cache of its own.
-export DOTNET_CLI_HOME="$work/dotnet-home"
+export DOTNET_CLI_HOME="$work_native/dotnet-home"
 export DOTNET_NOLOGO=1
 dotnet new tool-manifest >"$work/online-manifest.log" 2>&1 ||
     online_fails 'could not create its tool manifest' "$work/online-manifest.log"
@@ -438,7 +497,7 @@ offline='sqlsource: offline: no connection for postgres; the build uses the comm
 if ! grep -q -F "$offline" "$work/online-stale.log"; then
     online_fails 'did not show the offline line of the tool under auto with a stale entry' "$work/online-stale.log"
 fi
-if ! grep -q 'Queries/Users\.sql([0-9]*,[0-9]*): error SQLSRC244: ' "$work/online-stale.log"; then
+if ! grep -q 'Queries[/\\]Users\.sql([0-9]*,[0-9]*): error SQLSRC244: ' "$work/online-stale.log"; then
     online_fails 'did not report the stale entry at its query under auto' "$work/online-stale.log"
 fi
 
