@@ -24,6 +24,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tools/platform.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+# A path written into a file is in the spelling dotnet reads, which on Windows is not the one Git Bash gives.
+work_native="$(native_path "$work")"
 
 if [[ $# -eq 1 ]]; then
     # Resolved before the working directory changes, so that a relative path means what the caller meant.
@@ -34,6 +36,7 @@ else
     directory="$work/feed"
     dotnet pack src/SqlSource.Tool/SqlSource.Tool.csproj --output "$directory" --nologo --verbosity quiet
 fi
+directory_native="$(native_path "$directory")"
 
 packages=()
 for package in "$directory/$PACKAGE_ID".[0-9]*.nupkg; do
@@ -63,11 +66,11 @@ cat >"$install/nuget.config" <<CONFIG
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
     <config>
-        <add key="globalPackagesFolder" value="$work/packages" />
+        <add key="globalPackagesFolder" value="$work_native/packages" />
     </config>
     <packageSources>
         <clear />
-        <add key="package-under-test" value="$directory" />
+        <add key="package-under-test" value="$directory_native" />
     </packageSources>
     <packageSourceMapping>
         <clear />

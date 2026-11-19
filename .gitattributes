@@ -34,6 +34,12 @@ tests/DatabaseTests/SqlServer/Realistic/Cases/** text eol=lf
 # An AGENTS.md is held to a size in bytes by AgentsFileTests, which a CRLF checkout would exceed
 AGENTS.md text eol=lf
 
+# The templater's copy of the licence, at LF, is compared byte for byte with this one
+/LICENSE text eol=lf
+
+# The consumer that check-package-install.sh builds prints its queries' text, which it compares with expected-output.txt
+tools/package-install/** text eol=lf
+
 # The templater's corpus is compared byte for byte with what TemplatingCorpusTests writes, at LF
 src/sqlfluff-templater-sqlsource/tests/corpus/** text eol=lf
 
