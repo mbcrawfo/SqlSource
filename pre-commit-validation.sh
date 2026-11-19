@@ -195,7 +195,7 @@ for path in ${changes[@]+"${changes[@]}"}; do
     if [[ "$path" != "$SCOPES" ]]; then scope_of "$path"; fi
     needs_packages "$path"
     if [[ "$known" == false ]]; then first unknown; fi
-    if [[ "$path" == pre-commit-validation.sh ]]; then first script_trigger; fi
+    if [[ "$path" == pre-commit-validation.sh || "$path" == tools/platform.sh ]]; then first script_trigger; fi
     if [[ "$everything" == true ]]; then first format_all; fi
     # shfmt takes its layout from .editorconfig.
     if [[ "$path" == *.sh || "${path##*/}" == .editorconfig ]]; then first shell_trigger; fi
@@ -218,9 +218,10 @@ for path in ${changes[@]+"${changes[@]}"}; do
         no_format='no changed .cs file exists'
     fi
 done
-# This script makes every decision, and invokes every check, so a change to it can change any verdict.
+# This script makes every decision, and invokes every check, so a change to it can change any verdict, and so can a
+# change to tools/platform.sh, which this script and every check's script source.
 if [[ -n "$script_trigger" && -z "$full_reason" ]]; then
-    full_reason='pre-commit-validation.sh changed'
+    full_reason='pre-commit-validation.sh or tools/platform.sh changed'
 fi
 if [[ -n "$unknown" && -z "$full_reason" ]]; then
     full_reason="$unknown is of no known kind"

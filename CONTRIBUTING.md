@@ -136,7 +136,7 @@ A plain run checks only what the uncommitted change (staged, unstaged and untrac
 - Formatting is limited to the changed `.cs` files, and skipped when none changed; a change to `format.sh` or to a file that configures the formatters checks everything.
 - editorconfig-checker always runs.  shellcheck and shfmt run when a shell script or `.editorconfig` changed, actionlint when a workflow or `tools/actionlint.sh` changed, the site's build when a file under `site/`, `dotnet-tools.json` or `tools/build-site.sh` changed, the templater's three checks when a file under `src/sqlfluff-templater-sqlsource/` changed, and the three package checks when a change can alter what is packed or how the packages are checked.  A path under the templater's folder, its corpus included, never sets off the package checks.
 - The build and the tests that need no container always run.  A pair of container test projects, PostgreSQL's or SQL Server's, runs only when the change can reach it.  [`tools/test-scopes.txt`](tools/README.md#test-scopes) decides which pair a path can reach.
-- A clean tree, a change to `pre-commit-validation.sh`, a path of a kind the script does not know and a failing `git` command each make the run full.
+- A clean tree, a change to `pre-commit-validation.sh` or to `tools/platform.sh`, which it sources, a path of a kind the script does not know and a failing `git` command each make the run full.
 
 `--full` runs everything; no push needs it, but it finds a failure before CI does.  A partial run says so at its end.  `--plan [path ...]` prints what a run would do and why, for the uncommitted change or for the paths given, and runs nothing.
 
