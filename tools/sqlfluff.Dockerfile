@@ -3,4 +3,6 @@
 ARG SQLFLUFF_IMAGE
 FROM ${SQLFLUFF_IMAGE}
 COPY . /tmp/templater
-RUN pip install --no-cache-dir /tmp/templater
+# --no-deps keeps the image's sqlfluff, and pip check fails the build when it is outside the templater's range, which
+# pip would otherwise meet by installing another sqlfluff.
+RUN pip install --no-cache-dir --no-deps /tmp/templater && pip check
