@@ -62,6 +62,13 @@ public sealed class OnlineBuildTests : IDisposable
                 <AdditionalFiles Include="Queries/Users.sql" />
             </ItemGroup>
             """,
+        // A .sql file the project lists again by its full path, beside the props' pattern, which lists it by a relative
+        // one: the compiler is given its sidecar once all the same.
+        ["a file listed again by its full path"] = """
+            <ItemGroup>
+                <AdditionalFiles Include="$(MSBuildProjectDirectory)/Queries/Users.sql" />
+            </ItemGroup>
+            """,
         // A project that lists its own files, its sidecar by name, which an item names before the file exists.
         ["the sidecar listed by name"] = """
             <PropertyGroup>
@@ -426,6 +433,7 @@ public sealed class OnlineBuildTests : IDisposable
     [InlineData("SqlSourceIncludeFiles false", "Online/Queries/Users.sql.json", true)]
     [InlineData("a linked file", "Shared/Linked.sql.json", true)]
     [InlineData("a file listed twice", "Online/Queries/Users.sql.json", true)]
+    [InlineData("a file listed again by its full path", "Online/Queries/Users.sql.json", true)]
     [InlineData("the sidecar listed by name", "Online/Queries/Users.sql.json", true)]
     [InlineData("SqlSourceIncludeFiles false, the .sql file alone", "Online/Queries/Users.sql.json", false)]
     [InlineData("a linked file without its sidecar", "Shared/Linked.sql.json", false)]
