@@ -660,6 +660,7 @@ The cause is one of these:
 
 - No tool manifest in the folder of the project, or in a folder above it, names `SqlSource.Tool`.
 - The tool that the manifest names was never restored on this machine.
+- The tool was restored with another major version of the .NET SDK, such as 10 before you moved to 11.  Each major version needs its own `dotnet tool restore`.
 
 ```console
 /repo/App/App.csproj : error SQLSRC025: The build could not start the sqlsource tool, and SqlSourceOnline is true.  Install SqlSource.Tool as a local tool, run 'dotnet tool restore' if the tool manifest names it already, or set SqlSourceOnline to false to build from the committed sidecars.
@@ -689,6 +690,7 @@ The cause is one of these:
 
 - No tool manifest names `SqlSource.Tool`.
 - The tool that the manifest names was never restored on this machine.
+- The tool was restored with another major version of the .NET SDK, such as 10 before you moved to 11.  Each major version needs its own `dotnet tool restore`.
 
 ```console
 /repo/App/App.csproj : warning SQLSRC026: The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run 'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the queries; or set SqlSourceOnline to false to build from the sidecars without this warning.

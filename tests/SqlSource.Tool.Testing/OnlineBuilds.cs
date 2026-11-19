@@ -13,9 +13,10 @@ namespace SqlSource.Tool.Testing;
 
 // "dotnet build" of a copy of the fixture ErrorPaths of the engine's test project that goes online against the engine's
 // server: the build runs the tool beside the tests before the compiler, and the generator beside the tests compiles the
-// sidecar that the run created; a query that the server refuses fails the build at its file.  The build is given the
-// connection as SQLSOURCE_CONNECTION, whose value it must never print.  The fixture's output is "models", whose types
-// need no driver.  Each test makes the table of the query and drops it again.
+// sidecar that the run created, with the project named by its real path or through a link; a query that the server
+// refuses fails the build at its file.  The build is given the connection as SQLSOURCE_CONNECTION, whose value it must
+// never print.  The fixture's output is "models", whose types need no driver.  Each test makes the table of the query
+// and drops it again.
 internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : IDisposable
 {
     // The model of the query GetWidgets, named for the table that it reads whole.
@@ -29,7 +30,24 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
     public async Task ShouldCompileTheSidecarItCreatedAsync()
     {
         var project = RealPath(_projects.Copy("ErrorPaths"));
-        var folder = Path.GetDirectoryName(project)!;
+        await ShouldCompileTheSidecarItCreatedAsync(Path.GetDirectoryName(project)!, project);
+    }
+
+    // The same, with the project named through a symbolic link to its folder, as the .NET 11 SDK names it when the
+    // build starts in a folder reached through one, such as /tmp on macOS.  The compiler makes the path of the .sql
+    // file, which the project lists by a relative path, full where the link is resolved, so the sidecar must be given
+    // by a path made the same way: given by its full path through the link, it named no .sql file, and the query was
+    // SQLSRC241 until the next build listed the sidecar.
+    public async Task ShouldCompileTheSidecarItCreatedThroughALinkAsync()
+    {
+        var folder = Path.GetDirectoryName(RealPath(_projects.Copy("ErrorPaths")))!;
+        var link = _projects.PathOf("Link");
+        _ = Directory.CreateSymbolicLink(link, folder);
+        await ShouldCompileTheSidecarItCreatedAsync(folder, Path.Combine(link, "App.csproj"));
+    }
+
+    private async Task ShouldCompileTheSidecarItCreatedAsync(string folder, string project)
+    {
         var sidecar = Path.Combine(folder, "Widgets.sql.json");
         File.Exists(sidecar).ShouldBeFalse();
         await engine.WithTableAsync(async () =>
@@ -157,8 +175,8 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
     // The path with every link among its folders replaced by what it links to.  The temporary folder of macOS is under
     // /var, a link to /private/var, and a build of a project named through a link reports the tool's errors at the
     // path as MSBuild names it, under /var, and the compiler's under /private/var, where the compiler resolves a path
-    // of the project's own.  The project is named by its real path, as a build started in its folder with no project
-    // named would find it, so that the errors of both name a file alike.
+    // of the project's own.  The project is named by its real path, as a build of the .NET 10 SDK started in its folder
+    // with no project named finds it, so that the errors of both name a file alike.
     private static string RealPath(string path)
     {
         var real = Path.GetPathRoot(path)!;

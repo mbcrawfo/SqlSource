@@ -6,10 +6,10 @@ using Xunit;
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
 // "dotnet build" of a copy of ErrorPaths that goes online against the container: the build runs the tool beside the
-// tests on the database "fixtures" and compiles the sidecar that the run created, a query that the server refuses fails
-// the build at its file, and the error of a broken settings file is listed once.  Each test makes the table of the
-// query and drops it again.  OnlineBuilds of tests/SqlSource.Tool.Testing holds the steps, and ErrorPathTests the
-// statements of SQL Server.
+// tests on the database "fixtures" and compiles the sidecar that the run created, also through a symbolic link, a query
+// that the server refuses fails the build at its file, and the error of a broken settings file is listed once.  Each
+// test makes the table of the query and drops it again.  OnlineBuilds of tests/SqlSource.Tool.Testing holds the steps,
+// and ErrorPathTests the statements of SQL Server.
 [Collection(UsesSqlServer.Name)]
 public sealed class OnlineBuildTests(SqlServerDatabases sqlServer) : IDisposable
 {
@@ -20,6 +20,13 @@ public sealed class OnlineBuildTests(SqlServerDatabases sqlServer) : IDisposable
     [Fact]
     public async Task Build_OnlineWithNoSidecar_CompilesTheSidecarItsRunCreated() =>
         await _builds.ShouldCompileTheSidecarItCreatedAsync();
+
+    [Fact]
+    public async Task Build_OnlineThroughALinkWithNoSidecar_CompilesTheSidecarItsRunCreated()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Making a symbolic link needs a privilege on Windows.");
+        await _builds.ShouldCompileTheSidecarItCreatedThroughALinkAsync();
+    }
 
     [Fact]
     public async Task Build_OnlineWithAQueryTheServerRefuses_FailsAtTheQuery() =>
