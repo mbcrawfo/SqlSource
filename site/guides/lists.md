@@ -15,7 +15,10 @@ The [PostgreSQL example project](https://github.com/mbcrawfo/SqlSource/blob/main
 -- summary: The orders in any of the given statuses, or every order when the list is null, newest first.
 -- member-location: class
 -- visibility: public
-SELECT id, status, placed_at
+SELECT
+    id,
+    status,
+    placed_at
 FROM orders
 WHERE (@statuses IS NULL OR status IN @statuses)
 ORDER BY placed_at DESC;

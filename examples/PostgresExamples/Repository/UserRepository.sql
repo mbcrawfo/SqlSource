@@ -5,14 +5,19 @@
 -- name: GetUser -> one-optional
 -- summary: One user, or null.
 -- one-optional: the method returns the row, or null when there is none.
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 WHERE id = @userId;
 
 -- name: ListUserNames
 -- summary: The name of every user, in the order of their ids.
 -- A query that returns rows is many by default, and its method returns an array.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM users
 ORDER BY id;
 
@@ -27,7 +32,10 @@ WHERE id = @userId;
 -- summary: Finds the users with a name, or every user when the name is null.
 -- The param marker gives @name its type and says that it can be null, so FindUsersParams.Name is a string?.
 -- param: @name text null
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 WHERE @name IS NULL OR name = @name
 ORDER BY name;
@@ -35,7 +43,9 @@ ORDER BY name;
 -- name: ListUsersByIds
 -- summary: The users whose ids are in the list.
 -- A parameter directly after IN is a list, so ListUsersByIdsParams.Ids is an IEnumerable<int>.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM users
 WHERE id IN @ids
 ORDER BY id;
@@ -44,6 +54,8 @@ ORDER BY id;
 -- summary: The name of every user, with each word capitalized.
 -- The column marker says that display_name, the result of a function, is never null, so it is a string.
 -- column: display_name not null
-SELECT id, initcap(name) AS display_name
+SELECT
+    id,
+    initcap(name) AS display_name
 FROM users
 ORDER BY id;

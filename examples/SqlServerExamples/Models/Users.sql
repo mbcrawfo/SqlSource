@@ -2,6 +2,7 @@
 
 -- name: GetUser
 -- summary: One user, every column of the table.
-SELECT *
+-- Every column of the table, which its table model takes as it is.
+SELECT *  -- noqa: AM04
 FROM users
 WHERE id = @userId;

@@ -10,4 +10,4 @@ SELECT count(*) FROM users;
 
 -- name: CountRows
 -- summary: The number of rows of a table that the code chooses.
-SELECT count(*) FROM {{table}};
+SELECT count(*) FROM {{table:users}};

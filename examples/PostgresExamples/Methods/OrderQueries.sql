@@ -11,7 +11,10 @@
 -- summary: The orders of one user, newest first.
 -- member-location: class
 -- visibility: public
-SELECT id, placed_at, shipped_at
+SELECT
+    id,
+    placed_at,
+    shipped_at
 FROM orders
 WHERE user_id = @userId
 ORDER BY placed_at DESC;
@@ -21,7 +24,11 @@ ORDER BY placed_at DESC;
 -- generator: sort-output
 -- member-location: class
 -- visibility: public
-SELECT id, user_id, placed_at, shipped_at
+SELECT
+    id,
+    user_id,
+    placed_at,
+    shipped_at
 FROM orders
 WHERE id = @orderId;
 
@@ -36,7 +43,10 @@ WHERE order_id = @orderId;
 -- summary: The orders in any of the given statuses, or every order when the list is null, newest first.
 -- member-location: class
 -- visibility: public
-SELECT id, status, placed_at
+SELECT
+    id,
+    status,
+    placed_at
 FROM orders
 WHERE (@statuses IS NULL OR status IN @statuses)
 ORDER BY placed_at DESC;

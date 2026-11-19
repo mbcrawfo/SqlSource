@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "FindUserByEmail": {
-      "hash": "c859ccc69e374129327f8ea50d94efd0abe7bc8aa4a41671bcfebdd5ece40bb5",
+      "hash": "8ebf2cbecdcd039579059b67e27269a7715d5697718bb050e83b62da957ad468",
       "toolVersion": "0.2.0",
       "database": "mssql",
       "engine": "mssql",
@@ -135,7 +135,7 @@
       ]
     },
     "AddUser": {
-      "hash": "0932d31cd457f92961b24457751026a70a085dd2193c0e244d2665b3881b16a6",
+      "hash": "5d655e92cb2069a53e751ee92e2d271e1e9468347c73242268eb695ccf28488f",
       "toolVersion": "0.2.0",
       "database": "mssql",
       "engine": "mssql",
@@ -197,7 +197,7 @@
       ]
     },
     "ListUsersNewestFirst": {
-      "hash": "48003f0a731a75c819d0acf83d2013d4eb9c9e4804e054e669b71c028fee9d5c",
+      "hash": "64ad972cb9eeeb76e2701764988552ca866f0de43e02f60f6af255a60d88404c",
       "toolVersion": "0.2.0",
       "database": "mssql",
       "engine": "mssql",
@@ -272,7 +272,7 @@
       ]
     },
     "StreamUsersOldestFirst": {
-      "hash": "e483817a6cb3183306e9c7790abeaf005f3fb41065fe4cbe21fb32beeb8effac",
+      "hash": "c422e34ae1595a06eeefacdbc6a8ce0aa622c4977c0674591f1e0d9719f684c7",
       "toolVersion": "0.2.0",
       "database": "mssql",
       "engine": "mssql",
@@ -347,7 +347,7 @@
       ]
     },
     "ListUsersSortedBy": {
-      "hash": "a693111c134fa0a9d130085bdb4d44c7ae37d01b8c53b22aa470917fa9f77179",
+      "hash": "d491f3ab02f375065376f17ff307527c85ecf8499e1e1ad6faa27576b9390495",
       "toolVersion": "0.2.0",
       "database": "mssql",
       "engine": "mssql",

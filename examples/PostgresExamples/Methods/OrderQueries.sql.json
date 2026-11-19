@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListOrdersOfUser": {
-      "hash": "1eee15b3657a4e02c0be7c1015fc6d43a1e3e0ad17c772de8c54d4a10725e73d",
+      "hash": "efbfd850a070ef88a36267c3407d8f65c89b70768b5bea1e48a3ea50f9f6c091",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",
@@ -90,7 +90,7 @@
       ]
     },
     "FindOrder": {
-      "hash": "f0b7bde549169e5bea3c1018a806837e5020940eeda5ad61b1efe313e154c6ce",
+      "hash": "1dd0615c00922d846a4a977268a1267116eb12c8a6ab9d20a06f0ea5f0e9dd94",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",
@@ -237,7 +237,7 @@
       ]
     },
     "ListOrdersByStatuses": {
-      "hash": "913df26c1983fdac07329b61d7b5099d5bc05fae8c7eb8030fc1615225ac8277",
+      "hash": "205ad04250704d98acbb106453afb796fd3a029331e12cdd856555ab3ef59d6c",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",

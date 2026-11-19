@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "GetUser": {
-      "hash": "1553018188ebdebe2b05a15821f555ce3774e818a41f7da90b440bf1e5004e69",
+      "hash": "b6f8da6e27311a7c9bb889bfbaa416da4223c986ff3d6e6a688f5c82b1395a74",
       "toolVersion": "0.2.0",
       "database": "mssql",
       "engine": "mssql",
@@ -93,7 +93,7 @@
       ]
     },
     "ListUserNames": {
-      "hash": "99f9be8655b1be9383ff5309164d2790bea248681a6bdb0aae88ec14f415b58a",
+      "hash": "d4032085466802f4711cbe26e32e72c265a35c9ed65e0274051dd6a6666992d5",
       "toolVersion": "0.2.0",
       "database": "mssql",
       "engine": "mssql",
@@ -179,7 +179,7 @@
       ]
     },
     "FindUsers": {
-      "hash": "51913dcc743ec239664a002f30ff015f77a5e762d7d5446b403330a81a8e798d",
+      "hash": "d645a6bffa5317dbf77fa73d410f5622f6ad8f6f297449fc40f4d5035c9a6d3d",
       "toolVersion": "0.2.0",
       "database": "mssql",
       "engine": "mssql",
@@ -267,7 +267,7 @@
       ]
     },
     "ListUsersByIds": {
-      "hash": "0951b3d406c513f5c960f7972ede0de583395234f5ddd96cc615237e9ce021ca",
+      "hash": "3ba0fec89bca361dca65b4a6cc739876b1844275a1b1efc89867fa708532238c",
       "toolVersion": "0.2.0",
       "database": "mssql",
       "engine": "mssql",
@@ -332,7 +332,7 @@
       ]
     },
     "ListDisplayNames": {
-      "hash": "67f2dee9711f6f2e345b37cc5e4ad3019f389091230ac672b73b593dd9117e20",
+      "hash": "5bf40f29dc7ec33c8beee76fd8838edca95ff2e98f32f1cc6251b1d8e36f3d77",
       "toolVersion": "0.2.0",
       "database": "mssql",
       "engine": "mssql",
