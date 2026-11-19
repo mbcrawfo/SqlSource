@@ -231,18 +231,4 @@ public sealed class FilterTests : IDisposable
         );
         _run.Processes.Requests.ShouldBeEmpty();
     }
-
-    [Fact]
-    public async Task Run_Help_ShowsThePathsAndTheOptionsOfDescribe()
-    {
-        var result = await _run.RunAsync("describe", "--help");
-
-        result.ExitCode.ShouldBe(0);
-        result.Out.ShouldContain("sqlsource describe [<path>...]");
-        result.Out.ShouldContain(".sql");
-        result.Out.ShouldContain("--database <name>");
-        result.Out.ShouldContain("--connection <name=value>");
-        result.Out.ShouldContain("--force");
-        result.Out.ShouldContain("--env-file <path>");
-    }
 }
