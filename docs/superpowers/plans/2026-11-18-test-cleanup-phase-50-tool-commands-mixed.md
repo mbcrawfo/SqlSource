@@ -49,15 +49,15 @@ The folded help test keeps every text, the empty error and the no-process assert
 - [x] **Step 3 (F-SqlSource.Tool.Tests.Commands-2-04, -2-05):** remove `ReplayTests.Controls`; `Replay_ToolVersionWithAControlCharacter_PrintsItsEscape` and `Replay_FailureWithAControlCharacter_PrintsItsEscape` become facts on ESC, `"\u001b"` printed as `"\\u001B"`.
 - [x] **Step 4 (F-SqlSource.Tool.Tests.Commands-1-02):** replace the three `DescribeTests` help tests with `Run_Help_ShowsThePathsAndTheOptions`; delete `FilterTests.Run_Help_ShowsThePathsAndTheOptionsOfDescribe`.
 - [x] **Step 5 (F-SqlSource.Tool.Tests.Commands-1-01):** `Run_HelpOfTheTool_ListsTheCommand` asserts the line of the command's entry.
-- [ ] **Step 6:** Set row 50 of the epic's table to `done`.
-- [ ] **Step 7:** `./format.sh`, then `DescribeTests`, `FilterTests` and `ReplayTests` pass.
-- [ ] **Step 8:** Hand check of F-…-1-01: with the `describe` command hidden from the help, the new test fails and the old assertion passes.  Reverted.
-- [ ] **Step 9:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 6:** Set row 50 of the epic's table to `done`.
+- [x] **Step 7:** `./format.sh`, then `DescribeTests`, `FilterTests` and `ReplayTests` pass (185 tests).
+- [x] **Step 8:** Hand check of F-…-1-01: with the `describe` command hidden from the help, the output still holds "Describes" and "described", so the old assertion passes, and the new test fails.  Reverted.
+- [x] **Step 9:** `./pre-commit-validation.sh`, then commit.
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-50/tool-root/after`, then `compare` with the "before".
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-50/coverage-after/SqlSource.Tool.Tests`, compared file by file with the "before".
-- [ ] **Step 3:** Run time of `dotnet test --project tests/SqlSource.Tool.Tests`.
-- [ ] **Step 4:** Copy the "after" report to the run's `reports/p50-tool-root-after.json`.
+- [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-50/tool-root/after`: 464 killed, 0 survived, 107 timeouts, 2 h 3 min (p49's "before": 470 killed, 101 timeouts).  `compare`: 571 detected before, 565 still detected, 0 lost, 6 not comparable, each Killed to Timeout: `DescribeCommand.cs` 314:38 (Equality, `< 0`), 316:13 (Statement), 316:26 (String), 367:21 (Conditional true), 367:67 (String), and `DiagnoseCommand.cs:235:13` (Logical).  `kills` on the "before" report shows none of them killed by, or timing out under, any test this phase removes or changes; all are in the ranges the run notes list as flipping under load.  `kills` after: `Run_Help_ShowsThePathsAndTheOptions` 56 kills, 8 alone (the 6 of the FilterTests test and the 2 of `Run_Help_ShowsTheProjectOption`), 54 timeouts; `Run_HelpOfTheTool_ListsTheCommand` 37 kills (36 before); the two replay facts 55 and 57 kills, as before.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-50/coverage-after/SqlSource.Tool.Tests` (7,066 tests, 2 min 32 s): 1,216 of 1,224 lines over the 14 files of `src/SqlSource.Tool/*.cs`, before and after, the same lines in each file.
+- [x] **Step 3:** Run time of `dotnet test --project tests/SqlSource.Tool.Tests`: 2 min 30 s before (7,077 tests, load ~20), 2 min 25 s after (7,066 tests, load ~6).
+- [x] **Step 4:** Copy the "after" report to the run's `reports/p50-tool-root-after.json`.
 - [ ] **Step 5:** The pull request gives the changes, the compare result, the coverage figures, the hand check, the covers table and the run times.
