@@ -111,7 +111,9 @@ Read this if a list can be empty or null, or can hold thousands of values.
 
 ```sql postgres
 -- name: ListUsersByIds
-SELECT id, name
+SELECT
+    id,
+    name
 FROM users
 WHERE id IN @ids
 ORDER BY id;

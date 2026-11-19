@@ -213,10 +213,12 @@ for path in ${changes[@]+"${changes[@]}"}; do
     # uv runs ruff and pytest in the project's folder, from its .python-version and uv.lock.
     # format.sh runs the templater's ruff steps too, so a change to it sets off the templater's checks.
     if [[ "$path" == src/sqlfluff-templater-sqlsource/* || "$path" == format.sh ]]; then first templater_trigger; fi
-    # sqlfluff reads the .sql files with the settings of each folder, through the image that its script builds with the
-    # templater, so a change to any of them can change its verdict on any file.
+    # sqlfluff reads the .sql files with the settings of each folder, and the templater takes each file's SqlSource
+    # dialect from its sqlsource.json, through the image that its script builds with the templater, so a change to any
+    # of them can change its verdict on any file.
     case "$path" in
-    *.sql | .sqlfluff | */.sqlfluff | .sqlfluffignore | tools/sqlfluff.* | src/sqlfluff-templater-sqlsource/*)
+    *.sql | .sqlfluff | */.sqlfluff | .sqlfluffignore | sqlsource.json | */sqlsource.json | tools/sqlfluff.* | \
+        src/sqlfluff-templater-sqlsource/*)
         first sql_trigger
         ;;
     esac
@@ -264,7 +266,7 @@ decide shell "$shell_trigger" 'no .sh file or .editorconfig changed'
 decide workflow "$workflow_trigger" 'no workflow or tools/actionlint.sh changed'
 decide site "$site_trigger" 'nothing under site/ changed'
 decide templater "$templater_trigger" 'nothing under src/sqlfluff-templater-sqlsource/ changed'
-decide sql "$sql_trigger" 'no .sql file, sqlfluff setting, tools/sqlfluff.* or templater file changed'
+decide sql "$sql_trigger" 'no .sql file, sqlfluff or SqlSource setting, tools/sqlfluff.* or templater file changed'
 decide postgres "$postgres_trigger" "$no_scope"
 decide sqlserver "$sqlserver_trigger" "$no_scope"
 decide packages "$packages_trigger" 'no change reaches the packages'

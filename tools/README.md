@@ -73,7 +73,7 @@ Last, it runs `sqlsource --version` again with `DOTNET_ROLL_FORWARD` set to `Lat
 
 ## Formatting
 
-`format.sh` is at the root of the repository, and `pre-commit-validation.sh` runs it as `format.sh --check style analyzers csharpier`.  It runs ruff itself, in the steps `templater lint`, `templater format` and `templater tests` (with `pytest`), when a file under `src/sqlfluff-templater-sqlsource/` changed, and sqlfluff, as `tools/sqlfluff.sh --check` in the step `sqlfluff`, when a `.sql` file, a `.sqlfluff`, `.sqlfluffignore`, `tools/sqlfluff.*` or a file of the templater changed.
+`format.sh` is at the root of the repository, and `pre-commit-validation.sh` runs it as `format.sh --check style analyzers csharpier`.  It runs ruff itself, in the steps `templater lint`, `templater format` and `templater tests` (with `pytest`), when a file under `src/sqlfluff-templater-sqlsource/` changed, and sqlfluff, as `tools/sqlfluff.sh --check` in the step `sqlfluff`, when a `.sql` file, a `.sqlfluff`, `.sqlfluffignore`, a `sqlsource.json`, `tools/sqlfluff.*` or a file of the templater changed.
 
 ```bash
 ./format.sh [--check] [style|analyzers|csharpier|ruff|sql ...] [-- file ...]
