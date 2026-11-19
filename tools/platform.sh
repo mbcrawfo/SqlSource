@@ -4,8 +4,9 @@
 #
 # Git Bash rewrites an argument that looks like a Unix path into a Windows path before it starts a Windows program, so
 # docker would get C:/Program Files/Git/mnt for the container's /mnt; run_docker turns that off for the one command.
-# It rewrites only arguments, never a path written into a file or inside an argument's value, such as the value of
-# -p:Name=/tmp/x; native_path gives the spelling a Windows program reads there.  ScriptPortabilityTests of
+# It never rewrites a path written into a file, and inside an argument's value it rewrites some (-p:Name=/tmp/x) and
+# not others (a path after a ';' or inside %22), so every such path goes through native_path, which gives the
+# spelling a Windows program reads.  ScriptPortabilityTests of
 # tests/SqlSource.Repository.Tests/Validation/ fails on a script that does neither where it must.
 
 # Succeeds under Git Bash or Cygwin on Windows.

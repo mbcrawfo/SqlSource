@@ -187,17 +187,26 @@ internal static class ConnectionErrors
     private const int FirstWinsockCode = 10000;
     private const int LastWinsockCode = 11999;
 
-    // The SSPI and certificate codes of a TLS handshake that failed: SEC_E_UNTRUSTED_ROOT, SEC_E_WRONG_PRINCIPAL,
-    // SEC_E_CERT_EXPIRED, SEC_E_ILLEGAL_MESSAGE, CERT_E_UNTRUSTEDROOT, CERT_E_EXPIRED and CERT_E_CN_NO_MATCH.
+    // The SSPI and certificate codes of a TLS handshake that failed, each by its name in winerror.h.  Not the whole
+    // facility of SSPI, whose codes of a login that failed (SEC_E_LOGON_DENIED, SEC_E_TARGET_UNKNOWN) are no
+    // handshake's.
     private static readonly HashSet<int> HandshakeFailures =
     [
-        unchecked((int)0x80090325),
-        unchecked((int)0x80090322),
-        unchecked((int)0x80090328),
-        unchecked((int)0x80090326),
-        unchecked((int)0x800B0109),
-        unchecked((int)0x800B0101),
-        unchecked((int)0x800B010F),
+        unchecked((int)0x80090325), // SEC_E_UNTRUSTED_ROOT
+        unchecked((int)0x80090322), // SEC_E_WRONG_PRINCIPAL
+        unchecked((int)0x80090328), // SEC_E_CERT_EXPIRED
+        unchecked((int)0x80090326), // SEC_E_ILLEGAL_MESSAGE
+        unchecked((int)0x80090308), // SEC_E_INVALID_TOKEN: an answer that is no TLS, as from a service of another kind
+        unchecked((int)0x80090331), // SEC_E_ALGORITHM_MISMATCH: no version or cipher both ends accept
+        unchecked((int)0x80090327), // SEC_E_CERT_UNKNOWN
+        unchecked((int)0x800B0109), // CERT_E_UNTRUSTEDROOT
+        unchecked((int)0x800B0101), // CERT_E_EXPIRED
+        unchecked((int)0x800B010F), // CERT_E_CN_NO_MATCH
+        unchecked((int)0x800B010A), // CERT_E_CHAINING
+        unchecked((int)0x800B0112), // CERT_E_UNTRUSTEDCA
+        unchecked((int)0x800B010E), // CERT_E_REVOCATION_FAILURE
+        unchecked((int)0x80092010), // CRYPT_E_REVOKED
+        unchecked((int)0x80092013), // CRYPT_E_REVOCATION_OFFLINE
     ];
 
     /// <summary>An error of the describer's own: the text, and 0 for each number.</summary>

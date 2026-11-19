@@ -3,6 +3,8 @@
 # elsewhere: paths, quoting, exit codes, and how a process and what it started are killed.  That job runs no check that
 # needs Docker, no test that needs a container, and no pack: the lint images and the PostgreSQL and SQL Server images
 # are Linux images, which these runners cannot start, and build.yml has all three.
+# packages packs on Windows and macOS and runs the three package checks there, under Git's bash on Windows, and the
+# templater's tests, which build.yml runs on Linux alone.
 # build.yml tests each engine's floor and default image, and test-postgres and test-sqlserver here every supported major
 # between them, so that the two cover every supported major: see the rule in .github/AGENTS.md.
 # The two allocation jobs and the two sync-async jobs run the default images only.

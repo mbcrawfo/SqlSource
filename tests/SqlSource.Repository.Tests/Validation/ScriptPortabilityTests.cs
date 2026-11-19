@@ -52,6 +52,15 @@ public sealed class ScriptPortabilityTests
         "repo_root=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\nprintf '{\"solution\":{\"path\":%s}}' \"$repo_root/x.slnx\""
     )]
     [InlineData("repo_root=\"$(pwd)\"\nrun_docker run --volume \"$repo_root:/mnt\" img")]
+    [InlineData(
+        "work=\"$(mktemp -d)\"\n" + "printf '@\"%s\" \"%s\" %%*\\r\\n' \"$BASH\" \"$work/s.sh\" >\"$work/stand-in.cmd\""
+    )]
+    [InlineData("work=\"$(mktemp -d)\"\ndotnet build -p:Feed=\"$work/feed\"")]
+    [InlineData(
+        "work=\"$(mktemp -d)\"\nconfig=\"$work/nuget.config\"\n"
+            + "cat >\"$config\" <<EOF\n<add value=\"$work/feed\" />\nEOF"
+    )]
+    [InlineData("work=\"$(mktemp -d)\"\necho \"{ \\\"path\\\": \\\"$work/x\\\" }\" >\"$work/a.json\"")]
     public void Violations_UnconvertedHostPath_IsOne(string script) =>
         ScriptPortability
             .Violations("tools/x.sh", script)
@@ -67,6 +76,10 @@ public sealed class ScriptPortabilityTests
     [InlineData("work=\"$(mktemp -d)\"\ncat >\"$work/App.csproj\" <<'EOF'\n<Import Project=\"$work/x\" />\nEOF")]
     [InlineData("work=\"$(mktemp -d)\"\ndotnet pack x.csproj --output \"$work/feed\"")]
     [InlineData("version=\"$(cat VERSION)\"\ndotnet add package X --version \"$version\" -p:V=$version")]
+    [InlineData(
+        "work=\"$(mktemp -d)\"\n" + "printf '@\"%s\" %%*\\r\\n' \"$(native_path \"$BASH\")\" >\"$work/stand-in.cmd\""
+    )]
+    [InlineData("work=\"$(mktemp -d)\"\necho \"$work\" >\"$work/log.txt\"")]
     public void Violations_ConvertedOrNoHostPath_IsNone(string script) =>
         ScriptPortability.Violations("tools/x.sh", script).ShouldBeEmpty();
 

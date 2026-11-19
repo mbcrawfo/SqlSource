@@ -36,6 +36,14 @@ public sealed class ConnectionErrorsTests
     [InlineData(11001, 11001, "SqlClient could not reach the server: HostNotFound")]
     [InlineData(10061, 10061, "SqlClient could not reach the server: ConnectionRefused")]
     [InlineData(-2146893019, null, "the server's certificate is not trusted, or the TLS handshake failed")]
+    [InlineData(-2146893048, -2146893048, "the server's certificate is not trusted, or the TLS handshake failed")]
+    [InlineData(-2146893007, null, "the server's certificate is not trusted, or the TLS handshake failed")]
+    [InlineData(-2146893017, null, "the server's certificate is not trusted, or the TLS handshake failed")]
+    [InlineData(-2146762486, null, "the server's certificate is not trusted, or the TLS handshake failed")]
+    [InlineData(-2146762478, null, "the server's certificate is not trusted, or the TLS handshake failed")]
+    [InlineData(-2146762482, null, "the server's certificate is not trusted, or the TLS handshake failed")]
+    [InlineData(-2146885616, null, "the server's certificate is not trusted, or the TLS handshake failed")]
+    [InlineData(-2146885613, null, "the server's certificate is not trusted, or the TLS handshake failed")]
     public void NativeLayerText_NativeError_IsTheTextLinuxGives(int number, int? win32, string text) =>
         ConnectionErrors.NativeLayerText(number, win32).ShouldBe(text);
 

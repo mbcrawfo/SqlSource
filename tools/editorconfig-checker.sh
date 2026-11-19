@@ -22,10 +22,6 @@ if [[ ${#files[@]} -eq 0 ]]; then
     exit 0
 fi
 
-# The files go to the checker in batches whose paths total at most BATCH_CHARACTERS, since Windows refuses a command
-# line of more than 32,767 characters and the repository's paths exceed that.  Every batch runs, and any that fails
-# fails the check.
-BATCH_CHARACTERS=24000
 volume="$(native_path "$repo_root"):/mnt:ro"
 status=0
 batch=()
@@ -37,8 +33,11 @@ check_batch() {
     batch=()
     length=0
 }
+# On Windows the files go to the checker in batches whose paths total at most 24,000 characters, since Windows refuses
+# a command line of more than 32,767 and the repository's paths exceed that; elsewhere they go in one run.  Every batch
+# runs, and any that fails fails the check.
 for file in "${files[@]}"; do
-    if [[ $((length + ${#file} + 1)) -gt $BATCH_CHARACTERS ]]; then
+    if on_windows && [[ $((length + ${#file} + 1)) -gt 24000 ]]; then
         check_batch
     fi
     batch+=("$file")
