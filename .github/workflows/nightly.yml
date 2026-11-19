@@ -45,9 +45,9 @@ jobs:
   test:
     name: Build and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    # A green run takes 15 to 17 minutes on either system, and a cache miss or a slow runner adds minutes: 20 cancelled
-    # a Windows run whose every test had passed.
-    timeout-minutes: 30
+    # A green Windows run took 12 to 28 minutes in November 2026, a cache miss or a slow runner adding minutes, and 30
+    # cancelled one whose every test had passed so far, as 20 did before.
+    timeout-minutes: 45
     strategy:
       # One system's failure says nothing of the other.
       fail-fast: false
