@@ -10,7 +10,8 @@
 -- collection-type: Array
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -28,7 +29,8 @@ ORDER BY n;
 -- generator: method-type=sync
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -45,7 +47,8 @@ ORDER BY n;
 -- collection-type: IEnumerable
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -62,7 +65,8 @@ ORDER BY n;
 -- collection-type: IReadOnlyCollection
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -79,7 +83,8 @@ ORDER BY n;
 -- collection-type: IReadOnlyList
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -96,7 +101,8 @@ ORDER BY n;
 -- collection-type: List
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -114,7 +120,8 @@ ORDER BY n;
 -- generator: method-type=sync
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -131,7 +138,8 @@ ORDER BY n;
 -- collection-type: IList
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -149,7 +157,8 @@ ORDER BY n;
 -- generator: method-type=sync
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -166,7 +175,8 @@ ORDER BY n;
 -- collection-type: ICollection
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -184,7 +194,8 @@ ORDER BY n;
 -- generator: method-type=sync
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -201,7 +212,8 @@ ORDER BY n;
 -- collection-type: ImmutableArray
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -219,7 +231,8 @@ ORDER BY n;
 -- generator: method-type=sync
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -237,7 +250,8 @@ ORDER BY n;
 -- generator: array-pool=off
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -255,7 +269,8 @@ ORDER BY n;
 -- generator: array-pool=off
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -273,7 +288,8 @@ ORDER BY n;
 -- generator: array-pool=off
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -291,7 +307,8 @@ ORDER BY n;
 -- generator: array-pool=off
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -309,7 +326,8 @@ ORDER BY n;
 -- generator: array-pool=off
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -327,7 +345,8 @@ ORDER BY n;
 -- generator: array-pool=off method-type=sync
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -345,7 +364,8 @@ ORDER BY n;
 -- generator: array-pool=off
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -363,7 +383,8 @@ ORDER BY n;
 -- generator: array-pool=off method-type=sync
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -381,7 +402,8 @@ ORDER BY n;
 -- generator: array-pool=off
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -399,7 +421,8 @@ ORDER BY n;
 -- generator: array-pool=off method-type=sync
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -417,7 +440,8 @@ ORDER BY n;
 -- generator: array-pool=off
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n
@@ -435,7 +459,8 @@ ORDER BY n;
 -- generator: array-pool=off method-type=sync
 -- input-model: NumbersCount
 -- output-model: CountedNumber
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 1 AS n

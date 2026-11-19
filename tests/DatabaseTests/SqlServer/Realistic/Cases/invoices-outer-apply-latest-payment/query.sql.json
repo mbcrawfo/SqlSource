@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListInvoicesWithLatestPayment": {
-      "hash": "f50f4e133dc198db4fbfef96e7f1995502d462263ede0840553d5aeebd9602ac",
+      "hash": "437c76b8da08c2bd8f678ed0e762a60c2655450a7685b7c70bb9c94b409d872f",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

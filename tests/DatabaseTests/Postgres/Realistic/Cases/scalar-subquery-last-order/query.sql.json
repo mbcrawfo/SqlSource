@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListAccountsByLastOrder": {
-      "hash": "1b11abb24f056d6e226c70858975837ddb8ac97bafdde2f08afe0adcdcb40f30",
+      "hash": "2720e367b1ab6afe9fc059dff39d5d2d8836c106970902b9d85b046d498fcc45",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

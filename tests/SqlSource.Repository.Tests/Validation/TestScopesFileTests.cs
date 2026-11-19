@@ -54,6 +54,10 @@ public sealed class TestScopesFileTests
     [InlineData("tests/DatabaseTests/README.md", nameof(TestScope.None))]
     [InlineData("tests/DatabaseTests/TestHarness/EngineImage.cs", nameof(TestScope.Both))]
     [InlineData("tests/DatabaseTests/TestHarness/Postgis/Dockerfile", nameof(TestScope.Postgres))]
+    [InlineData(".sqlfluff", nameof(TestScope.None))]
+    [InlineData(".sqlfluffignore", nameof(TestScope.None))]
+    [InlineData("tests/DatabaseTests/Postgres/.sqlfluff", nameof(TestScope.None))]
+    [InlineData("tests/DatabaseTests/SqlServer/.sqlfluff", nameof(TestScope.None))]
     public void Of_RealPath_IsDecidedAsIntended(string path, string scope) =>
         TestScopes.Repository.Of(path).ToString().ShouldBe(scope);
 

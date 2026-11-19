@@ -6,6 +6,11 @@ SELECT
     r.id AS reservation_id,
     r.during,
     upper(r.during) - lower(r.during) AS duration
-FROM (SELECT id, name, email FROM accounts WHERE status = 'active') a
+FROM (SELECT
+    id,
+    name,
+    email
+FROM accounts
+WHERE status = 'active') a
 FULL JOIN reservations r ON r.account_id = a.id
 ORDER BY account_id, reservation_id;

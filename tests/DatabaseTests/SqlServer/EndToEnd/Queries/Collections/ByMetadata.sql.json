@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListAccountsByMetadata": {
-      "hash": "4553b31e60b52c73b8747e527e9304974f949dd04a8bfc7c80367412e462db55",
+      "hash": "29ab83dba498069400a35f33641c197e294ddeb346079e42b270744db850ec00",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "mssql",

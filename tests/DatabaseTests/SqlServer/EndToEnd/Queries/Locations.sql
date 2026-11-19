@@ -5,7 +5,9 @@
 
 -- name: ListAccountNames
 -- summary: The id and name of every account, through an extension method of the connection.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 
@@ -14,7 +16,9 @@ ORDER BY id;
 -- member-location: class
 -- visibility: public
 -- output-model: ListAccountNamesDto
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 
@@ -23,7 +27,9 @@ ORDER BY id;
 -- member-location: class
 -- visibility: internal
 -- output-model: ListAccountNamesDto
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 
@@ -32,7 +38,9 @@ ORDER BY id;
 -- member-location: class
 -- visibility: private
 -- output-model: ListAccountNamesDto
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 
@@ -41,7 +49,9 @@ ORDER BY id;
 -- member-location: nested-class
 -- visibility: internal
 -- output-model: ListAccountNamesDto
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 
@@ -49,6 +59,8 @@ ORDER BY id;
 -- summary: ListAccountNames again, with the Async suffix on its method.
 -- generator: async-method-suffix
 -- output-model: ListAccountNamesDto
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;

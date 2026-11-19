@@ -20,7 +20,14 @@ INSERT INTO dbo.noda_values (
 
 -- name: GetNodaValues -> one
 -- summary: The row of noda_values with the id, its six columns of the types that NodaTime's rows map.
-SELECT id, date_value, time_value, datetime2_value, datetime_value, smalldatetime_value, datetimeoffset_value
+SELECT
+    id,
+    date_value,
+    time_value,
+    datetime2_value,
+    datetime_value,
+    smalldatetime_value,
+    datetimeoffset_value
 FROM dbo.noda_values
 WHERE id = @id;
 
@@ -45,6 +52,13 @@ INSERT INTO dbo.noda_values (
 -- generator: method-type=sync
 -- input-model: GetNodaValuesArgs
 -- output-model: GetNodaValuesDto
-SELECT id, date_value, time_value, datetime2_value, datetime_value, smalldatetime_value, datetimeoffset_value
+SELECT
+    id,
+    date_value,
+    time_value,
+    datetime2_value,
+    datetime_value,
+    smalldatetime_value,
+    datetimeoffset_value
 FROM dbo.noda_values
 WHERE id = @id;

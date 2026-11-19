@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "SearchAccounts": {
-      "hash": "74ca762a4f0847583a06af650c3a94e3c13845186f86252074190f09916ae014",
+      "hash": "c8dcd92d02ea65493df8e06c7842dd2e90afd26617c7d58f84bb98d03bd8ad19",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

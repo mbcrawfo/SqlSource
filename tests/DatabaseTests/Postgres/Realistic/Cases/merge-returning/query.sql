@@ -1,7 +1,7 @@
 -- name: MergeProductCatalog
 MERGE INTO products p
 USING unnest(@ids::int[], @skus::text[], @names::text[], @prices::numeric[]) AS s (id, sku, name, price)
-ON s.sku = p.sku
+    ON s.sku = p.sku
 WHEN MATCHED AND p.discontinued_on IS NOT NULL THEN
     DO NOTHING
 WHEN MATCHED THEN

@@ -11,7 +11,9 @@ Add these two queries to `UserRepository.sql`, below `GetUser`:
 ```sql postgres
 -- name: ListUserNames
 -- summary: The name of every user, in the order of their ids.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM users
 ORDER BY id;
 
@@ -61,7 +63,10 @@ To filter by a value only when the caller gives one, test the parameter for null
 -- name: FindUsers
 -- summary: Finds the users with a name, or every user when the name is null.
 -- param: @name text null
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 WHERE @name IS NULL OR name = @name
 ORDER BY name;
@@ -73,7 +78,10 @@ ORDER BY name;
 -- name: FindUsers
 -- summary: Finds the users with a name, or every user when the name is null.
 -- param: @name nvarchar(100) null
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 WHERE @name IS NULL OR name = @name
 ORDER BY name;
@@ -94,7 +102,9 @@ To filter by a list of values, write the parameter directly after `IN`, with no 
 ```sql postgres
 -- name: ListUsersByIds
 -- summary: The users whose ids are in the list.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM users
 WHERE id IN @ids
 ORDER BY id;
@@ -120,7 +130,9 @@ A property is nullable when your database cannot show that its column is never n
 -- name: ListDisplayNames
 -- summary: The name of every user, with each word capitalized.
 -- column: display_name not null
-SELECT id, initcap(name) AS display_name
+SELECT
+    id,
+    initcap(name) AS display_name
 FROM users
 ORDER BY id;
 ```
@@ -131,7 +143,9 @@ ORDER BY id;
 -- name: ListDisplayNames
 -- summary: The name of every user, in upper case.
 -- column: display_name not null
-SELECT id, UPPER(name) AS display_name
+SELECT
+    id,
+    UPPER(name) AS display_name
 FROM users
 ORDER BY id;
 ```

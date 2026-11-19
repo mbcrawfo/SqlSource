@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "DeleteAbandonedCartItems": {
-      "hash": "02239e504132c4c645c8090b52d562a00d7d0dd054a1c36a2b2b14b6fc84a374",
+      "hash": "f8b4a9f65dee7412d8f709a0fecdbb92cfbb12fd18b92e3198e595a8ba34e243",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

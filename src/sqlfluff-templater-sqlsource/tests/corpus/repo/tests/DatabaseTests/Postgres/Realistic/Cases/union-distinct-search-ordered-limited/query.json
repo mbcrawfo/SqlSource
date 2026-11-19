@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: SearchEverything\nSELECT a.id, a.name AS label, 'account' AS kind\nFROM accounts a\nWHERE a.name ILIKE @pattern\nUNION\nSELECT o.id, o.note, 'order'\nFROM orders o\nWHERE o.note ILIKE @pattern\nUNION\nSELECT p.id, p.name, 'product'\nFROM products p\nWHERE p.name ILIKE @pattern OR p.sku ILIKE @pattern\nORDER BY label, kind\nLIMIT 20;\n",
+  "input": "-- name: SearchEverything\nSELECT\n    a.id,\n    a.name AS label,\n    'account' AS kind\nFROM accounts a\nWHERE a.name ILIKE @pattern\nUNION\nSELECT\n    o.id,\n    o.note,\n    'order'\nFROM orders o\nWHERE o.note ILIKE @pattern\nUNION\nSELECT\n    p.id,\n    p.name,\n    'product'\nFROM products p\nWHERE p.name ILIKE @pattern OR p.sku ILIKE @pattern\nORDER BY label, kind\nLIMIT 20;\n",
   "expected": {
     "startDialect": "postgres",
     "startOptions": [],
@@ -13,28 +13,28 @@
     "options": [],
     "lexemes": [
       ["LineComment", 0, 25],
-      ["Text", 25, 56],
-      ["Quoted", 56, 65],
-      ["Text", 65, 109],
-      ["Parameter", 109, 117],
-      ["Text", 117, 145],
-      ["Quoted", 145, 152],
-      ["Text", 152, 186],
-      ["Parameter", 186, 194],
-      ["Text", 194, 222],
-      ["Quoted", 222, 231],
-      ["Text", 231, 267],
-      ["Parameter", 267, 275],
-      ["Text", 275, 291],
-      ["Parameter", 291, 299],
-      ["Text", 299, 331]
+      ["Text", 25, 68],
+      ["Quoted", 68, 77],
+      ["Text", 77, 121],
+      ["Parameter", 121, 129],
+      ["Text", 129, 169],
+      ["Quoted", 169, 176],
+      ["Text", 176, 210],
+      ["Parameter", 210, 218],
+      ["Text", 218, 258],
+      ["Quoted", 258, 267],
+      ["Text", 267, 303],
+      ["Parameter", 303, 311],
+      ["Text", 311, 327],
+      ["Parameter", 327, 335],
+      ["Text", 335, 367]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 25, "name": null, "default": null },
-      { "kind": "parameter", "start": 109, "end": 117, "name": "pattern", "default": null },
-      { "kind": "parameter", "start": 186, "end": 194, "name": "pattern", "default": null },
-      { "kind": "parameter", "start": 267, "end": 275, "name": "pattern", "default": null },
-      { "kind": "parameter", "start": 291, "end": 299, "name": "pattern", "default": null }
+      { "kind": "parameter", "start": 121, "end": 129, "name": "pattern", "default": null },
+      { "kind": "parameter", "start": 210, "end": 218, "name": "pattern", "default": null },
+      { "kind": "parameter", "start": 303, "end": 311, "name": "pattern", "default": null },
+      { "kind": "parameter", "start": 327, "end": 335, "name": "pattern", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

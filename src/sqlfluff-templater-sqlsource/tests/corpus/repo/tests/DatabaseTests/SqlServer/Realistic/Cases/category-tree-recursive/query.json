@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: ListCategoryTree\nWITH tree AS (\n    SELECT c.id, c.parent_id, c.name, CAST(c.name AS nvarchar(400)) AS path, 1 AS depth\n    FROM dbo.categories AS c\n    WHERE c.parent_id IS NULL\n    UNION ALL\n    SELECT c.id, c.parent_id, c.name, CAST(t.path + N' > ' + c.name AS nvarchar(400)), t.depth + 1\n    FROM dbo.categories AS c\n    JOIN tree AS t ON t.id = c.parent_id\n)\nSELECT t.id, t.parent_id, t.name, t.path, t.depth, COUNT(p.id) AS product_count\nFROM tree AS t\nLEFT JOIN dbo.products AS p ON p.category_id = t.id\nGROUP BY t.id, t.parent_id, t.name, t.path, t.depth\nORDER BY t.path;\n",
+  "input": "-- name: ListCategoryTree\nWITH tree AS (\n    SELECT\n        c.id,\n        c.parent_id,\n        c.name,\n        CAST(c.name AS nvarchar(400)) AS path,\n        1 AS depth\n    FROM dbo.categories AS c\n    WHERE c.parent_id IS NULL\n    UNION ALL\n    SELECT\n        c.id,\n        c.parent_id,\n        c.name,\n        CAST(t.path + N' > ' + c.name AS nvarchar(400)),\n        t.depth + 1\n    FROM dbo.categories AS c\n    JOIN tree AS t ON t.id = c.parent_id\n)\n\nSELECT\n    t.id,\n    t.parent_id,\n    t.name,\n    t.path,\n    t.depth,\n    COUNT(p.id) AS product_count\nFROM tree AS t\nLEFT JOIN dbo.products AS p ON p.category_id = t.id\nGROUP BY t.id, t.parent_id, t.name, t.path, t.depth\nORDER BY t.path;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -13,9 +13,9 @@
     "options": [],
     "lexemes": [
       ["LineComment", 0, 25],
-      ["Text", 25, 255],
-      ["Quoted", 255, 260],
-      ["Text", 260, 589]
+      ["Text", 25, 327],
+      ["Quoted", 327, 332],
+      ["Text", 332, 694]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 25, "name": null, "default": null }

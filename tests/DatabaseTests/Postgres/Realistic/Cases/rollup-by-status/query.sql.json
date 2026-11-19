@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "GetRevenueByStatusAndMonth": {
-      "hash": "3367413aea874aeb36d87b3916cbb8388066ec74a1d0e713e09afd4fb1c5419b",
+      "hash": "b419d53bdd47c4ad6b76156f38af3cf98b3514dca7016b21b416078cfab90cfb",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

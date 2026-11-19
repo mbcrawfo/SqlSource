@@ -4,7 +4,10 @@
 
 -- name: GetExternalRef -> one-optional
 -- summary: The account that an external id names, with the id, or none.
-SELECT r.id, r.account_id, r.external_id
+SELECT
+    r.id,
+    r.account_id,
+    r.external_id
 FROM dbo.external_refs AS r
 WHERE r.external_id = @externalId;
 
@@ -16,7 +19,9 @@ VALUES (@id, @accountId, @externalId);
 
 -- name: ListAccountExternalIds
 -- summary: Every account with its external id, and NULL for an account with none, which a LEFT JOIN gives.
-SELECT a.id, r.external_id
+SELECT
+    a.id,
+    r.external_id
 FROM dbo.accounts AS a
 LEFT JOIN dbo.external_refs AS r ON r.account_id = a.id
 ORDER BY a.id;

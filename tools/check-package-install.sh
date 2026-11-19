@@ -415,8 +415,9 @@ if ! grep -q 'sqlsource: summary: ' "$work/online-auto.log"; then
     online_fails 'did not show the summary of the tool under auto with a .env' "$work/online-auto.log"
 fi
 
-# A query whose SQL changed has a stale entry, which needs a connection to describe again.
-sed 's/^SELECT \*$/SELECT id, name/' "$repo_root/$ONLINE_QUERY" >Queries/Users.sql
+# A query whose SQL changed has a stale entry, which needs a connection to describe again.  The line SELECT * ends in
+# the comment that tells sqlfluff it is meant, and the change drops that too.
+sed 's/^SELECT \*\( .*\)\{0,1\}$/SELECT id, name/' "$repo_root/$ONLINE_QUERY" >Queries/Users.sql
 if cmp -s "$repo_root/$ONLINE_QUERY" Queries/Users.sql; then
     online_fails "could not change the SQL of $ONLINE_QUERY, which no longer has a line SELECT *" Queries/Users.sql
 fi

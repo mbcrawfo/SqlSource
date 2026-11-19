@@ -99,7 +99,7 @@
       ]
     },
     "GetNodaValues": {
-      "hash": "76f7935f6984eed02bdd1218e896c77d6b1384c5fb182e5182eceee7a94af5b3",
+      "hash": "bf098c415a861bc6350f7c8c6dacd0fc0dcb4595644b5be068d7a4d27aa3d545",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "mssql",
@@ -353,7 +353,7 @@
       ]
     },
     "GetNodaValuesSync": {
-      "hash": "76f7935f6984eed02bdd1218e896c77d6b1384c5fb182e5182eceee7a94af5b3",
+      "hash": "bf098c415a861bc6350f7c8c6dacd0fc0dcb4595644b5be068d7a4d27aa3d545",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "mssql",

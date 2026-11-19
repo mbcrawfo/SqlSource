@@ -1,10 +1,15 @@
 -- name: ListOrderHistoryWithRunningTotals
 WITH order_totals AS (
-    SELECT o.id, o.account_id, o.placed_at, sum(l.quantity * l.unit_price) AS total
+    SELECT
+        o.id,
+        o.account_id,
+        o.placed_at,
+        sum(l.quantity * l.unit_price) AS total
     FROM orders o
     JOIN order_lines l ON l.order_id = o.id
     GROUP BY o.id
 )
+
 SELECT
     ot.id,
     ot.account_id,

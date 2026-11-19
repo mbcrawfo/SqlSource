@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "SearchContactNames": {
-      "hash": "0e808ffa07f7250bec79c388e6ba92d67d121505fff86514170fe348e181f207",
+      "hash": "0cb9468caeb66182e70fe5d46177b611b7aa7180b299a5014718036a62bc8fc9",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

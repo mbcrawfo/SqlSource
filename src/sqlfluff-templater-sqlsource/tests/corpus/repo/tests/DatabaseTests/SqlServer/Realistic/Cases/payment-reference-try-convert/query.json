@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: ListPaymentsForReconciliation\n-- param: @from datetime2(0)\n-- param: @to datetime2(0)\nSELECT\n    p.id,\n    i.number AS invoice_number,\n    p.paid_at,\n    p.amount,\n    p.method,\n    p.reference,\n    TRY_CONVERT(int, p.reference) AS bank_reference\nFROM billing.payments AS p\nJOIN billing.invoices AS i ON i.id = p.invoice_id\nWHERE p.paid_at >= @from\n    AND p.paid_at < @to\nORDER BY p.paid_at, p.id;\n",
+  "input": "-- name: ListPaymentsForReconciliation\n-- param: @from datetime2(0)\n-- param: @to datetime2(0)\nSELECT\n    p.id,\n    i.number AS invoice_number,\n    p.paid_at,\n    p.amount,\n    p.method,\n    p.reference,\n    TRY_CONVERT(int, p.reference) AS bank_reference\nFROM billing.payments AS p\nJOIN billing.invoices AS i ON i.id = p.invoice_id\nWHERE\n    p.paid_at >= @from\n    AND p.paid_at < @to\nORDER BY p.paid_at, p.id;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -17,18 +17,18 @@
       ["LineComment", 39, 67],
       ["Text", 67, 68],
       ["LineComment", 68, 94],
-      ["Text", 94, 352],
-      ["Parameter", 352, 357],
-      ["Text", 357, 378],
-      ["Parameter", 378, 381],
-      ["Text", 381, 408]
+      ["Text", 94, 356],
+      ["Parameter", 356, 361],
+      ["Text", 361, 382],
+      ["Parameter", 382, 385],
+      ["Text", 385, 412]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 38, "name": null, "default": null },
       { "kind": "markerComment", "start": 39, "end": 67, "name": null, "default": null },
       { "kind": "markerComment", "start": 68, "end": 94, "name": null, "default": null },
-      { "kind": "parameter", "start": 352, "end": 357, "name": "from", "default": null },
-      { "kind": "parameter", "start": 378, "end": 381, "name": "to", "default": null }
+      { "kind": "parameter", "start": 356, "end": 361, "name": "from", "default": null },
+      { "kind": "parameter", "start": 382, "end": 385, "name": "to", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

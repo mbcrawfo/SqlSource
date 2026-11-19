@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListCustomersFirstOrderValue": {
-      "hash": "616c76178788eb43fe9bf414517d26a6fa73d19ffb4982602b7709b1f2ebdbd4",
+      "hash": "dd0ef32b6b46b837e79e0f2c3847fb3b8144d6cf9da0fd215edfd790caa6c894",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

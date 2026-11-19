@@ -8,10 +8,10 @@ INSERT INTO spatial_values (
     id, geometry_value, geography_value, point_value, polygon_value, geometry_array_value, shape_value
 ) VALUES (
     1,
-    ST_GeomFromText('POINT ZM(1 2 3 4)', 3857),
-    ST_GeogFromText('SRID=4326;POINT(-71.06 42.36)'),
-    ST_GeomFromText('POINT(10 20)', 4326),
-    ST_GeomFromText('POLYGON((0 0, 4 0, 4 4, 0 4, 0 0))', 4326),
-    ARRAY[ST_GeomFromText('POINT(1 1)', 4326), NULL, ST_GeomFromText('LINESTRING(0 0, 1 1)', 3857)],
-    ST_GeomFromText('LINESTRING(0 0, 2 2)', 4326)
+    ST_GEOMFROMTEXT('POINT ZM(1 2 3 4)', 3857),
+    ST_GEOGFROMTEXT('SRID=4326;POINT(-71.06 42.36)'),
+    ST_GEOMFROMTEXT('POINT(10 20)', 4326),
+    ST_GEOMFROMTEXT('POLYGON((0 0, 4 0, 4 4, 0 4, 0 0))', 4326),
+    ARRAY[ST_GEOMFROMTEXT('POINT(1 1)', 4326), NULL, ST_GEOMFROMTEXT('LINESTRING(0 0, 1 1)', 3857)],
+    ST_GEOMFROMTEXT('LINESTRING(0 0, 2 2)', 4326)
 );

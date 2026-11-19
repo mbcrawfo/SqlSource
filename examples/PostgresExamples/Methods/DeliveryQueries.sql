@@ -21,6 +21,9 @@ VALUES (@orderId, @deliveredAt, @location, @details);
 -- class.  order_id is left out: the table's columns in its own order would give the rows the table's model,
 -- DeliveriesDto.
 -- column: details -> DeliveryDetails
-SELECT delivered_at, location, details
+SELECT
+    delivered_at,
+    location,
+    details
 FROM deliveries
 WHERE order_id = @orderId;

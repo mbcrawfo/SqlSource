@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListInvoicesDueInMonth": {
-      "hash": "79fd5e1c9923b5d1b704f99b30d9f330a2eee82146e6450c92995eee279655df",
+      "hash": "caa0f078df007827b511c74b832a44859b0b0a1db00b06126bba9d6b271b0d68",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

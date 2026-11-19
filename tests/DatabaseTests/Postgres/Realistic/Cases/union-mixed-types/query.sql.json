@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListItemsNeedingAttention": {
-      "hash": "c2b210b830d9733516f6a84c712d367032d1fda1d508c6f41473c506f077fc56",
+      "hash": "6720bc449c39e555a684165755d91597419352b157c6c75419ccba1db68e802b",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

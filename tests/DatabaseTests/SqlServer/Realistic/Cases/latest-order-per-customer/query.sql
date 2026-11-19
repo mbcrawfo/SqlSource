@@ -11,6 +11,7 @@ WITH ranked AS (
     FROM dbo.orders AS o
     WHERE o.status <> 'cancelled'
 )
+
 SELECT
     r.customer_id,
     c.name AS customer_name,

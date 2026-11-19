@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: SearchContactNames\n-- param: @q nvarchar(100)\nSELECT c.name, c.email, c.phone, 'customer' AS source\nFROM dbo.customers AS c\nWHERE c.name LIKE @q\nUNION\nSELECT o.ship_name, c.email, c.phone, 'recipient'\nFROM dbo.orders AS o\nJOIN dbo.customers AS c ON c.id = o.customer_id\nWHERE o.ship_name LIKE @q\nORDER BY name, source;\n",
+  "input": "-- name: SearchContactNames\n-- param: @q nvarchar(100)\nSELECT\n    c.name,\n    c.email,\n    c.phone,\n    'customer' AS source\nFROM dbo.customers AS c\nWHERE c.name LIKE @q\nUNION\nSELECT\n    o.ship_name,\n    c.email,\n    c.phone,\n    'recipient'\nFROM dbo.orders AS o\nJOIN dbo.customers AS c ON c.id = o.customer_id\nWHERE o.ship_name LIKE @q\nORDER BY name, source;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -15,21 +15,21 @@
       ["LineComment", 0, 27],
       ["Text", 27, 28],
       ["LineComment", 28, 54],
-      ["Text", 54, 88],
-      ["Quoted", 88, 98],
-      ["Text", 98, 151],
-      ["Parameter", 151, 153],
-      ["Text", 153, 198],
-      ["Quoted", 198, 209],
-      ["Text", 209, 302],
-      ["Parameter", 302, 304],
-      ["Text", 304, 328]
+      ["Text", 54, 104],
+      ["Quoted", 104, 114],
+      ["Text", 114, 167],
+      ["Parameter", 167, 169],
+      ["Text", 169, 230],
+      ["Quoted", 230, 241],
+      ["Text", 241, 334],
+      ["Parameter", 334, 336],
+      ["Text", 336, 360]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 27, "name": null, "default": null },
       { "kind": "markerComment", "start": 28, "end": 54, "name": null, "default": null },
-      { "kind": "parameter", "start": 151, "end": 153, "name": "q", "default": null },
-      { "kind": "parameter", "start": 302, "end": 304, "name": "q", "default": null }
+      { "kind": "parameter", "start": 167, "end": 169, "name": "q", "default": null },
+      { "kind": "parameter", "start": 334, "end": 336, "name": "q", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

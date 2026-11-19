@@ -18,9 +18,9 @@
 SET IDENTITY_INSERT dbo.accounts ON;
 
 INSERT INTO dbo.accounts (id, name, email, status, opened_on, created_at, closed_at) VALUES
-    (1, N'alice', N'alice@example.com', 'active', '2024-01-01', '2024-01-01 09:00:00 +00:00', NULL),
-    (2, N'bob', N'bob@example.com', 'closed', '2024-02-01', '2024-02-01 09:30:00 +00:00', '2024-09-01 17:45:00 +00:00'),
-    (3, N'carol', N'carol@example.com', 'suspended', '2024-03-01', '2024-03-01 10:00:00 +00:00', NULL);
+(1, N'alice', N'alice@example.com', 'active', '2024-01-01', '2024-01-01 09:00:00 +00:00', NULL),
+(2, N'bob', N'bob@example.com', 'closed', '2024-02-01', '2024-02-01 09:30:00 +00:00', '2024-09-01 17:45:00 +00:00'),
+(3, N'carol', N'carol@example.com', 'suspended', '2024-03-01', '2024-03-01 10:00:00 +00:00', NULL);
 
 SET IDENTITY_INSERT dbo.accounts OFF;
 GO
@@ -28,16 +28,16 @@ GO
 SET IDENTITY_INSERT dbo.notes ON;
 
 INSERT INTO dbo.notes (id, account_id, kind, body, written_at, remind_at) VALUES
-    (1, 1, 'call', N'Asked for a larger plan.', '2024-01-10 11:00:00.000', '09:30:00'),
-    (2, 1, 'email', N'Sent the quote.', '2024-01-12 14:20:00.000', NULL),
-    (3, 2, 'visit', N'Closed the account on site.', '2024-09-01 17:30:00.000', NULL);
+(1, 1, 'call', N'Asked for a larger plan.', '2024-01-10 11:00:00.000', '09:30:00'),
+(2, 1, 'email', N'Sent the quote.', '2024-01-12 14:20:00.000', NULL),
+(3, 2, 'visit', N'Closed the account on site.', '2024-09-01 17:30:00.000', NULL);
 
 SET IDENTITY_INSERT dbo.notes OFF;
 GO
 
 INSERT INTO dbo.external_refs (id, account_id, external_id) VALUES
-    (1, 1, 5000000001),
-    (2, 2, 5000000002);
+(1, 1, 5000000001),
+(2, 2, 5000000002);
 GO
 
 INSERT INTO dbo.all_types (

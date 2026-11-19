@@ -15,7 +15,10 @@ The [PostgreSQL example project](https://github.com/mbcrawfo/SqlSource/blob/main
 -- summary: The orders in any of the given statuses, or every order when the list is null, newest first.
 -- member-location: class
 -- visibility: public
-SELECT id, status, placed_at
+SELECT
+    id,
+    status,
+    placed_at
 FROM orders
 WHERE (@statuses IS NULL OR status IN @statuses)
 ORDER BY placed_at DESC;
@@ -54,7 +57,10 @@ Its class, in `Methods/OrderQueries.cs`, passes an array:
 
 ```sql postgres
 -- name: ListOrdersByStatuses
-SELECT id, status, placed_at
+SELECT
+    id,
+    status,
+    placed_at
 FROM orders
 WHERE (@statuses IS NULL OR status IN @statuses)
 ORDER BY placed_at DESC;
@@ -108,7 +114,9 @@ Read this if a list can be empty or null, or can hold thousands of values.
 
 ```sql postgres
 -- name: ListUsersByIds
-SELECT id, name
+SELECT
+    id,
+    name
 FROM users
 WHERE id IN @ids
 ORDER BY id;

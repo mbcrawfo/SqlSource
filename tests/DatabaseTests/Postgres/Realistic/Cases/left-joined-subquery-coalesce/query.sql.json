@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListAccountsWithCouponCodes": {
-      "hash": "5cfb073f22f9e2b9f9bd155363078000cf632bc5a7b66b4bd32c40d1acd86676",
+      "hash": "faac0faf67ec645fb080f1df35b04d263829a6474959ecf9f5a537b76f13924a",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

@@ -5,32 +5,51 @@
 -- name: StreamAccounts
 -- summary: Every account, streamed.
 -- output-model: CollectedAccount
-SELECT id, name FROM accounts ORDER BY id;
+SELECT
+    id,
+    name
+FROM accounts
+ORDER BY id;
 
 -- name: StreamAccountsBoth
 -- summary: StreamAccounts under method-type=both, which gives a stream its asynchronous method alone, named with Async
 -- summary: after it.
 -- generator: method-type=both
 -- output-model: CollectedAccount
-SELECT id, name FROM accounts ORDER BY id;
+SELECT
+    id,
+    name
+FROM accounts
+ORDER BY id;
 
 -- name: StreamAccountsNamedFrom
 -- summary: The accounts from an id on, streamed, for a method that takes parameters.
 -- output-model: CollectedAccount
-SELECT id, name FROM accounts WHERE id >= @firstId ORDER BY id;
+SELECT
+    id,
+    name
+FROM accounts
+WHERE id >= @firstId
+ORDER BY id;
 
 -- name: StreamNullAtThird
 -- summary: Every account, with a NULL for the name of the third, which the marker says is never NULL.
 -- column: name not null
-SELECT id, CASE WHEN id = 3 THEN NULL ELSE name END AS name FROM accounts ORDER BY id;
+SELECT
+    id,
+    CASE WHEN id = 3 THEN NULL ELSE name END AS name
+FROM accounts
+ORDER BY id;
 
 -- name: StreamNumbers
 -- summary: The numbers from 1 to a count, for a break and a cancellation partway through many rows.
-SELECT n FROM generate_series(1, @count) AS n ORDER BY n;
+SELECT n FROM generate_series(1, @count) AS n
+ORDER BY n;
 
 -- name: StreamFromTable
 -- summary: The ids of the rows of a table that the caller names, for a method that takes a token.
-SELECT id FROM {{table:accounts}} ORDER BY id;
+SELECT id FROM {{table:accounts}}
+ORDER BY id;
 
 -- name: StreamNumbersFailingHalfway
 -- summary: The numbers from 1 to a million, each with 10 divided by its distance from 500,000, which fails at that row.
@@ -39,8 +58,13 @@ SELECT id FROM {{table:accounts}} ORDER BY id;
 -- the server is still sending when the loop stops.  The numbers are sorted in a subquery, and the division is above
 -- it: PostgreSQL computes the columns of a query before its own sort, so a division beside the ORDER BY would fail
 -- before the first row is sent.
-SELECT n, 10 / (n - 500000) AS quotient
-FROM (SELECT n FROM generate_series(1, 1000000) AS n ORDER BY n) AS numbers
+SELECT
+    n,
+    10 / (n - 500000) AS quotient
+FROM (
+    SELECT n FROM generate_series(1, 1000000) AS n
+    ORDER BY n
+) AS numbers
 ORDER BY n;
 
 -- name: StreamThenRaise
@@ -49,6 +73,14 @@ ORDER BY n;
 -- row of the second, so the error comes after the three accounts.
 -- column: id not null
 -- output-model: CollectedAccount
-(SELECT id, name FROM accounts ORDER BY id)
+(SELECT
+    id,
+    name
+FROM accounts
+ORDER BY id)
 UNION ALL
-(SELECT id / 0, name FROM accounts WHERE id = 1);
+(SELECT
+    id / 0,
+    name
+FROM accounts
+WHERE id = 1);

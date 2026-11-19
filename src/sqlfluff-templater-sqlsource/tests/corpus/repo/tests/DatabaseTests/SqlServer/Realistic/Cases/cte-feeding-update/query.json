@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: FlagOrdersWithOverdueInvoices\n-- param: @as_of date\nWITH due AS (\n    SELECT\n        i.order_id,\n        i.number,\n        i.due_at,\n        i.amount - ISNULL(SUM(p.amount), 0) AS outstanding\n    FROM billing.invoices AS i\n    LEFT JOIN billing.payments AS p ON p.invoice_id = i.id\n    WHERE i.voided_at IS NULL\n        AND i.due_at < @as_of\n    GROUP BY i.order_id, i.number, i.due_at, i.amount\n    HAVING i.amount > ISNULL(SUM(p.amount), 0)\n)\nUPDATE o\nSET o.note = CONCAT(o.note + N'; ', N'Invoice ', d.number, N' overdue since ', CONVERT(char(10), d.due_at, 23))\nOUTPUT\n    inserted.id,\n    inserted.status,\n    deleted.note AS previous_note,\n    inserted.note,\n    d.number AS invoice_number,\n    d.due_at,\n    d.outstanding,\n    inserted.shipped_at\nFROM dbo.orders AS o\nJOIN due AS d ON d.order_id = o.id;\n",
+  "input": "-- name: FlagOrdersWithOverdueInvoices\n-- param: @as_of date\nWITH due AS (\n    SELECT\n        i.order_id,\n        i.number,\n        i.due_at,\n        i.amount - ISNULL(SUM(p.amount), 0) AS outstanding\n    FROM billing.invoices AS i\n    LEFT JOIN billing.payments AS p ON p.invoice_id = i.id\n    WHERE\n        i.voided_at IS NULL\n        AND i.due_at < @as_of\n    GROUP BY i.order_id, i.number, i.due_at, i.amount\n    HAVING i.amount > ISNULL(SUM(p.amount), 0)\n)\n\nUPDATE o\nSET o.note = CONCAT(o.note + N'; ', N'Invoice ', d.number, N' overdue since ', CONVERT(char(10), d.due_at, 23))\nOUTPUT\n    INSERTED.id,\n    INSERTED.status,\n    DELETED.note AS previous_note,\n    INSERTED.note,\n    d.number AS invoice_number,\n    d.due_at,\n    d.outstanding,\n    INSERTED.shipped_at\nFROM dbo.orders AS o\nJOIN due AS d ON d.order_id = o.id;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -15,20 +15,20 @@
       ["LineComment", 0, 38],
       ["Text", 38, 39],
       ["LineComment", 39, 60],
-      ["Text", 60, 344],
-      ["Parameter", 344, 350],
-      ["Text", 350, 493],
-      ["Quoted", 493, 497],
-      ["Text", 497, 500],
-      ["Quoted", 500, 510],
-      ["Text", 510, 523],
-      ["Quoted", 523, 540],
-      ["Text", 540, 820]
+      ["Text", 60, 352],
+      ["Parameter", 352, 358],
+      ["Text", 358, 502],
+      ["Quoted", 502, 506],
+      ["Text", 506, 509],
+      ["Quoted", 509, 519],
+      ["Text", 519, 532],
+      ["Quoted", 532, 549],
+      ["Text", 549, 829]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 38, "name": null, "default": null },
       { "kind": "markerComment", "start": 39, "end": 60, "name": null, "default": null },
-      { "kind": "parameter", "start": 344, "end": 350, "name": "as_of", "default": null }
+      { "kind": "parameter", "start": 352, "end": 358, "name": "as_of", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

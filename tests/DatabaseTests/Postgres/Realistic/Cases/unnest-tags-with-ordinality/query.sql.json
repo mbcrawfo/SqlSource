@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListAccountTags": {
-      "hash": "578027dadc0d7f67864c6756ddf795dc13d638e56af5cf6e38776bfcf766c77e",
+      "hash": "659b5b3cd07cfb6957c2911991944b46c639de43a9d13af00865018d68313980",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

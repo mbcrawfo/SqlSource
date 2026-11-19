@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "GetOrder": {
-      "hash": "43df156e324115b07d6b32d15416ae5ceff4e8cd390ac5d521df52e9eb3935da",
+      "hash": "01ae82e83ccaeef35c9cbe007eed6e27a27ab4616a923b3b0613ef6fd81919b2",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",
@@ -133,7 +133,7 @@
       ]
     },
     "ListOrderTotals": {
-      "hash": "7b607b4b58b5398c45bcfc0c6a0e71425c83c26477fe503e19e318d7bcc25757",
+      "hash": "67c72cd054b8722730211b44d45111c3652b89396ddd1660254e9087878d0019",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",
@@ -181,7 +181,7 @@
       ]
     },
     "CountShippedOrders": {
-      "hash": "ff5451aeaac7558e15de4116fb44c0a298e27c16e3b5d0c4b4eac03e85e2eace",
+      "hash": "51558ca6dfe277d0eeb25f561dcaf2099678e49aa21fa2f6a25546877d25cd8c",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",
@@ -229,7 +229,7 @@
       ]
     },
     "ListUserDisplayNames": {
-      "hash": "a6bb963ed27508bbcbac15edbdea5012de8c16643372a4fa9507d2851ecc31a7",
+      "hash": "46311f5601493190fbcb897cba3613edf1fbf2e2506e64ffd859a6b5c6296657",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",
@@ -277,7 +277,7 @@
       ]
     },
     "GetOrderTags": {
-      "hash": "c1cc2a44e8fe4bd2ffb95649b1f13cc6597021797822534010f785a336369258",
+      "hash": "809d2a7722dc989e8d8e1b0b7789b4f2ee96ccb27b3b2b249b2117d353d410ed",
       "toolVersion": "0.2.0",
       "database": "postgres",
       "engine": "postgres",

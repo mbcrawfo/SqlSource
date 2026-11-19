@@ -13,7 +13,9 @@ SELECT
 FROM dbo.products AS p
 JOIN dbo.prices AS pr ON pr.product_id = p.id
 OUTER APPLY (
-    SELECT MIN(ph.price) AS lowest_previous, MAX(ph.price) AS highest_previous
+    SELECT
+        MIN(ph.price) AS lowest_previous,
+        MAX(ph.price) AS highest_previous
     FROM dbo.prices_history AS ph
     WHERE ph.product_id = p.id
 ) AS h

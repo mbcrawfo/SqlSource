@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListBestSellers": {
-      "hash": "a5f721723fa98c51e37839cba43258bbfb0882cd1b86de6e72847ca337093e3d",
+      "hash": "5b20bf82f6839e0cbfa3b0ef1b88d3a4bd570327b9eb323e4e531559ce20792a",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

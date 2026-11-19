@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListAccountsWithOrderStats": {
-      "hash": "d00bf25335309edce7b4bf29575d5e69aea225f040002244458357c2e5bfd6f8",
+      "hash": "8182e864d179037a28041b8b0c6f716811bc2be5f396975e6098b26845309f4a",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

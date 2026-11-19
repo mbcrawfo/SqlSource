@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListRecentBuyersWithLastLogin": {
-      "hash": "4eef5af27021f0038a27d73a5725cfc23a65c47e8789203f308e0a58c8e907c8",
+      "hash": "c4c0adc0562b02ae588067f1c0d3a0ff565a1432e9f7840cd430e511a9fc379a",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

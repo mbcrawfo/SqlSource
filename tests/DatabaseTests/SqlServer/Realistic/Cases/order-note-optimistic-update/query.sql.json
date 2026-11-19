@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "UpdateOrderNote": {
-      "hash": "81a33b7cdbb05c96b5dea1fa592b5f25d1a264fc8feabc57b7e9e9ad4307b5d6",
+      "hash": "ee476bcb284b5c833c8ce8eee4acdd8545e5b9db9801391919db4f42fb7d729b",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",
