@@ -10,7 +10,8 @@ SELECT
     o.ship_city,
     o.shipped_at
 FROM dbo.orders AS o
-WHERE o.status IN (@status_1, @status_2)
+WHERE
+    o.status IN (@status_1, @status_2)
     AND o.customer_id IN (
         SELECT c.id
         FROM dbo.customers AS c

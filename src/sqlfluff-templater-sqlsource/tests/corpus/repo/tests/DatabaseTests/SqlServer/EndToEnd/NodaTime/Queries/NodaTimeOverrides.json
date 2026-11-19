@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- The queries of noda_values' three columns that the file header's type overrides make NodaTime's Instant, through\n-- datetime2 and datetimeoffset, and its Duration, through time, which no row of NodaTime maps.  An override to those\n-- types takes the generated conversion whether NodaTime is on or not.\n-- type-override: datetime2 = NodaTime.Instant\n-- type-override: datetimeoffset = NodaTime.Instant\n-- type-override: time = NodaTime.Duration\n\n-- name: InsertNodaOverrides\n-- summary: Inserts a row of noda_values with a parameter for each of the three columns, any of which may be null.\n-- param: @instantValue null\n-- param: @instantOffsetValue null\n-- param: @durationValue null\nINSERT INTO dbo.noda_values (id, instant_value, instant_offset_value, duration_value)\nVALUES (@id, @instantValue, @instantOffsetValue, @durationValue);\n\n-- name: GetNodaOverrides -> one\n-- summary: The row of noda_values with the id, its three columns of the types that the overrides name.\nSELECT id, instant_value, instant_offset_value, duration_value\nFROM dbo.noda_values\nWHERE id = @id;\n",
+  "input": "-- The queries of noda_values' three columns that the file header's type overrides make NodaTime's Instant, through\n-- datetime2 and datetimeoffset, and its Duration, through time, which no row of NodaTime maps.  An override to those\n-- types takes the generated conversion whether NodaTime is on or not.\n-- type-override: datetime2 = NodaTime.Instant\n-- type-override: datetimeoffset = NodaTime.Instant\n-- type-override: time = NodaTime.Duration\n\n-- name: InsertNodaOverrides\n-- summary: Inserts a row of noda_values with a parameter for each of the three columns, any of which may be null.\n-- param: @instantValue null\n-- param: @instantOffsetValue null\n-- param: @durationValue null\nINSERT INTO dbo.noda_values (id, instant_value, instant_offset_value, duration_value)\nVALUES (@id, @instantValue, @instantOffsetValue, @durationValue);\n\n-- name: GetNodaOverrides -> one\n-- summary: The row of noda_values with the id, its three columns of the types that the overrides name.\nSELECT\n    id,\n    instant_value,\n    instant_offset_value,\n    duration_value\nFROM dbo.noda_values\nWHERE id = @id;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -45,9 +45,9 @@
       ["LineComment", 839, 871],
       ["Text", 871, 872],
       ["LineComment", 872, 975],
-      ["Text", 975, 1071],
-      ["Parameter", 1071, 1074],
-      ["Text", 1074, 1076]
+      ["Text", 975, 1087],
+      ["Parameter", 1087, 1090],
+      ["Text", 1090, 1092]
     ],
     "spans": [
       { "kind": "markerComment", "start": 305, "end": 351, "name": null, "default": null },
@@ -64,7 +64,7 @@
       { "kind": "parameter", "start": 821, "end": 835, "name": "durationValue", "default": null },
       { "kind": "markerComment", "start": 839, "end": 871, "name": null, "default": null },
       { "kind": "markerComment", "start": 872, "end": 975, "name": null, "default": null },
-      { "kind": "parameter", "start": 1071, "end": 1074, "name": "id", "default": null }
+      { "kind": "parameter", "start": 1087, "end": 1090, "name": "id", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

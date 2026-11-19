@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "SearchCustomers": {
-      "hash": "8b7fbcfd71557c875374f0f004a639d4711ea3796629d36112485922c770c025",
+      "hash": "9c5acb62e5e72197a33fd02864ef77a17211082762532d48c9b0929e7bce34bc",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

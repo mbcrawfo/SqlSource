@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListCategoryFilterOptions": {
-      "hash": "e5c1bd78f40dc2b01c8a306ef08754b8798d082a6de057aa1cb280e399fa1b9e",
+      "hash": "e542cb2aab52790d27a154f2a079b7bca774d81125eda61ef780ae61525f3741",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

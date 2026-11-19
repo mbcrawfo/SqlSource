@@ -4,6 +4,7 @@ WITH removed AS (
     WHERE upper(r.during) < @cutoff
     RETURNING *
 )
+
 INSERT INTO events (id, account_id, at, kind, payload)
 SELECT
     1000 + rm.id,

@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListPriceBounds": {
-      "hash": "38599a5833f3e87344d1ede122ff135b62dfe51963e0a277d82860878627f4c0",
+      "hash": "1827c34060528f6cc29354c6544b90fe12ba1d027885afec3e35acc0e59a7fe3",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

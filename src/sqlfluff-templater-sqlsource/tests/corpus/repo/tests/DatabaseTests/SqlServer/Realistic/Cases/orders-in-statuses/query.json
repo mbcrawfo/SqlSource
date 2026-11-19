@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: ListOrdersInStatuses\n-- param: @status_1 varchar(10)\n-- param: @status_2 varchar(10)\nSELECT\n    o.id,\n    o.customer_id,\n    o.placed_at,\n    o.status,\n    o.ship_name,\n    o.ship_city,\n    o.shipped_at\nFROM dbo.orders AS o\nWHERE o.status IN (@status_1, @status_2)\n    AND o.customer_id IN (\n        SELECT c.id\n        FROM dbo.customers AS c\n        WHERE c.status IN ('active', 'suspended')\n    )\nORDER BY o.placed_at;\n",
+  "input": "-- name: ListOrdersInStatuses\n-- param: @status_1 varchar(10)\n-- param: @status_2 varchar(10)\nSELECT\n    o.id,\n    o.customer_id,\n    o.placed_at,\n    o.status,\n    o.ship_name,\n    o.ship_city,\n    o.shipped_at\nFROM dbo.orders AS o\nWHERE\n    o.status IN (@status_1, @status_2)\n    AND o.customer_id IN (\n        SELECT c.id\n        FROM dbo.customers AS c\n        WHERE c.status IN ('active', 'suspended')\n    )\nORDER BY o.placed_at;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -17,22 +17,22 @@
       ["LineComment", 30, 61],
       ["Text", 61, 62],
       ["LineComment", 62, 93],
-      ["Text", 93, 252],
-      ["Parameter", 252, 261],
-      ["Text", 261, 263],
-      ["Parameter", 263, 272],
-      ["Text", 272, 380],
-      ["Quoted", 380, 388],
-      ["Text", 388, 390],
-      ["Quoted", 390, 401],
-      ["Text", 401, 431]
+      ["Text", 93, 256],
+      ["Parameter", 256, 265],
+      ["Text", 265, 267],
+      ["Parameter", 267, 276],
+      ["Text", 276, 384],
+      ["Quoted", 384, 392],
+      ["Text", 392, 394],
+      ["Quoted", 394, 405],
+      ["Text", 405, 435]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 29, "name": null, "default": null },
       { "kind": "markerComment", "start": 30, "end": 61, "name": null, "default": null },
       { "kind": "markerComment", "start": 62, "end": 93, "name": null, "default": null },
-      { "kind": "parameter", "start": 252, "end": 261, "name": "status_1", "default": null },
-      { "kind": "parameter", "start": 263, "end": 272, "name": "status_2", "default": null }
+      { "kind": "parameter", "start": 256, "end": 265, "name": "status_1", "default": null },
+      { "kind": "parameter", "start": 267, "end": 276, "name": "status_2", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

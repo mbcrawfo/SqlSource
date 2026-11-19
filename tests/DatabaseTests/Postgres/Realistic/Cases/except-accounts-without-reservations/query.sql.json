@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListActiveAccountsFreeDuring": {
-      "hash": "aed8b5937b05b12ad2196ac9f92999113a90d4a2ce1fef152d1a39d38f7359c8",
+      "hash": "75026dc42f3e131b7f0e4e3acfff63274bd86dcb19fbc25228418fec289f25ce",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

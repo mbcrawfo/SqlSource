@@ -12,6 +12,9 @@ VALUES (@id, @pointValue, @polygonValue);
 
 -- name: GetSpatialOverrides -> one
 -- summary: The row of spatial_values with the id, its point and its polygon.
-SELECT id, point_value, polygon_value
+SELECT
+    id,
+    point_value,
+    polygon_value
 FROM dbo.spatial_values
 WHERE id = @id;

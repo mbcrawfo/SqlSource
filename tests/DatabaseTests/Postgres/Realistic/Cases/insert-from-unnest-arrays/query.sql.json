@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ImportProducts": {
-      "hash": "db781fc799232310aa4b959f8c645ac25ddf4c4505e3ab0e4a68374efb4028ed",
+      "hash": "9ce64194fbde40a97bdbcfc746ff757f51adbe8b70a3cb3be8e69987a6e8971c",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

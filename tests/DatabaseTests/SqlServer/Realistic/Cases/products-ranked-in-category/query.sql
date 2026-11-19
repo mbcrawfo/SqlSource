@@ -1,11 +1,15 @@
 -- name: RankProductsBySales
 WITH sales AS (
-    SELECT ol.product_id, SUM(ol.quantity) AS units_sold, MAX(o.placed_at) AS last_sold_at
+    SELECT
+        ol.product_id,
+        SUM(ol.quantity) AS units_sold,
+        MAX(o.placed_at) AS last_sold_at
     FROM dbo.order_lines AS ol
     JOIN dbo.orders AS o ON o.id = ol.order_id
     WHERE o.status <> 'cancelled'
     GROUP BY ol.product_id
 )
+
 SELECT
     c.name AS category_name,
     p.id,

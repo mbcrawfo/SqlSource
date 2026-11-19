@@ -10,7 +10,12 @@ SELECT
     lo.shipped_at
 FROM dbo.customers AS c
 CROSS APPLY (
-    SELECT TOP (1) o.id, o.placed_at, o.status, o.ship_city, o.shipped_at
+    SELECT TOP (1)
+        o.id,
+        o.placed_at,
+        o.status,
+        o.ship_city,
+        o.shipped_at
     FROM dbo.orders AS o
     WHERE o.customer_id = c.id
     ORDER BY o.placed_at DESC, o.id DESC

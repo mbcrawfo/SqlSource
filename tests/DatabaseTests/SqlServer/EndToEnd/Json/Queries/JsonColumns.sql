@@ -14,6 +14,9 @@ VALUES (@id, @element, @meta);
 
 -- name: GetJsonColumns -> one
 -- summary: The row of json_columns with the id, both columns read.
-SELECT id, element, meta
+SELECT
+    id,
+    element,
+    meta
 FROM dbo.json_columns
 WHERE id = @id;

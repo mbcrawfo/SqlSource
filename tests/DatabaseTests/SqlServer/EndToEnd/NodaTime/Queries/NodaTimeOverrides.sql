@@ -15,6 +15,10 @@ VALUES (@id, @instantValue, @instantOffsetValue, @durationValue);
 
 -- name: GetNodaOverrides -> one
 -- summary: The row of noda_values with the id, its three columns of the types that the overrides name.
-SELECT id, instant_value, instant_offset_value, duration_value
+SELECT
+    id,
+    instant_value,
+    instant_offset_value,
+    duration_value
 FROM dbo.noda_values
 WHERE id = @id;

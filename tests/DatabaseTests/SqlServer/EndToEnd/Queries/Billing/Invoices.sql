@@ -11,6 +11,10 @@ ORDER BY id;
 
 -- name: GetInvoice
 -- summary: The number and payment of one invoice.
-SELECT id, number, amount, paid_at
+SELECT
+    id,
+    number,
+    amount,
+    paid_at
 FROM billing.invoices
 WHERE id = @invoiceId;

@@ -14,7 +14,7 @@ SELECT
         WHEN 'pending' THEN N'Can be changed'
         WHEN 'shipped' THEN N'Can be tracked'
     END AS action_hint,
-    CASE WHEN o.shipped_at IS NOT NULL THEN DATEDIFF(day, o.placed_at, o.shipped_at) END AS days_to_ship,
+    CASE WHEN o.shipped_at IS NOT NULL THEN DATEDIFF(DAY, o.placed_at, o.shipped_at) END AS days_to_ship,
     CASE WHEN o.ship_city IS NULL THEN N'(none)' ELSE o.ship_city END AS ship_to,
     CAST(CASE WHEN o.status IN ('pending', 'shipped') THEN 1 ELSE 0 END AS bit) AS is_open
 FROM dbo.orders AS o

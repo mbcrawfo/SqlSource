@@ -1,11 +1,15 @@
 -- name: ListMonthlySpendWithChange
 WITH monthly AS (
-    SELECT o.account_id, date_trunc('month', o.placed_at) AS month_start, sum(l.quantity * l.unit_price) AS total
+    SELECT
+        o.account_id,
+        date_trunc('month', o.placed_at) AS month_start,
+        sum(l.quantity * l.unit_price) AS total
     FROM orders o
     JOIN order_lines l ON l.order_id = o.id
     WHERE o.placed_at >= @from
     GROUP BY o.account_id, date_trunc('month', o.placed_at)
 )
+
 SELECT
     a.id,
     a.name,

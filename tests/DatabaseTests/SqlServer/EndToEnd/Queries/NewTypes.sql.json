@@ -264,7 +264,7 @@
       ]
     },
     "GetNewType": {
-      "hash": "13ed5a1583a0367bd361e7cddd4c1ab82453be5e3712b24ce56b205853c5bcab",
+      "hash": "842a3bbe5ec722ac7180ae05019bcab20d65d506b30e24316130064b17ae6cfc",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "mssql",

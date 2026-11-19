@@ -3,4 +3,4 @@
 dialect = tsql
 # The root's list, with CP02: the schemas name things in mixed case, such as dbo.Email, and those names reach what the
 # describer records, so recasing them would change the sidecars.
-exclude_rules = AL01, AL03, AM03, AM04, AM05, CP02, RF04, ST06, ST09
+exclude_rules = AL01, AL03, AM03, AM04, AM05, CP02, RF02, RF04, RF06, ST02, ST05, ST06, ST09

@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListOrderStatusLabels": {
-      "hash": "de5193199f22761a0c753894c8f38d2325fa731bab68306af0256369637cf1fa",
+      "hash": "ef81d7238eb57e334735b312ed405b98623d62955d42c306072f6902bdfd1794",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

@@ -7,7 +7,9 @@
 -- name: ListAccountsByHeader
 -- summary: The id and name of every account, in the collection type of the file header.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 
@@ -15,7 +17,9 @@ ORDER BY id;
 -- summary: The id and name of every account, in an array by the query's marker.
 -- collection-type: Array
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 
@@ -23,6 +27,8 @@ ORDER BY id;
 -- summary: The id and name of every account, in an IImmutableList by the query's marker.
 -- collection-type: IImmutableList
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;

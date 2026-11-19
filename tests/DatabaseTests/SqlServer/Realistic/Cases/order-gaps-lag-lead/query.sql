@@ -6,7 +6,7 @@ SELECT
     o.status,
     LAG(o.placed_at) OVER (ORDER BY o.placed_at, o.id) AS previous_placed_at,
     LEAD(o.placed_at) OVER (ORDER BY o.placed_at, o.id) AS next_placed_at,
-    DATEDIFF(day, LAG(o.placed_at) OVER (ORDER BY o.placed_at, o.id), o.placed_at) AS days_since_previous,
+    DATEDIFF(DAY, LAG(o.placed_at) OVER (ORDER BY o.placed_at, o.id), o.placed_at) AS days_since_previous,
     LAG(o.status, 1, 'none') OVER (ORDER BY o.placed_at, o.id) AS previous_status
 FROM dbo.orders AS o
 WHERE o.customer_id = @customer_id

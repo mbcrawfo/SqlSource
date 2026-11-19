@@ -16,16 +16,16 @@ src/sqlfluff-templater-sqlsource/
 tests/SqlSource.Tool.Tests/Fixtures/
 tests/SqlSource.Tests/Parsing/Templating/Cases/
 
-# A file of each SqlSource dialect in one folder, where one sqlfluff dialect cannot read them all, and mysql with
-# no-backslash-escapes, which no sqlfluff dialect reads.
-tests/SqlSource.Tests/EndToEnd/Dialects/
-tools/package-install/Queries/AddedByATarget.sql
-tools/package-install/Queries/ByHeader.sql
-tools/package-install/Queries/ByMarker.sql
-tools/package-install/Queries/ByOption.sql
+# The generator's end-to-end queries and the consumer project of check-package-install.sh, whose tests compare the SQL
+# that they generate with text, and which hold, on purpose, files of other dialects, tokens without defaults and an
+# escape string that sqlfluff's postgres dialect misreads.
+tests/SqlSource.Tests/EndToEnd/
+tools/package-install/
+
+# The projects of the error-path tests, which edit a query by its text.
+tests/DatabaseTests/Postgres/EndToEnd/ErrorPaths/
+tests/DatabaseTests/SqlServer/EndToEnd/ErrorPaths/
 
 # PostgreSQL's TABLE statement, which sqlfluff's postgres dialect does not parse.
 tests/DatabaseTests/Postgres/Realistic/Cases/table-statement/
 
-# Tokens without defaults on purpose, which sqlfluff checks as their names and cannot parse.
-tests/SqlSource.Tests/EndToEnd/Tokens/Search.sql

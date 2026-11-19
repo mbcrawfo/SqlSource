@@ -11,6 +11,7 @@ SELECT
     TRY_CONVERT(int, p.reference) AS bank_reference
 FROM billing.payments AS p
 JOIN billing.invoices AS i ON i.id = p.invoice_id
-WHERE p.paid_at >= @from
+WHERE
+    p.paid_at >= @from
     AND p.paid_at < @to
 ORDER BY p.paid_at, p.id;

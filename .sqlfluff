@@ -15,7 +15,19 @@ processes = 0
 # AM03: ORDER BY with mixed implicit and explicit directions, written as the tests need them.
 # AM04: SELECT *, which the tests use to describe every column of a table.
 # AM05: a bare JOIN, which the tests write as an inner join's shortest form.
+# RF02: unqualified names in a select of two tables, which it reports in a UNION's ORDER BY and for a token without
+# a default, neither of which can be qualified.
 # RF04: keywords as names, such as `name`, `status` and `type`, which the test schemas use.
+# RF06: unneeded quotes, which fix removes, but PostgreSQL's "char" is a type of its own and char is character(1).
+# ST02: a CASE that COALESCE could replace, which fix rewrites, and which the describer may type with another
+# nullability.
+# ST05: subqueries in a FROM or JOIN, which fix moves to CTEs, which would change what a test checks, such as the
+# LEFT JOIN LATERAL that takes a lock.
 # ST06: wildcards and simple columns after expressions in a select list, in the order the tests check.
 # ST09: join conditions written as `b.id = a.id`, an order that changes no result.
-exclude_rules = AL01, AL03, AM03, AM04, AM05, RF04, ST06, ST09
+exclude_rules = AL01, AL03, AM03, AM04, AM05, RF02, RF04, RF06, ST02, ST05, ST06, ST09
+
+# SqlSource reads a column name that ends in ? or ! as a mark of its nullability, so those two characters are no
+# special characters in a name.
+[sqlfluff:rules:references.special_chars]
+additional_allowed_characters = ?!

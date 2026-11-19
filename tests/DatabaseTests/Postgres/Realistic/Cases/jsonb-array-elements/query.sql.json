@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListPurchasedItems": {
-      "hash": "356a44254f4571c8343613a0e427e47f198fa0d547ac3faa4162ec2722920fb8",
+      "hash": "70235122dc9995fe19d0da307200a70ecc0f3db3d5b1e4408ae881cd9e6c0b45",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

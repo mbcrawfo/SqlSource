@@ -1,3 +1,0 @@
-# The sqlfluff dialect of the PostgreSQL queries of this folder.
-[sqlfluff]
-dialect = postgres

@@ -18,7 +18,7 @@ CREATE SEQUENCE billing.invoice_numbers AS int START WITH 1000;
 CREATE TABLE dbo.customers (
     id int IDENTITY PRIMARY KEY,
     name nvarchar(100) NOT NULL,
-    email dbo.Email NULL,
+    email dbo.email NULL,
     phone varchar(20) NULL,
     company nvarchar(100) NULL,
     status varchar(10) NOT NULL CHECK (status IN ('active', 'suspended', 'closed')),
@@ -46,7 +46,7 @@ CREATE TABLE dbo.products (
     sale_price AS (list_price * (1 - ISNULL(discount_pct, 0) / 100)),
     sku_prefix AS (LEFT(sku, 3)) PERSISTED,
     discontinued_at date NULL,
-    attributes nvarchar(max) NULL
+    attributes nvarchar(MAX) NULL
 );
 
 CREATE TABLE dbo.stock (
@@ -126,7 +126,12 @@ GO
 -- A view over an outer join, of each customer and the latest of their orders: order_id, placed_at and status are NULL
 -- for a customer with no order.
 CREATE VIEW dbo.customer_last_orders AS
-SELECT c.id AS customer_id, c.name, o.id AS order_id, o.placed_at, o.status
+SELECT
+    c.id AS customer_id,
+    c.name,
+    o.id AS order_id,
+    o.placed_at,
+    o.status
 FROM dbo.customers AS c
 LEFT JOIN dbo.orders AS o
     ON o.id = (

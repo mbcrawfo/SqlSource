@@ -15,7 +15,7 @@ CREATE TYPE account_status AS ENUM ('active', 'suspended', 'closed');
 -- The enum that the queries map to a C# enum.
 CREATE TYPE note_kind AS ENUM ('call', 'email', 'visit');
 
-CREATE DOMAIN email AS text CHECK (VALUE LIKE '%@%');
+CREATE DOMAIN email AS text CHECK (value LIKE '%@%');
 
 -- The id that the queries read and send as a value type of the project, through its converters.
 CREATE DOMAIN note_ref AS bigint;

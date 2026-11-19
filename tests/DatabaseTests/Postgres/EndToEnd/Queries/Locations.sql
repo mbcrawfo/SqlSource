@@ -4,7 +4,11 @@
 
 -- name: GetLocatedName -> one
 -- summary: The name of an account, by its id.
-SELECT id, name FROM accounts WHERE id = @accountId;
+SELECT
+    id,
+    name
+FROM accounts
+WHERE id = @accountId;
 
 -- name: GetLocatedNameInternal -> one
 -- summary: GetLocatedName again, as an internal static method of the type, which any code of the project calls.
@@ -12,7 +16,11 @@ SELECT id, name FROM accounts WHERE id = @accountId;
 -- visibility: internal
 -- input-model: GetLocatedNameArgs
 -- output-model: GetLocatedNameDto
-SELECT id, name FROM accounts WHERE id = @accountId;
+SELECT
+    id,
+    name
+FROM accounts
+WHERE id = @accountId;
 
 -- name: GetLocatedNamePrivate -> one
 -- summary: GetLocatedName again, as a private static method of the type, which only the type's own code calls.
@@ -20,7 +28,11 @@ SELECT id, name FROM accounts WHERE id = @accountId;
 -- visibility: private
 -- input-model: GetLocatedNameArgs
 -- output-model: GetLocatedNameDto
-SELECT id, name FROM accounts WHERE id = @accountId;
+SELECT
+    id,
+    name
+FROM accounts
+WHERE id = @accountId;
 
 -- name: GetLocatedNameNested -> one
 -- summary: GetLocatedName again, as a static method of the type's nested class Sql, which is internal.
@@ -28,4 +40,8 @@ SELECT id, name FROM accounts WHERE id = @accountId;
 -- visibility: internal
 -- input-model: GetLocatedNameArgs
 -- output-model: GetLocatedNameDto
-SELECT id, name FROM accounts WHERE id = @accountId;
+SELECT
+    id,
+    name
+FROM accounts
+WHERE id = @accountId;

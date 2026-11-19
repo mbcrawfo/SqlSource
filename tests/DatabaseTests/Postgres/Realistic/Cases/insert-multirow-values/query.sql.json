@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "AddTwoOrderLines": {
-      "hash": "e8b812062f30a2092db1675ecf5e2d32a8cb748de4d411619fdfc6e2a423f9f6",
+      "hash": "912a42925e857b04554a10237368fcccaf6c9a49aa16be3d6926cc73a198a156",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

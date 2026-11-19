@@ -45,6 +45,8 @@ WHERE id = @id;
 -- A JSON null in either is no SQL NULL, so it reaches the read, which throws for a property that cannot be null.
 -- column: meta not null
 -- column: node not null
-SELECT meta, node
+SELECT
+    meta,
+    node
 FROM json_values
 WHERE id = @id;

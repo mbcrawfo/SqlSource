@@ -27,7 +27,10 @@ WHERE id = @accountId;
 -- name: MergeAccountStatus
 -- summary: Sets the status of an account by MERGE, and returns the action it took and the account's id.
 MERGE dbo.accounts AS a
-USING (SELECT id FROM dbo.accounts WHERE id = @accountId) AS s
-ON a.id = s.id
+USING (
+    SELECT id FROM dbo.accounts
+    WHERE id = @accountId
+) AS s
+    ON a.id = s.id
 WHEN MATCHED THEN UPDATE SET status = @status
 OUTPUT $action AS change, INSERTED.id;

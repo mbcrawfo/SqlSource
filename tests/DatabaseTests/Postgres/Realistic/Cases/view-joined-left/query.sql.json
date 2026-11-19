@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListOpenAccountOrdersWithInvoice": {
-      "hash": "7544fc57ce301ba3fa70fc7e8883fe99acbbf01dd118def5af67059bf98cbcbe",
+      "hash": "7e1e27a2fe300788cf7a60a59b732b2237ca431f48b774cf3bcb4f26728125b1",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

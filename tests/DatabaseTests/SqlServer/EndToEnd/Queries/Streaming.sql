@@ -5,7 +5,9 @@
 -- name: StreamAccounts
 -- summary: Every account, streamed.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 
@@ -14,14 +16,18 @@ ORDER BY id;
 -- summary: after it.
 -- generator: method-type=both
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 
 -- name: StreamAccountsNamedFrom
 -- summary: The accounts from an id on, streamed, for a method that takes parameters.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id >= @firstId
 ORDER BY id;
@@ -29,7 +35,9 @@ ORDER BY id;
 -- name: StreamNullAtThird
 -- summary: Every account, with a NULL for the name of the third, which the marker says is never NULL.
 -- column: name not null
-SELECT id, CASE WHEN id = 3 THEN NULL ELSE name END AS name
+SELECT
+    id,
+    CASE WHEN id = 3 THEN NULL ELSE name END AS name
 FROM dbo.accounts
 ORDER BY id;
 
@@ -39,7 +47,9 @@ ORDER BY id;
 -- off rolls back a transaction: its test pins that the loop throws the rollback after the first two rows.
 -- output-model: CollectedAccount
 -- column: name not null
-SELECT id, CASE WHEN id = 3 THEN NULL ELSE name END AS name
+SELECT
+    id,
+    CASE WHEN id = 3 THEN NULL ELSE name END AS name
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
@@ -49,7 +59,8 @@ SELECT CAST('x' AS int);
 -- The cross join of six digits is a million numbers, which SQL Server must sort before it sends the first, so that it
 -- is still sending when a loop stops partway and a stream that cancelled its command would show.  It runs on every
 -- supported version, where GENERATE_SERIES needs 2022.
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 10000 * d5.v + 100000 * d6.v + 1 AS n
@@ -72,7 +83,9 @@ ORDER BY id;
 -- name: StreamThenSelect
 -- summary: The accounts, and then a second result set, whose rows the stream does not yield.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SELECT 1;
@@ -82,7 +95,9 @@ SELECT 1;
 -- output-model: CollectedAccount
 -- SET CONTEXT_INFO keeps its value for the session, which a test reads from the same connection: the mark is there when
 -- the batch ran as far as the THROW.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SET CONTEXT_INFO 0x02;
@@ -93,7 +108,9 @@ THROW 50000, 'after the rows', 1;
 -- StreamThenRaise with a failed conversion, error 245, in the place of the THROW: with XACT_ABORT off, as SqlClient
 -- leaves it, SQL Server rolls back the transaction for this error, where it leaves it open for the THROW.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
@@ -103,7 +120,9 @@ SELECT CAST('x' AS int);
 -- StreamThenFailConversion with an overflow, error 220, in the place of the failed conversion: with XACT_ABORT off
 -- SQL Server ends that statement alone and leaves the transaction open, and under XACT_ABORT ON rolls it back.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST(300 AS tinyint);
@@ -115,7 +134,9 @@ SELECT CAST(300 AS tinyint);
 -- read of the second row or at the drain of a break at the first, and the iterator reads the failed conversion after
 -- it, which with XACT_ABORT off rolls back a transaction: its tests pin that the loop throws the rollback, with the
 -- divide by zero inside it.
-SELECT id, 10 / (id - 2) AS quotient
+SELECT
+    id,
+    10 / (id - 2) AS quotient
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
@@ -126,7 +147,9 @@ SELECT CAST('x' AS int);
 -- throws, and the failed conversion after it rolls back a transaction with XACT_ABORT off: its test pins that the loop
 -- throws the rollback, with the overflow inside it.
 -- output-model: CollectedAccount
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 ORDER BY id;
 SELECT CAST(300 AS tinyint);
@@ -137,7 +160,8 @@ SELECT CAST('x' AS int);
 -- This is StreamNumbers with the mark after it, and the two are meant to match.
 -- SET CONTEXT_INFO keeps its value for the session, which a test reads from the same connection: the mark is there only
 -- when the batch ran to its end, and a command that was cancelled partway through the numbers never reaches it.
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
 SELECT n
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 10000 * d5.v + 100000 * d6.v + 1 AS n
@@ -160,8 +184,11 @@ SET CONTEXT_INFO 0x01;
 -- supported version.  The division is by the number's place in that order, which is the number itself: SQL Server
 -- would compute a division by the number before its sort, and fail before the first row is sent, while a place in the
 -- order is known only after it.
-WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))
-SELECT n, 10 / (CAST(ROW_NUMBER() OVER (ORDER BY n) AS int) - 500000) AS quotient
+WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d(v))
+
+SELECT
+    n,
+    10 / (CAST(ROW_NUMBER() OVER (ORDER BY n) AS int) - 500000) AS quotient
 FROM (
     SELECT d1.v + 10 * d2.v + 100 * d3.v + 1000 * d4.v + 10000 * d5.v + 100000 * d6.v + 1 AS n
     FROM digits AS d1

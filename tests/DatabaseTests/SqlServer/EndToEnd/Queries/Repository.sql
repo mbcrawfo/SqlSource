@@ -10,7 +10,11 @@
 -- name: GetNote -> one-optional
 -- summary: The note that an id names, or null.
 -- output-model: RepositoryNote
-SELECT id, account_id, body, remind_at
+SELECT
+    id,
+    account_id,
+    body,
+    remind_at
 FROM dbo.notes
 WHERE id = @id;
 
@@ -18,7 +22,11 @@ WHERE id = @id;
 -- summary: GetNote, by a synchronous method.
 -- generator: method-type=sync
 -- output-model: RepositoryNote
-SELECT id, account_id, body, remind_at
+SELECT
+    id,
+    account_id,
+    body,
+    remind_at
 FROM dbo.notes
 WHERE id = @id;
 
@@ -26,7 +34,11 @@ WHERE id = @id;
 -- summary: GetNote, by a synchronous method and an asynchronous one, which is named with Async after it.
 -- generator: method-type=both
 -- output-model: RepositoryNote
-SELECT id, account_id, body, remind_at
+SELECT
+    id,
+    account_id,
+    body,
+    remind_at
 FROM dbo.notes
 WHERE id = @id;
 
@@ -34,7 +46,11 @@ WHERE id = @id;
 -- summary: The note of an account, if it has one, and an error when it has two, as alice does.
 -- generator: method-type=sync
 -- output-model: RepositoryNote
-SELECT id, account_id, body, remind_at
+SELECT
+    id,
+    account_id,
+    body,
+    remind_at
 FROM dbo.notes
 WHERE account_id = @accountId
 ORDER BY id;
@@ -43,7 +59,11 @@ ORDER BY id;
 -- summary: Every note, streamed, so that a loop that breaks leaves its connection to the method's disposal.
 -- collection-type: IAsyncEnumerable
 -- output-model: RepositoryNote
-SELECT id, account_id, body, remind_at
+SELECT
+    id,
+    account_id,
+    body,
+    remind_at
 FROM dbo.notes
 ORDER BY id;
 
@@ -52,7 +72,11 @@ ORDER BY id;
 -- generator: method-type=sync
 -- collection-type: List
 -- output-model: RepositoryNote
-SELECT id, account_id, body, remind_at
+SELECT
+    id,
+    account_id,
+    body,
+    remind_at
 FROM dbo.notes
 ORDER BY id;
 
