@@ -11,6 +11,8 @@ This repository holds SqlSource, a C# source generator that turns the `.sql` fil
 | [uv](https://docs.astral.sh/uv/) | Any current release | Runs the checks of `src/sqlfluff-templater-sqlsource`, and installs the Python 3.14.7 of its `.python-version` and its virtual environment on the first run |
 | `unzip` | Any | `tools/check-package.sh` lists the contents of the packages with it.  Present on macOS and most Linux distributions. |
 
+On Windows, run the scripts and the commands below in Git Bash, which Git for Windows installs with `unzip`, and use Docker Desktop with Linux containers.  [`tools/README.md`](tools/README.md#windows) says what the scripts do there.
+
 CSharpier, ReportGenerator, docfx and Stryker.NET are local .NET tools pinned in `dotnet-tools.json`.  Restore them once after cloning:
 
 ```bash
@@ -150,7 +152,7 @@ dotnet restore SqlSource.slnx
 
 ## Continuous integration
 
-CI runs the same checks as `pre-commit-validation.sh --full` on Linux, in parallel jobs, but the tests of `tests/SqlSource.Tests.RoslynFloor`, which only the nightly runs: each group of test projects has a runner of its own, and one job merges their coverage.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/DatabaseTests/Postgres` again on PostgreSQL 14 and `tests/DatabaseTests/SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main` and `integration/*` branches.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and `tests/DatabaseTests/Postgres` on PostgreSQL 15 to 17 and `tests/DatabaseTests/SqlServer` on SQL Server 2019 and 2022 on Linux, RoslynFloor's tests on Linux, and the allocation tests and the comparison of each synchronous method with its asynchronous twin on each engine's default image, and by hand on a branch:
+CI runs the same checks as `pre-commit-validation.sh --full` on Linux, in parallel jobs, but the tests of `tests/SqlSource.Tests.RoslynFloor`, which only the nightly runs: each group of test projects has a runner of its own, and one job merges their coverage.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/DatabaseTests/Postgres` again on PostgreSQL 14 and `tests/DatabaseTests/SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main` and `integration/*` branches.  `nightly.yml` runs the tests that need no container, the three package checks and the templater's tests on Windows and macOS every night, and `tests/DatabaseTests/Postgres` on PostgreSQL 15 to 17 and `tests/DatabaseTests/SqlServer` on SQL Server 2019 and 2022 on Linux, RoslynFloor's tests on Linux, and the allocation tests and the comparison of each synchronous method with its asynchronous twin on each engine's default image, and by hand on a branch:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>

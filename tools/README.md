@@ -2,6 +2,12 @@
 
 This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that builds the manual's site, a script that pulls the test images, the script that gives the templater its version, two recording scripts and the script and program of mutation testing and of the test review, none of which is a check.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
 
+## Windows
+
+Every script runs under Git Bash on Windows as well, through `tools/platform.sh`, which each script that needs it sources and which does nothing on Linux and macOS.  Git Bash rewrites an argument that looks like a Unix path into a Windows path before it starts a Windows program, so `docker` would get `C:/Program Files/Git/mnt` for a container's `/mnt`: `run_docker` runs `docker` with that rewriting off.  It never rewrites a path written into a file, such as a `nuget.config`, or inside an argument's value, such as `-p:Name=/tmp/x`: `native_path` gives the spelling a Windows program reads there, `C:/Users/...`, and `windows_path` the one such a program prints, for comparing with what it wrote.  `on_windows` tells the two apart.  `ScriptPortabilityTests` of `tests/SqlSource.Repository.Tests/Validation/` fails, on any system, on a script that calls `docker` or hands over such a path without them.
+
+A path given to a script as an argument is in Git Bash's spelling, `/d/Projects/x`, or relative: Git Bash reads `D:/Projects/x` as a list of two paths, `D` and `/Projects/x`, and passes it on rewritten.
+
 ## Linters
 
 Each linter script runs its tool from a pinned Docker image, so they need Docker:
