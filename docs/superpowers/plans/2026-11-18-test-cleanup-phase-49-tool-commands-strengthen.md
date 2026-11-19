@@ -44,7 +44,7 @@ The added files are compared as a set of full paths; a run that writes a trace, 
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-49/tool-root/after`, then `compare` with the "before"; `kills` on the before report for the changed test.  Each LOST or NOT COMPARABLE mutant gets a hand check against `notes.md`'s known flips.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-49/coverage-after/SqlSource.Tool.Tests`; the line coverage of `src/SqlSource.Tool/*.cs` does not fall.
-- [ ] **Step 3:** Copy the "after" report to the run's `reports/p49-tool-root-after.json`.
-- [ ] **Step 4:** The pull request gives the change, the compare result, the coverage figures, the hand check and the run times.
+- [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-49/tool-root/after`: 470 killed, 0 survived, 101 timeouts, 1 h 57 min (p28's "before": 431 killed, 140 timeouts).  `compare`: 571 detected before, 571 still detected, 0 lost, 0 not comparable.  `kills` for the changed test: before, 2 kills, 0 alone, 67 timeouts under it; after, 60 kills, 0 alone, 55 timeouts under it, 0 survivors under it.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-49/coverage-after/SqlSource.Tool.Tests` (7,077 tests, 3 min 48 s): 1,216 of 1,224 lines over the 14 files of `src/SqlSource.Tool/*.cs`, before and after, the same lines in each file.
+- [x] **Step 3:** Copy the "after" report to the run's `reports/p49-tool-root-after.json`.
+- [x] **Step 4:** The pull request gives the change, the compare result, the coverage figures, the hand check and the run times.
