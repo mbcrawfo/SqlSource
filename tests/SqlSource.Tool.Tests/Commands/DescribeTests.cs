@@ -22,17 +22,40 @@ public sealed class DescribeTests : IDisposable
         var result = await _run.RunAsync("--help");
 
         result.ExitCode.ShouldBe(0);
-        result.Out.ShouldContain("describe");
+        // The command's entry in the list of commands, and not the root's description, which starts "Describes".
+        result
+            .Out.Split('\n')
+            .ShouldContain(line => line.TrimStart().StartsWith("describe ", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task Run_Help_ShowsThePath()
+    public async Task Run_Help_ShowsThePathsAndTheOptions()
     {
         var result = await _run.RunAsync("describe", "--help");
 
         result.ExitCode.ShouldBe(0);
-        result.Out.ShouldContain("sqlsource describe [<path>...]");
+        foreach (
+            var text in new[]
+            {
+                "sqlsource describe [<path>...]",
+                ".sql",
+                "--project <path>",
+                "--database <name>",
+                "--connection <name=value>",
+                "--force",
+                "--check",
+                "--verbose",
+                "--log <path>",
+                "--env-file <path>",
+                "--watch",
+            }
+        )
+        {
+            result.Out.ShouldContain(text);
+        }
+
         result.Error.ShouldBeEmpty();
+        _run.Processes.Requests.ShouldBeEmpty();
     }
 
     [Fact]
@@ -79,29 +102,6 @@ public sealed class DescribeTests : IDisposable
         var result = await _run.RunAsync("describe");
 
         result.ShouldBe(new CliResult(0, "", ""));
-    }
-
-    [Fact]
-    public async Task Run_Help_ShowsTheProjectOption()
-    {
-        var result = await _run.RunAsync("describe", "--help");
-
-        result.ExitCode.ShouldBe(0);
-        result.Out.ShouldContain("--project <path>");
-        result.Out.ShouldContain("--check");
-        result.Out.ShouldContain("--log <path>");
-        result.Out.ShouldContain("--verbose");
-        _run.Processes.Requests.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public async Task Help_Describe_ListsWatch()
-    {
-        var result = await _run.RunAsync("describe", "--help");
-
-        result.ExitCode.ShouldBe(0);
-        result.Out.ShouldContain("--watch");
-        _run.Processes.Requests.ShouldBeEmpty();
     }
 
     [Theory]
