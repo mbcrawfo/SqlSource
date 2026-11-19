@@ -37,6 +37,8 @@ done
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
+# shellcheck source=tools/platform.sh
+source tools/platform.sh
 
 # The decisions, one function each, each taking a path from the repository root and setting its result.  The step
 # rules are positive triggers, so a kind of file that none of them knows makes the run full instead of skipping its
@@ -376,7 +378,9 @@ if [[ "$plan" == true ]]; then
         printf 'Partial run of %s changed path(s).\n' "${#changes[@]}"
     fi
 elif [[ "$test_solution" != "$SOLUTION" ]]; then
-    printf '{"solution":{"path":%s,"projects":[%s]}}\n' "$(json_string "$repo_root/$SOLUTION")" "$filter_projects" \
+    # dotnet reads the solution's path from the filter, so it is in the spelling dotnet reads.
+    solution_native="$(native_path "$repo_root")/$SOLUTION"
+    printf '{"solution":{"path":%s,"projects":[%s]}}\n' "$(json_string "$solution_native")" "$filter_projects" \
         >"$test_solution"
 fi
 

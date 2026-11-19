@@ -13,6 +13,8 @@ IMAGES='tests/DatabaseTests/TestHarness/DefaultImages.cs'
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+# shellcheck source=tools/platform.sh
+source tools/platform.sh
 
 # The default images are named in one place, which is read here and not repeated.
 postgres_image="$(sed -n 's/.*const string Postgres = "\(.*\)";.*/\1/p' "$IMAGES")"
@@ -29,6 +31,6 @@ fi
 # An image that is given twice, or that is a default too, is pulled twice: the second is fast, and shows as such.
 for image in "$postgres_image" "$sql_server_image" "$@"; do
     start="$SECONDS"
-    docker pull --quiet "$image" >/dev/null
+    run_docker pull --quiet "$image" >/dev/null
     echo "$image: $((SECONDS - start)) s"
 done

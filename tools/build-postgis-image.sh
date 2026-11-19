@@ -21,6 +21,8 @@ POSTGIS_DOCKERFILE='tests/DatabaseTests/TestHarness/Postgis'
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+# shellcheck source=tools/platform.sh
+source tools/platform.sh
 
 usage() {
     echo 'Usage: build-postgis-image.sh [--name | --id | --unchanged <id>] [postgres-image]' >&2
@@ -61,9 +63,14 @@ if [[ -z "$package" ]]; then
 fi
 
 # The name is PostgisContainer.ImageOf's: the postgres tag, the PostGIS version, and the first twelve hex digits of the
-# SHA-256 of the Dockerfile without its carriage returns.
+# SHA-256 of the Dockerfile without its carriage returns.  sha256sum where there is one, since Git's bash on Windows
+# has shasum only on the PATH of a login shell, and shasum on macOS, which has no sha256sum.
 tag="${postgres_image##*:}"
-hash="$(tr -d '\r' <"$POSTGIS_DOCKERFILE/Dockerfile" | shasum -a 256 | cut -c1-12)"
+sha256=(shasum -a 256)
+if command -v sha256sum >/dev/null; then
+    sha256=(sha256sum)
+fi
+hash="$(tr -d '\r' <"$POSTGIS_DOCKERFILE/Dockerfile" | "${sha256[@]}" | cut -c1-12)"
 image="sqlsource-postgis:$tag-${package%%+*}-$hash"
 
 case "$mode" in
@@ -72,7 +79,7 @@ name)
     exit 0
     ;;
 id | unchanged)
-    if ! id="$(docker image inspect --format '{{.Id}}' "$image" 2>/dev/null)"; then
+    if ! id="$(run_docker image inspect --format '{{.Id}}' "$image" 2>/dev/null)"; then
         echo "Docker has no image $image." >&2
         exit 1
     fi
@@ -88,4 +95,4 @@ id | unchanged)
 esac
 
 echo "Building $image"
-docker build --progress=plain --build-arg "PG=$tag" --build-arg "POSTGIS=$package" -t "$image" "$POSTGIS_DOCKERFILE"
+run_docker build --progress=plain --build-arg "PG=$tag" --build-arg "POSTGIS=$package" -t "$image" "$POSTGIS_DOCKERFILE"

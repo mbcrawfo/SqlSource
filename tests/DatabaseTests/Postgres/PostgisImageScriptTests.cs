@@ -25,7 +25,8 @@ public sealed class PostgisImageScriptTests
         (await NameAsync()).ShouldBe(PostgisContainer.ImageOf(DefaultImages.Postgres));
 
     // A checkout with CRLF line endings, which git may give on Windows, names the image that the harness names.  The
-    // script takes the repository's root from its own place, so a copy of it runs on copies of the files it reads.
+    // script takes the repository's root from its own place, so a copy of it runs on copies of the files it reads and
+    // of tools/platform.sh, which it sources.
     [Fact]
     public async Task Name_DockerfileWithCrlf_IsTheHarnesss()
     {
@@ -35,6 +36,13 @@ public sealed class PostgisImageScriptTests
             "tools/build-postgis-image.sh",
             await File.ReadAllTextAsync(
                 RepositoryRoot.Path("tools", "build-postgis-image.sh"),
+                TestContext.Current.CancellationToken
+            )
+        );
+        _ = copy.WriteFile(
+            "tools/platform.sh",
+            await File.ReadAllTextAsync(
+                RepositoryRoot.Path("tools", "platform.sh"),
                 TestContext.Current.CancellationToken
             )
         );

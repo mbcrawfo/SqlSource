@@ -59,6 +59,8 @@ fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+# shellcheck source=tools/platform.sh
+source tools/platform.sh
 
 # The containers that are running, which are removed however the script ends.
 postgres_container=''
@@ -68,7 +70,7 @@ remove_containers() {
     local container
     for container in "$postgres_container" "$postgis_container" "$sqlserver_container"; do
         if [[ -n $container ]]; then
-            docker rm -f "$container" >/dev/null
+            run_docker rm -f "$container" >/dev/null
         fi
     done
 }
@@ -90,13 +92,13 @@ default_image() {
 start_postgres() {
     local image="$1" variable="$2" container ready
     printf 'Starting %s ... ' "$image"
-    container="$(docker run -d -e "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" -p 127.0.0.1::5432 "$image")"
+    container="$(run_docker run -d -e "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" -p 127.0.0.1::5432 "$image")"
     printf -v "$variable" '%s' "$container"
 
     # The entrypoint's first server listens on its socket alone, so the check asks over TCP, as the tool will.
     ready=false
     for _ in $(seq 60); do
-        if docker exec "$container" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then
+        if run_docker exec "$container" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then
             ready=true
             break
         fi
@@ -111,16 +113,17 @@ start_postgres() {
 
 # The port on the host of a PostgreSQL container.
 postgres_port() {
-    docker port "$1" 5432/tcp | head -n 1 | sed 's/.*://'
+    run_docker port "$1" 5432/tcp | head -n 1 | sed 's/.*://'
 }
 
 # Creates the database on the container and runs the schema.sql and seed.sql of the folder on it.
 create_postgres_database() {
     local container="$1" database="$2" folder="$3" file
     printf 'Creating the database %s ... ' "$database"
-    docker exec "$container" psql -v ON_ERROR_STOP=1 -q -U postgres -c "CREATE DATABASE $database" >/dev/null
+    run_docker exec "$container" psql -v ON_ERROR_STOP=1 -q -U postgres -c "CREATE DATABASE $database" >/dev/null
     for file in schema.sql seed.sql; do
-        docker exec -i "$container" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$database" <"$folder/$file" >/dev/null
+        run_docker exec -i "$container" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$database" \
+            <"$folder/$file" >/dev/null
     done
     echo 'done'
 }
@@ -160,16 +163,16 @@ describe_postgres() {
     dotnet run --project src/SqlSource.Tool -- \
         describe --force "$POSTGRES_PROJECT/Postgres.csproj" "${connections[@]}"
 
-    docker rm -f "$postgres_container" >/dev/null
+    run_docker rm -f "$postgres_container" >/dev/null
     postgres_container=''
 
     # The examples: their schema on a database of their own, on the PostGIS container, since the schema creates the
     # extension postgis, and their project described with that connection, under the logical database that its queries
     # belong to, named after their dialect.
     printf 'Creating the database %s ... ' "$EXAMPLES_DATABASE"
-    docker exec "$postgis_container" psql -v ON_ERROR_STOP=1 -q -U postgres -c "CREATE DATABASE $EXAMPLES_DATABASE" \
-        >/dev/null
-    docker exec -i "$postgis_container" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$EXAMPLES_DATABASE" \
+    run_docker exec "$postgis_container" psql -v ON_ERROR_STOP=1 -q -U postgres \
+        -c "CREATE DATABASE $EXAMPLES_DATABASE" >/dev/null
+    run_docker exec -i "$postgis_container" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$EXAMPLES_DATABASE" \
         <"$POSTGRES_EXAMPLES/schema.sql" >/dev/null
     echo 'done'
 
@@ -180,7 +183,7 @@ describe_postgres() {
         describe --force "$POSTGRES_EXAMPLES/PostgresExamples.csproj" \
         --connection "postgres=$connection;Database=$EXAMPLES_DATABASE"
 
-    docker rm -f "$postgis_container" >/dev/null
+    run_docker rm -f "$postgis_container" >/dev/null
     postgis_container=''
 }
 
@@ -190,13 +193,13 @@ describe_sqlserver() {
 
     # The image is built for x64 alone, which an arm64 host runs under emulation.  Keep --platform linux/amd64.
     printf 'Starting %s ... ' "$image"
-    sqlserver_container="$(docker run -d --platform linux/amd64 -e ACCEPT_EULA=Y \
+    sqlserver_container="$(run_docker run -d --platform linux/amd64 -e ACCEPT_EULA=Y \
         -e "MSSQL_SA_PASSWORD=$SQLSERVER_PASSWORD" -p 127.0.0.1::1433 "$image")"
-    port="$(docker port "$sqlserver_container" 1433/tcp | head -n 1 | sed 's/.*://')"
+    port="$(run_docker port "$sqlserver_container" 1433/tcp | head -n 1 | sed 's/.*://')"
 
     # A try can wait for its login as long as -l allows, so the limit is a time, not a count of tries.
     deadline=$((SECONDS + 120))
-    until docker exec "$sqlserver_container" "${SQLCMD[@]}" -l 5 -Q 'SELECT 1' >/dev/null 2>&1; do
+    until run_docker exec "$sqlserver_container" "${SQLCMD[@]}" -l 5 -Q 'SELECT 1' >/dev/null 2>&1; do
         if ((SECONDS >= deadline)); then
             echo 'failed: the server was not ready in 120 seconds' >&2
             exit 1
@@ -212,7 +215,7 @@ describe_sqlserver() {
     # UTF-8, as SqlServerContainer reads it.
     for database in "${SQLSERVER_DATABASES[@]}"; do
         printf 'Creating the database %s ... ' "$database"
-        docker exec "$sqlserver_container" "${SQLCMD[@]}" -Q "CREATE DATABASE [$database]" >/dev/null
+        run_docker exec "$sqlserver_container" "${SQLCMD[@]}" -Q "CREATE DATABASE [$database]" >/dev/null
         folder="$SQLSERVER_END_TO_END/$database"
         if [[ $database == realistic ]]; then
             folder="$SQLSERVER_REALISTIC"
@@ -222,7 +225,7 @@ describe_sqlserver() {
             files+=(new-types.sql)
         fi
         for file in "${files[@]}"; do
-            docker exec -i "$sqlserver_container" "${SQLCMD[@]}" -d "$database" -f 65001 -i /dev/stdin \
+            run_docker exec -i "$sqlserver_container" "${SQLCMD[@]}" -d "$database" -f 65001 -i /dev/stdin \
                 <"$folder/$file" >/dev/null
         done
         echo 'done'
@@ -240,8 +243,8 @@ describe_sqlserver() {
     # The examples: their schema on a database of their own, and their project described with that connection, under
     # the logical database that its queries belong to, named after their dialect.
     printf 'Creating the database %s ... ' "$EXAMPLES_DATABASE"
-    docker exec "$sqlserver_container" "${SQLCMD[@]}" -Q "CREATE DATABASE [$EXAMPLES_DATABASE]" >/dev/null
-    docker exec -i "$sqlserver_container" "${SQLCMD[@]}" -d "$EXAMPLES_DATABASE" -f 65001 -i /dev/stdin \
+    run_docker exec "$sqlserver_container" "${SQLCMD[@]}" -Q "CREATE DATABASE [$EXAMPLES_DATABASE]" >/dev/null
+    run_docker exec -i "$sqlserver_container" "${SQLCMD[@]}" -d "$EXAMPLES_DATABASE" -f 65001 -i /dev/stdin \
         <"$SQLSERVER_EXAMPLES/schema.sql" >/dev/null
     echo 'done'
 
@@ -252,7 +255,7 @@ describe_sqlserver() {
         describe --force "$SQLSERVER_EXAMPLES/SqlServerExamples.csproj" \
         --connection "mssql=$connection;Database=$EXAMPLES_DATABASE"
 
-    docker rm -f "$sqlserver_container" >/dev/null
+    run_docker rm -f "$sqlserver_container" >/dev/null
     sqlserver_container=''
 }
 
