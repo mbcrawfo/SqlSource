@@ -6,6 +6,8 @@ IMAGE='koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f17825325
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+# shellcheck source=tools/platform.sh
+source tools/platform.sh
 
 files=()
 while IFS= read -r -d '' file; do
@@ -19,4 +21,4 @@ if [[ ${#files[@]} -eq 0 ]]; then
     exit 0
 fi
 
-docker run --rm --volume "$repo_root:/mnt:ro" --workdir /mnt "$IMAGE" "${files[@]}"
+run_docker run --rm --volume "$(native_path "$repo_root"):/mnt:ro" --workdir /mnt "$IMAGE" "${files[@]}"

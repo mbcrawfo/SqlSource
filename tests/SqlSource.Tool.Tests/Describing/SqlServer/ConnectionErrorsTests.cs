@@ -29,8 +29,8 @@ public sealed class ConnectionErrorsTests
                 "Msg 18456, Level 14, State 1: the server refused the login",
             ]);
 
-    // SqlClient's native network layer, which it uses on Windows, puts a Win32 code where the managed layer of Linux and
-    // macOS puts a SocketException or an AuthenticationException, and each gets the text the managed layer's gets.
+    // SqlClient's native network layer, which it uses on Windows, puts a Win32 code where the managed layer of Linux
+    // and macOS puts a SocketException or an AuthenticationException, and each gets the text the managed layer's gets.
     [Theory]
     [InlineData(258, 258, "the connection to the server timed out")]
     [InlineData(11001, 11001, "SqlClient could not reach the server: HostNotFound")]

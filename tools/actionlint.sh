@@ -7,6 +7,8 @@ IMAGE='rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+# shellcheck source=tools/platform.sh
+source tools/platform.sh
 
 files=()
 while IFS= read -r -d '' file; do
@@ -20,4 +22,4 @@ if [[ ${#files[@]} -eq 0 ]]; then
     exit 0
 fi
 
-docker run --rm --volume "$repo_root:/mnt:ro" --workdir /mnt "$IMAGE" -color "${files[@]}"
+run_docker run --rm --volume "$(native_path "$repo_root"):/mnt:ro" --workdir /mnt "$IMAGE" -color "${files[@]}"

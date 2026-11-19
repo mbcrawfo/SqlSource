@@ -128,8 +128,8 @@ internal static class ConnectionErrors
 
     // The text at open of an error that is no refused login, database or timeout: a TLS handshake that failed, a server
     // that could not be reached, or anything else.  An AuthenticationException comes inside a SqlException whose chain
-    // holds no socket's error, so the order of the two is for clarity alone.  On Windows SqlClient's native network layer
-    // throws neither, and its numbers are read first.
+    // holds no socket's error, so the order of the two is for clarity alone.  On Windows SqlClient's native network
+    // layer throws neither, and its numbers are read first.
     private static string OtherAtOpen(SqlException exception)
     {
         if (
@@ -157,9 +157,10 @@ internal static class ConnectionErrors
     /// Linux and macOS gets for the same failure, or null for an error the layer does not give.
     /// </summary>
     /// <remarks>
-    /// The codes are those of <c>winerror.h</c>.  <c>WAIT_TIMEOUT</c> is a connect that ran out of time, and also a port
-    /// where nothing listens, since the native layer retries a refused connection until the connect timeout ends: a
-    /// probe of SqlClient 7.1.1 gave it for both.  A Winsock code is the <see cref="SocketError" /> of the same number.
+    /// The codes are those of <c>winerror.h</c>.  <c>WAIT_TIMEOUT</c> is a connect that ran out of time, and also a
+    /// port where nothing listens, since the native layer retries a refused connection until the connect timeout ends:
+    /// a probe of SqlClient 7.1.1 gave it for both.  A Winsock code is the <see cref="SocketError" /> of the same
+    /// number.
     /// </remarks>
     internal static string? NativeLayerText(int errorNumber, int? win32Code)
     {
