@@ -2,7 +2,10 @@
 
 -- name: GetAccount
 -- summary: One account, its columns in another order than the table's.
-SELECT name, id, email
+SELECT
+    name,
+    id,
+    email
 FROM dbo.accounts
 WHERE id = @accountId;
 
@@ -14,7 +17,15 @@ ORDER BY id;
 
 -- name: ListAccountsInTableOrder
 -- summary: Every account, by the whole list of columns in the table's order.
-SELECT id, name, email, status, opened_on, created_at, closed_at, name_length
+SELECT
+    id,
+    name,
+    email,
+    status,
+    opened_on,
+    created_at,
+    closed_at,
+    name_length
 FROM dbo.accounts
 ORDER BY id;
 
@@ -28,21 +39,28 @@ ORDER BY id;
 -- name: GetAccountName
 -- summary: The name of an account, by its id.
 -- output-model: AccountName
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id = @accountId;
 
 -- name: FindAccountName
 -- summary: The name of an account, by its email, a parameter of the alias type dbo.Email.
 -- output-model: AccountName
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE email = @email;
 
 -- name: ListClosedBefore
 -- summary: The accounts closed before a time, or every account when it is null.
 -- param: @closedBefore datetimeoffset null
-SELECT id, name, closed_at
+SELECT
+    id,
+    name,
+    closed_at
 FROM dbo.accounts
 WHERE @closedBefore IS NULL OR closed_at < @closedBefore
 ORDER BY id;
@@ -53,15 +71,20 @@ ORDER BY id;
 -- and the entry is the same on both.
 -- param: @days int
 -- param: @asOf date
-SELECT id, name, opened_on
+SELECT
+    id,
+    name,
+    opened_on
 FROM dbo.accounts
-WHERE opened_on >= DATEADD(day, -@days, @asOf) AND opened_on <= @asOf
+WHERE opened_on >= DATEADD(DAY, -@days, @asOf) AND opened_on <= @asOf
 ORDER BY id;
 
 -- name: ListAccountsInRange
 -- summary: The accounts whose ids are within two bounds, but one name, with parameters named by a letter number and
 -- a combining mark, which SQL Server reads as part of a name.
-SELECT id, name
+SELECT
+    id,
+    name
 FROM dbo.accounts
 WHERE id BETWEEN @idⅠ AND @idⅡ AND name <> @skippé
 ORDER BY id;

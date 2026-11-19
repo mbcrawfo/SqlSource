@@ -20,7 +20,7 @@ GO
 CREATE TABLE dbo.accounts (
     id int IDENTITY PRIMARY KEY,
     name nvarchar(100) NOT NULL,
-    email dbo.Email NOT NULL,
+    email dbo.email NOT NULL,
     status varchar(20) NOT NULL DEFAULT 'active',
     opened_on date NOT NULL,
     created_at datetimeoffset NOT NULL DEFAULT SYSDATETIMEOFFSET(),
@@ -33,7 +33,7 @@ CREATE TABLE dbo.notes (
     id int IDENTITY PRIMARY KEY,
     account_id int NOT NULL REFERENCES dbo.accounts (id),
     kind varchar(10) NOT NULL,
-    body nvarchar(max) NOT NULL,
+    body nvarchar(MAX) NOT NULL,
     written_at datetime2(3) NOT NULL,
     remind_at time(0) NULL
 );
@@ -87,7 +87,7 @@ CREATE TABLE dbo.all_types (
 CREATE TABLE dbo.external_refs (
     id int PRIMARY KEY,
     account_id int NOT NULL REFERENCES dbo.accounts (id),
-    external_id dbo.ExternalId NOT NULL
+    external_id dbo.externalid NOT NULL
 );
 
 -- One nullable column for each date and time type that NodaTime's rows map, read and written by the queries of
@@ -126,15 +126,15 @@ CREATE TABLE dbo.spatial_values (
 -- which SqlClient cannot read.  It has no seed: each test writes its rows in a transaction that is rolled back.
 CREATE TABLE dbo.json_values (
     id int PRIMARY KEY,
-    element nvarchar(max) NULL,
-    document nvarchar(max) NULL,
-    node nvarchar(max) NULL,
-    obj nvarchar(max) NULL,
-    arr nvarchar(max) NULL,
-    settings_meta nvarchar(max) NULL,
-    header_meta nvarchar(max) NULL,
-    tags nvarchar(max) NULL,
-    marker_meta nvarchar(max) NULL,
-    camel nvarchar(max) NULL,
+    element nvarchar(MAX) NULL,
+    document nvarchar(MAX) NULL,
+    node nvarchar(MAX) NULL,
+    obj nvarchar(MAX) NULL,
+    arr nvarchar(MAX) NULL,
+    settings_meta nvarchar(MAX) NULL,
+    header_meta nvarchar(MAX) NULL,
+    tags nvarchar(MAX) NULL,
+    marker_meta nvarchar(MAX) NULL,
+    camel nvarchar(MAX) NULL,
     plain_meta nvarchar(200) NULL
 );

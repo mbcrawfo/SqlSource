@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListOrdersWithOpenAccount": {
-      "hash": "647b7c2e75e50d829a57eaf47bfce53c85535d21f1c40a16d0b4dc85fed3e0e9",
+      "hash": "605d2e9da7e162b8ca907f9d8510d8edcdaff8e50657171b84bc184846ae0337",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

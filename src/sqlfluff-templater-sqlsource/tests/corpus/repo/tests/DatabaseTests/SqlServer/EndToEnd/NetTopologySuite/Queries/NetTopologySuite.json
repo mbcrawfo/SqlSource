@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- The queries of spatial_values' geography and geometry columns, claimed by NetTopologySuiteQueries here and in\n-- SqlServer.SqlClient61.  The folder's settings file turns NetTopologySuite on, so every column and parameter of a\n-- spatial type takes its Geometry, read through the column's stream and written as SqlBytes by the generated\n-- NetTopologySuiteConversions.\n\n-- name: InsertSpatialValues\n-- summary: Inserts a row of spatial_values with a parameter for its geography and its geometry, either of which may be\n-- null.\n-- param: @geographyValue null\n-- param: @geometryValue null\nINSERT INTO dbo.spatial_values (id, geography_value, geometry_value)\nVALUES (@id, @geographyValue, @geometryValue);\n\n-- name: GetSpatialValues -> one\n-- summary: The row of spatial_values with the id, its geography and its geometry.\nSELECT id, geography_value, geometry_value\nFROM dbo.spatial_values\nWHERE id = @id;\n\n-- name: ListGeographyValues\n-- summary: The id and the geography of every row of spatial_values, with no parameter, so that a connection that wraps\n-- SqlClient's can run it.\nSELECT id, geography_value\nFROM dbo.spatial_values\nORDER BY id;\n",
+  "input": "-- The queries of spatial_values' geography and geometry columns, claimed by NetTopologySuiteQueries here and in\n-- SqlServer.SqlClient61.  The folder's settings file turns NetTopologySuite on, so every column and parameter of a\n-- spatial type takes its Geometry, read through the column's stream and written as SqlBytes by the generated\n-- NetTopologySuiteConversions.\n\n-- name: InsertSpatialValues\n-- summary: Inserts a row of spatial_values with a parameter for its geography and its geometry, either of which may be\n-- null.\n-- param: @geographyValue null\n-- param: @geometryValue null\nINSERT INTO dbo.spatial_values (id, geography_value, geometry_value)\nVALUES (@id, @geographyValue, @geometryValue);\n\n-- name: GetSpatialValues -> one\n-- summary: The row of spatial_values with the id, its geography and its geometry.\nSELECT\n    id,\n    geography_value,\n    geometry_value\nFROM dbo.spatial_values\nWHERE id = @id;\n\n-- name: ListGeographyValues\n-- summary: The id and the geography of every row of spatial_values, with no parameter, so that a connection that wraps\n-- SqlClient's can run it.\nSELECT\n    id,\n    geography_value\nFROM dbo.spatial_values\nORDER BY id;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -39,15 +39,15 @@
       ["LineComment", 708, 740],
       ["Text", 740, 741],
       ["LineComment", 741, 823],
-      ["Text", 823, 902],
-      ["Parameter", 902, 905],
-      ["Text", 905, 908],
-      ["LineComment", 908, 936],
-      ["Text", 936, 937],
-      ["LineComment", 937, 1056],
-      ["Text", 1056, 1057],
-      ["LineComment", 1057, 1083],
-      ["Text", 1083, 1148]
+      ["Text", 823, 914],
+      ["Parameter", 914, 917],
+      ["Text", 917, 920],
+      ["LineComment", 920, 948],
+      ["Text", 948, 949],
+      ["LineComment", 949, 1068],
+      ["Text", 1068, 1069],
+      ["LineComment", 1069, 1095],
+      ["Text", 1095, 1168]
     ],
     "spans": [
       { "kind": "markerComment", "start": 372, "end": 400, "name": null, "default": null },
@@ -59,9 +59,9 @@
       { "kind": "parameter", "start": 690, "end": 704, "name": "geometryValue", "default": null },
       { "kind": "markerComment", "start": 708, "end": 740, "name": null, "default": null },
       { "kind": "markerComment", "start": 741, "end": 823, "name": null, "default": null },
-      { "kind": "parameter", "start": 902, "end": 905, "name": "id", "default": null },
-      { "kind": "markerComment", "start": 908, "end": 936, "name": null, "default": null },
-      { "kind": "markerComment", "start": 937, "end": 1056, "name": null, "default": null }
+      { "kind": "parameter", "start": 914, "end": 917, "name": "id", "default": null },
+      { "kind": "markerComment", "start": 920, "end": 948, "name": null, "default": null },
+      { "kind": "markerComment", "start": 949, "end": 1068, "name": null, "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

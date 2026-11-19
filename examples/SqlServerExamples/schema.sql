@@ -6,13 +6,16 @@
 
 -- An email address, an alias type over nvarchar.  Methods/UserQueries.sql maps it to the C# type EmailAddress.  A table
 -- can use the type only in a batch after the one that creates it, so GO ends this one.
-CREATE TYPE dbo.Email FROM nvarchar(200);
+-- Email is the alias type's name as the type override of UserQueries.sql and the readme write it.
+CREATE TYPE dbo.Email FROM nvarchar(200);  -- noqa: CP02
 GO
 
 CREATE TABLE users (
     id int IDENTITY PRIMARY KEY,
-    name nvarchar(100) NOT NULL,
-    email dbo.Email NOT NULL,
+    -- A column called name, which SQL Server does not reserve, as the manual's examples query it.
+    name nvarchar(100) NOT NULL,  -- noqa: RF04
+    -- The alias type dbo.Email, as above.
+    email dbo.Email NOT NULL,  -- noqa: CP05
     created_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
 );
 
@@ -40,7 +43,8 @@ CREATE TABLE order_lines (
 CREATE TABLE deliveries (
     order_id int PRIMARY KEY REFERENCES orders (id),
     delivered_at datetimeoffset NOT NULL,
-    location geography NOT NULL,
+    -- A column called location, which SQL Server does not reserve.
+    location geography NOT NULL,  -- noqa: RF04
     details json NOT NULL,
     events json NOT NULL
 );
@@ -67,7 +71,8 @@ INSERT INTO deliveries (order_id, delivered_at, location, details, events) VALUE
 (
     1,
     '2026-03-02T16:00:00+00:00',
-    geography::Point(51.5072, -0.1276, 4326),
+    -- Point is a method of the .NET type geography, and its name is case-sensitive.
+    geography::Point(51.5072, -0.1276, 4326),  -- noqa: CP05
     N'{"Carrier": "Parcelforce", "TrackingNumber": "PF1234567"}',
     N'[{"Status": "Delivered"}]'
 );

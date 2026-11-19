@@ -5,9 +5,10 @@
 UPDATE dbo.orders
 SET note = @note
 OUTPUT
-    inserted.id,
-    deleted.note AS previous_note,
-    inserted.note,
-    inserted.row_version
-WHERE id = @id
+    INSERTED.id,
+    DELETED.note AS previous_note,
+    INSERTED.note,
+    INSERTED.row_version
+WHERE
+    id = @id
     AND row_version = @version;

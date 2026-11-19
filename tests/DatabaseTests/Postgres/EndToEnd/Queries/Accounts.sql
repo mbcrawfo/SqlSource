@@ -4,7 +4,10 @@
 
 -- name: GetAccount
 -- summary: One account, its columns in another order than the table's.
-SELECT name, id, email
+SELECT
+    name,
+    id,
+    email
 FROM accounts
 WHERE id = @accountId;
 
@@ -37,7 +40,14 @@ ORDER BY id;
 
 -- name: ListAccountsInTableOrder
 -- summary: Every account, by the whole list of columns in the table's order.
-SELECT id, name, email, status, created_at, closed_at, name_length
+SELECT
+    id,
+    name,
+    email,
+    status,
+    created_at,
+    closed_at,
+    name_length
 FROM accounts
 ORDER BY id;
 
@@ -51,7 +61,9 @@ ORDER BY id;
 -- name: GetAccountName
 -- summary: The name of an account, by its id.
 -- output-model: AccountName
-SELECT id, name
+SELECT
+    id,
+    name
 FROM accounts
 WHERE id = @accountId;
 
@@ -60,7 +72,9 @@ WHERE id = @accountId;
 -- output-model: AccountName
 -- generator: array-pool=off
 -- input-model: GetAccountNameArgs
-SELECT id, name
+SELECT
+    id,
+    name
 FROM accounts
 WHERE id = @accountId;
 
@@ -69,7 +83,9 @@ WHERE id = @accountId;
 -- output-model: AccountName
 -- generator: method-type=sync
 -- input-model: GetAccountNameArgs
-SELECT id, name
+SELECT
+    id,
+    name
 FROM accounts
 WHERE id = @accountId;
 
@@ -78,21 +94,28 @@ WHERE id = @accountId;
 -- output-model: AccountName
 -- generator: array-pool=off method-type=sync
 -- input-model: GetAccountNameArgs
-SELECT id, name
+SELECT
+    id,
+    name
 FROM accounts
 WHERE id = @accountId;
 
 -- name: FindAccountName
 -- summary: The name of an account, by its email.
 -- output-model: AccountName
-SELECT id, name
+SELECT
+    id,
+    name
 FROM accounts
 WHERE email = @email;
 
 -- name: ListClosedBefore
 -- summary: The accounts closed before a time, or every account when it is null.
 -- param: @closedBefore timestamptz null
-SELECT id, name, closed_at
+SELECT
+    id,
+    name,
+    closed_at
 FROM accounts
 WHERE @closedBefore IS NULL OR closed_at < @closedBefore
 ORDER BY id;
@@ -103,7 +126,10 @@ ORDER BY id;
 -- generator: array-pool=off
 -- input-model: ListClosedBeforeArgs
 -- output-model: ListClosedBeforeDto
-SELECT id, name, closed_at
+SELECT
+    id,
+    name,
+    closed_at
 FROM accounts
 WHERE @closedBefore IS NULL OR closed_at < @closedBefore
 ORDER BY id;
@@ -114,7 +140,10 @@ ORDER BY id;
 -- generator: method-type=sync
 -- input-model: ListClosedBeforeArgs
 -- output-model: ListClosedBeforeDto
-SELECT id, name, closed_at
+SELECT
+    id,
+    name,
+    closed_at
 FROM accounts
 WHERE @closedBefore IS NULL OR closed_at < @closedBefore
 ORDER BY id;
@@ -125,7 +154,10 @@ ORDER BY id;
 -- generator: array-pool=off method-type=sync
 -- input-model: ListClosedBeforeArgs
 -- output-model: ListClosedBeforeDto
-SELECT id, name, closed_at
+SELECT
+    id,
+    name,
+    closed_at
 FROM accounts
 WHERE @closedBefore IS NULL OR closed_at < @closedBefore
 ORDER BY id;

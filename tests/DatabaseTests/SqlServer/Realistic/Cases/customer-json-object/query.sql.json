@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListCustomerCards": {
-      "hash": "de4fe429de47923e5c9e45cd05247c8e580c0aeb39e84f1664d62f1c19d2ec76",
+      "hash": "05855d76567a2fdd7afaff130f9b03fe0f9960c0a1033dbf86440040660c3110",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

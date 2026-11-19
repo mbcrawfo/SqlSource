@@ -1,0 +1,9 @@
+# The sqlfluff dialect of the SQL Server queries of this folder.  The root's exclude_rules applies here too.
+[sqlfluff]
+dialect = tsql
+
+# CP02 is off here: the schemas name things in mixed case, such as dbo.Email, and those names reach what the describer
+# records, so recasing them would change the sidecars.  It is turned off by its own option, since an exclude_rules here
+# would replace the root's list instead of adding to it.
+[sqlfluff:rules:capitalisation.identifiers]
+ignore_words_regex = .*

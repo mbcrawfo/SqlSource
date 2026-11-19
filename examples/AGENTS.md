@@ -11,12 +11,13 @@
 ## Keeping them current
 
 1. **The sidecars are written by `tools/describe-end-to-end.sh`, never by hand.**  Run it after a change to a query or to a project's `schema.sql`, and read its diff.
-2. **A project sets no `database`.**  Its queries belong to the default logical database of its dialect, `postgres` or `mssql`, so a run has one database: the README's `SQLSOURCE_CONNECTION`, the same line in `.env.example`, and the connection `postgres=` or `mssql=` in `tools/describe-end-to-end.sh` all depend on it.
-3. **`schema.sql` names no owner, role or database.**  The Compose file and the script each run it in a database of their own, PostgreSQL's Compose file as its own user and the script as `postgres`, SQL Server's both as `sa` in a database `examples`, and both must give the sidecars the same answer.  SQL Server's Compose file applies it from a second service, with `sqlcmd -I` and `-d examples`, only when it creates the database.
-4. **Each README's links to the manual are relative.**  It is not a packed readme.
+2. **Format a query with `./format.sh sql` before you describe it**, since formatting changes its hash and makes the sidecar stale.  The examples meet every sqlfluff rule, since users copy them: what an example exists to show, such as `SELECT *`, keeps its form with `-- noqa: <rule>` and the reason on the line above.
+3. **A project sets no `database`.**  Its queries belong to the default logical database of its dialect, `postgres` or `mssql`, so a run has one database: the README's `SQLSOURCE_CONNECTION`, the same line in `.env.example`, and the connection `postgres=` or `mssql=` in `tools/describe-end-to-end.sh` all depend on it.
+4. **`schema.sql` names no owner, role or database.**  The Compose file and the script each run it in a database of their own, PostgreSQL's Compose file as its own user and the script as `postgres`, SQL Server's both as `sa` in a database `examples`, and both must give the sidecars the same answer.  SQL Server's Compose file applies it from a second service, with `sqlcmd -I` and `-d examples`, only when it creates the database.
+5. **Each README's links to the manual are relative.**  It is not a packed readme.
 
 ## Adding a database
 
-A new database gets a project of its own, `examples/<Engine>Examples`, by the pattern of `PostgresExamples` and `SqlServerExamples`: its Compose file and `schema.sql`, the four folders, a README, an entry in `SqlSource.slnx` under `/examples/`, and its sidecars written by the same script.
+A new database gets a project of its own, `examples/<Engine>Examples`, by the pattern of `PostgresExamples` and `SqlServerExamples`: its Compose file and `schema.sql`, the four folders, a README, an entry in `SqlSource.slnx` under `/examples/`, its sidecars written by the same script, and a `.sqlfluff` that sets the sqlfluff dialect of its database.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

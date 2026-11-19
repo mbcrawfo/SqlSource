@@ -162,43 +162,35 @@ public sealed class ReplayTests : IDisposable
             );
     }
 
-    // A control character of each kind that a crafted bundle may hold, and how it is printed: C0's escape and bell, a
-    // character of C1, and DEL.
-    public static TheoryData<string, string> Controls =>
-        new()
-        {
-            { "\u001b", "\\u001B" },
-            { "\u0007", "\\u0007" },
-            { "\u009b", "\\u009B" },
-            { "\u007f", "\\u007F" },
-        };
+    // A control character that a crafted bundle may hold, ESC, and how it is printed.  Which kinds are escaped is
+    // BundleTextTests'; these tests show that the field is printed through BundleText.
+    private const string Control = "\u001b";
+    private const string Escape = "\\u001B";
 
-    [Theory]
-    [MemberData(nameof(Controls))]
-    public async Task Replay_ToolVersionWithAControlCharacter_PrintsItsEscape(string control, string escape)
+    [Fact]
+    public async Task Replay_ToolVersionWithAControlCharacter_PrintsItsEscape()
     {
         var bundle = BundleReplays.OfCase("postgres", "select-plain");
         var expected = JsonNode.Parse(bundle.Expected.ShouldNotBeNull()).ShouldNotBeNull();
         var entry = expected["queries"].ShouldNotBeNull().AsObject().Single().Value.ShouldNotBeNull();
         entry["serverVersion"] = "0.1";
-        var info = InfoOf("postgres", renamed: true) with { ToolVersion = $"1.0{control}[3A\t{control}[0J" };
+        var info = InfoOf("postgres", renamed: true) with { ToolVersion = $"1.0{Control}[3A\t{Control}[0J" };
         _ = WriteFolder(bundle with { Info = info, Expected = expected.ToJsonString() });
 
         var result = await _run.RunAsync("replay", "case");
 
         result.ExitCode.ShouldBe(2);
-        result.Out.ShouldNotContain(control);
+        result.Out.ShouldNotContain(Control);
         result
             .Out.TrimEnd('\n')
             .Split('\n')[^1]
             .ShouldStartWith(
-                $"sqlsource: the bundle was made by sqlsource 1.0{escape}[3A\t{escape}[0J, sidecar format "
+                $"sqlsource: the bundle was made by sqlsource 1.0{Escape}[3A\t{Escape}[0J, sidecar format "
             );
     }
 
-    [Theory]
-    [MemberData(nameof(Controls))]
-    public async Task Replay_FailureWithAControlCharacter_PrintsItsEscape(string control, string escape)
+    [Fact]
+    public async Task Replay_FailureWithAControlCharacter_PrintsItsEscape()
     {
         _ = WriteFolder(
             BundleReplays.PrepareTypeNotDetermined() with
@@ -206,7 +198,7 @@ public sealed class ReplayTests : IDisposable
                 Info = InfoOf("postgres") with
                 {
                     Renamed = true,
-                    Outcome = BundleOutcome.Failure($"SQLSRC231{control}[2J", $"parse\t{control}"),
+                    Outcome = BundleOutcome.Failure($"SQLSRC231{Control}[2J", $"parse\t{Control}"),
                 },
             }
         );
@@ -214,11 +206,11 @@ public sealed class ReplayTests : IDisposable
         var result = await _run.RunAsync("replay", "case");
 
         result.ExitCode.ShouldBe(2);
-        result.Out.ShouldNotContain(control);
+        result.Out.ShouldNotContain(Control);
         result
             .Out.Split('\n')
             .ShouldContain(
-                $"sqlsource:   expected SQLSRC231{escape}[2J at parse\t{escape}, "
+                $"sqlsource:   expected SQLSRC231{Escape}[2J at parse\t{Escape}, "
                     + "replayed SQLSRC226 at describe parameters"
             );
     }
@@ -608,15 +600,6 @@ public sealed class ReplayTests : IDisposable
     }
 
     [Fact]
-    public async Task Replay_Failed_HasNoLineThatPointsToALog()
-    {
-        var result = await _run.RunAsync("replay", "missing");
-
-        result.ExitCode.ShouldBe(1);
-        result.Error.ShouldNotContain(Cli.RunAgainLine);
-    }
-
-    [Fact]
     public async Task Replay_WithoutVerbose_PrintsOnlyTheDecisions()
     {
         _ = CopyCase("postgres", "select-left-join");
@@ -735,20 +718,6 @@ public sealed class ReplayTests : IDisposable
         var result = await _run.RunAsync("replay");
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: command 'replay' needs the path of a bundle\n"));
-    }
-
-    [Fact]
-    public async Task Replay_LogPathWithAnEqualsSign_IsAWrongCommandLine()
-    {
-        var result = await _run.RunAsync("replay", "case", "--log", "a=" + Secrets.Word);
-
-        result.ShouldBe(
-            new CliResult(
-                1,
-                "",
-                "sqlsource: the value of option '--log' at position 4 holds '=' or ';', which a log's path may not\n"
-            )
-        );
     }
 
     [Fact]

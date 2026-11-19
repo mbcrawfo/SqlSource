@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListCustomersWithLatestOrder": {
-      "hash": "da2084978876cbf9c1d3b5b675a39b5909437d0d9d84171dc8583d0b6e505723",
+      "hash": "8f23f0b9b3af8a445031da7fc8c5dde2edf9c2decd4d2f88e383ee8c77c9ac02",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

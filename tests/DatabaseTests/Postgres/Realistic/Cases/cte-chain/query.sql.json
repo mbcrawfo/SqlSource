@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListCustomerLifetimeValue": {
-      "hash": "d5bbd46a0c35413b171d07dd052ece2dc9894baf48f3f6e7a8196b1dfb5f517b",
+      "hash": "a6e0456b0aafb0bbfcabbfbc1b71574e5e4590a912ce97f78a5c62ded4ae783d",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

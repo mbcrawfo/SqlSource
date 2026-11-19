@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListAccountActivitySince": {
-      "hash": "c4a68267b090f95b0d405dd6eda79019c6f20e7bfb9670e8350bf49bc8cb4b4c",
+      "hash": "c0d3bce2b530877d00d68b837d3272d5d86ed4da12ad06661c055871f36d6323",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

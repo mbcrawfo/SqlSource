@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListProductsNotOrderedSince": {
-      "hash": "5ea1eba270097d4fc91c772a2058ec350b1ed0d87f9361803cfc7c82764bed95",
+      "hash": "2a913d660ddcd3ff039561021a6c90338078fcfc5b59441ea79caf3bc435cf01",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

@@ -138,7 +138,7 @@
       ]
     },
     "GetInvoice": {
-      "hash": "35a16f7120d06aabd5aabb4bb4860edd5fc981318478cfdd859fb3f95ce4fc9e",
+      "hash": "6b0a908220957364d8d880b4941a0ed90539e15e877da618908cc49a279f5332",
       "toolVersion": "0.2.0",
       "database": "billing",
       "engine": "postgres",

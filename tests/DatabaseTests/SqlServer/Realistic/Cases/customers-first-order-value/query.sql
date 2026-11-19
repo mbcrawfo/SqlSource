@@ -1,11 +1,17 @@
 -- name: ListCustomersFirstOrderValue
 WITH order_totals AS (
-    SELECT o.id, o.customer_id, o.placed_at, o.ship_city, SUM(ol.quantity * ol.unit_price) AS total
+    SELECT
+        o.id,
+        o.customer_id,
+        o.placed_at,
+        o.ship_city,
+        SUM(ol.quantity * ol.unit_price) AS total
     FROM dbo.orders AS o
     JOIN dbo.order_lines AS ol ON ol.order_id = o.id
     WHERE o.status <> 'cancelled'
     GROUP BY o.id, o.customer_id, o.placed_at, o.ship_city
 )
+
 SELECT DISTINCT
     c.id,
     c.name,

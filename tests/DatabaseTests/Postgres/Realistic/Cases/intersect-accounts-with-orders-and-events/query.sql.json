@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListAccountsThatOrderedAndLoggedIn": {
-      "hash": "38799f0eb37e47bdbcb452b671362d38b5f4704513d71d9735ada98aefa2dcbd",
+      "hash": "b93a7953c040060130ad66fb0d8d115d5543b0539c17a9d70c98dcd8487738f9",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

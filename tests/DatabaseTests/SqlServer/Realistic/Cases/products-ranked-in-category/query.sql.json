@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "RankProductsBySales": {
-      "hash": "ed710854e239f6d7ed62212cd3d2d56688b38b5fb3dd487c19d7eee4130d2d9b",
+      "hash": "110c923a106b09db15a5775ffdad3103a2036d9ac8445b8e07fe9cb00ed2d1ae",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

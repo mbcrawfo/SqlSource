@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListShippingOptions": {
-      "hash": "5c64018e652e06e2253b87357638a9cff21b00519a8a3211432513da108a58fc",
+      "hash": "532fcccc65152b9173c842713262f0758e6bb34223566cd33a435b9640ee1b74",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

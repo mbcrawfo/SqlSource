@@ -8,7 +8,7 @@ SELECT
     p.name AS product_name,
     p.price
 FROM events e
-CROSS JOIN LATERAL jsonb_array_elements(e.payload -> 'items') AS li(item)
+CROSS JOIN LATERAL jsonb_array_elements(e.payload -> 'items') AS li (item)
 LEFT JOIN products p ON p.sku = li.item ->> 'sku'
 WHERE e.kind = 'purchase' AND e.payload ? 'items'
 ORDER BY e.at, sku;

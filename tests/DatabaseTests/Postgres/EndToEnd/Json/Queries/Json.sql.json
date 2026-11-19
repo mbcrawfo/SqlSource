@@ -486,7 +486,7 @@
       ]
     },
     "GetRequiredJson": {
-      "hash": "0c3db6b46c8da5e84bf7bb34bcaf1ead8889dd017f3bf6312552f37d49c6e6b8",
+      "hash": "4ae002f8ff5b2ff93014571bea2e4ce70bb3c1bb1bce98b58ea55f81df2bd227",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "postgres",

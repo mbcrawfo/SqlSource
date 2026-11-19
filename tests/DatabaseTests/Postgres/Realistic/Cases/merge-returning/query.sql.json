@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "MergeProductCatalog": {
-      "hash": "35f3764b84931fe6a9d787c10491040641369cbe9b25cd1bbb17852d1ef6b9c9",
+      "hash": "146032cb7e9af1923d31571992567fb85f7ae0139d820ed1e7cf1a5b6c69397a",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

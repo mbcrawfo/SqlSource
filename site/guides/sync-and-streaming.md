@@ -64,7 +64,10 @@ If a result is too large to hold in an array, stream its rows: your loop gets ea
 ```sql postgres
 -- name: StreamUsersOldestFirst
 -- collection-type: IAsyncEnumerable
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 ORDER BY created_at, id;
 ```

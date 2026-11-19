@@ -9,7 +9,12 @@
 -- A parameter is no column of a table, so its marker gives it the type OrderId.  order_id comes last: the table's
 -- columns in its own order would give the rows the table's model, OrderLinesDto.
 -- param: @orderId -> OrderId
-SELECT line_number, product, quantity, unit_price, order_id
+SELECT
+    line_number,
+    product,
+    quantity,
+    unit_price,
+    order_id
 FROM order_lines
 WHERE order_id = @orderId
 ORDER BY line_number;
@@ -19,7 +24,9 @@ ORDER BY line_number;
 -- The largest order_id is computed, no column of a table, so the column types do not reach it, and the marker gives
 -- it the type OrderId.
 -- column: latest_order_id -> OrderId
-SELECT product, max(order_id) AS latest_order_id
+SELECT
+    product,
+    max(order_id) AS latest_order_id
 FROM order_lines
 GROUP BY product
 ORDER BY product;

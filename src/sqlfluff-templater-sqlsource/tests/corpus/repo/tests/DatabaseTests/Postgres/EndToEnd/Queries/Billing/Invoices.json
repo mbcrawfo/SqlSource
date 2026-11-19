@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- The queries of the database billing, claimed by InvoiceQueries.  The folder's settings file gives them their model\n-- shape, their output suffix, their type override and their collection type.\n-- database: billing\n-- model-namespace: SqlSource.DatabaseTests.Postgres.EndToEnd.Billing\n\n-- name: ListInvoices\n-- summary: Every invoice, by SELECT *.\nSELECT *\nFROM billing.invoices\nORDER BY id;\n\n-- name: GetInvoice\n-- summary: The number and payment of one invoice.\nSELECT id, number, amount, paid_at\nFROM billing.invoices\nWHERE id = @invoiceId;\n",
+  "input": "-- The queries of the database billing, claimed by InvoiceQueries.  The folder's settings file gives them their model\n-- shape, their output suffix, their type override and their collection type.\n-- database: billing\n-- model-namespace: SqlSource.DatabaseTests.Postgres.EndToEnd.Billing\n\n-- name: ListInvoices\n-- summary: Every invoice, by SELECT *.\nSELECT *\nFROM billing.invoices\nORDER BY id;\n\n-- name: GetInvoice\n-- summary: The number and payment of one invoice.\nSELECT\n    id,\n    number,\n    amount,\n    paid_at\nFROM billing.invoices\nWHERE id = @invoiceId;\n",
   "expected": {
     "startDialect": "postgres",
     "startOptions": [],
@@ -27,9 +27,9 @@
       ["LineComment", 395, 414],
       ["Text", 414, 415],
       ["LineComment", 415, 465],
-      ["Text", 465, 534],
-      ["Parameter", 534, 544],
-      ["Text", 544, 546]
+      ["Text", 465, 550],
+      ["Parameter", 550, 560],
+      ["Text", 560, 562]
     ],
     "spans": [
       { "kind": "markerComment", "start": 196, "end": 216, "name": null, "default": null },
@@ -38,7 +38,7 @@
       { "kind": "markerComment", "start": 310, "end": 349, "name": null, "default": null },
       { "kind": "markerComment", "start": 395, "end": 414, "name": null, "default": null },
       { "kind": "markerComment", "start": 415, "end": 465, "name": null, "default": null },
-      { "kind": "parameter", "start": 534, "end": 544, "name": "invoiceId", "default": null }
+      { "kind": "parameter", "start": 550, "end": 560, "name": "invoiceId", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

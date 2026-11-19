@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListEventsSince": {
-      "hash": "c906db90b88abf9dcec5048c60442141c13cbbd9e9f80d82d64c45c3c68bfb2a",
+      "hash": "173d16087901d0334e5bf8d3fe210e3626fc49a48d4060a80b9b194c579fb035",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

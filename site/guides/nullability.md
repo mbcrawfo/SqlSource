@@ -25,7 +25,9 @@ If you know that a column is never null, add `-- column: <name> not null` inside
 ```sql postgres
 -- name: ListUserDisplayNames
 -- column: display_name not null
-SELECT u.id, initcap(u.name) AS display_name
+SELECT
+    u.id,
+    initcap(u.name) AS display_name
 FROM users AS u
 ORDER BY u.id;
 ```
@@ -35,7 +37,9 @@ ORDER BY u.id;
 ```sql mssql
 -- name: ListOrderMonths
 -- column: month_end not null
-SELECT id, EOMONTH(placed_at) AS month_end
+SELECT
+    id,
+    EOMONTH(placed_at) AS month_end
 FROM orders
 ORDER BY id;
 ```
@@ -95,7 +99,10 @@ If a query parameter can be null, add `null` to its `-- param:` line:
 ```sql postgres
 -- name: FindUsers
 -- param: @name text null
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 WHERE @name IS NULL OR name = @name
 ORDER BY name;
@@ -106,7 +113,10 @@ ORDER BY name;
 ```sql mssql
 -- name: FindUsers
 -- param: @name nvarchar(100) null
-SELECT id, name, email
+SELECT
+    id,
+    name,
+    email
 FROM users
 WHERE @name IS NULL OR name = @name
 ORDER BY name;

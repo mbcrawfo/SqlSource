@@ -1,0 +1,4 @@
+# The examples meet every rule of sqlfluff, since users copy them: this clears the root's list of rules that the test
+# SQL breaks.  What an example exists to show, such as a SELECT *, is marked with a noqa comment that says why.
+[sqlfluff]
+exclude_rules = None

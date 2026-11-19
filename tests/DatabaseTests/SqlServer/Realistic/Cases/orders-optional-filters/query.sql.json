@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "SearchOrders": {
-      "hash": "52e27e8456f9475a0a56ed7085365de326187b256885fa4d6c933233cb658fb1",
+      "hash": "952ba725316d6427a57c904c034649df49f15475c9060e784864eeb08418b9da",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListCategoryTree": {
-      "hash": "a66a1302c05232b143d6ae5ce5d0cb5e36d03b0a4985672801e3b6ae80621fb9",
+      "hash": "04e97adbeec15eac8d0d2148d2d633c89b0a7391a90a90f92074fb48c5b36c7f",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

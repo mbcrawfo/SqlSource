@@ -12,8 +12,8 @@ CREATE TABLE dbo.new_types (
 );
 
 INSERT INTO dbo.new_types (id, json_value, vector_value) VALUES
-    (1, N'{"name":"Zoë","tags":["a","b"]}', '[1.5,-2.25,0.5]'),
-    (2, NULL, NULL);
+(1, N'{"name":"Zoë","tags":["a","b"]}', '[1.5,-2.25,0.5]'),
+(2, NULL, NULL);
 
 -- One nullable column of json for the library's JsonElement and one for a class, read and sent through the serializer,
 -- by the queries of Json/Queries/JsonColumns.sql, whose folder turns System.Text.Json on.  It has no seed: each test

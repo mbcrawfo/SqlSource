@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListUnpaidInvoices": {
-      "hash": "77a21df6b4ca099d0f42ef8f98c170a69ead8b4559513f0602e6b7e1f875adea",
+      "hash": "270a0e24b6e37ea4d37c8295622a8c82ca8b5148c46b795607c2a0f9f7878112",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

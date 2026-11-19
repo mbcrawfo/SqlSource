@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "UpsertProduct": {
-      "hash": "aed38501b7e2d4b1bb1ca265ef963c877d2217345adff3ffc73929b7b31b6229",
+      "hash": "1c704d4330a9e0a11e95fd3b1a3ce171e8a172cbe6328c7cb0ed4eb4731da14f",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

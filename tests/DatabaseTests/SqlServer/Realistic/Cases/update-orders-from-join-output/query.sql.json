@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "MarkShippedOrdersDelivered": {
-      "hash": "8439ac03fa42644668efed0de2b5610fb5116c1f5ba68a44d4138049ca2c54d2",
+      "hash": "91adc9abcdbf0ddb5c4039d43224ece56188c64ce9b47fe5ff5170373ffa4b29",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

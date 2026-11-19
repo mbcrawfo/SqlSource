@@ -4,7 +4,7 @@
     "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // The output of every .sql file of this folder: methods, so that each query gets an extension method on a connection\n  // and its models.\n  \"output\": \"methods\",\n}\n",
     "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // No settings file above this folder applies to the project.\n  \"root\": true,\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  \"typeOverrides\": {\n    // Every date is a DateOnly, which Dapper reads through DateOnlyHandler.\n    \"date\": \"System.DateOnly\",\n  },\n  \"columnTypes\": {\n    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.\n    \"order_lines.order_id\": \"OrderId\",\n  },\n  \"libraryTypes\": {\n    // SQL Server turns a library on only when asked, so the project turns on NodaTime, NetTopologySuite and\n    // System.Text.Json, whose types only the methods of Methods/ get.  The type override above still wins over NodaTime\n    // for every date, which stays a DateOnly.\n    \"nodaTime\": \"on\",\n    \"netTopologySuite\": \"on\",\n    \"json\": \"on\",\n  },\n}\n"
   ],
-  "input": "-- The queries of the deliveries, at the folder's output, methods, which DeliveryQueries calls.  The project's library\n-- types turn on NodaTime, NetTopologySuite and System.Text.Json, so delivered_at, a datetimeoffset, is NodaTime's\n-- OffsetDateTime, location, a geography, NetTopologySuite's Geometry, and events, a json, a JsonElement.  details, a\n-- json too, is the project's class DeliveryDetails.  The methods convert each of them themselves, so nothing is\n-- registered on the connection.\n\n-- name: RecordDelivery -> rowcount\n-- summary: Records where and when an order arrived.\n-- rowcount: the method returns the count of rows inserted.  SQL Server gives a parameter written to a column the\n-- column's type, so @deliveredAt is an OffsetDateTime, @location a Geometry and @events a JsonElement with no marker;\n-- no column type reaches a parameter, so the marker gives @details the class.\n-- param: @details -> DeliveryDetails\nINSERT INTO deliveries (order_id, delivered_at, location, details, events)\nVALUES (@orderId, @deliveredAt, @location, @details, @events);\n\n-- name: FindDelivery -> one-optional\n-- summary: The delivery of an order, or null when it has not arrived.\n-- one-optional: the method returns the row, or null when there is none.  The marker gives the column details the\n-- class.  order_id is left out: the table's columns in its own order would give the rows the table's model,\n-- DeliveriesDto.\n-- column: details -> DeliveryDetails\nSELECT delivered_at, location, details, events\nFROM deliveries\nWHERE order_id = @orderId;\n",
+  "input": "-- The queries of the deliveries, at the folder's output, methods, which DeliveryQueries calls.  The project's library\n-- types turn on NodaTime, NetTopologySuite and System.Text.Json, so delivered_at, a datetimeoffset, is NodaTime's\n-- OffsetDateTime, location, a geography, NetTopologySuite's Geometry, and events, a json, a JsonElement.  details, a\n-- json too, is the project's class DeliveryDetails.  The methods convert each of them themselves, so nothing is\n-- registered on the connection.\n\n-- name: RecordDelivery -> rowcount\n-- summary: Records where and when an order arrived.\n-- rowcount: the method returns the count of rows inserted.  SQL Server gives a parameter written to a column the\n-- column's type, so @deliveredAt is an OffsetDateTime, @location a Geometry and @events a JsonElement with no marker;\n-- no column type reaches a parameter, so the marker gives @details the class.\n-- param: @details -> DeliveryDetails\nINSERT INTO deliveries (order_id, delivered_at, location, details, events)\nVALUES (@orderId, @deliveredAt, @location, @details, @events);\n\n-- name: FindDelivery -> one-optional\n-- summary: The delivery of an order, or null when it has not arrived.\n-- one-optional: the method returns the row, or null when there is none.  The marker gives the column details the\n-- class.  order_id is left out: the table's columns in its own order would give the rows the table's model,\n-- DeliveriesDto.\n-- column: details -> DeliveryDetails\nSELECT\n    delivered_at,\n    location,\n    details,\n    events\nFROM deliveries\nWHERE order_id = @orderId;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -54,9 +54,9 @@
       ["LineComment", 1409, 1426],
       ["Text", 1426, 1427],
       ["LineComment", 1427, 1464],
-      ["Text", 1464, 1545],
-      ["Parameter", 1545, 1553],
-      ["Text", 1553, 1555]
+      ["Text", 1464, 1561],
+      ["Parameter", 1561, 1569],
+      ["Text", 1569, 1571]
     ],
     "spans": [
       { "kind": "markerComment", "start": 499, "end": 534, "name": null, "default": null },
@@ -70,7 +70,7 @@
       { "kind": "markerComment", "start": 1077, "end": 1114, "name": null, "default": null },
       { "kind": "markerComment", "start": 1115, "end": 1185, "name": null, "default": null },
       { "kind": "markerComment", "start": 1427, "end": 1464, "name": null, "default": null },
-      { "kind": "parameter", "start": 1545, "end": 1553, "name": "orderId", "default": null }
+      { "kind": "parameter", "start": 1561, "end": 1569, "name": "orderId", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

@@ -5,7 +5,7 @@
     "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: ListInvoicesDueInMonth\n-- param: @year int\n-- param: @month int\n-- param: @reminder_days int\nSELECT\n    i.id,\n    i.number,\n    i.issued_at,\n    i.due_at,\n    COALESCE(i.due_at, i.issued_at) AS due_on,\n    DATEADD(day, @reminder_days, i.due_at) AS remind_on,\n    EOMONTH(COALESCE(i.due_at, i.issued_at)) AS statement_on,\n    i.amount\nFROM billing.invoices AS i\nWHERE i.voided_at IS NULL\n    AND COALESCE(i.due_at, i.issued_at) >= DATEFROMPARTS(@year, @month, 1)\n    AND COALESCE(i.due_at, i.issued_at) <= EOMONTH(DATEFROMPARTS(@year, @month, 1))\nORDER BY due_on, i.id;\n",
+  "input": "-- name: ListInvoicesDueInMonth\n-- param: @year int\n-- param: @month int\n-- param: @reminder_days int\nSELECT\n    i.id,\n    i.number,\n    i.issued_at,\n    i.due_at,\n    COALESCE(i.due_at, i.issued_at) AS due_on,\n    DATEADD(DAY, @reminder_days, i.due_at) AS remind_on,\n    EOMONTH(COALESCE(i.due_at, i.issued_at)) AS statement_on,\n    i.amount\nFROM billing.invoices AS i\nWHERE\n    i.voided_at IS NULL\n    AND COALESCE(i.due_at, i.issued_at) >= DATEFROMPARTS(@year, @month, 1)\n    AND COALESCE(i.due_at, i.issued_at) <= EOMONTH(DATEFROMPARTS(@year, @month, 1))\nORDER BY due_on, i.id;\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -21,15 +21,15 @@
       ["LineComment", 73, 101],
       ["Text", 101, 228],
       ["Parameter", 228, 242],
-      ["Text", 242, 453],
-      ["Parameter", 453, 458],
-      ["Text", 458, 460],
-      ["Parameter", 460, 466],
-      ["Text", 466, 536],
-      ["Parameter", 536, 541],
-      ["Text", 541, 543],
-      ["Parameter", 543, 549],
-      ["Text", 549, 578]
+      ["Text", 242, 457],
+      ["Parameter", 457, 462],
+      ["Text", 462, 464],
+      ["Parameter", 464, 470],
+      ["Text", 470, 540],
+      ["Parameter", 540, 545],
+      ["Text", 545, 547],
+      ["Parameter", 547, 553],
+      ["Text", 553, 582]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 31, "name": null, "default": null },
@@ -37,10 +37,10 @@
       { "kind": "markerComment", "start": 52, "end": 72, "name": null, "default": null },
       { "kind": "markerComment", "start": 73, "end": 101, "name": null, "default": null },
       { "kind": "parameter", "start": 228, "end": 242, "name": "reminder_days", "default": null },
-      { "kind": "parameter", "start": 453, "end": 458, "name": "year", "default": null },
-      { "kind": "parameter", "start": 460, "end": 466, "name": "month", "default": null },
-      { "kind": "parameter", "start": 536, "end": 541, "name": "year", "default": null },
-      { "kind": "parameter", "start": 543, "end": 549, "name": "month", "default": null }
+      { "kind": "parameter", "start": 457, "end": 462, "name": "year", "default": null },
+      { "kind": "parameter", "start": 464, "end": 470, "name": "month", "default": null },
+      { "kind": "parameter", "start": 540, "end": 545, "name": "year", "default": null },
+      { "kind": "parameter", "start": 547, "end": 553, "name": "month", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

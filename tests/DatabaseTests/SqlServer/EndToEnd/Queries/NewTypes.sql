@@ -28,7 +28,9 @@ VALUES (@id, @jsonValue, @vectorValue);
 -- name: GetNewType -> one
 -- summary: The vector of one row of new_types, which the marker says is never null, so that a NULL throws.
 -- column: v not null
-SELECT id, vector_value AS v
+SELECT
+    id,
+    vector_value AS v
 FROM dbo.new_types
 WHERE id = @id;
 

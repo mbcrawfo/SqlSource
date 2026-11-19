@@ -13,13 +13,18 @@ VALUES (@id, @geographyValue, @geometryValue);
 
 -- name: GetSpatialValues -> one
 -- summary: The row of spatial_values with the id, its geography and its geometry.
-SELECT id, geography_value, geometry_value
+SELECT
+    id,
+    geography_value,
+    geometry_value
 FROM dbo.spatial_values
 WHERE id = @id;
 
 -- name: ListGeographyValues
 -- summary: The id and the geography of every row of spatial_values, with no parameter, so that a connection that wraps
 -- SqlClient's can run it.
-SELECT id, geography_value
+SELECT
+    id,
+    geography_value
 FROM dbo.spatial_values
 ORDER BY id;

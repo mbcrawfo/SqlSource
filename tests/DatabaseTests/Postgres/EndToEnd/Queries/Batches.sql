@@ -13,7 +13,14 @@
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, account_id, body;
 
 -- name: InsertNoteSync -> one
@@ -22,7 +29,14 @@ RETURNING id, account_id, body;
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, account_id, body;
 
 -- name: InsertNoteBoth -> one
@@ -31,45 +45,92 @@ RETURNING id, account_id, body;
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, account_id, body;
 
 -- name: InsertNoteRowCount -> rowcount
 -- summary: Adds a note as InsertNote does, and counts it.
 -- input-model: NoteToAdd
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId;
 
 -- name: InsertNoteRowCountSync -> rowcount
 -- summary: InsertNoteRowCount, by a synchronous collection method.
 -- generator: method-type=sync
 -- input-model: NoteToAdd
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId;
 
 -- name: InsertNoteQuietly -> none
 -- summary: InsertNoteRowCount again, under none, which returns nothing.
 -- input-model: NoteToAdd
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId;
 
 -- name: InsertNoteQuietlySync -> none
 -- summary: InsertNoteQuietly, by a synchronous collection method.
 -- generator: method-type=sync
 -- input-model: NoteToAdd
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId;
 
 -- name: FindNotes
 -- summary: The notes of the account that an id names.
 -- output-model: BatchNote
-SELECT id, account_id, body FROM notes WHERE account_id = @accountId ORDER BY id;
+SELECT
+    id,
+    account_id,
+    body
+FROM notes
+WHERE account_id = @accountId
+ORDER BY id;
 
 -- name: FindNotesSync
 -- summary: FindNotes, by a synchronous collection method.
 -- generator: method-type=sync
 -- output-model: BatchNote
-SELECT id, account_id, body FROM notes WHERE account_id = @accountId ORDER BY id;
+SELECT
+    id,
+    account_id,
+    body
+FROM notes
+WHERE account_id = @accountId
+ORDER BY id;
 
 -- name: FindNotesStreamBoth
 -- summary: FindNotes as a stream under method-type=both, which gives a stream its asynchronous method alone, named
@@ -77,18 +138,34 @@ SELECT id, account_id, body FROM notes WHERE account_id = @accountId ORDER BY id
 -- generator: method-type=both
 -- collection-type: IAsyncEnumerable
 -- output-model: BatchNote
-SELECT id, account_id, body FROM notes WHERE account_id = @accountId ORDER BY id;
+SELECT
+    id,
+    account_id,
+    body
+FROM notes
+WHERE account_id = @accountId
+ORDER BY id;
 
 -- name: FindNote -> one-optional
 -- summary: The note that an id names, if there is one.
 -- output-model: BatchNote
-SELECT id, account_id, body FROM notes WHERE id = @id;
+SELECT
+    id,
+    account_id,
+    body
+FROM notes
+WHERE id = @id;
 
 -- name: FindNoteSync -> one-optional
 -- summary: FindNote, by a synchronous collection method.
 -- generator: method-type=sync
 -- output-model: BatchNote
-SELECT id, account_id, body FROM notes WHERE id = @id;
+SELECT
+    id,
+    account_id,
+    body
+FROM notes
+WHERE id = @id;
 
 -- name: InsertNoteSerializable -> one
 -- summary: Adds a note as InsertNote does, in a transaction of its own at the level serializable, and returns its id
@@ -97,7 +174,14 @@ SELECT id, account_id, body FROM notes WHERE id = @id;
 -- input-model: NoteToAdd
 -- output-model: IsolatedNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, current_setting('transaction_isolation') AS isolation;
 
 -- name: InsertNoteSerializableSync -> one
@@ -106,7 +190,14 @@ RETURNING id, current_setting('transaction_isolation') AS isolation;
 -- input-model: NoteToAdd
 -- output-model: IsolatedNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, current_setting('transaction_isolation') AS isolation;
 
 -- name: InsertNoteReadCommitted -> one
@@ -115,7 +206,14 @@ RETURNING id, current_setting('transaction_isolation') AS isolation;
 -- input-model: NoteToAdd
 -- output-model: IsolatedNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, current_setting('transaction_isolation') AS isolation;
 
 -- name: InsertNoteReadCommittedSync -> one
@@ -124,7 +222,14 @@ RETURNING id, current_setting('transaction_isolation') AS isolation;
 -- input-model: NoteToAdd
 -- output-model: IsolatedNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, current_setting('transaction_isolation') AS isolation;
 
 -- name: InsertNoteRepeatableRead -> one
@@ -133,7 +238,14 @@ RETURNING id, current_setting('transaction_isolation') AS isolation;
 -- input-model: NoteToAdd
 -- output-model: IsolatedNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, current_setting('transaction_isolation') AS isolation;
 
 -- name: InsertNoteRepeatableReadSync -> one
@@ -142,7 +254,14 @@ RETURNING id, current_setting('transaction_isolation') AS isolation;
 -- input-model: NoteToAdd
 -- output-model: IsolatedNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, current_setting('transaction_isolation') AS isolation;
 
 -- name: InsertNoteNoTransaction -> one
@@ -151,7 +270,14 @@ RETURNING id, current_setting('transaction_isolation') AS isolation;
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, account_id, body;
 
 -- name: InsertNoteNoTransactionSync -> one
@@ -160,7 +286,14 @@ RETURNING id, account_id, body;
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, account_id, body;
 
 -- name: InsertNoteInRepository -> one
@@ -170,7 +303,14 @@ RETURNING id, account_id, body;
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, account_id, body;
 
 -- name: InsertNoteInRepositorySync -> one
@@ -180,7 +320,14 @@ RETURNING id, account_id, body;
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+SELECT
+    @id,
+    id,
+    'call',
+    @body,
+    now()
+FROM accounts
+WHERE id = @accountId
 RETURNING id, account_id, body;
 
 -- name: InsertNoteAfterLock -> one
@@ -189,8 +336,19 @@ RETURNING id, account_id, body;
 -- As in ListThenWait of Methods.sql, the lock is taken in a LEFT JOIN LATERAL that the row's account reaches.
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
-SELECT @id, a.id, 'call', @body, now()
+SELECT
+    @id,
+    a.id,
+    'call',
+    @body,
+    now()
 FROM accounts AS a
-LEFT JOIN LATERAL (SELECT pg_advisory_xact_lock_shared(@lockKey) WHERE a.id = @accountId) AS w ON true
+LEFT JOIN
+    -- The join takes the lock; it is joined for that alone, and adds no column.
+    LATERAL (  -- noqa: ST11
+        SELECT pg_advisory_xact_lock_shared(@lockKey)
+        WHERE a.id = @accountId
+    ) AS w
+    ON true
 WHERE a.id = @accountId
 RETURNING id, account_id, body;

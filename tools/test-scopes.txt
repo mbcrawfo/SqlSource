@@ -16,6 +16,11 @@ project postgres tests/DatabaseTests/Postgres.Npgsql8/Postgres.Npgsql8.csproj
 project sqlserver tests/DatabaseTests/SqlServer/SqlServer.csproj
 project sqlserver tests/DatabaseTests/SqlServer.SqlClient61/SqlServer.SqlClient61.csproj
 
+# sqlfluff's settings, which only tools/sqlfluff.sh reads, before the folders of the engines that hold some of them.
+none .sqlfluff
+none .sqlfluffignore
+none */.sqlfluff
+
 postgres src/SqlSource.Tool/Bundles/Renaming/Postgres/*
 postgres src/SqlSource.Tool/Describing/Postgres/*
 postgres tests/DatabaseTests/Postgres/*

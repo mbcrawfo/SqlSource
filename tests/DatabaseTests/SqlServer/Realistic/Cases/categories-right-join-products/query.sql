@@ -8,6 +8,7 @@ SELECT
     p.list_price,
     p.sale_price
 FROM dbo.categories AS c
-RIGHT JOIN dbo.products AS p ON p.category_id = c.id
+-- The RIGHT JOIN, whose left side can be null, is what this case describes.
+RIGHT JOIN dbo.products AS p ON p.category_id = c.id  -- noqa: CV08
 WHERE p.discontinued_at IS NULL
 ORDER BY c.name, p.name;

@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "FlagOrdersWithOverdueInvoices": {
-      "hash": "7d2e2319c512f8d589585bb75cc0f850c1bbbcc2f8d4593784f6327afff912ef",
+      "hash": "bf3a84b1df12f0a1e0c7140c1ef795fe4d2bd774b435c3fa2b4433959412ed8d",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListProductsByColor": {
-      "hash": "1e9b636e94cd609c8dfd4b43b58ab3eca4dc7180baadf1b6e38220a1e2f16e63",
+      "hash": "7f4911c4696a203ed8cd2d12b1e4064c428ccbac228996420f8544d755ec5049",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

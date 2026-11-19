@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "CreateCustomer": {
-      "hash": "046cf3d92f1f99b2d092066033255ea1900319c726e09623e1d9e0b7354c3142",
+      "hash": "71ce9aa1f88c9be239f5e678fcefad674e70dc857240756b866742ca5f5e3225",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "mssql",

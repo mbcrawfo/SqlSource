@@ -136,7 +136,7 @@
       ]
     },
     "GetInvoice": {
-      "hash": "95c649ccedfe9c1b7b220861c333401bbd121985e6db8b9b71a68298a2689eaf",
+      "hash": "f6544af9bbda981435072880f9d69e28b67514326cffd2acbd7a5aa66add61f6",
       "toolVersion": "0.2.0",
       "database": "billing",
       "engine": "mssql",

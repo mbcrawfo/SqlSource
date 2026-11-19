@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "ListCurrentProductSales": {
-      "hash": "8af2a44bb4cbda8b5102cf7d772a760f0b968b71b4dce5980e3060be336db449",
+      "hash": "ca5f7a2d03d68fb0b1195d99f58bfe286c7d113d89219857182a11eb2b5af21d",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

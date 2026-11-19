@@ -147,7 +147,7 @@
       ]
     },
     "GetJsonValues": {
-      "hash": "d53d3fe0f71b94dfdda17ac86f059a4a75a684a0aa9c6323d97da40128205791",
+      "hash": "e61330ac22cc74c9f640babc9baa7a1dadd1dd22c33b7a41d439c4abe072dbbd",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "mssql",
@@ -383,7 +383,7 @@
       ]
     },
     "GetRequiredJson": {
-      "hash": "005fad6147758a6f726cd03d575e73aeedf7a1f887a72b696ea919216ea22a5a",
+      "hash": "4540233d43b9ec185ad906c51ced953d735c694d26f30dedd45c67851f37f3a1",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "mssql",

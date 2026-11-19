@@ -5,7 +5,7 @@
   "toolVersion": "0.2.0",
   "queries": {
     "SearchEverything": {
-      "hash": "a8f82fb9c844e6203e07d1efd711ec64b9e9e1652a3bb2e606e69b1618ff25d1",
+      "hash": "f875f7ba48e824d518ead7a47094ce6120d1b39fda1532f5f4ccf66ff2c6bb53",
       "toolVersion": "0.2.0",
       "database": "realistic",
       "engine": "postgres",

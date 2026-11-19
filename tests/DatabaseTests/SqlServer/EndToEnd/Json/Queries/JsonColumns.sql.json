@@ -51,7 +51,7 @@
       ]
     },
     "GetJsonColumns": {
-      "hash": "7ffc2ec63169a1b09df05a288300ba543247523deca775af506b87e24d386ded",
+      "hash": "33d481de495e9620933f9a68a69c79da0b3c2bf3f34e23bc76b4319e39e77405",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "mssql",

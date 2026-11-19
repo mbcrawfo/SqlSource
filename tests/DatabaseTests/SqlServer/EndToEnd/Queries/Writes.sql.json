@@ -284,7 +284,7 @@
       ]
     },
     "MergeAccountStatus": {
-      "hash": "c73b8f423b7ecd9c09fe865307f9cc458c25b1330c5cbd8c4f9f915d8d689893",
+      "hash": "89729557354c9440db2b28d01519225a963c6d93033535ef5cfdc70266aa73bf",
       "toolVersion": "0.2.0",
       "database": "app",
       "engine": "mssql",
