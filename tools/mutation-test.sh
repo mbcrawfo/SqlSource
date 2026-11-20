@@ -117,7 +117,11 @@ dotnet stryker --skip-version-check --output "$output/static" --reporter json --
     --mutate '**/*.cs{0..1}' ${tests[@]+"${tests[@]}"}
 exclusions="$output/static/exclusions.txt"
 report_tool static "$output/static/reports/mutation-report.json" >"$exclusions"
+# The report tool ends its lines as its platform does, so on Windows each keeps a carriage return, which would make
+# the last span of the line one Stryker never matches.
 while IFS= read -r exclusion; do
+    exclusion="${exclusion%$'\r'}"
+    [[ -n "$exclusion" ]] || continue
     mutate+=(--mutate "$exclusion")
 done <"$exclusions"
 
