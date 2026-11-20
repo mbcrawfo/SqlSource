@@ -28,10 +28,11 @@ usage() {
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 called_in="$PWD"
 
-# Prints a path as an absolute one, read from the folder the script was called in.
+# Prints a path as an absolute one, read from the folder the script was called in.  A path that starts at a drive, as
+# C:/Users, is absolute too, under Git Bash on Windows.
 absolute() {
     case "$1" in
-    /*) printf '%s\n' "$1" ;;
+    /* | [A-Za-z]:[/\\]*) printf '%s\n' "$1" ;;
     *) printf '%s\n' "$called_in/$1" ;;
     esac
 }

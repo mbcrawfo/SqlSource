@@ -40,6 +40,10 @@ AGENTS.md text eol=lf
 # pre-commit-validation.sh reads the scopes with bash's read, which would keep a carriage return on each line
 tools/test-scopes.txt text eol=lf
 
+# measure.sh reads them with bash's read, which would keep a carriage return on each line
+.claude/skills/reviewing-test-quality/scopes.txt text eol=lf
+.claude/skills/reviewing-test-quality/projects.txt text eol=lf
+
 # The consumer that check-package-install.sh builds prints its queries' text, which it compares with expected-output.txt
 tools/package-install/** text eol=lf
 
