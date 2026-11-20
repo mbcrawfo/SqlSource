@@ -28,8 +28,9 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../../.." && pwd)"
 
 [[ $# -ge 2 ]] || usage
+# A path that starts at a drive, as C:/Users, is absolute too, under Git Bash on Windows.
 case "$1" in
-/*) run="$1" ;;
+/* | [A-Za-z]:[/\\]*) run="$1" ;;
 *) run="$PWD/$1" ;;
 esac
 kind="$2"
@@ -42,6 +43,8 @@ note() {
 }
 
 # The blocks of scopes.txt, in order: a key and its value to a line, and a line with no key ends nothing.
+# Each loop that reads scopes.txt or projects.txt drops a carriage return, which read keeps, since a Windows checkout
+# made before .gitattributes held both at LF has them at CRLF.
 scope_names=()
 scope_projects=()
 scope_mutates=()
@@ -49,6 +52,7 @@ scope_tests=()
 read_scopes() {
     local line key value last
     while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
         line="${line%%#*}"
         [[ "$line" == *' '* ]] || continue
         key="${line%% *}"
@@ -97,6 +101,7 @@ run_scope() {
 mark_of() {
     local line
     while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
         line="${line%%#*}"
         if [[ "${line%% *}" == "$1" && "$line" == *' '* ]]; then
             echo "${line#* }"
@@ -154,6 +159,7 @@ tests)
     projects=("$@")
     if [[ ${#projects[@]} -eq 0 ]]; then
         while IFS= read -r line || [[ -n "$line" ]]; do
+            line="${line%$'\r'}"
             line="${line%%#*}"
             if [[ -n "${line// /}" && "$line" != *' not-run'* ]]; then
                 projects+=("${line%% *}")

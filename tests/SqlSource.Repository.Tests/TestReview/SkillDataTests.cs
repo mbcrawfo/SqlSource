@@ -272,6 +272,14 @@ public sealed partial class SkillDataTests
                 "tests/DatabaseTests/QueryMethodAllocation not-run",
             ]);
 
+    // measure.sh reads both with bash's read, which keeps a carriage return, and .gitattributes holds them at LF.
+    [Theory]
+    [InlineData("scopes.txt")]
+    [InlineData("projects.txt")]
+    public void ReadAllText_OfAListThatMeasureReads_HasNoCarriageReturn(string file) =>
+        File.ReadAllText(RepositoryRoot.Path(".claude", "skills", "reviewing-test-quality", file))
+            .ShouldNotContain('\r');
+
     [Fact]
     public void Exclusions_EveryLine_IsAFolderThatExists() =>
         Listed("excluded.txt")
