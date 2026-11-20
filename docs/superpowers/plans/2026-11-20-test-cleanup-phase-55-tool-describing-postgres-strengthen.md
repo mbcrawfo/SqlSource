@@ -48,10 +48,14 @@ Checked against the spec on `ff1da495`: the guard of `ParameterOids` (`PostgresS
 - [x] **Step 4 (F-SqlSource.Tool.Tests.Describing.Postgres.Walk.Expressions-1-02):** `NullableOf_CoalesceOverBothSidesOfAFullJoin_IsNotNull` gains the row `("COALESCE(a.id, r.account_id, r.account_id)", false, BuiltInTypes.Int4)`.
 - [x] **Step 5:** Set row 55 of the epic's table to `done`.
 - [x] **Step 6:** `./format.sh`, then the three classes pass (487 tests).
-- [ ] **Step 7:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 7:** `./pre-commit-validation.sh`, then commit.
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-55/tool-describing-postgres/after`, `compare` against the "before", and each survivor the findings name `Killed`.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-55/coverage-after/SqlSource.Tool.Tests`, compared file by file.
-- [ ] **Step 3:** The pull request gives the change, the compare result and the coverage figures.
+- [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-55/tool-describing-postgres/after`: 2,745 mutants tested, 2,321 killed, 371 survived, 51 timeouts, 2 errors; the tested run took 25 min 6 s.  `compare`: 2,360 detected before, 2,360 still detected, 0 lost, 0 not comparable.  `kills` on the "after" report:
+  - `DescribeAsync_FewerTypesThanParameters_ThrowsAndFreesTheStatement`: 1 row, 34 kills, 2 alone; `PostgresSession.Builders.cs:38:16` and `40:17` are `Killed`, each by this test alone.
+  - `MembersOf_AppendOfAnotherShape_IsEmpty`: 10 rows, 43 kills, 9 alone; `PlanPartitions.cs:119:16` (Logical `||` and Equality `cut >= 0`), `119:27`, `119:33` and `119:53` are `Killed`, each by this test alone.
+  - `MayNameColumn_Entry_IsWhetherItNamesTheColumnOrHoldsAParameter`: 7 rows, 69 kills, 3 alone; `PlanExpression.cs:197:21` (Logical) is `Killed` by this test alone.
+  - `NullableOf_CoalesceOverBothSidesOfAFullJoin_IsNotNull`: 12 rows, 146 kills, 5 alone; `PlanExpression.Nullability.cs:109:21` (`^=`) is `Killed` by this test alone.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-55/coverage-after/SqlSource.Tool.Tests` (7,089 tests, 3 min 43 s): 5,031 of 5,645 lines over the 56 files, before and after, the same figure in each file.
+- [x] **Step 3:** The pull request gives the change, the compare result and the coverage figures.
