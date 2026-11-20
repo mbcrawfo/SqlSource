@@ -723,6 +723,7 @@ public sealed class PlanExpressionTests
     [InlineData("LEAST(r.account_id, a.id)", false, BuiltInTypes.Int4)]
     [InlineData("COALESCE(a.id, r.account_id, NULL::integer)", false, BuiltInTypes.Int4)]
     [InlineData("COALESCE(a.id, r.account_id, r.account_id)", false, BuiltInTypes.Int4)]
+    [InlineData("COALESCE(a.id, a.id, r.account_id)", false, BuiltInTypes.Int4)]
     [InlineData("COALESCE(a.id, r.id)", false, null)]
     [InlineData("COALESCE(a.id, a.id)", null, null)]
     [InlineData("COALESCE(a.id, (r.account_id)::bigint)", null, null)]

@@ -59,3 +59,7 @@ Checked against the spec on `ff1da495`: the guard of `ParameterOids` (`PostgresS
   - `NullableOf_CoalesceOverBothSidesOfAFullJoin_IsNotNull`: 12 rows, 146 kills, 5 alone; `PlanExpression.Nullability.cs:109:21` (`^=`) is `Killed` by this test alone.
 - [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-55/coverage-after/SqlSource.Tool.Tests` (7,089 tests, 3 min 43 s): 5,031 of 5,645 lines over the 56 files, before and after, the same figure in each file.
 - [x] **Step 3:** The pull request gives the change, the compare result and the coverage figures.
+
+### Task 3: Review
+
+- [x] **R1-F1:** `NullableOf_CoalesceOverBothSidesOfAFullJoin_IsNotNull` gains the row `("COALESCE(a.id, a.id, r.account_id)", false, BuiltInTypes.Int4)`, the outer-side twin of F-1-02's row, which fails when `outer |= side.OuterSide` (`PlanExpression.Nullability.cs:108`) toggles instead of setting.  Stryker gives that mutant `CompileError` in both runs, so the guard cannot see it; the row was shown to fail with line 108 changed by hand to `outer ^= side.OuterSide`, and to pass on the code.  The mutation and coverage runs above predate this row, which can only add kills and lines.
