@@ -25,8 +25,8 @@ None beyond the findings: each change adds one assertion or one row that the fin
 
 ### Task 0: The guard's "before" half
 
-- [ ] Mutation into `artifacts/test-cleanup/phase-57/tool-describing-sqlserver/before`, with `kills` for each of the three tests.
-- [ ] Coverage of `tests/SqlSource.Tool.Tests` into `artifacts/test-cleanup/phase-57/coverage-before/SqlSource.Tool.Tests`, with the line figures of `src/SqlSource.Tool/Describing/SqlServer/**/*.cs`, and the project's run time.
+- [x] Mutation into `artifacts/test-cleanup/phase-57/tool-describing-sqlserver/before`: 1,590 mutants tested, 1,344 killed, 217 survived, 28 timeouts, 1 error; the tested run took 7 min 36 s.  `kills`: `Read_TopDistinct_SkipsThem` 3 rows, 160 kills, 10 alone, 40 survivors under it; `Read_Groupings_AreRead` 11 rows, 126 kills, 3 alone, 21 survivors under it; `Read_AnythingElse_IsRefusedWithWhatWasFound` 62 rows, 108 kills, 19 alone, 3 survivors under it.  Each survivor the findings name is among them.
+- [x] Coverage of `tests/SqlSource.Tool.Tests` into `artifacts/test-cleanup/phase-57/coverage-before/SqlSource.Tool.Tests` (7,083 tests, 4 min 20 s): 2,625 of 2,946 lines over the 29 files of `src/SqlSource.Tool/Describing/SqlServer/` that have lines (31 files in the glob).
 
 ### Task 1: Apply the findings
 
@@ -35,16 +35,16 @@ None beyond the findings: each change adds one assertion or one row that the fin
 - Modify: `tests/SqlSource.Tool.Tests/Describing/SqlServer/Statements/DeclaredTypeTextTests.cs`
 - Modify: `docs/superpowers/specs/2026-11-13-test-cleanup-epic-design.md` (row 57's state)
 
-- [ ] **Step 1 (F-SqlSource.Tool.Tests.Describing.SqlServer-2-01):** `Read_TopDistinct_SkipsThem` reads the tokens with the statement and asserts, in every row, `Text(tokens, item.Expression).ShouldBe("a")` beside the item's name and `HasTop`.
-- [ ] **Step 2 (F-SqlSource.Tool.Tests.Describing.SqlServer-2-02):** `Read_Groupings_AreRead` gains the row `[InlineData("GROUP BY GROUPING SETS ((a), (b))", nameof(SelectGrouping.Sets))]`.
-- [ ] **Step 3 (F-SqlSource.Tool.Tests.Describing.SqlServer-2-04):** `Read_AnythingElse_IsRefusedWithWhatWasFound` gains the row `[InlineData("nvarchar(50).x", TypeNameFound.Parts)]`.
-- [ ] **Step 4:** Set row 57 of the epic's table to `done`.
-- [ ] **Step 5:** `./format.sh`, then both test classes pass.
-- [ ] **Step 6:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 1 (F-SqlSource.Tool.Tests.Describing.SqlServer-2-01):** `Read_TopDistinct_SkipsThem` reads the tokens with the statement and asserts, in every row, `Text(tokens, item.Expression).ShouldBe("a")` beside the item's name and `HasTop`.
+- [x] **Step 2 (F-SqlSource.Tool.Tests.Describing.SqlServer-2-02):** `Read_Groupings_AreRead` gains the row `[InlineData("GROUP BY GROUPING SETS ((a), (b))", nameof(SelectGrouping.Sets))]`.
+- [x] **Step 3 (F-SqlSource.Tool.Tests.Describing.SqlServer-2-04):** `Read_AnythingElse_IsRefusedWithWhatWasFound` gains the row `[InlineData("nvarchar(50).x", TypeNameFound.Parts)]`.
+- [x] **Step 4:** Set row 57 of the epic's table to `done`.
+- [x] **Step 5:** `./format.sh`, then both test classes pass (382 tests).
+- [x] **Step 6:** `./pre-commit-validation.sh`, then commit.
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-57/tool-describing-sqlserver/after`, then `compare`: nothing `LOST`, nothing `NOT COMPARABLE` but a kill that did not repeat, which `kills` on the "before" report shows no changed test made.  Each survivor the findings name is `Killed`.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-57/coverage-after/SqlSource.Tool.Tests`: no file of `src/SqlSource.Tool/Describing/SqlServer/**/*.cs` falls.
-- [ ] **Step 3:** Run time of `dotnet test --project tests/SqlSource.Tool.Tests` after the change.
-- [ ] **Step 4:** The pull request gives the change, the compare result, the coverage figures and the run times.
+- [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-57/tool-describing-sqlserver/after`: 1,590 mutants tested, 1,356 killed, 205 survived, 28 timeouts, 1 error; the tested run took 5 min 57 s.  `compare`: 1,372 detected before, 1,372 still detected, 0 lost, 0 not comparable.  Twelve survivors are now `Killed`: the seven the findings name (`SelectBody.cs:264:13` Statement and PostDecrement, `273:13` Statement, `276:61` Arithmetic, `276:72` String, `450:30` and `450:99` String, `DeclaredTypeText.cs:252:16` Conditional (false)), and `SelectBody.cs:271:13` Equality (`at > end`), `271:39` String, `276:13` Equality (`at + 1 > end`) and `276:43` String.  `kills` after: `Read_TopDistinct_SkipsThem` 178 kills, 19 alone, 31 survivors under it; `Read_Groupings_AreRead` 12 rows, 128 kills, 5 alone, 19 survivors under it; `Read_AnythingElse_IsRefusedWithWhatWasFound` 63 rows, 115 kills, 20 alone, 2 survivors under it.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-57/coverage-after/SqlSource.Tool.Tests` (7,085 tests, 3 min 16 s): 2,625 of 2,946 lines, before and after, the same figure in each file.
+- [x] **Step 3:** Run time of the coverage runs of `tests/SqlSource.Tool.Tests`: 4 min 20 s before (7,083 tests) and 3 min 16 s after (7,085 tests); the phase adds two rows and no test, and the difference is the machine's load.
+- [x] **Step 4:** The pull request gives the change, the compare result, the coverage figures and the run times.
