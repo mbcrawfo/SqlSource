@@ -181,6 +181,7 @@ public sealed class DeclaredTypeTextTests
     [InlineData("t.", TypeNameFound.Parts)]
     [InlineData(". t", TypeNameFound.Parts)]
     [InlineData("t .", TypeNameFound.Parts)]
+    [InlineData("nvarchar(50).x", TypeNameFound.Parts)]
     // A schema collection of three parts makes the server end the session, so it never reaches the server.
     [InlineData("xml(a.b.c)", TypeNameFound.Parts)]
     [InlineData("xml(CONTENT a.b.c)", TypeNameFound.Parts)]
