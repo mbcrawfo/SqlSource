@@ -142,15 +142,21 @@ public sealed class PostgresDerivationsTests
         position.ShouldBe(32);
     }
 
-    [Fact]
-    public void Derive_PrepareErrorBeforeTheList_IsKept()
+    // At "PREPARE sqlsource_1 ("'s first code point, at its third and at its "(", its last: each is before the list,
+    // which the renaming does not change.
+    [Theory]
+    [InlineData(20)]
+    [InlineData(18)]
+    [InlineData(0)]
+    public void Derive_PrepareErrorBeforeTheList_IsKept(int beforeTheList)
     {
         var scope = Scope();
-        var call = PrepareCall("SELECT $1", ["mytype"], 3, scope);
+        var at = ParameterPlaceholders.Characters(ParameterPlaceholders.Opening(Statement)) - beforeTheList;
+        var call = PrepareCall("SELECT $1", ["mytype"], at, scope);
 
         PostgresDerivations.Derive(call, scope);
 
-        PositionOf(call).ShouldBe(3);
+        PositionOf(call).ShouldBe(at);
         scope.Refusals.ShouldBeEmpty();
     }
 
