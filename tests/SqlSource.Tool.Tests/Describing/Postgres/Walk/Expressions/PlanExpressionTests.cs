@@ -722,6 +722,7 @@ public sealed class PlanExpressionTests
     [InlineData("GREATEST(a.id, r.account_id)", false, BuiltInTypes.Int4)]
     [InlineData("LEAST(r.account_id, a.id)", false, BuiltInTypes.Int4)]
     [InlineData("COALESCE(a.id, r.account_id, NULL::integer)", false, BuiltInTypes.Int4)]
+    [InlineData("COALESCE(a.id, r.account_id, r.account_id)", false, BuiltInTypes.Int4)]
     [InlineData("COALESCE(a.id, r.id)", false, null)]
     [InlineData("COALESCE(a.id, a.id)", null, null)]
     [InlineData("COALESCE(a.id, (r.account_id)::bigint)", null, null)]
@@ -783,6 +784,7 @@ public sealed class PlanExpressionTests
     [InlineData("$1", "id", true)]
     [InlineData("'id'::text", "id", false)]
     [InlineData("row_number() OVER w1", "id", false)]
+    [InlineData("(u.name || 'x'::text)", "id", false)]
     [InlineData("(u.name", "id", true)]
     public void MayNameColumn_Entry_IsWhetherItNamesTheColumnOrHoldsAParameter(
         string entry,
