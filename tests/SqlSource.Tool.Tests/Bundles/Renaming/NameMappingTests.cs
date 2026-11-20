@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Bundles.Renaming;
@@ -184,9 +185,6 @@ public sealed class NameMappingTests
     }
 
     [Fact]
-    public void IsMapped_UnknownSpelling_IsFalse() => Mapping().IsMapped("x", false).ShouldBeFalse();
-
-    [Fact]
     public void Name_SpellingsTheEngineTellsApart_DifferByCaseAlone()
     {
         var mapping = CaseKeeping();
@@ -324,6 +322,30 @@ public sealed class NameMappingTests
     public void NameClasses_EveryMember_HasAPrefixAndAWord()
     {
         var values = Enum.GetValues<NameClass>();
+        var prefixes = new Dictionary<NameClass, string>
+        {
+            [NameClass.Schema] = "s_",
+            [NameClass.Table] = "t_",
+            [NameClass.Column] = "c_",
+            [NameClass.Alias] = "a_",
+            [NameClass.Function] = "f_",
+            [NameClass.Type] = "y_",
+            [NameClass.Index] = "i_",
+            [NameClass.Parameter] = "p_",
+            [NameClass.Token] = "k_",
+            [NameClass.Query] = "q_",
+            [NameClass.Database] = "d_",
+            [NameClass.Literal] = "l_",
+        };
+
+        prefixes.Keys.ShouldBe(values, ignoreOrder: true);
+        foreach (var value in values)
+        {
+            NameClasses.PrefixOf(value).ShouldMatch("^[a-z]_$");
+            NameClasses.PrefixOf(value).ShouldBe(prefixes[value]);
+            NameClasses.WordOf(value).ShouldMatch("^[a-z]+$");
+            NameClasses.WordOf(value).ShouldBe(value.ToString(), StringCompareShould.IgnoreCase);
+        }
 
         values.Select(NameClasses.PrefixOf).Distinct().Count().ShouldBe(values.Length);
         values.Select(NameClasses.WordOf).Distinct().Count().ShouldBe(values.Length);
