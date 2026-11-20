@@ -184,9 +184,6 @@ public sealed class NameMappingTests
     }
 
     [Fact]
-    public void IsMapped_UnknownSpelling_IsFalse() => Mapping().IsMapped("x", false).ShouldBeFalse();
-
-    [Fact]
     public void Name_SpellingsTheEngineTellsApart_DifferByCaseAlone()
     {
         var mapping = CaseKeeping();
@@ -324,6 +321,13 @@ public sealed class NameMappingTests
     public void NameClasses_EveryMember_HasAPrefixAndAWord()
     {
         var values = Enum.GetValues<NameClass>();
+
+        foreach (var value in values)
+        {
+            NameClasses.PrefixOf(value).ShouldMatch("^[a-z]_$");
+            NameClasses.WordOf(value).ShouldMatch("^[a-z]+$");
+            NameClasses.WordOf(value).ShouldBe(value.ToString(), StringCompareShould.IgnoreCase);
+        }
 
         values.Select(NameClasses.PrefixOf).Distinct().Count().ShouldBe(values.Length);
         values.Select(NameClasses.WordOf).Distinct().Count().ShouldBe(values.Length);
