@@ -28,8 +28,9 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../../.." && pwd)"
 
 [[ $# -ge 2 ]] || usage
+# A path that starts at a drive, as C:/Users, is absolute too, under Git Bash on Windows.
 case "$1" in
-/*) run="$1" ;;
+/* | [A-Za-z]:[/\\]*) run="$1" ;;
 *) run="$PWD/$1" ;;
 esac
 kind="$2"
