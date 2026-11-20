@@ -42,6 +42,9 @@ public sealed class PlanPartitionsTests
         { "member-of-another-prefix", Text(Append(Member("e_1", "e_2024"), Member("f_2", "e_2025"))) },
         { "member-without-a-number", Text(Append(Member("e_1", "e_2024"), Member("e", "e_2025"))) },
         { "member-with-a-word-for-a-number", Text(Append(Member("e_1", "e_2024"), Member("e_x", "e_2025"))) },
+        { "member-with-nothing-after-the-underscore", Text(Append(Member("e_1", "e_2024"), Member("e_", "e_2025"))) },
+        { "member-with-a-number-then-a-word", Text(Append(Member("e_1", "e_2024"), Member("e_1x", "e_2025"))) },
+        { "member-with-nothing-before-the-underscore", Text(Append(Member("_1", "e_2024"), Member("_2", "e_2025"))) },
         {
             "subquery-scan-member",
             Text(
