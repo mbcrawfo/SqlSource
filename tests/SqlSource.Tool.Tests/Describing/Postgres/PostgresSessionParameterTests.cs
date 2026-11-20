@@ -170,7 +170,9 @@ public sealed class PostgresSessionParameterTests
         exchange.Unused.ShouldBeEmpty();
     }
 
-    // A bug of the describer or of the server, and the statement is freed all the same.
+    // A bug of the describer or of the server, and the statement is freed all the same.  The message is the session's
+    // own: without the check the session goes on to ask "columns", which the script does not answer, and the replay's
+    // miss is an InvalidOperationException too.
     [Fact]
     public async Task DescribeAsync_FewerTypesThanParameters_ThrowsAndFreesTheStatement()
     {
@@ -184,13 +186,14 @@ public sealed class PostgresSessionParameterTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        _ = await Should.ThrowAsync<InvalidOperationException>(() =>
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
             session.DescribeAsync(
                 Listed("SELECT @a, @b", Inferred("a"), Inferred("b")),
                 TestContext.Current.CancellationToken
             )
         );
 
+        thrown.Message.ShouldBe($"The server resolved 1 types for the 2 parameters of '{Query}'.");
         exchange.Unused.ShouldBeEmpty();
     }
 
