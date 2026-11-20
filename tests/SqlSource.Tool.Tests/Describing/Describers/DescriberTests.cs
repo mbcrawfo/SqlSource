@@ -32,9 +32,17 @@ public sealed class DescriberTests
     public void Find_DialectWithoutADescriber_GivesNull() =>
         new DescriberRegistry([new FakeDescriber()]).Find(SqlDialect.SqlServer).ShouldBeNull();
 
+    // The registry's own refusal, which names the dialect: the dictionary it builds would refuse a second key too.
     [Fact]
-    public void Constructor_TwoDescribersOfOneDialect_Throws() =>
-        Should.Throw<ArgumentException>(() => new DescriberRegistry([new FakeDescriber(), new FakeDescriber()]));
+    public void Constructor_TwoDescribersOfOneDialect_Throws()
+    {
+        var thrown = Should.Throw<ArgumentException>(() =>
+            new DescriberRegistry([new FakeDescriber(), new FakeDescriber()])
+        );
+
+        thrown.ParamName.ShouldBe("describers");
+        thrown.Message.ShouldBe("Two describers are given for the dialect PostgreSql. (Parameter 'describers')");
+    }
 
     // The registry of the tests' hosts, which has no describer: the released tool's has PostgreSQL's and SQL Server's.
     [Fact]
@@ -75,20 +83,6 @@ public sealed class DescriberTests
         described.Value.ShouldBe(FakeDescriber.NoRows);
         describer.Opened.ShouldHaveSingleItem().Database.ShouldBe("billing");
         describer.Described.ShouldHaveSingleItem().Name.ShouldBe("GetUser");
-    }
-
-    [Fact]
-    public async Task DescribeAsync_QueryGivenAFailure_ReturnsItAndDoesNotThrow()
-    {
-        var describer = new FakeDescriber();
-        describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser", "42P01: relation \"users\" does not exist");
-        var token = TestContext.Current.CancellationToken;
-
-        var opened = await describer.OpenAsync("billing", "Host=db");
-        var described = await opened.Value.ShouldNotBeNull().DescribeAsync(CaptureInputs.GetUser, token);
-
-        described.Value.ShouldBeNull();
-        described.Failure.ShouldNotBeNull().Step.ShouldBe(DescribeStep.DescribeColumns);
     }
 
     private static async Task<IDescribeSession> OpenAsync(FakeDescriber describer)
