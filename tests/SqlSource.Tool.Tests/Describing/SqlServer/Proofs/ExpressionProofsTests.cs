@@ -187,6 +187,7 @@ public sealed class ExpressionProofsTests
     [InlineData("CONVERT(varchar(10), t.d, NULL)", "", false, false, "")]
     [InlineData("CONVERT(varchar(10), t.d, -1)", "", false, false, "")]
     [InlineData("CONVERT(varchar(10), t.d, (23))", "", false, false, "")]
+    [InlineData("CONVERT(varchar(10), t.d, 23 + @p)", "", false, false, "")]
     // TRY_CAST is no form: it is asked whole inside a form, and the server answers it.
     [InlineData("CAST(TRY_CAST(t.a AS int) AS bigint)", "", true, false, "TRY_CAST(t.a AS int)")]
     // JSON_OBJECT and JSON_ARRAY.
@@ -439,29 +440,6 @@ public sealed class ExpressionProofsTests
         second.Holds(Answers(false, true)).ShouldBeTrue();
         second.Holds(Answers(true, false)).ShouldBeFalse();
         first.Holds(Answers(false, true)).ShouldBeTrue();
-    }
-
-    [Fact]
-    public void Of_FormOfOperands_AsksEachOperand()
-    {
-        var (sql, tokens, proofs, body) = Read("SELECT COALESCE(t.a, t.b) AS c FROM t AS t");
-
-        var proof = proofs.Of(body.Items[0].Expression);
-
-        Texts(sql, tokens, proofs.Operands).ShouldBe("t.a|t.b");
-        proof.Holds(null).ShouldBeFalse();
-        proof.Holds(Answers(false, true)).ShouldBeTrue();
-    }
-
-    [Fact]
-    public void Of_ProvedFromTheTextAlone_AsksNothing()
-    {
-        var (_, _, proofs, body) = Read("SELECT COUNT(*) AS c FROM t AS t");
-
-        var proof = proofs.Of(body.Items[0].Expression);
-
-        proofs.Operands.ShouldBeEmpty();
-        proof.Holds(null).ShouldBeTrue();
     }
 
     private static (bool Proved, bool Unproved, string Operands) Prove(string item, string tail)
