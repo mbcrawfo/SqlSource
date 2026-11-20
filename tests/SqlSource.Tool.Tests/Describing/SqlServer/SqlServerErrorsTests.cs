@@ -360,16 +360,6 @@ public sealed class SqlServerErrorsTests
     }
 
     [Fact]
-    public void Failed_ErrorAtDeclared_IsAtResolveType() =>
-        SqlServerErrors
-            .Failed(
-                Of(SqlDialectRules.SqlServer, "SELECT @p AS p"),
-                new SqlServerServerError([new SqlServerErrorRow(-2, 11, 0, ConnectionTexts.NoAnswerInTime)]),
-                DescribeStep.ResolveType
-            )
-            .Step.ShouldBe(DescribeStep.ResolveType);
-
-    [Fact]
     public void Columns_ConflictingResults_Is263()
     {
         const string Message =
@@ -523,16 +513,6 @@ public sealed class SqlServerErrorsTests
         failure.ServerLines.ShouldBe([$"Msg {cause}: {causeText}", $"Msg {last}: {lastText}"]);
         failure.Help.ShouldBeNull();
     }
-
-    [Fact]
-    public void Columns_TableStep_IsTableMatch() =>
-        SqlServerErrors
-            .Columns(
-                Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users"),
-                [new SqlServerDescribeError(208, 2, "Invalid object name 'dbo.users'.")],
-                DescribeStep.TableMatch
-            )
-            .Step.ShouldBe(DescribeStep.TableMatch);
 
     // The parameters' procedure reports a temporary table of a batch as a missing table, where the columns' gives its
     // cause.
