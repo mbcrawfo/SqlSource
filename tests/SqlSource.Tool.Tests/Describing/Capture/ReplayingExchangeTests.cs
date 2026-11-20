@@ -236,6 +236,11 @@ public sealed class ReplayingExchangeTests
         "server.settings[0]"
     )]
     [InlineData(
+        "{\"server\":{\"version\":\"1\",\"driver\":null,\"driverVersion\":null,"
+            + "\"settings\":[{\"name\":\"a\",\"value\":\"b\"},null]},\"error\":null}",
+        "server.settings[1]"
+    )]
+    [InlineData(
         "{\"server\":{\"version\":\"1\",\"driver\":null,\"driverVersion\":null,\"settings\":[{\"name\":\"a\"}]},"
             + "\"error\":null}",
         "server.settings[0].value"
