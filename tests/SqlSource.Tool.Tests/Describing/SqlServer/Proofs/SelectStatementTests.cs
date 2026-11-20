@@ -73,9 +73,12 @@ public sealed class SelectStatementTests
     [InlineData("SELECT ALL TOP (1) a FROM t")]
     public void Read_TopDistinct_SkipsThem(string sql)
     {
-        var body = Read(sql).Statement.ShouldNotBeNull().Body;
+        var (tokens, statement) = Read(sql);
+        var body = statement.ShouldNotBeNull().Body;
 
-        body.Items.ShouldHaveSingleItem().Name.ShouldBe("a");
+        var item = body.Items.ShouldHaveSingleItem();
+        item.Name.ShouldBe("a");
+        Text(tokens, item.Expression).ShouldBe("a");
         body.HasTop.ShouldBeTrue();
     }
 
@@ -115,6 +118,7 @@ public sealed class SelectStatementTests
     [InlineData("GROUP BY ROLLUP (a)", nameof(SelectGrouping.Sets))]
     [InlineData("GROUP BY CUBE (a)", nameof(SelectGrouping.Sets))]
     [InlineData("GROUP BY GROUPING SETS ((a), ())", nameof(SelectGrouping.Sets))]
+    [InlineData("GROUP BY GROUPING SETS ((a), (b))", nameof(SelectGrouping.Sets))]
     [InlineData("GROUP BY a WITH ROLLUP", nameof(SelectGrouping.Sets))]
     [InlineData("GROUP BY a WITH CUBE", nameof(SelectGrouping.Sets))]
     [InlineData("GROUP BY ()", nameof(SelectGrouping.Sets))]
