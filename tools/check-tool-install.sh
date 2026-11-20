@@ -136,8 +136,9 @@ fi
 # A project of one mssql query, and a connection to the port 1 of this machine, which refuses at once.  The tool loads
 # SqlClient to connect, and its copy for the platform must be the one it loads: the copy outside runtimes/ throws
 # PlatformNotSupportedException at the first use, which the tool reports as SQLSRC224 with another text.  On Windows
-# and macOS SqlClient retries a refused port until the connect timeout ends, and the text is that of a connection that
-# timed out; either text shows the copy for the platform loaded.  The project
+# SqlClient retries a refused port until the connect timeout ends, and the text is that of a connection that timed out.
+# On macOS it does either from one run to the next, so either text passes there; each shows the copy for the platform
+# loaded.  The project
 # imports SqlSource.props and .targets, copied from src/SqlSource/build/ with SqlSource.AfterSdk.targets, which the
 # props have the SDK import, and the repository's global.json beside them, and is never restored.
 mssql="$work/mssql"
@@ -164,17 +165,24 @@ code=0
 "$tool" describe App/App.csproj --connection 'orders=Data Source=127.0.0.1,1;Connect Timeout=5;Encrypt=False' \
     >"$work/mssql.out" 2>"$work/mssql.err" || code=$?
 summary='orders (mssql): 0 described, 0 skipped, 1 failed'
-unreachable='SqlClient could not reach the server'
-if on_windows || [[ "${OSTYPE:-}" == darwin* ]]; then
-    unreachable='the connection to the server timed out'
+refused='SqlClient could not reach the server'
+timed_out='the connection to the server timed out'
+unreachable=(--regexp="$refused")
+expected="$refused"
+if on_windows; then
+    unreachable=(--regexp="$timed_out")
+    expected="$timed_out"
+elif [[ "${OSTYPE:-}" == darwin* ]]; then
+    unreachable=(--regexp="$refused" --regexp="$timed_out")
+    expected="$refused, or $timed_out"
 fi
 if [[ "$code" -ne 1 ]] || ! grep --quiet --fixed-strings "$summary" "$work/mssql.out" ||
     ! grep --quiet ': error SQLSRC224: ' "$work/mssql.err" ||
-    ! grep --quiet --fixed-strings "$unreachable" "$work/mssql.err" ||
+    ! grep --quiet --fixed-strings "${unreachable[@]}" "$work/mssql.err" ||
     grep --quiet 'SQLSRC200' "$work/mssql.err"; then
     cat "$work/mssql.out" "$work/mssql.err" >&2
     echo "check-tool-install: $COMMAND describe of an mssql query exited with $code, and not with 1 and SQLSRC224" >&2
-    echo "check-tool-install: that says $unreachable: SqlClient's copy did not load" >&2
+    echo "check-tool-install: that says $expected: SqlClient's copy did not load" >&2
     exit 1
 fi
 
