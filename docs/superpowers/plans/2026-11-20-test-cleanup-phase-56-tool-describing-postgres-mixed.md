@@ -53,7 +53,11 @@ Checked against the spec on `2d035cdb`: the ungated `!fits` return of `Unusable`
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-56/tool-describing-postgres/after`, then `compare` against the "before" report.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-56/coverage-after/SqlSource.Tool.Tests`, compared file by file over the scope's files.
-- [ ] **Step 3:** Run time of the test project after the change, on the same machine.
-- [ ] **Step 4:** The pull request gives the change, the compare result, the coverage figures, each removed row beside its cover, and the run times.
+- [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-56/tool-describing-postgres/after`: 2,745 mutants tested, 2,318 killed, 374 survived, 51 timeouts, 2 errors; the tested run took 23 min 32 s.  `compare`: 2,369 detected before, 2,369 still detected, 0 lost, 0 not comparable.  `kills` on the "after" report:
+  - `Run_UngatedQueryWhoseReferenceNamesAnotherColumn_IsUnavailableAndKeepsTheCatalogsAnswer`: 1 row, 59 kills, 0 alone.
+  - `Run_UnmappedReferenceAndExpression_PassTheCheck`: 1 row, 30 kills, 0 alone.
+  - `Run_ViewsColumnPrintedUnderTheBaseTablesName_IsWalked`: 1 row, 35 kills, 0 alone.
+  - `Run_ColumnOfATableWhoseEntryCannotBeMapped_KeepsTheHeuristic`: 2 rows, 30 kills, 0 alone.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-56/coverage-after/SqlSource.Tool.Tests` (7,087 tests): 5,031 of 5,645 lines over the 56 files, before and after, the same figure in each file.
+- [x] **Step 3:** Run time of `dotnet test --project tests/SqlSource.Tool.Tests`: 2 min 42 s before (7,091 tests), 2 min 35 s after (7,087 tests).
+- [x] **Step 4:** The pull request gives the change, the compare result, the coverage figures, each removed row beside its cover, and the run times.
