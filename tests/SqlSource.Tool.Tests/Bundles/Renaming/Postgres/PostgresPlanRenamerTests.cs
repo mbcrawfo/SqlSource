@@ -769,10 +769,10 @@ public sealed class PostgresPlanRenamerTests
         PostgresPlanRenamer
             .WordsOf(
                 FieldOf( /*lang=json,strict*/
-                    "[{\"Plan\": {\"Node Type\": \"Result\", \"Future Key\": [\"secret\"]}, \"Extra\": 1}]"
+                    "[{\"Plan\": {\"Node Type\": \"Result\", \"Future Key\": [\"secret\"]}, \"Extra\": \"other\"}]"
                 )
             )
-            .ShouldBe(["Future Key", "secret", "Extra"]);
+            .ShouldBe(["Future Key", "secret", "Extra", "other"]);
 
     [Theory]
     [InlineData("not json")]
