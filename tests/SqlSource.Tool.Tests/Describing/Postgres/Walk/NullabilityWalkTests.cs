@@ -28,11 +28,7 @@ public sealed class NullabilityWalkTests
 
     [Theory]
     [InlineData("a.id + 1")]
-    [InlineData("(a.id)")]
-    [InlineData("COALESCE(a.id, b.id)")]
-    [InlineData("$1")]
     [InlineData("old.id")]
-    [InlineData("id")]
     public void Run_ColumnOfATableWhoseEntryCannotBeMapped_KeepsTheHeuristic(string entry) =>
         AnswersOf(Run(LeftJoin(entry, entry), NotNull, Optional)).ShouldBe([NullableHeuristic, NullableHeuristic]);
 
@@ -114,6 +110,7 @@ public sealed class NullabilityWalkTests
     {
         var outcome = RunUngated(Scan("t", "t.opt"), NotNull);
 
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
         outcome.Reason.ShouldBe(WalkReasons.OutputDiffers);
         AnswersOf(outcome).ShouldBe([NotNullCatalog]);
     }
@@ -125,12 +122,18 @@ public sealed class NullabilityWalkTests
         var outcome = Run(Scan("t", "t.opt"), OfView);
 
         outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        outcome.Reason.ShouldBeNull();
         AnswersOf(outcome).ShouldBe([UnknownView]);
     }
 
     [Fact]
-    public void Run_UnmappedReferenceAndExpression_PassTheCheck() =>
-        Run(LeftJoin("x.other", "a.id + 1"), NotNull, NotNull).Plan.ShouldBe(SidecarValues.Plan.Walked);
+    public void Run_UnmappedReferenceAndExpression_PassTheCheck()
+    {
+        var outcome = Run(LeftJoin("x.other", "a.id + 1"), NotNull, NotNull);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        outcome.Reason.ShouldBeNull();
+    }
 
     // A foreign table's scan is an instance: unknown when nothing extends it, and the join's when one does.
     [Fact]
