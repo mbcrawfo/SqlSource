@@ -101,8 +101,9 @@ internal static class ConnectionErrors
                 {
                     LoginFailed => LoginRefused,
                     CannotOpenDatabase or CannotOpenDefaultDatabase => DatabaseRefused,
-                    // WAIT_TIMEOUT, which SqlClient gives on Windows and on macOS for a port where nothing listens as
-                    // well as for a connect that ran out of time, since it tries again until the timeout ends.
+                    // WAIT_TIMEOUT, which SqlClient gives for a connect that ran out of time, and for a port where
+                    // nothing listens on Windows and on some attempts on macOS, since it tries again until the timeout
+                    // ends there.
                     Timeout or WaitTimeout => ConnectionTexts.ConnectTimedOut,
                     _ when timedOut => ConnectionTexts.ConnectTimedOut,
                     _ => other,
