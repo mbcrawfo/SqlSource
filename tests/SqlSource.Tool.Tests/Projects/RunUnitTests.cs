@@ -296,7 +296,9 @@ public sealed class RunUnitTests : IDisposable
         {
             Find("locked").ShouldBeNull();
             ShouldHaveReported("SQLSRC222", directory);
-            _error.ToString().ShouldContain(" cannot be read: ");
+            var reason = Should.Throw<UnauthorizedAccessException>(() => Directory.GetFiles(directory)).Message;
+            _error.ToString().ShouldContain($" cannot be read: {reason}\n");
+            _error.ToString().ShouldNotContain("the system would not list its files");
         }
         finally
         {

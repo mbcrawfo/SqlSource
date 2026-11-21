@@ -467,10 +467,12 @@ public sealed class ProjectEvaluatorTests : IDisposable
     [Fact]
     public async Task Evaluate_NoProjects_StartsNothingAndMakesNoFolder()
     {
+        // No folder can be made below a file, so a run that tried to make one would throw.
+        _temp = Path.Combine(_folder.WriteFile("not-a-folder"), "tmp");
+
         (await EvaluateAsync([])).ShouldBeEmpty();
 
         _runner.Requests.ShouldBeEmpty();
-        Directory.EnumerateFileSystemEntries(_temp).ShouldBeEmpty();
     }
 
     [Fact]

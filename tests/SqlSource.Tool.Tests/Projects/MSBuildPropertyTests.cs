@@ -14,6 +14,7 @@ public sealed class MSBuildPropertyTests
     [InlineData("/work/100%/", "/work/100%25/")]
     // The percent sign first: "%3B" as a user typed it is three characters, and must come back as three.
     [InlineData("/work/%3B;,/", "/work/%253B%3B%2C/")]
+    [InlineData(";a,b", "%3Ba%2Cb")]
     [InlineData("", "")]
     public void Escape_Value_IsWhatMSBuildReadsBackWhole(string value, string expected) =>
         MSBuildProperty.Escape(value).ShouldBe(expected);
