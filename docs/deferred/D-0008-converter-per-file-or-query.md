@@ -2,7 +2,7 @@
 
 ## Planned
 
-[The research on converters](../superpowers/specs/2026-10-24-query-generation-phase-8-converter-research.md#c-converter-type-named-in-the-override-entry), its option C, proposed naming a converter class in the type override's entry, `public.email=MyApp.Email|MyApp.EmailConverter`, so that the converter is keyed by the database type and follows the override's levels: one file or one query could convert a C# type another way than the project does.  [The 8.2 spec](../superpowers/specs/2026-10-24-query-generation-phase-8-2-converters-design.md) lists it among its non-goals, deferred as `D-0008`.
+[The research on converters](https://github.com/mbcrawfo/SqlSource/blob/c1a960bba0e0e17cfd3ce891f33168f83c977d85/docs/superpowers/specs/2026-10-24-query-generation-phase-8-converter-research.md#c-converter-type-named-in-the-override-entry), its option C, proposed naming a converter class in the type override's entry, `public.email=MyApp.Email|MyApp.EmailConverter`, so that the converter is keyed by the database type and follows the override's levels: one file or one query could convert a C# type another way than the project does.  [The 8.2 spec](https://github.com/mbcrawfo/SqlSource/blob/c1a960bba0e0e17cfd3ce891f33168f83c977d85/docs/superpowers/specs/2026-10-24-query-generation-phase-8-2-converters-design.md) lists it among its non-goals, deferred as `D-0008`.
 
 ## Delivered instead
 

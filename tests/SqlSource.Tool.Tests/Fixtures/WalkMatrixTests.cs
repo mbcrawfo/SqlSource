@@ -12,11 +12,11 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Fixtures;
 
 // The matrix of the nullability walk: what the expected.json of each walk-* case must say, written here by hand.  It
-// began as "The matrix" of docs/superpowers/specs/2026-10-12-query-generation-phase-3-5-nullability-walk-design.md, and
-// the walk has since come to answer walk-subquery-kept, walk-cte-materialized, walk-aggregate, walk-union and the
-// merged columns of walk-using and walk-natural.  A recording that says otherwise is a bug of the walk or of the case,
-// never a reason to change this table without knowing which.  DescriberFixtureTests replays the same cases, and
-// tests/DatabaseTests/Postgres describes them on every supported major: 14 and 18 in CI, 15 to 17 every night.
+// began as the matrix of the design of phase 3.5, and the walk has since come to answer walk-subquery-kept,
+// walk-cte-materialized, walk-aggregate, walk-union and the merged columns of walk-using and walk-natural.  A recording
+// that says otherwise is a bug of the walk or of the case, never a reason to change this table without knowing which.
+// DescriberFixtureTests replays the same cases, and tests/DatabaseTests/Postgres describes them on every supported
+// major: 14 and 18 in CI, 15 to 17 every night.
 public sealed class WalkMatrixTests
 {
     // A NOT NULL column that nothing extends.

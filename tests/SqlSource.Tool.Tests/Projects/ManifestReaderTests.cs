@@ -6,8 +6,8 @@ namespace SqlSource.Tool.Tests.Projects;
 
 public sealed class ManifestReaderTests
 {
-    // The example of docs/superpowers/specs/2026-10-09-query-generation-phase-2-3-project-manifest-design.md in
-    // version 2: the folders of the build, two files, two settings files and a second Compile item.
+    // An example manifest in version 2: the folders of the build, two files, two settings files and a second Compile
+    // item.
     private const string Example = """
         SqlSourceManifest=2
         Project=/work/src/App/App.csproj
