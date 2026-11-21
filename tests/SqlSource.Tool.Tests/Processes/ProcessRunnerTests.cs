@@ -189,7 +189,9 @@ public sealed class ProcessRunnerTests
 
     // A kill only asks, and on Windows the program ends some time after.  The run waits for that: what its caller
     // deletes next, the folder that MSBuild writes its manifest to, is then no longer held by it.  The kill here
-    // is done only when the test lets it, after the runner asked for it, so it is late on every system.
+    // is done only when the test lets it, after the runner asked for it, so it is late on every system.  The run may
+    // wait as long as the test does, so a loaded machine cannot end its wait first.  The kill is held for a moment
+    // that only a run that does not wait can use: load can make this miss such a run, never fail one that waits.
     [Fact]
     public async Task Run_Cancelled_EndsOnlyWhenTheProgramHas()
     {
@@ -198,23 +200,37 @@ public sealed class ProcessRunnerTests
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var asked = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var let = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var runner = new ProcessRunner(process =>
-        {
-            var id = process.Id;
-            _ = Task.Run(async () =>
+        var runner = new ProcessRunner(
+            process =>
             {
-                await let.Task;
-                using var late = Process.GetProcessById(id);
-                late.Kill();
-            });
-            asked.SetResult(id);
-        });
+                var id = process.Id;
+                _ = Task.Run(async () =>
+                {
+                    await let.Task;
+                    using var late = Process.GetProcessById(id);
+                    late.Kill();
+                });
+                asked.SetResult(id);
+            },
+            Eventually.Patience
+        );
 
         var run = runner.RunAsync(wait, cancel.Token);
         await cancel.CancelAsync();
         var program = await asked.Task;
-        IsRunning(program).ShouldBeTrue();
-        let.SetResult();
+        try
+        {
+            _ = await Task.WhenAny(
+                run,
+                Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken)
+            );
+            run.IsCompleted.ShouldBeFalse("the run ended while its program was still running");
+            IsRunning(program).ShouldBeTrue();
+        }
+        finally
+        {
+            let.SetResult();
+        }
 
         _ = await Should.ThrowAsync<OperationCanceledException>(run);
         IsRunning(program).ShouldBeFalse();
@@ -231,12 +247,15 @@ public sealed class ProcessRunnerTests
         var wait = Wait();
         Programs.SkipUnlessOnPath(wait.Program);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var runner = new ProcessRunner(process =>
-        {
-            // The program is ended, so that the test leaves none, and the kill fails as the system's would.
-            process.Kill(entireProcessTree: true);
-            throw (Exception)Activator.CreateInstance(failure)!;
-        });
+        var runner = new ProcessRunner(
+            process =>
+            {
+                // The program is ended, so that the test leaves none, and the kill fails as the system's would.
+                process.Kill(entireProcessTree: true);
+                throw (Exception)Activator.CreateInstance(failure)!;
+            },
+            Eventually.Patience
+        );
 
         var run = runner.RunAsync(wait, cancel.Token);
         await cancel.CancelAsync();

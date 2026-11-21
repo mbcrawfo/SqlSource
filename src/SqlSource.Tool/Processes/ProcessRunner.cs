@@ -20,16 +20,19 @@ internal sealed class ProcessRunner : IProcessRunner
     private static readonly TimeSpan KillWait = TimeSpan.FromSeconds(5);
 
     private readonly Action<Process> _kill;
+    private readonly TimeSpan _killWait;
 
     public ProcessRunner()
-        : this(Kill) { }
+        : this(Kill, KillWait) { }
 
     /// <summary>
-    /// A runner that ends a program whose run was cancelled with the function given.  A test gives one that fails.
+    /// A runner that ends a program whose run was cancelled with the function given, and waits for it as long as
+    /// given.  A test gives a kill that fails or comes late, and a wait that a loaded machine cannot outlast.
     /// </summary>
-    internal ProcessRunner(Action<Process> kill)
+    internal ProcessRunner(Action<Process> kill, TimeSpan killWait)
     {
         _kill = kill;
+        _killWait = killWait;
     }
 
     public async Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken)
@@ -112,7 +115,7 @@ internal sealed class ProcessRunner : IProcessRunner
             // A kill only asks, and on Windows the program ends some time after.  What the caller deletes next, a
             // folder the program wrote to, is then no longer held by it.  A program that does not end is left,
             // and so is what the program started: nothing waits for that.
-            _ = process.WaitForExit(KillWait);
+            _ = process.WaitForExit(_killWait);
         }
         catch (Exception exception)
             when (exception is InvalidOperationException or Win32Exception or AggregateException)
