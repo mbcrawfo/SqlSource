@@ -138,29 +138,25 @@ public sealed class ProcessRunnerTests
         Programs.SkipUnlessOnPath(Wait().Program);
 
         var run = Runner.RunAsync(request, cancel.Token);
-        var parent = await ReadIdAsync(folder.PathOf("parent"));
-        var child = await ReadIdAsync(folder.PathOf("child"));
-        IsRunning(parent).ShouldBeTrue();
-        IsRunning(child).ShouldBeTrue();
+        using var parent = Hold(await ReadIdAsync(folder.PathOf("parent")));
+        using var child = Hold(await ReadIdAsync(folder.PathOf("child")));
+        parent.HasExited.ShouldBeFalse();
+        child.HasExited.ShouldBeFalse();
 
-        // Held so that its id cannot pass to another process, and so that a failure does not leave it for ten minutes.
-        using var started = Process.GetProcessById(child);
         try
         {
             await cancel.CancelAsync();
 
             _ = await Should.ThrowAsync<OperationCanceledException>(run);
-            await Eventually.TrueAsync(() => !IsRunning(parent), "the program is still running");
-            await Eventually.TrueAsync(
-                () => started.HasExited,
-                "the program that the program started is still running"
-            );
+            await Eventually.TrueAsync(() => parent.HasExited, "the program is still running");
+            await Eventually.TrueAsync(() => child.HasExited, "the program that the program started is still running");
         }
         finally
         {
-            if (!started.HasExited)
+            // A failure does not leave it for ten minutes.
+            if (!child.HasExited)
             {
-                started.Kill();
+                child.Kill();
             }
         }
     }
@@ -173,51 +169,48 @@ public sealed class ProcessRunnerTests
             $"Nothing wrote an id to '{file}'."
         );
 
-    private static bool IsRunning(int id)
+    // The process of an id, with its handle open: on Windows the id then cannot pass to another process while this
+    // is held, which GetProcessById alone does not promise.
+    private static Process Hold(int id)
     {
-        try
-        {
-            using var process = Process.GetProcessById(id);
-            return !process.HasExited;
-        }
-        catch (ArgumentException)
-        {
-            // No process has the id.
-            return false;
-        }
+        var process = Process.GetProcessById(id);
+        _ = process.SafeHandle;
+        return process;
     }
 
     // A kill only asks, and on Windows the program ends some time after.  The run waits for that: what its caller
     // deletes next, the folder that MSBuild writes its manifest to, is then no longer held by it.  The kill here
     // is done only when the test lets it, after the runner asked for it, so it is late on every system.  The run may
     // wait as long as the test does, so a loaded machine cannot end its wait first.  The kill is held for a moment
-    // that only a run that does not wait can use: load can make this miss such a run, never fail one that waits.
+    // that only a run that does not wait can use: load can make this miss such a run, never fail one that waits.  The
+    // program outlasts that patience too, so that its own timer cannot end the run first.
     [Fact]
     public async Task Run_Cancelled_EndsOnlyWhenTheProgramHas()
     {
-        var wait = Wait();
+        var (waiter, arguments) = Programs.Waiter((int)Eventually.Patience.TotalSeconds + 30);
+        var wait = Request(waiter, arguments);
         Programs.SkipUnlessOnPath(wait.Program);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var asked = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var asked = new TaskCompletionSource<Process>(TaskCreationOptions.RunContinuationsAsynchronously);
         var let = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var killed = Task.CompletedTask;
         var runner = new ProcessRunner(
             process =>
             {
-                var id = process.Id;
-                _ = Task.Run(async () =>
+                var held = Hold(process.Id);
+                killed = Task.Run(async () =>
                 {
                     await let.Task;
-                    using var late = Process.GetProcessById(id);
-                    late.Kill();
+                    held.Kill();
                 });
-                asked.SetResult(id);
+                asked.SetResult(held);
             },
             Eventually.Patience
         );
 
         var run = runner.RunAsync(wait, cancel.Token);
         await cancel.CancelAsync();
-        var program = await asked.Task;
+        using var program = await asked.Task;
         try
         {
             _ = await Task.WhenAny(
@@ -225,15 +218,16 @@ public sealed class ProcessRunnerTests
                 Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken)
             );
             run.IsCompleted.ShouldBeFalse("the run ended while its program was still running");
-            IsRunning(program).ShouldBeTrue();
+            program.HasExited.ShouldBeFalse();
         }
         finally
         {
             let.SetResult();
+            await killed;
         }
 
         _ = await Should.ThrowAsync<OperationCanceledException>(run);
-        IsRunning(program).ShouldBeFalse();
+        program.HasExited.ShouldBeTrue();
     }
 
     // A kill of the whole tree can fail, as when a process of it belongs to another user.  The run was cancelled
