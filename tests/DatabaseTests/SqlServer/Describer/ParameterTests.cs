@@ -31,10 +31,8 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         new SqlServerUserType("dbo", "Email", null)
     );
 
-    // Every row of the table of parameters of the phase 6 spike,
-    // docs/superpowers/specs/2026-10-20-query-generation-phase-6-sql-server-spike.md, that the server types, one
-    // parameter a row: the SQL, the parameter, and its type's name, length, precision and scale, and whether it is the
-    // alias type dbo.Email.
+    // Every row of the table of parameters of the phase 6 spike that the server types, one parameter a row: the SQL,
+    // the parameter, and its type's name, length, precision and scale, and whether it is the alias type dbo.Email.
     public static TheoryData<string, string, string, int, int, int, bool> SpikeRows =>
         new()
         {

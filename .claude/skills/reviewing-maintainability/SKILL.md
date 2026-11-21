@@ -57,7 +57,7 @@ A move changes a namespace: `dotnet_style_namespace_match_folder` is on, and the
 ## Common mistakes
 
 - Reporting what an AGENTS.md says is deliberate: the full `new DiagnosticDescriptor(...)` per diagnostic, the linear path searches, the parallel engine-name lists, the allocation-free readers.
-- Taking a comment's "the tool will", "phase 5" or "not yet" as stale without checking the epic outline, `docs/superpowers/specs/2026-10-07-query-generation-epic-design.md`: several are still true.
+- Taking a comment's "the tool will", "phase 5" or "not yet" as stale without checking `docs/deferred` and the code: several are still true.
 - Fixing a duplicated helper while passing: it belongs in the tech-debt item, and the pull request stays a review.
 - Proposing a sub-folder from file names alone.  Read the first thirty lines of each file and count the references first.
 - Leaving a bare `// Review focus N.` or "this sub-phase" in a test: the plan it refers to is not named, so the reader cannot follow it.

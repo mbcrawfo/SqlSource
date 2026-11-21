@@ -2,7 +2,7 @@
 
 ## Problem
 
-Sub-phase 9.0 of [the phase 9 design](../superpowers/specs/2026-11-02-query-generation-phase-9-build-integration-design.md) left to the owner what only an IDE shows: when IntelliSense picks up a sidecar that another process wrote, whether the online build's guard keeps it out of the IDE's design-time builds, the VS Code task that starts the watcher, Rider's startup task, and the file events of an editor's save.  The owner ran them in Rider 2026.2.4 on macOS; [the spike's record](../superpowers/specs/2026-11-02-query-generation-phase-9-spike.md#the-owners-checklist) holds the answers.  Nothing was run in Visual Studio, in VS Code, in Rider on Windows or Linux, or on Windows at all.
+Sub-phase 9.0 of [the phase 9 design](https://github.com/mbcrawfo/SqlSource/blob/c1a960bba0e0e17cfd3ce891f33168f83c977d85/docs/superpowers/specs/2026-11-02-query-generation-phase-9-build-integration-design.md) left to the owner what only an IDE shows: when IntelliSense picks up a sidecar that another process wrote, whether the online build's guard keeps it out of the IDE's design-time builds, the VS Code task that starts the watcher, Rider's startup task, and the file events of an editor's save.  The owner ran them in Rider 2026.2.4 on macOS; [the spike's record](../superpowers/specs/2026-11-02-query-generation-phase-9-spike.md#the-owners-checklist) holds the answers.  Nothing was run in Visual Studio, in VS Code, in Rider on Windows or Linux, or on Windows at all.
 
 What the design says of those IDEs is therefore what their documentation and source say, not what they did:
 
@@ -21,7 +21,7 @@ The watcher of sub-phase 9.3, and the manual's recipes and "what each IDE shows"
 
 ## Proposed fix
 
-Run the procedure below in each IDE and on each system that its tables leave blank, write the answers into the tables of [the spike's checklist](../superpowers/specs/2026-11-02-query-generation-phase-9-spike.md#the-owners-checklist), and correct the design and the manual where an answer differs.  Then delete this item.
+Run the procedure below in each IDE and on each system that its tables leave blank, write the answers into the tables of [the spike's checklist](../superpowers/specs/2026-11-02-query-generation-phase-9-spike.md#the-owners-checklist), and correct the manual where an answer differs.  Then delete this item.
 
 The procedure needs no database but for the VS Code task, which runs the manual's recipe in a project of your own: the sample's sidecars are written in advance, and a tool of the sample writes them from a process of its own, as the watcher does.
 
