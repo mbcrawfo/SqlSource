@@ -19,7 +19,7 @@ Checked against the spec on `a77d0352`: `NearName.IsNear` still has the length g
 
 ## Review Focus
 
-Each new row is the one its finding proposes.  `IsNear_UnrelatedName_IsFalseWhenCaseIsIgnored` keeps its assertion and changes its names to two of equal length, so the comparison runs.
+Each row of Steps 1 and 2 is the one its finding proposes, and the branch review added one more to each theory (Step 6).  `IsNear_UnrelatedName_IsFalseWhenCaseIsIgnored` keeps its assertion and changes its names to two of equal length, so the comparison runs.
 
 ---
 
@@ -38,10 +38,11 @@ Each new row is the one its finding proposes.  `IsNear_UnrelatedName_IsFalseWhen
 - [x] **Step 2 (F-SqlSource.Tool.Tests-4-02):** `IsNear_NameBeyondTheDistance_IsFalse` gains the rows `("-x", "-abc")` and `("--forxxx", "--force")`.
 - [x] **Step 3 (F-SqlSource.Tool.Tests-4-03):** `IsNear_UnrelatedName_IsFalseWhenCaseIsIgnored` compares `"Host"` with `"user"`.  Checked by hand with `Same` changed to `left == right || ignoreCase`: the test fails with the new names and passes with the old ones.
 - [x] **Step 4:** Set row 62 of the epic's table to `done`.
-- [x] **Step 5:** `./format.sh`, `./pre-commit-validation.sh`, then commit.
+- [x] **Step 5:** `./format.sh`, `./pre-commit-validation.sh`, then commit (`e18515f3`).
+- [x] **Step 6 (branch review, R1-F1 and R1-F2):** `IsNear_NameWithinTheDistance_IsTrue` gains `("badc", "abcd")`, whose first swap is at the start of both names, and `IsNear_NameBeyondTheDistance_IsFalse` gains `("--oxre", "--force")`, whose characters match only one way round.  With `NearName.cs:46` changed to `i > 2`, `:47` to `j > 2`, or `:48` or `:49` removed, all 17 tests of the class passed before this step, and after it the matching new row fails.
 
 ### Task 2: The guard's "after" half
 
-- [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-62/tool-reporting/after` (Windows): 100 mutants tested, 88 killed, 12 survived, 0 timeouts, 0 errors, 7 without coverage; the tested run took 1 min 0 s.  `compare`: 81 detected before, 81 still detected, 0 lost, 0 not comparable.  All seven survivors at the six places the findings name are now `Killed`: `NearName.cs:23:13` `>=`, `33:25` `>` and `<`, `34:9` block removal, `38:25` `<`, `46:21` `i < 1` and `47:24` `j < 1`.  `kills` after: `IsNear_NameWithinTheDistance_IsTrue` 8 rows, 39 kills, 6 alone; `IsNear_NameBeyondTheDistance_IsFalse` 7 rows, 34 kills, 5 alone; `IsNear_UnrelatedName_IsFalseWhenCaseIsIgnored` 1 row, 29 kills, 0 alone; none has a survivor under it.
-- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-62/coverage-after/SqlSource.Tool.Tests` (7,094 tests, 19 skipped, 3 min 36 s, against 7,090 tests in 2 min 54 s before): 183 of 183 lines, before and after, the same figure in each of the 6 files.
+- [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-62/tool-reporting/after` (Windows): 100 mutants tested, 88 killed, 12 survived, 0 timeouts, 0 errors, 7 without coverage; the tested run took 1 min 1 s.  `compare`: 81 detected before, 81 still detected, 0 lost, 0 not comparable.  All seven survivors at the six places the findings name are now `Killed`: `NearName.cs:23:13` `>=`, `33:25` `>` and `<`, `34:9` block removal, `38:25` `<`, `46:21` `i < 1` and `47:24` `j < 1`.  `kills` after: `IsNear_NameWithinTheDistance_IsTrue` 9 rows, 39 kills, 6 alone; `IsNear_NameBeyondTheDistance_IsFalse` 8 rows, 34 kills, 5 alone; `IsNear_UnrelatedName_IsFalseWhenCaseIsIgnored` 1 row, 29 kills, 0 alone; none has a survivor under it.
+- [x] **Step 2:** Coverage into `artifacts/test-cleanup/phase-62/coverage-after/SqlSource.Tool.Tests` (7,096 tests, 19 skipped, 3 min 8 s, against 7,090 tests in 2 min 54 s before): 183 of 183 lines, before and after, the same figure in each of the 6 files.
 - [ ] **Step 3:** The pull request gives the change, the compare result, the coverage figures and the run times.

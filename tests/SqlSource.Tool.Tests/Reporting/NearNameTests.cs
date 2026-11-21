@@ -14,6 +14,7 @@ public sealed class NearNameTests
     [InlineData("--conncetion", "--connection")]
     [InlineData("ba", "ab")]
     [InlineData("--cnonectoin", "--connection")]
+    [InlineData("badc", "abcd")]
     // The distance is 2 and no more.
     [InlineData("--forxx", "--force")]
     // Names that differ in length by exactly the distance are still compared.
@@ -28,6 +29,8 @@ public sealed class NearNameTests
     // Every character counts, from the start of the known name to the end of the given one.
     [InlineData("-x", "-abc")]
     [InlineData("--forxxx", "--force")]
+    // Two characters that match only one way round are not a swap.
+    [InlineData("--oxre", "--force")]
     // Two names that differ by more than the distance in length are far apart without being compared.
     [InlineData("--connection", "-c")]
     [InlineData("-", "--project")]
