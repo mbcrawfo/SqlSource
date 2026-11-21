@@ -30,9 +30,10 @@ public sealed class ProcessRunnerTests
     }
 
     // Writes its id to one file, starts a program that waits, writes that one's id to the other, and waits for it.
-    // Windows has no shell that knows its own id but PowerShell.  The files reach the script as variables, which
-    // need no quoting, and with their full paths: the programs do not run in the folder of the files, since Windows
-    // does not delete a folder that a process runs in.
+    // That program waits ten minutes, longer than Eventually's patience, so only a kill of the whole tree ends it
+    // before a test gives up on it.  Windows has no shell that knows its own id but PowerShell.  The files reach the
+    // script as variables, which need no quoting, and with their full paths: the programs do not run in the folder
+    // of the files, since Windows does not delete a folder that a process runs in.
     private static ProcessRequest WaitWithAChild(string parentFile, string childFile)
     {
         var request = OperatingSystem.IsWindows()
@@ -42,14 +43,14 @@ public sealed class ProcessRunnerTests
                 "-NonInteractive",
                 "-Command",
                 "[IO.File]::WriteAllText($env:SQLSOURCE_TEST_PARENT, $PID);"
-                    + " $child = Start-Process ping -ArgumentList '-n', '30', '127.0.0.1' -NoNewWindow -PassThru;"
+                    + " $child = Start-Process ping -ArgumentList '-n', '600', '127.0.0.1' -NoNewWindow -PassThru;"
                     + " [IO.File]::WriteAllText($env:SQLSOURCE_TEST_CHILD, $child.Id);"
                     + " $child.WaitForExit()"
             )
             : Request(
                 "sh",
                 "-c",
-                "echo $$ > \"$SQLSOURCE_TEST_PARENT\"; sleep 30 & echo $! > \"$SQLSOURCE_TEST_CHILD\"; wait"
+                "echo $$ > \"$SQLSOURCE_TEST_PARENT\"; sleep 600 & echo $! > \"$SQLSOURCE_TEST_CHILD\"; wait"
             );
         return request with
         {
@@ -75,13 +76,16 @@ public sealed class ProcessRunnerTests
     [Fact]
     public async Task Run_ProgramThatFails_GivesItsExitCodeAndItsErrorOutput()
     {
-        var result = await Runner.RunAsync(
-            Request(Programs.Dotnet, "sqlsource-no-such-command"),
-            TestContext.Current.CancellationToken
-        );
+        var request = OperatingSystem.IsWindows()
+            ? Request("cmd", "/c", "echo sqlsource-error>&2& exit /b 3")
+            : Request("sh", "-c", "echo sqlsource-error >&2; exit 3");
+        Programs.SkipUnlessOnPath(request.Program);
 
-        result.ExitCode.ShouldNotBe(0);
-        (result.Output + result.Error).Trim().ShouldNotBeEmpty();
+        var result = await Runner.RunAsync(request, TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(3);
+        result.Error.Trim().ShouldBe("sqlsource-error");
+        result.Output.ShouldBeEmpty();
     }
 
     [Fact]
@@ -138,11 +142,27 @@ public sealed class ProcessRunnerTests
         var child = await ReadIdAsync(folder.PathOf("child"));
         IsRunning(parent).ShouldBeTrue();
         IsRunning(child).ShouldBeTrue();
-        await cancel.CancelAsync();
 
-        _ = await Should.ThrowAsync<OperationCanceledException>(run);
-        await Eventually.TrueAsync(() => !IsRunning(parent), "the program is still running");
-        await Eventually.TrueAsync(() => !IsRunning(child), "the program that the program started is still running");
+        // Held so that its id cannot pass to another process, and so that a failure does not leave it for ten minutes.
+        using var started = Process.GetProcessById(child);
+        try
+        {
+            await cancel.CancelAsync();
+
+            _ = await Should.ThrowAsync<OperationCanceledException>(run);
+            await Eventually.TrueAsync(() => !IsRunning(parent), "the program is still running");
+            await Eventually.TrueAsync(
+                () => started.HasExited,
+                "the program that the program started is still running"
+            );
+        }
+        finally
+        {
+            if (!started.HasExited)
+            {
+                started.Kill();
+            }
+        }
     }
 
     // The id that a script wrote to a file, once it has.  PowerShell takes seconds to start on a machine that has
