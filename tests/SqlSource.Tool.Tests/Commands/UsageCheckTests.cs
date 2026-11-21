@@ -310,6 +310,11 @@ public sealed class UsageCheckTests
                 yield return sequence;
             }
 
+            if (length == maximumLength)
+            {
+                yield break;
+            }
+
             ofOneLength =
             [
                 .. ofOneLength.SelectMany(_ => vocabulary, (sequence, token) => (string[])[.. sequence, token]),

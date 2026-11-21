@@ -69,8 +69,9 @@ public sealed class SessionTests(SqlServerDatabases sqlServer)
 
     // The port 1 of this machine refuses at once.  SqlClient's message names the host and the port.  On Linux SqlClient
     // gives the socket's error as Success, which names no reason, and the error the number 0, so the line is the fixed
-    // text alone there.  On Windows and macOS SqlClient retries a refused port until the connect timeout ends and
-    // reports WAIT_TIMEOUT, 258, which is the text of a connection that timed out.
+    // text alone there.  On Windows SqlClient retries a refused port until the connect timeout ends and reports
+    // WAIT_TIMEOUT, 258, which is the text of a connection that timed out.  On macOS it does either from one run to the
+    // next, so either line passes there.
     [Fact]
     public async Task OpenAsync_UnreachableHost_IsSqlsrc224WithNoPartOfTheValue()
     {
@@ -80,13 +81,19 @@ public sealed class SessionTests(SqlServerDatabases sqlServer)
 
         var failure = await ShouldNotOpenAsync(connection);
 
-        failure
-            .ServerLines.ShouldHaveSingleItem()
-            .ShouldMatch(
-                OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
-                    ? "^Msg 258, Level 20, State 0: the connection to the server timed out$"
-                    : @"(^|: )SqlClient could not reach the server(: ConnectionRefused)?$"
-            );
+        const string TimedOut = "^Msg 258, Level 20, State 0: the connection to the server timed out$";
+        const string Refused = @"(^|: )SqlClient could not reach the server(: ConnectionRefused)?$";
+        var expected = Refused;
+        if (OperatingSystem.IsWindows())
+        {
+            expected = TimedOut;
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            expected = $"{TimedOut}|{Refused}";
+        }
+
+        failure.ServerLines.ShouldHaveSingleItem().ShouldMatch(expected);
     }
 
     // The container's certificate is its own and signed by no authority this machine trusts, so a string that asks for
