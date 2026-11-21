@@ -13,8 +13,11 @@ public sealed class NearNameTests
     // One transposition of neighbours counts as one edit.
     [InlineData("--conncetion", "--connection")]
     [InlineData("ba", "ab")]
+    [InlineData("--cnonectoin", "--connection")]
     // The distance is 2 and no more.
     [InlineData("--forxx", "--force")]
+    // Names that differ in length by exactly the distance are still compared.
+    [InlineData("--for", "--force")]
     public void IsNear_NameWithinTheDistance_IsTrue(string given, string known) =>
         NearName.IsNear(given, known, ignoreCase: false).ShouldBeTrue();
 
@@ -22,6 +25,9 @@ public sealed class NearNameTests
     [InlineData("-pS3cret", "--project")]
     [InlineData("-s3cret", "-h")]
     [InlineData("--xxxce", "--force")]
+    // Every character counts, from the start of the known name to the end of the given one.
+    [InlineData("-x", "-abc")]
+    [InlineData("--forxxx", "--force")]
     // Two names that differ by more than the distance in length are far apart without being compared.
     [InlineData("--connection", "-c")]
     [InlineData("-", "--project")]
@@ -37,5 +43,5 @@ public sealed class NearNameTests
 
     [Fact]
     public void IsNear_UnrelatedName_IsFalseWhenCaseIsIgnored() =>
-        NearName.IsNear("Host", "postgres", ignoreCase: true).ShouldBeFalse();
+        NearName.IsNear("Host", "user", ignoreCase: true).ShouldBeFalse();
 }
