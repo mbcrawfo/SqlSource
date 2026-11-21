@@ -30,6 +30,21 @@ public sealed class DotEnvParserTests
                 ["SQLSOURCE_CONNECTION_A", "Host=x"]
             },
             {
+                "unquoted value ends at the first # that follows white space",
+                "SQLSOURCE_CONNECTION_A=Host=x # one # two",
+                ["SQLSOURCE_CONNECTION_A", "Host=x"]
+            },
+            {
+                "unquoted value keeps a # with white space after it but none before it",
+                "SQLSOURCE_CONNECTION_A=Password=a# b",
+                ["SQLSOURCE_CONNECTION_A", "Password=a# b"]
+            },
+            {
+                "unquoted value ends at a # with white space before it and none after it",
+                "SQLSOURCE_CONNECTION_A=Password=a #b",
+                ["SQLSOURCE_CONNECTION_A", "Password=a"]
+            },
+            {
                 "unquoted value is trimmed",
                 "SQLSOURCE_CONNECTION_A=  Host=x \t ",
                 ["SQLSOURCE_CONNECTION_A", "Host=x"]
@@ -81,8 +96,13 @@ public sealed class DotEnvParserTests
                 ["SQLSOURCE_CONNECTION_A", "x"]
             },
             {
+                "a byte order mark before the first key is dropped",
+                "\uFEFFSQLSOURCE_CONNECTION_A=1",
+                ["SQLSOURCE_CONNECTION_A", "1"]
+            },
+            {
                 "a byte order mark, a carriage return and no final break, the last of a key wins",
-                "﻿SQLSOURCE_CONNECTION_A=1\r\nSQLSOURCE_CONNECTION_A=2",
+                "\uFEFFSQLSOURCE_CONNECTION_A=1\r\nSQLSOURCE_CONNECTION_A=2",
                 ["SQLSOURCE_CONNECTION_A", "2"]
             },
             {
