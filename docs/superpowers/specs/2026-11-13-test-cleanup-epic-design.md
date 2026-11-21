@@ -151,7 +151,7 @@ Counts are of findings.  The guard is **mutation** (the scope's run before and a
 | 59 | [tool-dotenv-strengthen](2026-11-13-test-cleanup-phase-59-tool-dotenv-strengthen-design.md) | `tests/SqlSource.Tool.Tests/DotEnv` |  |  | 1 |  |  | mutation: `tool-dotenv` | done |
 | 60 | [tool-processes-strengthen](2026-11-13-test-cleanup-phase-60-tool-processes-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Processes` |  |  | 2 |  |  | mutation: `tool-processes` | not started |
 | 61 | [tool-projects-strengthen](2026-11-13-test-cleanup-phase-61-tool-projects-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Projects` |  |  | 3 |  |  | mutation: `tool-projects` | done |
-| 62 | [tool-reporting-strengthen](2026-11-13-test-cleanup-phase-62-tool-reporting-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Reporting` |  |  | 3 |  |  | mutation: `tool-reporting` | not started |
+| 62 | [tool-reporting-strengthen](2026-11-13-test-cleanup-phase-62-tool-reporting-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Reporting` |  |  | 3 |  |  | mutation: `tool-reporting` | done |
 | 63 | [tool-reporting-mixed](2026-11-13-test-cleanup-phase-63-tool-reporting-mixed-design.md) | `tests/SqlSource.Tool.Tests/Reporting` | 1 |  | 1 |  |  | mutation: `tool-reporting` | not started |
 | 64 | [tool-watching-strengthen](2026-11-13-test-cleanup-phase-64-tool-watching-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Watching` |  |  | 1 |  |  | mutation: `tool-watching`; covers and run time for 1 | not started |
 | 65 | [generator-root-loosen](2026-11-13-test-cleanup-phase-65-generator-root-loosen-design.md) | `tests/SqlSource.Tests (root files)` |  |  |  | 1 |  | mutation: `generator-root`; covers and run time for 1 | not started |
