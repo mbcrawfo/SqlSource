@@ -891,8 +891,8 @@ internal static class SqlServerVocabulary
         "@@VERSION",
     ];
 
-    // The documented functions (docs/superpowers/specs/2026-11-05-query-generation-phase-10-spike/mssql-functions.tsv,
-    // fetched 2026-11-04, with STRING_SPLIT and GENERATE_SERIES, which its table of contents lacks) that the probe of
+    // The documented functions (the node "Functions" of Microsoft's table of contents, fetched 2026-11-04, with
+    // STRING_SPLIT and GENERATE_SERIES, which it lacks) that the probe of
     // tests/DatabaseTests/SqlServer/Renaming/VocabularyTests.cs found on the floor image or on the default one, on
     // 2026-11-05, leaving out those that a keyword list holds already, such as LEFT.  CHANGETABLE and PREDICT, the
     // documented rowset functions of "CHANGETABLE (Transact-SQL)" and "PREDICT (Transact-SQL)", fetched 2026-11-05,

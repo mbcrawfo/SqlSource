@@ -2,7 +2,7 @@
 
 ## Planned
 
-[The research on converters](../superpowers/specs/2026-10-24-query-generation-phase-8-converter-research.md#b-convention-members-on-the-mapped-type-zero-config), its option B, proposed reading a mapped type's own members as its converters, with no code: a `static T From(P)`, a public constructor `T(P)` or an `explicit operator T(P)` to read, and a `P Value { get; }` or an `explicit operator P(T)` to write.  It would make the types of Vogen, StronglyTypedId and positional records work through the query methods as they are.  [The 8.2 spec](../superpowers/specs/2026-10-24-query-generation-phase-8-2-converters-design.md) lists it among its non-goals, deferred as `D-0007`.
+[The research on converters](https://github.com/mbcrawfo/SqlSource/blob/c1a960bba0e0e17cfd3ce891f33168f83c977d85/docs/superpowers/specs/2026-10-24-query-generation-phase-8-converter-research.md#b-convention-members-on-the-mapped-type-zero-config), its option B, proposed reading a mapped type's own members as its converters, with no code: a `static T From(P)`, a public constructor `T(P)` or an `explicit operator T(P)` to read, and a `P Value { get; }` or an `explicit operator P(T)` to write.  It would make the types of Vogen, StronglyTypedId and positional records work through the query methods as they are.  [The 8.2 spec](https://github.com/mbcrawfo/SqlSource/blob/c1a960bba0e0e17cfd3ce891f33168f83c977d85/docs/superpowers/specs/2026-10-24-query-generation-phase-8-2-converters-design.md) lists it among its non-goals, deferred as `D-0007`.
 
 ## Delivered instead
 

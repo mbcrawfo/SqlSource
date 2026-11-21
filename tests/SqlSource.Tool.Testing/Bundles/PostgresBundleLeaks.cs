@@ -31,8 +31,7 @@ internal static class PostgresBundleLeaks
     // sought as a whole word, an unquoted one case-insensitively and a quoted one as written, so that "Order" is sought
     // though its fold is a keyword and ORDER BY is not it, and a literal of four characters or more as a substring, or
     // as a whole word when it is one, since a word that holds it, such as the setting standard_conforming_strings, is
-    // another word.  After the leak search of the phase 10 spike,
-    // docs/superpowers/specs/2026-11-05-query-generation-phase-10-spike.md.
+    // another word.
     public static IReadOnlyList<string> Of(
         Bundle renamed,
         IEnumerable<string> sources,

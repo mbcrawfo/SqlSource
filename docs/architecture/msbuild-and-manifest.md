@@ -130,7 +130,7 @@ Without `SqlSourceManifestFile` the target writes to `$(IntermediateOutputPath)$
 
 ### The format
 
-The manifest's format is the contract between the package and the tool, as the sidecar's is between the tool and the generator.  A project's package may be of another version than the tool that reads its manifest.  The decisions behind version 1 are in the design of [sub-phase 2.3](../superpowers/specs/2026-10-09-query-generation-phase-2-3-project-manifest-design.md).
+The manifest's format is the contract between the package and the tool, as the sidecar's is between the tool and the generator.  A project's package may be of another version than the tool that reads its manifest.  The decisions behind version 1 are in the design of [sub-phase 2.3](https://github.com/mbcrawfo/SqlSource/blob/c1a960bba0e0e17cfd3ce891f33168f83c977d85/docs/superpowers/specs/2026-10-09-query-generation-phase-2-3-project-manifest-design.md).
 
 The file is lines of `key=value`, and the key ends at the first `=`.  The target writes them in this order:
 

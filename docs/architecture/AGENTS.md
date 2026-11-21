@@ -52,19 +52,7 @@ A new page gets its rows here and its line in the reading guide of `README.md`, 
 - **A page is coupled to every name it gives.**  When a change renames, moves or removes a file, folder, type or member that a page names, the same commit updates the page, as root `AGENTS.md` asks of an `AGENTS.md`.
 - **Check a claim against the code before you write it.**  When the code and an older document disagree, the page says what the code does.  When the code itself is the problem, it is recorded in `docs/tech-debt`.
 - **Use the glossary's terms in its sense.**  A term that a second page needs goes in the glossary of `README.md`, and is not defined again on a page.
-
-## Placeholders
-
-A part of query generation that is not built yet has a placeholder under `## Not built yet` of the page it will extend.  It is exactly this: a heading, one sentence on what will go there, and the phase with a link to the epic.  Nothing else.
-
-```markdown
-### Build integration
-
-> **Not built yet.**  How a target of the build runs the tool before the compile in the online mode.  Delivered by phase 9 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
-```
-
-- **A placeholder is never filled with design from a spec.**  It holds no design and no types until the code exists.
-- **Never describe the future as present.**  A part that is not built is a placeholder or nothing.
+- **Never describe the future as present.**  A page describes what is built.
 
 ## What belongs elsewhere
 
