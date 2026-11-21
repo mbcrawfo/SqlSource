@@ -44,11 +44,11 @@ Each change is one its finding traced to one named mutant.  The temporary folder
 - [x] **Step 3 (F-SqlSource.Tool.Tests.Projects-1-03):** `Find_DirectoryThatCannotBeRead_IsSqlsrc222` asserts `ShouldNotContain("the system would not list its files")`.
 - [x] **Step 4:** Set row 61 of the epic's table to `done`.
 - [x] **Step 5:** `./format.sh`, then the three changed classes pass (102 tests, 2 of them skipped on Windows).
-- [ ] **Step 6:** `./pre-commit-validation.sh`, then commit.
+- [x] **Step 6:** `./pre-commit-validation.sh`, then commit (`2a4140ba`).  The merge of `main` that followed (`574efc1d`) changed only comments in this scope's tests and none of its source, so the "before" still stands.
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-61/tool-projects/after`, and `compare` lists nothing `LOST` or `NOT COMPARABLE`.
-- [ ] **Step 2:** `RunUnitFinder.cs` on Linux as a non-root user: the Conditional (true) at `74:17` is `Killed`.
-- [ ] **Step 3:** Coverage into `artifacts/test-cleanup/phase-61/coverage-after/SqlSource.Tool.Tests` does not fall in any file.
-- [ ] **Step 4:** The pull request gives the change, the compare result, the coverage figures and the run times.
+- [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-61/tool-projects/after` (Windows): 222 mutants tested, 212 killed, 9 survived, 1 timeout, 0 errors, 19 without coverage; the tested run took 13 min 37 s.  `compare`: 211 detected before, 211 still detected, 0 lost, 0 not comparable.  `MSBuildProperty.cs:25:9` Equality `<= 0` and `ProjectEvaluator.cs:89:9` Block removal are now `Killed`, each by its test alone.  `kills` after: `Escape_Value_IsWhatMSBuildReadsBackWhole` 8 rows, 9 kills, 1 alone, and the 1 survivor under it is the equivalent Conditional (false); `Evaluate_NoProjects_StartsNothingAndMakesNoFolder` 1 kill, alone.
+- [x] **Step 2:** `RunUnitFinder.cs` on Linux as a non-root user: 23 mutants tested, 23 killed.  `compare`: 22 detected before, 22 still detected, 0 lost, 0 not comparable.  The Conditional (true) at `74:17` is `Killed`, by `Find_DirectoryThatCannotBeRead_IsSqlsrc222` alone (5 kills and 1 survivor under it before, 8 kills and none after).
+- [x] **Step 3:** Coverage into `artifacts/test-cleanup/phase-61/coverage-after/SqlSource.Tool.Tests` (7,090 tests, 19 skipped, 3 min 45 s, against 7,089 tests in 3 min 9 s before): 578 of 589 lines, before and after, the same figure in each of the 9 files.
+- [x] **Step 4:** The pull request gives the change, the compare result, the coverage figures and the run times.
