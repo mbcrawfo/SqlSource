@@ -297,6 +297,7 @@ public sealed class RunUnitTests : IDisposable
             Find("locked").ShouldBeNull();
             ShouldHaveReported("SQLSRC222", directory);
             _error.ToString().ShouldContain(" cannot be read: ");
+            _error.ToString().ShouldNotContain("the system would not list its files");
         }
         finally
         {
