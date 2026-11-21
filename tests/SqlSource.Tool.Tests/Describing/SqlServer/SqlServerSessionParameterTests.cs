@@ -450,6 +450,24 @@ public sealed class SqlServerSessionParameterTests
         failure.ServerLines.ShouldBe(["the connection to the server was lost"]);
     }
 
+    // A "declared" whose connection was lost reads no type: the describe ends with the error at resolving the type.
+    [Fact]
+    public async Task DescribeAsync_DeclaredAnswersAnError_IsSqlsrc225AtResolveType()
+    {
+        var declared = new SqlServerDeclaredRequest("SELECT @p AS [1]", "@p int");
+        var script = new SqlServerScript().Declared(declared, new SqlServerDeclaredAnswer(null, null, Lost));
+
+        var (described, asked) = await script.DescribeAsync(
+            Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users WHERE id = @p", ("p", "int"))
+        );
+
+        asked.ShouldBe([Call(Calls.Declared, declared)]);
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.ServerLines.ShouldBe(["the connection to the server was lost"]);
+    }
+
     [Fact]
     public async Task DescribeAsync_DeclaredAnswersErrorRows_IsSqlsrc228AndAsksNoParameters()
     {
