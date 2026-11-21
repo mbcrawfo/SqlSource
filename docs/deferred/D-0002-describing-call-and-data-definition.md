@@ -2,11 +2,11 @@
 
 ## Planned
 
-The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) describes queries that a user keeps in `.sql` files.  It puts stored procedures out of scope, in its list of what is out of scope, and phase 8 generates a `rowcount` method for a statement without rows and always uses `CommandType.Text`, so a `CALL` could have a method.
+The [epic design](https://github.com/mbcrawfo/SqlSource/blob/c1a960bba0e0e17cfd3ce891f33168f83c977d85/docs/superpowers/specs/2026-10-07-query-generation-epic-design.md) describes queries that a user keeps in `.sql` files.  It puts stored procedures out of scope, in its list of what is out of scope, and phase 8 generates a `rowcount` method for a statement without rows and always uses `CommandType.Text`, so a `CALL` could have a method.
 
 ## Delivered instead
 
-[`SQLSRC233`](../../site/diagnostics.md#sqlsrc233), raised by [`StatementShape`](../../src/SqlSource.Tool/Describing/Postgres/Statements/StatementShape.cs) before anything is sent, and `-- output: sql` as the way to keep such a query: its SQL is still a string constant, or a method where the query has tokens, with no types, so the tool does not describe it.  The error still fails the query, so the file's sidecar is held back until the query is mended or given the marker.  Since a query without an entry has no models, [sub-phase 8.1](../superpowers/specs/2026-10-24-query-generation-phase-8-1-methods-design.md) generates no method for such a query either, so no generated method calls a procedure: under `-- output: sql` the query keeps its constant, which the project runs itself, and the manual's [query methods](../../site/reference/query-methods.md#which-methods) say so.
+[`SQLSRC233`](../../site/diagnostics.md#sqlsrc233), raised by [`StatementShape`](../../src/SqlSource.Tool/Describing/Postgres/Statements/StatementShape.cs) before anything is sent, and `-- output: sql` as the way to keep such a query: its SQL is still a string constant, or a method where the query has tokens, with no types, so the tool does not describe it.  The error still fails the query, so the file's sidecar is held back until the query is mended or given the marker.  Since a query without an entry has no models, [sub-phase 8.1](https://github.com/mbcrawfo/SqlSource/blob/c1a960bba0e0e17cfd3ce891f33168f83c977d85/docs/superpowers/specs/2026-10-24-query-generation-phase-8-1-methods-design.md) generates no method for such a query either, so no generated method calls a procedure: under `-- output: sql` the query keeps its constant, which the project runs itself, and the manual's [query methods](../../site/reference/query-methods.md#which-methods) say so.
 
 ## Why deferred
 

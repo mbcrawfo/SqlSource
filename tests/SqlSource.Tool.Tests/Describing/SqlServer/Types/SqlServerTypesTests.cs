@@ -9,8 +9,8 @@ namespace SqlSource.Tool.Tests.Describing.SqlServer.Types;
 
 // A SQL Server type from a row of sp_describe_undeclared_parameters or of sys.dm_exec_describe_first_result_set, a
 // parameter's, a declared parameter's or a column's: the system type name and the facets verbatim, and the user type
-// when the row names one; and how a type is declared and spelled.  The rows are those of the table of types in
-// docs/superpowers/specs/2026-10-20-query-generation-phase-6-sql-server-spike.md.
+// when the row names one; and how a type is declared and spelled.  The rows are those the server answered in the spike
+// of phase 6.
 public sealed class SqlServerTypesTests
 {
     private const string TypesAssembly =

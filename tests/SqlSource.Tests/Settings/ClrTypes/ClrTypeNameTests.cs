@@ -106,9 +106,8 @@ public sealed class ClrTypeNameTests
         name.ShouldBeNull();
     }
 
-    // An open generic is a type that cannot be a property's
-    // (docs/superpowers/specs/2026-10-18-query-generation-phase-5-2-type-map-design.md).  The grammar has no way to
-    // write one, so no override names it.
+    // An open generic is a type that cannot be a property's.  The grammar has no way to write one, so no override
+    // names it.
     [Fact]
     public void TryParse_OpenGeneric_IsRefused()
     {

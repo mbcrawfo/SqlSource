@@ -16,8 +16,8 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // the nullableSource expression and give no NULL over rows chosen to tempt one: empty groups' neighbours, the totals
 // of a grouping set, NULLs beside the values.  A query that tries to break a proof must stay the server's nullable
 // and give at least one NULL over the same rows, which shows the server was right.  Every column is named c, which the
-// count of NULL rows reads.  The facts of docs/superpowers/specs/2026-10-23-sql-server-nullability-noise-design.md that
-// the proofs stand on, its "fact N" below, are pinned beside them.
+// count of NULL rows reads.  The facts the proofs stand on, each "design fact N" below, are numbered as in the design
+// that docs/architecture/sqlserver-describer.md links, and are pinned beside them.
 [Collection(UsesSqlServer.Name)]
 public sealed class ProofTests(SqlServerDatabases sqlServer)
 {

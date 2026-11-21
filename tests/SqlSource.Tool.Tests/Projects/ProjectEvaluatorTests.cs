@@ -175,8 +175,8 @@ public sealed class ProjectEvaluatorTests : IDisposable
         FakeProcessRunner.PropertyOf(_runner.Requests[1], "SqlSourceManifestFile").ShouldStartWith(_temp);
     }
 
-    // The table of "Whether a project uses SqlSource", the first row that holds, in
-    // docs/superpowers/specs/2026-10-09-query-generation-phase-2-3-project-manifest-design.md.
+    // Whether a project uses SqlSource: the first that holds, in the order that "evaluating a project" in
+    // docs/architecture/tool.md gives.
     [Theory]
     [InlineData("true", "", "", nameof(ProjectState.UsesSqlSource))]
     [InlineData("True", "SqlSource", "missing", nameof(ProjectState.UsesSqlSource))]
@@ -467,10 +467,12 @@ public sealed class ProjectEvaluatorTests : IDisposable
     [Fact]
     public async Task Evaluate_NoProjects_StartsNothingAndMakesNoFolder()
     {
+        // No folder can be made below a file, so a run that tried to make one would throw.
+        _temp = Path.Combine(_folder.WriteFile("not-a-folder"), "tmp");
+
         (await EvaluateAsync([])).ShouldBeEmpty();
 
         _runner.Requests.ShouldBeEmpty();
-        Directory.EnumerateFileSystemEntries(_temp).ShouldBeEmpty();
     }
 
     [Fact]

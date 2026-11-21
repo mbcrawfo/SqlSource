@@ -3,7 +3,8 @@ namespace SqlSource.Tests.SettingsFiles;
 internal static class SettingsFileExamples
 {
     /// <summary>
-    /// The example under "The settings file" in docs/superpowers/specs/2026-10-25-settings-files-design.md.
+    /// A settings file with a schema, <c>root</c>, a dialect, generator parameters, type overrides and column types,
+    /// and with comments and trailing commas.
     /// </summary>
     public const string Design = /*lang=json*/
         """
