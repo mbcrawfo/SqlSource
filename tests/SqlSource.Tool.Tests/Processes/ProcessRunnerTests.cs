@@ -22,10 +22,11 @@ public sealed class ProcessRunnerTests
     private static ProcessRequest Request(string program, params string[] arguments) =>
         Programs.Request(program, arguments);
 
-    // Waits for half a minute.
+    // Waits for longer than Eventually's patience, so that on a loaded machine its own timer cannot end a run that a
+    // test is about to cancel.
     private static ProcessRequest Wait()
     {
-        var (program, arguments) = Programs.Waiter(30);
+        var (program, arguments) = Programs.Waiter((int)Eventually.Patience.TotalSeconds + 30);
         return Request(program, arguments);
     }
 
@@ -182,13 +183,11 @@ public sealed class ProcessRunnerTests
     // deletes next, the folder that MSBuild writes its manifest to, is then no longer held by it.  The kill here
     // is done only when the test lets it, after the runner asked for it, so it is late on every system.  The run may
     // wait as long as the test does, so a loaded machine cannot end its wait first.  The kill is held for a moment
-    // that only a run that does not wait can use: load can make this miss such a run, never fail one that waits.  The
-    // program outlasts that patience too, so that its own timer cannot end the run first.
+    // that only a run that does not wait can use: load can make this miss such a run, never fail one that waits.
     [Fact]
     public async Task Run_Cancelled_EndsOnlyWhenTheProgramHas()
     {
-        var (waiter, arguments) = Programs.Waiter((int)Eventually.Patience.TotalSeconds + 30);
-        var wait = Request(waiter, arguments);
+        var wait = Wait();
         Programs.SkipUnlessOnPath(wait.Program);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var asked = new TaskCompletionSource<Process>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -229,6 +228,10 @@ public sealed class ProcessRunnerTests
         _ = await Should.ThrowAsync<OperationCanceledException>(run);
         program.HasExited.ShouldBeTrue();
     }
+
+    // The test above gives its own wait, so this holds the one that a real run uses.
+    [Fact]
+    public void WaitAfterKill_OfARealRun_IsFiveSeconds() => Runner.WaitAfterKill.ShouldBe(TimeSpan.FromSeconds(5));
 
     // A kill of the whole tree can fail, as when a process of it belongs to another user.  The run was cancelled
     // all the same, and that is what its caller is told: anything else would be reported as SQLSRC200.
