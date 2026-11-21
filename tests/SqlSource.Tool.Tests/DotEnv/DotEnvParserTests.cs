@@ -40,6 +40,11 @@ public sealed class DotEnvParserTests
                 ["SQLSOURCE_CONNECTION_A", "Password=a# b"]
             },
             {
+                "unquoted value ends at a # with white space before it and none after it",
+                "SQLSOURCE_CONNECTION_A=Password=a #b",
+                ["SQLSOURCE_CONNECTION_A", "Password=a"]
+            },
+            {
                 "unquoted value is trimmed",
                 "SQLSOURCE_CONNECTION_A=  Host=x \t ",
                 ["SQLSOURCE_CONNECTION_A", "Host=x"]
