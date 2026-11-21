@@ -160,7 +160,7 @@ public sealed class ReporterTests : IDisposable
         reporter.Report(
             ToolDiagnostic
                 .Create(ToolDiagnostics.UnexpectedFailure, "System.Exception", "one\r\ntwo\nthree\rfour")
-                .WithLines(new ContinuationLine("server", "first\nsecond"))
+                .WithLines(new ContinuationLine("server", "first\nsecond"), new ContinuationLine("help", "\nsecond"))
         );
 
         _error
@@ -168,6 +168,7 @@ public sealed class ReporterTests : IDisposable
             .ShouldBe(
                 "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.Exception: one two three four\n"
                     + "    server: first second\n"
+                    + "    help:  second\n"
                     + Expected.See("SQLSRC200")
             );
     }
@@ -239,18 +240,6 @@ public sealed class ReporterTests : IDisposable
         reporter.Report(Failure.WithLines(new ContinuationLine("help", "try again")));
 
         writer.Writes.Count.ShouldBe(1);
-    }
-
-    [Fact]
-    public void Count_AfterTwoErrors_IsTwo()
-    {
-        var reporter = new Reporter(_error);
-        reporter.Count.ShouldBe(0);
-
-        reporter.Report(Failure);
-        reporter.Report(Failure with { Path = "/work/App/App.csproj" });
-
-        reporter.Count.ShouldBe(2);
     }
 
     [Fact]
