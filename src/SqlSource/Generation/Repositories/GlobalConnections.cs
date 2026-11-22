@@ -66,7 +66,7 @@ internal static class GlobalConnections
                 IParameterSymbol parameter => IsRepositoryParameter(parameter, token) ? null : parameter.Name,
                 null => null,
                 _ when IsOwnMember(symbol) || IsInheritedByARepository(symbol, repositoryTypes) => null,
-                _ => BrokenNameOf(symbol, mark.Location),
+                _ => BrokenNameOf(symbol, compilation, mark.Location),
             };
             if (name is not null && symbol?.ContainingType is { } type)
             {
@@ -88,8 +88,9 @@ internal static class GlobalConnections
     /// Every valid global of the project that the repository can reach, in the order of the marks, each with its
     /// <see cref="ConnectionCandidate.GlobalTypeText" />, except the statics of types marked
     /// <c>[SqlSourceGenerate]</c> and of the repository's own base types.  A static of a base type is the repository's
-    /// own member, which its own candidates read, or skip when a more derived member has its name, so it is never the
-    /// repository's global; it is still a global of every other repository that can reach it.
+    /// own member, which its own candidates read, or skip when <see cref="MemberHiding" /> says a more derived member
+    /// hides it, so it is never the repository's global; it is still a global of every other repository that can reach
+    /// it.
     /// </summary>
     /// <param name="marks">The project's marks, from <see cref="GlobalMarkReader" />.</param>
     /// <param name="repository">The repository.</param>
@@ -120,7 +121,14 @@ internal static class GlobalConnections
                 continue;
             }
 
-            var read = ConnectionCandidateReader.ReadMarkedMember(member, isInherited: false, mark.Location);
+            var read = ConnectionCandidateReader.ReadMarkedMember(
+                member,
+                compilation,
+                repository,
+                throughType: null,
+                isInherited: false,
+                mark.Location
+            );
             if (GlobalOf(member, read) is { } candidate)
             {
                 candidates.Add(candidate);
@@ -144,9 +152,16 @@ internal static class GlobalConnections
             };
 
     // The name a message gives a broken member, the property's for an accessor, or null when it is a valid global.
-    private static string? BrokenNameOf(ISymbol member, LocationInfo fallback)
+    private static string? BrokenNameOf(ISymbol member, Compilation compilation, LocationInfo fallback)
     {
-        var read = ConnectionCandidateReader.ReadMarkedMember(member, isInherited: false, fallback);
+        var read = ConnectionCandidateReader.ReadMarkedMember(
+            member,
+            compilation,
+            member.ContainingType,
+            throughType: null,
+            isInherited: false,
+            fallback
+        );
         if (GlobalOf(member, read) is not null)
         {
             return null;
