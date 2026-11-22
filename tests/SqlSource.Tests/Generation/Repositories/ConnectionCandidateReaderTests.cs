@@ -306,6 +306,197 @@ public sealed class ConnectionCandidateReaderTests
         shape.Candidates.ShouldBeEmpty();
     }
 
+    // A call with no argument cannot bind to an overload that needs one, so the base's method is still the one called.
+    [Fact]
+    public void Read_BaseMethodBesideARequiredOverload_IsACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    protected NpgsqlConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    private int Open(int retries) => retries;
+                }
+            }
+            """
+        );
+
+        var candidate = shape.Candidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.IsInherited.ShouldBeTrue();
+    }
+
+    // A member that the repository cannot reach is not the one its call binds to.
+    [Fact]
+    public void Read_PrivateMemberOfABaseTypeBetween_HidesNothing()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public abstract class LowestBase
+                {
+                    [SqlSourceConnection]
+                    protected NpgsqlConnection Open() => null!;
+                }
+
+                public abstract class MiddleBase : LowestBase
+                {
+                    private new NpgsqlConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : MiddleBase;
+            }
+            """
+        );
+
+        var candidate = shape.Candidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.IsMarked.ShouldBeTrue();
+    }
+
+    // C# binds a read to the property it can reach and only then fails on its getter, so the base's is out of reach.
+    [Fact]
+    public void Read_PropertyWithAnUnreachableGetter_HidesTheBases()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public abstract class LowestBase
+                {
+                    protected string ConnectionString { get; } = "";
+                }
+
+                public abstract class MiddleBase : LowestBase
+                {
+                    public new string ConnectionString { private get; set; } = "";
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : MiddleBase;
+            }
+            """
+        );
+
+        shape.Candidates.ShouldBeEmpty();
+    }
+
+    // A destructor cannot be called by its name, but the repository's own still hides the base's.
+    [Fact]
+    public void Read_MarkedBaseDestructorBesideTheRepositorysOwn_IsNotACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    ~RepositoryBase() { }
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    ~UserRepository() { }
+                }
+            }
+            """
+        );
+
+        shape.Candidates.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Read_MarkedAccessorOfAHiddenProperty_IsNotACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    protected string Source { [SqlSourceConnection] get; } = "";
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    private new int Source { set { } }
+                }
+            }
+            """
+        );
+
+        shape.Candidates.ShouldBeEmpty();
+    }
+
+    // A property's accessor cannot be called by its name, so it hides no method that has that name.
+    [Fact]
+    public void Read_BaseMethodNamedForADerivedAccessor_IsACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    protected NpgsqlConnection get_Source() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    private int Source => 0;
+                }
+            }
+            """
+        );
+
+        shape.Candidates.ShouldHaveSingleItem().Name.ShouldBe("get_Source");
+    }
+
+    // An indexer hides an indexer of its signature alone.
+    [Theory]
+    [InlineData("string", 1)]
+    [InlineData("int", 0)]
+    public void Read_MarkedBaseIndexer_IsHiddenOnlyByItsSignature(string keyType, int candidates)
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    protected string this[int key] => "";
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    private new string this[{{keyType}} key] => "";
+                }
+            }
+            """
+        );
+
+        shape
+            .Candidates.Select(static candidate => candidate.Type)
+            .ShouldBe(Enumerable.Repeat(CandidateType.Unsupported, candidates));
+    }
+
     [Fact]
     public void Read_OverrideOfAMarkedBaseMethod_IsMarkedWithTheBasesDatabase()
     {

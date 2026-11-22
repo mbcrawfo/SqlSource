@@ -102,8 +102,8 @@ internal static class ConnectionCandidateReader
 
     /// <summary>
     /// The members of the type and of its base types, the type's own first, with whether each is a base type's: the
-    /// type's own all, and a base type's only when the type can reach it and no member of a more derived type has its
-    /// name, since such a member overrides or hides it.  Hiding by name alone is TD-0118.
+    /// type's own all, and a base type's only when the type can reach it and <see cref="MemberHiding" /> says that no
+    /// member of a more derived type overrides or hides it.
     /// </summary>
     /// <param name="type">The repository.</param>
     /// <param name="compilation">The compilation, which says which members of a base type the type can reach.</param>
@@ -112,20 +112,23 @@ internal static class ConnectionCandidateReader
         Compilation compilation
     )
     {
-        var derivedNames = new HashSet<string>(StringComparer.Ordinal);
-        for (var current = type; current is not null; current = current.BaseType)
+        var lookedIn = MemberHiding.BaseTypesOf(type);
+        foreach (var current in lookedIn)
         {
             var isInherited = !SymbolEqualityComparer.Default.Equals(current, type);
-            var currentMembers = current.GetMembers();
-            foreach (var member in currentMembers)
+            foreach (var member in current.GetMembers())
             {
-                if (!derivedNames.Contains(member.Name) && (!isInherited || IsReachable(member, type, compilation)))
+                if (
+                    !isInherited
+                    || (
+                        IsReachable(member, type, compilation)
+                        && !MemberHiding.IsHidden(member, current, lookedIn, type, compilation, throughType: null)
+                    )
+                )
                 {
                     yield return (member, isInherited);
                 }
             }
-
-            derivedNames.UnionWith(currentMembers.Select(static member => member.Name));
         }
     }
 
@@ -553,7 +556,7 @@ internal static class ConnectionCandidateReader
         };
 
     // The property or event that an accessor or a backing field belongs to.
-    private static ISymbol? OwnerOf(ISymbol member) =>
+    internal static ISymbol? OwnerOf(ISymbol member) =>
         member switch
         {
             IFieldSymbol field => field.AssociatedSymbol,

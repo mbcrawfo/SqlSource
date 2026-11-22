@@ -542,6 +542,97 @@ public sealed class HeldFactoryReaderTests
     }
 
     [Fact]
+    public void Read_BaseHolderBehindAPrivateMember_IsAHolder()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public abstract class LowestBase
+                {
+                    protected IDatabaseFactory Connections = null!;
+                }
+
+                public abstract class MiddleBase : LowestBase
+                {
+                    private new int Connections => 0;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : MiddleBase;
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldHaveSingleItem().Holder.ShouldNotBeNull().Name.ShouldBe("Connections");
+    }
+
+    // A read of the name binds to the method, so the base's field is out of reach.
+    [Fact]
+    public void Read_BaseHolderHiddenByAMethod_IsNotAHolder()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public abstract class RepositoryBase
+                {
+                    protected IDatabaseFactory Connections = null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    private int Connections() => 0;
+                }
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
+    // C# binds a read to the property it can reach and only then fails on its getter, so the base's is out of reach.
+    [Fact]
+    public void Read_FactoryPropertyWithAnUnreachableGetter_HidesTheBases()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public class FactoryBase
+                {
+                    [SqlSourceConnection]
+                    public DbConnection Connection => null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public new DbConnection Connection { private get; set; } = null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Read_NullableStructHolder_ReadsItsValuesType()
     {
         var shape = RepositoryShapes.Of(

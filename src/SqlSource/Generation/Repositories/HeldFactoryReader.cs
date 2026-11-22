@@ -156,7 +156,7 @@ internal static class HeldFactoryReader
                         IsExplicitImplementation(member)
                         || (
                             ConnectionCandidateReader.IsReachable(member, type, compilation, factory)
-                            && !IsHidden(member, current, lookedIn, type, compilation, factory)
+                            && !MemberHiding.IsHidden(member, current, lookedIn, type, compilation, factory)
                         )
                     )
                     && ConnectionCandidateReader.ReadMarkedMember(member, isInherited, holder.Location, implementer)
@@ -243,7 +243,7 @@ internal static class HeldFactoryReader
     )
     {
         var called = LastOverrideOf(implementation, lookedIn);
-        return IsHidden(called, called.ContainingType, lookedIn, type, compilation, factory);
+        return MemberHiding.IsHidden(called, called.ContainingType, lookedIn, type, compilation, factory);
     }
 
     // The override of the implementation in the first of the types that declares one, each derived type before its
@@ -304,111 +304,15 @@ internal static class HeldFactoryReader
         var types = new List<INamedTypeSymbol>();
         foreach (var factoryType in factoryTypes)
         {
-            var own =
+            IEnumerable<INamedTypeSymbol> own =
                 factoryType.TypeKind == TypeKind.Interface
                     ? factoryType.AllInterfaces.Insert(0, factoryType)
-                    : BaseTypesOf(factoryType);
+                    : MemberHiding.BaseTypesOf(factoryType);
             types.AddRange(own.Where(seen.Add));
         }
 
         return types;
     }
-
-    private static ImmutableArray<INamedTypeSymbol> BaseTypesOf(INamedTypeSymbol type)
-    {
-        var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
-        for (var current = type; current is not null; current = current.BaseType)
-        {
-            types.Add(current);
-        }
-
-        return types.ToImmutable();
-    }
-
-    // Whether a member that the type can reach, of a type that derives from the member's, hides the member as C# hides
-    // it: a method hides a method of its signature and every member of its name that is not a method, and any other
-    // member every member of its name.  Two interfaces that neither derives from the other hide nothing of each other,
-    // so a call that both answer is ambiguous, and both are candidates.  Only the members of the name are looked at.
-    private static bool IsHidden(
-        ISymbol member,
-        INamedTypeSymbol declaring,
-        List<INamedTypeSymbol> lookedIn,
-        INamedTypeSymbol type,
-        Compilation compilation,
-        ITypeSymbol factory
-    )
-    {
-        foreach (var derived in lookedIn)
-        {
-            if (!DerivesFrom(derived, declaring))
-            {
-                continue;
-            }
-
-            foreach (var hiding in derived.GetMembers(member.Name))
-            {
-                if (
-                    (
-                        hiding is not IMethodSymbol hidingMethod
-                        || member is not IMethodSymbol method
-                        || HaveOneSignature(hidingMethod, method)
-                    ) && ConnectionCandidateReader.IsReachable(hiding, type, compilation, factory)
-                )
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    // Whether the type is a class that derives from the other, or an interface that extends it, and is not it.
-    private static bool DerivesFrom(INamedTypeSymbol type, INamedTypeSymbol other)
-    {
-        for (var current = type.BaseType; current is not null; current = current.BaseType)
-        {
-            if (SymbolEqualityComparer.Default.Equals(current, other))
-            {
-                return true;
-            }
-        }
-
-        return other.TypeKind == TypeKind.Interface
-            && type.AllInterfaces.Contains(other, SymbolEqualityComparer.Default);
-    }
-
-    // The arity, and each parameter's type and kind of reference.  The names are equal, since the members were found by
-    // the name.
-    private static bool HaveOneSignature(IMethodSymbol first, IMethodSymbol second) =>
-        first.Arity == second.Arity
-        && first.Parameters.Length == second.Parameters.Length
-        && first
-            .Parameters.Zip(second.Parameters, static (one, other) => (One: one, Other: other))
-            .All(static pair => pair.One.RefKind == pair.Other.RefKind && AreOneType(pair.One.Type, pair.Other.Type));
-
-    // Whether two parameter types are one in a signature: a type parameter of each method is the one of its position,
-    // since each method declares its own; an array or a generic type is one when its parts are, the type it is nested
-    // in among them.
-    private static bool AreOneType(ITypeSymbol first, ITypeSymbol second) =>
-        (first, second) switch
-        {
-            (
-                ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } one,
-                ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } other
-            ) => one.Ordinal == other.Ordinal,
-            (IArrayTypeSymbol one, IArrayTypeSymbol other) => one.Rank == other.Rank
-                && AreOneType(one.ElementType, other.ElementType),
-            (INamedTypeSymbol { IsGenericType: true } one, INamedTypeSymbol { IsGenericType: true } other) =>
-                SymbolEqualityComparer.Default.Equals(one.OriginalDefinition, other.OriginalDefinition)
-                    && one.TypeArguments.Zip(other.TypeArguments, AreOneType).All(static same => same)
-                    && AreOneContainer(one.ContainingType, other.ContainingType),
-            _ => SymbolEqualityComparer.Default.Equals(first, second),
-        };
-
-    // Whether two types are nested in one type, or neither in any.
-    private static bool AreOneContainer(INamedTypeSymbol? first, INamedTypeSymbol? second) =>
-        first is null || second is null ? first is null && second is null : AreOneType(first, second);
 
     // Whether the member is an interface's that the factory's class or struct implements with a member of its own, as a
     // type parameter's class constraint can: a class member hides an interface member there.  A default member that
