@@ -64,6 +64,25 @@ public sealed class ScanColumnTests(PostgresDatabases postgres)
                     + "GROUP BY t.label) SELECT c.n FROM c",
                 "n"
             },
+            // A WITH query read twice keeps its unread column as MATERIALIZED does, and that column proves itself.
+            {
+                $"WITH c AS (SELECT t.label, count(*) AS n, sum(t.id) AS total FROM {T} t GROUP BY t.label) "
+                    + "SELECT c1.n FROM c c1 JOIN c c2 ON c1.label = c2.label",
+                "n"
+            },
+            // An expression of no type the walk reads, and an ORDER BY's expression outside the select list.
+            {
+                $"SELECT s.n, s.l FROM (SELECT initcap(t.label) AS l, t.id, count(*) AS n FROM {T} t GROUP BY 1, 2 "
+                    + "OFFSET 0) s WHERE s.id > 0",
+                "??"
+            },
+            {
+                $"SELECT s.n FROM (SELECT t.id, count(*) AS n FROM {T} t GROUP BY t.id ORDER BY max(t.n) OFFSET 0) s "
+                    + "WHERE s.id > 0",
+                "?"
+            },
+            // The word NEW, here an alias, may name the new row, so no scan is read.
+            { $"SELECT s.c AS new FROM (SELECT t.id, count(*) AS c FROM {T} t GROUP BY t.id OFFSET 0) s", "?" },
             // A cast the plan does not print: an inlined function's result is text, whatever its entry's type.
             { "SELECT f.t, f.c FROM scan_columns.as_text() f", "??" },
             { "SELECT f.t FROM scan_columns.union_as_text() f", "?" },
@@ -86,6 +105,18 @@ public sealed class ScanColumnTests(PostgresDatabases postgres)
                 $"SELECT s.m, s.c FROM (SELECT max(t.id) AS m, count(*) AS c FROM {T} t WHERE t.id < 0 OFFSET 0) s "
                     + "WHERE s.c >= 0",
                 "??"
+            },
+            // A grouping set puts NULL in a key of its total row, so a plan with one proves nothing.
+            {
+                $"SELECT s.k2 FROM (SELECT t.id + 1 AS k2, count(*) AS c FROM {T} t GROUP BY ROLLUP (t.id) OFFSET 0) s "
+                    + "WHERE s.c > 0",
+                "?"
+            },
+            // Two columns of one table through one scan, the first kept and the second on the side a join extends.
+            {
+                $"SELECT s.a, s.b FROM (SELECT x.id AS a, y.label AS b FROM {T} x LEFT JOIN {T} y ON y.id = x.n "
+                    + "OFFSET 0) s WHERE s.a > 0",
+                "n?"
             },
             // A recursive CTE, and a user's cast over a set operation.
             {

@@ -479,6 +479,30 @@ public sealed class RunLogRedactionTests : IDisposable
         logged.GetProperty("table").GetProperty("table").GetString().ShouldBe("***");
     }
 
+    [Fact]
+    public async Task Run_PostgresDescriberThatLogsACastsErrorWithItsConnection_HasTheMarkInTheError()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            PostgresEvents.Casts(
+                log,
+                "GetUser",
+                new PostgresCastsRequest([25], [20]),
+                new PostgresCastsAnswer(null, new PostgresServerError("42501", value, value, value, null)),
+                0
+            );
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var error = LogReader.Events(Log, "postgres.casts").ShouldHaveSingleItem().GetProperty("error");
+        error.GetProperty("message").GetString().ShouldBe("***");
+        error.GetProperty("detail").GetString().ShouldBe("***");
+        error.GetProperty("hint").GetString().ShouldBe("***");
+    }
+
     // SqlClient's events reach the log through the describer's log too, so a command's text that held the value would
     // be written with the mark: the listener forwards one as SqlClient writes it.
     [Fact]
