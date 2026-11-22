@@ -25,8 +25,8 @@ namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 /// computed it under its own grouping.
 /// </param>
 /// <param name="GroupsHaveRows">
-/// Whether the node that computes the entry is an <c>Aggregate</c> each of whose groups has a row: one with a
-/// <c>Group Key</c> and no <c>Grouping Sets</c>.
+/// Whether the node that computes the entry is an <c>Aggregate</c> each of whose groups has a row: one with no
+/// <c>Grouping Sets</c> that has a <c>Group Key</c> or the <c>Sorted</c> strategy.
 /// </param>
 /// <param name="ScalarSubPlanTypeOf">
 /// The type of the value of the <c>SubPlan</c> of a name, <c>SubPlan 1</c>, when its plan always returns one row whose

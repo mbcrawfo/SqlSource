@@ -19,7 +19,7 @@ public sealed class ExpressionColumnTests(PostgresDatabases postgres)
     public static TheoryData<string, string> Queries =>
         new()
         {
-            // A GROUP BY the WHERE fixes: PostgreSQL 18 prints no key, and returns no row for no input.
+            // A GROUP BY the WHERE fixes: PostgreSQL 16 and later print no key, and return no row for no input.
             { $"SELECT t.id, max(t.amount) FROM {T} t WHERE t.id = 1 GROUP BY t.id", "nn" },
             { $"SELECT max(t.amount) FROM {T} t WHERE t.id = -5 GROUP BY t.id", "n" },
             { $"SELECT t.big, sum(t.amount) FROM {T} t WHERE t.big = @p GROUP BY t.big", "nn" },

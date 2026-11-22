@@ -54,8 +54,8 @@ public sealed class NullabilityWalkAggregateTests
     public void Run_AggregateOfAGroupedNodeThatMayBeNull_KeepsNoOrigin(string aggregate) =>
         AnswersOf(RunOverOrders(GroupedOverAAndO(sorted: true, aggregate))).ShouldBe([UnknownNoOrigin]);
 
-    // PostgreSQL 18 drops a key the WHERE fixes, and the planner writes Sorted only for a query with a GROUP BY, whose
-    // Aggregate returns no row for an input of none.
+    // PostgreSQL 16 and later drop a key the WHERE fixes, and the planner writes Sorted only for a query with a
+    // GROUP BY, whose Aggregate returns no row for an input of none.
     [Fact]
     public void Run_SortedAggregateWithNoKeyLeft_IsNotNull() =>
         AnswersOf(

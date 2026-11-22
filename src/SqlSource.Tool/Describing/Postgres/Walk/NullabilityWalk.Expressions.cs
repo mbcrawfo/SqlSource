@@ -14,9 +14,9 @@ internal static partial class NullabilityWalk
     // catalog's rule.  For a Full join at or under the node that computes the entry, the reader is told too which side
     // an instance that only that join extends is under (ExpressionContext.ProvedOnFullJoinSides), for a COALESCE over
     // both sides.  A bare name is the plan's one relation's (PlanInstances.BareAlias): a plan of several prints every
-    // name with its alias but
-    // the columns of a relation the planner proved empty, a Result under an outer join, and at a ModifyTable that may
-    // return the old or the new row only the target's alias is a relation.  An entry is read in a plan where no join
+    // name with its alias but the columns of a relation the planner proved empty, a Result under an outer join, and at
+    // a ModifyTable that may return the old or the new row only the target's alias is a relation.  An entry is read in
+    // a plan where no join
     // null-extends a side, or where the walk follows it to the node that computes it and no join null-extends that
     // node: a node prints a value computed under it in one pair of parentheses, at every node up to the root.  An
     // aggregate is read only where the walk follows the entry to the node that computes it.  A subquery's SubPlan is
@@ -328,9 +328,8 @@ internal static partial class NullabilityWalk
         // Where the entry is computed, a value it takes from a child that computed it is in parentheses: one that is
         // not preserved is read as unknown, so that a pulled-up constant of the side a join extends, ('x'::text)
         // inside a CASE the root computes, proves nothing, while a COALESCE with a constant still does.  There an
-        // aggregate is the node's own, over a group that has a row when the node is an Aggregate with a Group Key and
-        // no Grouping Sets, unless it is inside a value a child printed, which the child computed under its own
-        // grouping.
+        // aggregate is the node's own, over a group that has a row where GroupsHaveRows says so, unless it is inside a
+        // value a child printed, which the child computed under its own grouping.
         private List<(string Entry, ExpressionContext Context)>? ComputedAt(
             PlanNode node,
             string entry,
@@ -380,10 +379,11 @@ internal static partial class NullabilityWalk
         }
 
         // Whether each group of the node has a row: an Aggregate with a Group Key makes its groups of the rows that
-        // share a key.  So does a Sorted one with no key left, as PostgreSQL 18 plans a GROUP BY whose every column the
-        // WHERE sets to one value: the planner writes Sorted only for a query with a GROUP BY, and the executor returns
-        // no row for an input of none unless the strategy is Plain.  A Plain one returns a row for an input of none, a
-        // Hashed one with no key is never planned, and Grouping Sets may hold the empty set.
+        // share a key.  So does a Sorted one with no key left, as PostgreSQL 16 and later plan a GROUP BY whose every
+        // column the WHERE sets to one value: the planner writes Sorted only for a query with a GROUP BY, and the
+        // executor returns no row for an input of none unless the strategy is Plain.  A Plain one returns a row for an
+        // input of none, a Hashed one with no key was never seen and is not read, and Grouping Sets may hold the empty
+        // set.
         private static bool GroupsHaveRows(PlanNode node) =>
             node.NodeType == PlanNodeTypes.Aggregate
             && !node.HasGroupingSets
