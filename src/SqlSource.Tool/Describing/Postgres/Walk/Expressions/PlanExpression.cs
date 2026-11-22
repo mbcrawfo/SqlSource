@@ -25,7 +25,7 @@ namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 /// that can be <c>NULL</c>; the null tests <c>IS NULL</c> and <c>IS NOT NULL</c>, of a primary or of a parameter or
 /// an <c>InitPlan</c>'s value; <c>COALESCE</c>, <c>GREATEST</c> and
 /// <c>LEAST</c> with an argument that cannot be <c>NULL</c>, or with a plain reference to each side of the full join
-/// that computes the entry (<see cref="ExpressionContext.ProvedOnFullJoinSide" />), since each row of such a join has
+/// that computes the entry (<see cref="ExpressionContext.ProvedOnFullJoinSides" />), since each row of such a join has
 /// a row of one side at least; and a <c>CASE</c> with an <c>ELSE</c> whose every result cannot be.  A <c>CASE</c>
 /// written without an <c>ELSE</c> prints <c>ELSE NULL::type</c>.  Each of the forms that is not <c>NULL</c> is typed
 /// from its arguments or results that are proved of a known type, as the next paragraph says.
@@ -647,6 +647,9 @@ internal static partial class PlanExpression
                 ? from + 6
                 : null;
         }
+
+        // Whether the span is wholly a value the plan computes elsewhere.
+        private bool IsComputedValue(int from, int to) => Computed(from, to) == to;
 
         // The index after one primary that starts the span, or null: a group, a literal, a number, a name with its
         // dots, or such a name called with a group.

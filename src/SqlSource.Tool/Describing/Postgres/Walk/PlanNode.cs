@@ -134,6 +134,23 @@ internal sealed record PlanNode(
             : null;
 
     /// <summary>
+    /// The root of the one <c>InitPlan</c> of the tree that returns the parameter, as PostgreSQL before 17 names one,
+    /// <c>InitPlan 2 (returns $1)</c>, or null.  One that returns several is named for them all, and is none.
+    /// </summary>
+    /// <param name="parameter">The parameter as the plan prints it, <c>$1</c>.</param>
+    public PlanNode? OnlyInitPlanReturning(string parameter) =>
+        SelfAndDescendants()
+            .Where(node =>
+                node.ParentRelationship == PlanRelationships.InitPlan
+                && node.SubplanName?.EndsWith($" (returns {parameter})", StringComparison.Ordinal) == true
+            )
+            .Take(2)
+            .ToArray()
+            is [var only]
+            ? only
+            : null;
+
+    /// <summary>
     /// The root of a plan's text, or null: the text is an array of one object whose <c>Plan</c> is the root, and
     /// anything else is a plan that cannot be used.  A key the walk does not read is ignored.
     /// </summary>

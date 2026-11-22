@@ -276,7 +276,9 @@ internal sealed partial class PostgresSession : DescriberSession
                     PostgresSearchPath.PutsCatalogFirst(SettingOf("search_path")),
                     tables.Value,
                     ColumnTypes: [.. columns.Select(static column => column.TypeOid)],
-                    DistrustsJoinReduction: gated && request.Parameters.Any(static parameter => parameter.HasNegatedUse)
+                    DistrustsJoinReduction: gated
+                        && request.Parameters.Any(static parameter => parameter.HasNegatedUse),
+                    ParameterCount: parameterOids.Count
                 ),
                 cancellationToken
             );

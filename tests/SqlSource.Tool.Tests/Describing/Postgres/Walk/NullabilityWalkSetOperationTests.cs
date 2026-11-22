@@ -108,6 +108,21 @@ public sealed class NullabilityWalkSetOperationTests
         AnswersOf(outcome).ShouldBe([NotNullSetOperation, NotNullSetOperation]);
     }
 
+    // A branch that is an expression counts by the type the walk proves it of, which carries to the column's.
+    [Fact]
+    public void Run_UnionAllOfExpressionsOfTheFamily_IsFalseFromTheBranches() =>
+        AnswersOf(RunSet(AppendOf(Scan("u", "(u.id + 1)"), Scan("o", "(o.user_id + 1)")), Int8Oid))
+            .ShouldBe([NotNullSetOperation]);
+
+    // A branch's expression over a nullable column proves nothing, nor does one whose type cannot carry to the
+    // column's, nor one proved of no known type.
+    [Theory]
+    [InlineData("(o.ref + 1)", Int4Oid)]
+    [InlineData("(o.user_id + 1)", TextOid)]
+    [InlineData("COALESCE(o.dom_free, o.label)", TextOid)]
+    public void Run_UnionAllOfAnExpressionThatProvesNothing_KeepsNoOrigin(string branch, long type) =>
+        AnswersOf(RunSet(AppendOf(Scan("u", "(u.id + 1)"), Scan("o", branch)), type)).ShouldBe([UnknownNoOrigin]);
+
     // An Append that partition pruning removed a member of shows not every partition, and another execution may read
     // the removed one's rows.
     [Fact]

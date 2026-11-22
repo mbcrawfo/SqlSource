@@ -54,12 +54,27 @@ public sealed class NullabilityWalkAggregateTests
     public void Run_AggregateOfAGroupedNodeThatMayBeNull_KeepsNoOrigin(string aggregate) =>
         AnswersOf(RunOverOrders(GroupedOverAAndO(sorted: true, aggregate))).ShouldBe([UnknownNoOrigin]);
 
-    // An Aggregate with no Group Key returns a row for an input of none, and a node that is no Aggregate computes no
-    // aggregate.
+    // PostgreSQL 18 drops a key the WHERE fixes, and the planner writes Sorted only for a query with a GROUP BY, whose
+    // Aggregate returns no row for an input of none.
+    [Fact]
+    public void Run_SortedAggregateWithNoKeyLeft_IsNotNull() =>
+        AnswersOf(
+                RunOverOrders(
+                    Over("Sort", Aggregate("Sorted", false, JoinOfAAndO("Inner"), "max(o.placed_at)")) with
+                    {
+                        Output = ["(max(o.placed_at))"],
+                    }
+                )
+            )
+            .ShouldBe([NotNullExpression]);
+
+    // A Plain Aggregate returns a row for an input of none, a Hashed one with no key was never seen, and a node that is
+    // no Aggregate computes no aggregate.
     [Theory]
     [InlineData("Aggregate", "Plain", false)]
-    [InlineData("Aggregate", "Sorted", false)]
+    [InlineData("Aggregate", "Hashed", false)]
     [InlineData("Group", "Sorted", true)]
+    [InlineData("Group", "Sorted", false)]
     [InlineData("WindowAgg", null, true)]
     public void Run_AggregateOfAPlainNode_KeepsNoOrigin(string nodeType, string? strategy, bool groupKey)
     {

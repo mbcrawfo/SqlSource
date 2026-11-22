@@ -243,6 +243,26 @@ internal sealed class PlanInstances
     public bool IsUnder(string alias, PlanNode node) =>
         _nodesOfInstances.TryGetValue(alias, out var named) && Reaches(node, named);
 
+    /// <summary>
+    /// Whether a join from the node down to the node that names the instance of the alias null-extends the side the
+    /// instance is on; true when the alias names no instance under the node.
+    /// </summary>
+    public bool ExtendsBetween(PlanNode node, string alias) =>
+        !_nodesOfInstances.TryGetValue(alias, out var named) || !Reaches(node, named) || ExtendsOnPath(node, named);
+
+    private bool ExtendsOnPath(PlanNode node, PlanNode sought)
+    {
+        if (ReferenceEquals(node, sought))
+        {
+            return false;
+        }
+
+        var child = node.JoinChildren.First(candidate => Reaches(candidate, sought));
+        var side = child.ParentRelationship == PlanRelationships.Inner ? NullExtension.Inner : NullExtension.Outer;
+        var extends = ExtendsOf(node);
+        return extends is null || extends == NullExtension.Both || extends == side || ExtendsOnPath(child, sought);
+    }
+
     // Whether the node is the one sought, by reference, or one of its Outer and Inner children reaches it.
     private static bool Reaches(PlanNode node, PlanNode sought) =>
         ReferenceEquals(node, sought) || node.JoinChildren.Any(child => Reaches(child, sought));

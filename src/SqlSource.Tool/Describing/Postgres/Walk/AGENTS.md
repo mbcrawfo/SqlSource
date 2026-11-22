@@ -21,6 +21,7 @@ How the walk reads a plan is [the plan walk](../../../../../docs/architecture/po
 - **A column of no origin is answered from its entry of the root's `Output` as an expression, or not at all** ([expressions](../../../../../docs/architecture/postgres-nullability.md#expressions)).  An entry is read as a whole, never as a prefix, and only in a plan with no set operation.
 - **A form is pinned in `tests/DatabaseTests/Postgres/Describer/PlanOutputTests.cs`, as 14 and 18 print it, before it is read.**
 - **Where a join null-extends, an entry is read only at the node that computes it and only when that node is preserved.**  An aggregate is read only at the grouped `Aggregate` that computes it, never inside a value a child printed.
+- **Before 17 a `$k` from 1 to `WalkScope.ParameterCount` is the statement's parameter and never an `InitPlan`'s value**, which prints the same ([expressions](../../../../../docs/architecture/postgres-nullability.md#expressions)).
 - **An operator, a function or an aggregate other than `count(*)` and the rankings is read only by an exact signature of `TotalFunctions` or by a name of `CatalogOverloads`**, a cast only within a family of `SetOperationTypes`.  Any of them, a ranking and a literal's type name are read only when the session finds `pg_catalog` first (`PostgresSearchPath`).  What a row of either table needs is in the table's remarks.
 
 ## Set operations

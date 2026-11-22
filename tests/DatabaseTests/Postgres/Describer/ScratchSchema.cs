@@ -231,8 +231,9 @@ internal static class ScratchSchema
 
     /// <summary>
     /// The schema <c>scan_columns</c>: a table <c>t</c> whose first row holds <c>NULL</c> in every column that may, a
-    /// domain, and two SQL functions the planner inlines, whose result reaches its declared <c>text</c> by an
-    /// assignment cast the plan does not print.  The text makes the schema again.
+    /// partitioned table <c>p</c> of the same kind, a domain, and two SQL functions the planner inlines, whose result
+    /// reaches its declared <c>text</c> by an assignment cast the plan does not print.  The text makes the schema
+    /// again.
     /// </summary>
     public const string ScanColumns = """
         DROP SCHEMA IF EXISTS scan_columns CASCADE;
@@ -252,6 +253,10 @@ internal static class ScratchSchema
         INSERT INTO scan_columns.t VALUES
             (1, NULL, 'a', NULL, NULL, '2026-01-01', 1, NULL, 10),
             (2, 1, 'b', 'x', '2026-01-02', '2026-01-02', 2, 'm', 20);
+        CREATE TABLE scan_columns.p (id integer NOT NULL, n integer) PARTITION BY RANGE (id);
+        CREATE TABLE scan_columns.p_low PARTITION OF scan_columns.p FOR VALUES FROM (0) TO (100);
+        CREATE TABLE scan_columns.p_high PARTITION OF scan_columns.p FOR VALUES FROM (100) TO (200);
+        INSERT INTO scan_columns.p VALUES (1, NULL), (150, 1);
         CREATE FUNCTION scan_columns.as_text() RETURNS TABLE (t text, c bigint) LANGUAGE sql STABLE AS
             'SELECT s.n, count(*) FROM scan_columns.t s GROUP BY s.n OFFSET 0';
         CREATE FUNCTION scan_columns.union_as_text() RETURNS TABLE (t text, i bigint) LANGUAGE sql STABLE AS

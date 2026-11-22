@@ -1,8 +1,4 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Npgsql;
-using Shouldly;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.Describer;
@@ -127,7 +123,7 @@ public sealed class ScanColumnTests(PostgresDatabases postgres)
             {
                 $"SELECT s.a::bigint, s.b FROM (SELECT t.note AS a, t.id::bigint AS b FROM {T} t "
                     + $"UNION ALL SELECT t2.label, t2.id::bigint FROM {T} t2) s WHERE s.b < 0",
-                "??"
+                "?n"
             },
             {
                 $"SELECT DISTINCT s.a::bigint FROM (SELECT t.note AS a FROM {T} t "
@@ -171,40 +167,6 @@ public sealed class ScanColumnTests(PostgresDatabases postgres)
         }
     }
 
-    private async Task ShouldAnswerAsync(string sql, string expected)
-    {
-        var description = await Sessions.ShouldDescribeAsync(postgres.ConnectionString, sql);
-        var columns = description.Columns.ShouldNotBeNull();
-        string.Concat(columns.Select(static column => column.Nullable == false ? 'n' : '?')).ShouldBe(expected, sql);
-
-        var nulls = await ColumnsWithANullAsync(sql);
-        for (var index = 0; index < columns.Count; index++)
-        {
-            if (columns[index].Nullable == false)
-            {
-                nulls.ShouldNotContain(index, sql);
-            }
-        }
-    }
-
-    private async Task<HashSet<int>> ColumnsWithANullAsync(string sql)
-    {
-        var token = TestContext.Current.CancellationToken;
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        await using var reader = await command.ExecuteReaderAsync(token);
-        var nulls = new HashSet<int>();
-        while (await reader.ReadAsync(token))
-        {
-            for (var index = 0; index < reader.FieldCount; index++)
-            {
-                if (await reader.IsDBNullAsync(index, token))
-                {
-                    _ = nulls.Add(index);
-                }
-            }
-        }
-
-        return nulls;
-    }
+    private Task ShouldAnswerAsync(string sql, string expected) =>
+        ProvedColumns.ShouldAnswerAsync(postgres, sql, expected);
 }

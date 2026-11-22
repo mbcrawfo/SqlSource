@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using SqlSource.Tool.Describing.Postgres.Columns;
 using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
@@ -10,9 +11,10 @@ internal static partial class NullabilityWalk
 {
     // The entries of a plan read as expressions, with a reference inside one answered as the walk answers a column:
     // through an instance that no join extends, to a column of a relation that "tables" or "relations" answered, by the
-    // catalog's rule.  At a Full join that computes the entry, the reader is told too which side an instance that only
-    // that join extends is under (ExpressionContext.ProvedOnFullJoinSide), for a COALESCE over both sides.  A bare name
-    // is the plan's one relation's (PlanInstances.BareAlias): a plan of several prints every name with its alias but
+    // catalog's rule.  For a Full join at or under the node that computes the entry, the reader is told too which side
+    // an instance that only that join extends is under (ExpressionContext.ProvedOnFullJoinSides), for a COALESCE over
+    // both sides.  A bare name is the plan's one relation's (PlanInstances.BareAlias): a plan of several prints every
+    // name with its alias but
     // the columns of a relation the planner proved empty, a Result under an outer join, and at a ModifyTable that may
     // return the old or the new row only the target's alias is a relation.  An entry is read in a plan where no join
     // null-extends a side, or where the walk follows it to the node that computes it and no join null-extends that
@@ -31,7 +33,8 @@ internal static partial class NullabilityWalk
 
         private readonly WalkScope _scope = plans.Scope;
 
-        // The plan of each SubPlan this plan's entries named, by its name, read once; null for one that is not read.
+        // The plan of each SubPlan or InitPlan this plan's entries named, by its name, read once; null for one that is
+        // not read.
         private readonly Dictionary<string, Expressions?> _subPlans = [with(StringComparer.Ordinal)];
 
         private readonly bool _nothingExtends = instances.Nodes.All(static visited =>
@@ -146,7 +149,7 @@ internal static partial class NullabilityWalk
         // The type of an entry of the root's Output when the walk proves it is not NULL, read as NullableOf reads it:
         // a reference's declared type, or the type of an expression the reader proves.  A subquery's value is none
         // here, since no column's type is known.
-        private long? ValueTypeOf(string entry)
+        public long? ValueTypeOf(string entry)
         {
             if (OutputReference.Parse(entry) is { } reference)
             {
@@ -166,7 +169,8 @@ internal static partial class NullabilityWalk
                 ProvedTypeOf,
                 ScalarSubPlanTypeOf: name => IsWhole(entry, name) ? ScalarSubPlanTypeOf(name, columnType) : null,
                 SubPlanColumnTypeOf: SubPlanColumnTypeOf,
-                CatalogAlone: _scope.CatalogAlone
+                CatalogAlone: _scope.CatalogAlone,
+                InitPlanTypeOf: value => IsWhole(entry, value) ? OneRowValueTypeOf(InitPlanOf(value), columnType) : null
             );
 
         // Whether the entry is the subplan's value and nothing else, once the parentheses that wrap it whole are off.
@@ -186,11 +190,16 @@ internal static partial class NullabilityWalk
         // Group Key, no Grouping Sets and no Filter returns one row whatever its input.  The type is what tells the
         // subquery from the other subplans before PostgreSQL 17, which prints each as (SubPlan n): an EXISTS, an IN,
         // an ANY, an ALL and a comparison of rows are boolean, and an ARRAY an array, none in a family.
-        private long? ScalarSubPlanTypeOf(string name, long columnType)
+        private long? ScalarSubPlanTypeOf(string name, long columnType) =>
+            OneRowValueTypeOf(SubPlanOf(name), columnType);
+
+        // The rule of a scalar subquery, for a SubPlan and for an InitPlan: an InitPlan prints an EXISTS, an ARRAY and
+        // a scalar subquery alike, on every major, and the column's type tells them apart in the same way.
+        private static long? OneRowValueTypeOf(Expressions? plan, long columnType)
         {
             if (
                 !SetOperationTypes.InFamily(columnType)
-                || SubPlanOf(name) is not { } subPlan
+                || plan is not { } subPlan
                 || subPlan.Root
                     is not {
                         NodeType: PlanNodeTypes.Aggregate,
@@ -219,21 +228,46 @@ internal static partial class NullabilityWalk
         // its plan holds no set operation and is one the walk can use, and the walk is no more than Plans.MaxDepth
         // plans deep.  In a statement that may name OLD or NEW none is read, since a subplan has no target whose alias
         // alone may be mapped, and the old or the new row may print under an alias that a relation of the subplan has.
-        private Expressions? SubPlanOf(string name)
+        private Expressions? SubPlanOf(string name) =>
+            PlanNamed(name, () => plans.Tree.OnlyPlanNamed(PlanRelationships.SubPlan, name));
+
+        // The entries of the InitPlan whose value the plan prints so, read as a SubPlan is: (InitPlan n).col1 from
+        // PostgreSQL 17, and before it $k, which is the statement's own parameter for a k up to their number.
+        private Expressions? InitPlanOf(string value) => PlanNamed(value, () => InitPlanRootOf(value));
+
+        private PlanNode? InitPlanRootOf(string value)
+        {
+            const string FirstColumn = ").col1";
+            if (value.StartsWith('$'))
+            {
+                return
+                    int.TryParse(value.AsSpan(1), NumberStyles.None, CultureInfo.InvariantCulture, out var parameter)
+                    && (parameter == 0 || parameter > _scope.ParameterCount)
+                    ? plans.Tree.OnlyInitPlanReturning(value)
+                    : null;
+            }
+
+            return value.StartsWith('(') && value.EndsWith(FirstColumn, StringComparison.Ordinal)
+                ? plans.Tree.OnlyPlanNamed(PlanRelationships.InitPlan, value[1..^FirstColumn.Length])
+                : null;
+        }
+
+        // The plan found by the key, read once as a plan of its own, or null for one that is not read.
+        private Expressions? PlanNamed(string key, Func<PlanNode?> find)
         {
             if (plansFollowed >= Plans.MaxDepth || _scope.OldAndNewMayBeNamed)
             {
                 return null;
             }
 
-            if (!_subPlans.TryGetValue(name, out var found))
+            if (!_subPlans.TryGetValue(key, out var found))
             {
                 found =
-                    plans.Tree.OnlyPlanNamed(PlanRelationships.SubPlan, name) is { } subRoot
+                    find() is { } subRoot
                     && plans.InstancesOf(subRoot) is { Reason: null, HasSetOperation: false } subInstances
                         ? new Expressions(plans, subRoot, subInstances, plans.OnlyAliasOf(subRoot), plansFollowed + 1)
                         : null;
-                _subPlans[name] = found;
+                _subPlans[key] = found;
             }
 
             return found;
@@ -325,7 +359,7 @@ internal static partial class NullabilityWalk
                                         .All(found => Preserved(found.Child, found.Printed, depth + 1)),
                                 GroupFromChild = group => Printing(children, group).Any(),
                                 GroupsHaveRows = GroupsHaveRows(node),
-                                ProvedOnFullJoinSide = ProvedOnFullJoinSideOf(node),
+                                ProvedOnFullJoinSides = ProvedOnFullJoinSidesOf(node),
                             }
                         ),
                     ];
@@ -346,10 +380,14 @@ internal static partial class NullabilityWalk
         }
 
         // Whether each group of the node has a row: an Aggregate with a Group Key makes its groups of the rows that
-        // share a key, while one with no key returns a row for an input of none, and Grouping Sets may hold the empty
-        // set.
+        // share a key.  So does a Sorted one with no key left, as PostgreSQL 18 plans a GROUP BY whose every column the
+        // WHERE sets to one value: the planner writes Sorted only for a query with a GROUP BY, and the executor returns
+        // no row for an input of none unless the strategy is Plain.  A Plain one returns a row for an input of none, a
+        // Hashed one with no key is never planned, and Grouping Sets may hold the empty set.
         private static bool GroupsHaveRows(PlanNode node) =>
-            node.NodeType == PlanNodeTypes.Aggregate && node.HasGroupKey && !node.HasGroupingSets;
+            node.NodeType == PlanNodeTypes.Aggregate
+            && !node.HasGroupingSets
+            && (node.HasGroupKey || node.Strategy == AggregateStrategies.Sorted);
 
         // Whether the entry of the node's Output is computed where no join null-extends, and so is every value it is
         // computed from, followed as ComputedAt follows it.
@@ -431,16 +469,39 @@ internal static partial class NullabilityWalk
                 ? ProvedTypeThrough(found.Instance, reference.Column)
                 : null;
 
-        // What the reader is told of the sides of the node that computes an entry: only a Full join has any.
-        private Func<OutputReference, (bool OuterSide, long Type)?>? ProvedOnFullJoinSideOf(PlanNode node) =>
-            node.JoinType == PlanJoinTypes.Full ? reference => ProvedOnSideOf(node, reference) : null;
+        // What the reader is told of the full joins at or under the node that computes an entry, each that no join
+        // above extends: a form computed above the join reads the values the join passed up.
+        private List<Func<OutputReference, (bool OuterSide, long Type)?>>? ProvedOnFullJoinSidesOf(PlanNode node)
+        {
+            List<Func<OutputReference, (bool OuterSide, long Type)?>> readers =
+            [
+                .. FullJoinsAtOrUnder(node)
+                    .Where(join => !instances.IsExtended(join))
+                    .Select(join =>
+                        (Func<OutputReference, (bool OuterSide, long Type)?>)(
+                            reference => ProvedOnSideOf(node, join, reference)
+                        )
+                    ),
+            ];
+            return readers.Count > 0 ? readers : null;
+        }
+
+        private static IEnumerable<PlanNode> FullJoinsAtOrUnder(PlanNode node) =>
+            (node.JoinType == PlanJoinTypes.Full ? [node] : Enumerable.Empty<PlanNode>()).Concat(
+                node.JoinChildren.SelectMany(FullJoinsAtOrUnder)
+            );
 
         // Which side of the full join an instance of the reference is under, its Outer child or not, and the type of
-        // its column, when the walk would prove it but for that join: the join computes the entry and no join above
-        // extends it (ComputedAt), and no join under that side extends either, so the join alone extends the instance.
-        private (bool OuterSide, long Type)? ProvedOnSideOf(PlanNode join, OutputReference reference)
+        // its column, when the walk would prove it but for that join: no join above extends the join, every node from
+        // the one that computes the entry down to it prints the reference as it is, and no join between the join and
+        // the instance extends the instance, so the join alone can have made it NULL.
+        private (bool OuterSide, long Type)? ProvedOnSideOf(
+            PlanNode computing,
+            PlanNode join,
+            OutputReference reference
+        )
         {
-            if (InstanceOf(reference) is not { } found)
+            if (InstanceOf(reference) is not { } found || !PassesOn(computing, join, reference))
             {
                 return null;
             }
@@ -448,11 +509,19 @@ internal static partial class NullabilityWalk
             PlanNode[] sides = [.. join.JoinChildren.Where(child => instances.IsUnder(found.Alias, child))];
             return
                 sides is [var side]
-                && !instances.ExtendsUnder(side)
+                && !instances.ExtendsBetween(side, found.Alias)
                 && ProvedTypeThrough(found.Instance, reference.Column) is { } type
                 ? (side.ParentRelationship == PlanRelationships.Outer, type)
                 : null;
         }
+
+        // Whether every node under the one given, down to the join, prints the reference as it is.
+        private static bool PassesOn(PlanNode node, PlanNode join, OutputReference reference) =>
+            ReferenceEquals(node, join)
+            || node.JoinChildren.Any(child =>
+                child.Output?.Any(entry => OutputReference.Parse(entry) == reference) == true
+                && PassesOn(child, join, reference)
+            );
 
         // The alias a reference names and its instance: a bare name is the plan's one relation's, unless the
         // statement may name OLD or NEW, and only the plan's one alias where it has one.

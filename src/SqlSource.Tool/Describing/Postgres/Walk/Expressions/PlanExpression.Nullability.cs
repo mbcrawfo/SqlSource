@@ -83,35 +83,73 @@ internal static partial class PlanExpression
         private bool AnyArgumentIsNotNull(int from, int to) =>
             ArgumentSpans(from, to, emptyHasOne: true).Any(argument => IsNotNull(argument.From, argument.To));
 
-        // The types of the plain references among the arguments of [from, to) that the walk proves on a side of the
-        // full join that computes the entry, when one is on each side; or null.  A row of a full join has a row of one
-        // side at least, so one of the two is not NULL, and COALESCE, GREATEST and LEAST are NULL only when every
-        // argument is.  Read only where the session finds pg_catalog first, as the forms read by their name are.
+        // The types of the arguments of [from, to) that the walk proves on a side of one full join the entry can be
+        // read at, when one is on each side of it; or null.  A row of a full join has a row of one side at least, so
+        // one of the two is not NULL, and COALESCE, GREATEST and LEAST are NULL only when every argument is.  Read only
+        // where the session finds pg_catalog first, as the forms read by their name are.
         private List<long>? FullJoinSides(int from, int to)
         {
-            if (!_context.CatalogFunctions || _context.ProvedOnFullJoinSide is not { } sideOf)
+            if (!_context.CatalogFunctions || _context.ProvedOnFullJoinSides is not { } joins)
             {
                 return null;
             }
 
-            var types = new List<long>();
-            var outer = false;
-            var inner = false;
-            foreach (var (start, end) in ArgumentSpans(from, to, emptyHasOne: true))
+            var arguments = ArgumentSpans(from, to, emptyHasOne: true);
+            foreach (var sideOf in joins)
             {
-                if (
-                    end > start
-                    && OutputReference.Parse(Text(start, end)) is { } reference
-                    && sideOf(reference) is { } side
-                )
+                var types = new List<long>();
+                var outer = false;
+                var inner = false;
+                foreach (var (start, end) in arguments)
                 {
-                    outer |= side.OuterSide;
-                    inner |= !side.OuterSide;
-                    types.Add(side.Type);
+                    if (SideOfArgument(start, end, sideOf) is { } side)
+                    {
+                        outer |= side.OuterSide;
+                        inner |= !side.OuterSide;
+                        types.Add(side.Type);
+                    }
+                }
+
+                if (outer && inner)
+                {
+                    return types;
                 }
             }
 
-            return outer && inner ? types : null;
+            return null;
+        }
+
+        // The side and the type of an argument that is a plain reference, or its cast within a family of
+        // SetOperationTypes, which is NULL only for a NULL and is of the type it names.  A value a child computed
+        // prints in parentheses of its own inside the cast's, ((u.id))::bigint, and is no reference.
+        private (bool OuterSide, long Type)? SideOfArgument(
+            int from,
+            int to,
+            Func<OutputReference, (bool OuterSide, long Type)?> sideOf
+        )
+        {
+            if (to <= from)
+            {
+                return null;
+            }
+
+            if (OutputReference.Parse(Text(from, to)) is { } reference)
+            {
+                return sideOf(reference);
+            }
+
+            return
+                Is(from, Kind.Open)
+                && _closes[from] is var close and >= 0
+                && close + 2 < to
+                && Is(close + 1, Kind.Cast)
+                && IsTypeName(close + 2, to)
+                && BuiltInType(close + 2, to) is { } target
+                && OutputReference.Parse(Text(from + 1, close)) is { } operand
+                && sideOf(operand) is { } side
+                && SetOperationTypes.Carries(side.Type, target)
+                ? (side.OuterSide, target)
+                : null;
         }
 
         // The arguments of [from, to), each between the commas of depth zero, an empty last one after a trailing comma
