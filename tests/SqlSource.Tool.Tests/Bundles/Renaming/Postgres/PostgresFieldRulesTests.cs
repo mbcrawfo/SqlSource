@@ -28,6 +28,7 @@ public sealed class PostgresFieldRulesTests
         [PostgresCallNames.Partitions] = (typeof(PostgresPartitionsRequest), typeof(PostgresPartitionsAnswer)),
         [PostgresCallNames.Relations] = (typeof(PostgresRelationsRequest), typeof(PostgresTablesAnswer)),
         [PostgresCallNames.Overloads] = (typeof(PostgresOverloadsRequest), typeof(PostgresOverloadsAnswer)),
+        [PostgresCallNames.Casts] = (typeof(PostgresCastsRequest), typeof(PostgresCastsAnswer)),
         [PostgresCallNames.Deallocate] = (typeof(PostgresDeallocateRequest), typeof(PostgresDeallocateAnswer)),
     };
 

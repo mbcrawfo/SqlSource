@@ -337,6 +337,16 @@ internal sealed record PostgresOverloadsAnswer(
     PostgresServerError? Error
 );
 
+/// <summary>The request of <c>casts</c>: ordered pairs of types, each source with the target at its index.</summary>
+/// <param name="Sources">The type each pair casts from.</param>
+/// <param name="Targets">The type each pair casts to.</param>
+internal sealed record PostgresCastsRequest(IReadOnlyList<long> Sources, IReadOnlyList<long> Targets);
+
+/// <summary>Whether <c>pg_cast</c> holds a row for any pair asked, or why it could not be read.</summary>
+/// <param name="AnyCast">Whether a row exists, or null with an error.</param>
+/// <param name="Error">What the server said, or null.  It is logged and never reported.</param>
+internal sealed record PostgresCastsAnswer(bool? AnyCast, PostgresServerError? Error);
+
 /// <summary>The request of <c>partitions</c>.</summary>
 /// <param name="Relations">
 /// The relations the members of a plan's <c>Append</c>s scan (<see cref="PlanPartitions" />), in schema and name

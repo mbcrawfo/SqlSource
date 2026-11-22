@@ -198,6 +198,20 @@ internal sealed class PostgresLive(PostgresConnection connection)
         ORDER BY 1
         """;
 
+    // Whether pg_cast holds a row for any ordered pair of $1 and $2, which ROWS FROM pairs by index.
+    private const string CastsSql = """
+        SELECT EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_cast AS c
+            JOIN ROWS FROM (
+                pg_catalog.unnest($1::pg_catalog.oid[]),
+                pg_catalog.unnest($2::pg_catalog.oid[])
+            ) AS p (source, target)
+                ON c.castsource OPERATOR(pg_catalog.=) p.source
+                AND c.casttarget OPERATOR(pg_catalog.=) p.target
+        )
+        """;
+
     // The server's spelling of each pair of a type and a modifier, in one query.
     private const string SpellingsSql = """
         SELECT p.oid, p.typmod, pg_catalog.format_type(p.oid, p.typmod)
@@ -578,6 +592,22 @@ internal sealed class PostgresLive(PostgresConnection connection)
                 return new PostgresOverloadsAnswer(functions, operators, null);
             },
             static error => new PostgresOverloadsAnswer(null, null, error),
+            token
+        );
+
+    /// <summary>Asks <c>casts</c>: whether <c>pg_cast</c> holds a row for any of the ordered pairs of types.</summary>
+    public Task<PostgresCastsAnswer> CastsAsync(PostgresCastsRequest asked, CancellationToken token) =>
+        InDescribeAsync(
+            async () =>
+            {
+                await using var command = await connection.CommandAsync(CastsSql, token);
+                _ = command.Parameters.Add(OidArray(asked.Sources));
+                _ = command.Parameters.Add(OidArray(asked.Targets));
+                await using var reader = await command.ExecuteReaderAsync(token);
+                _ = await reader.ReadAsync(token);
+                return new PostgresCastsAnswer(reader.GetBoolean(0), null);
+            },
+            static error => new PostgresCastsAnswer(null, error),
             token
         );
 

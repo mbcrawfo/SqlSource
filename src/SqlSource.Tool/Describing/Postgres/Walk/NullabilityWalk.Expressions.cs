@@ -46,11 +46,98 @@ internal static partial class NullabilityWalk
         // root's reading knows no node's groups, and answers no aggregate.
         public bool? NullableOf(string entry, long columnType)
         {
+            if (OutputReference.Parse(entry) is { } whole && InstanceOf(whole) is { Instance.Kind: InstanceKind.Plan })
+            {
+                return ProvedThroughScan(whole, columnType) ? false : null;
+            }
+
             var context = ContextOf(entry, columnType);
             return _nothingExtends
                 ? PlanExpression.NullableOf(entry, context) ?? NullableAt(root, entry, context)
                 : NullableAt(root, entry, context);
         }
+
+        /// <summary>
+        /// Whether a reference to a <c>Subquery Scan</c> or a <c>CTE Scan</c> that no join extends is not <c>NULL</c>.
+        /// The plan names the scanned plan's columns nowhere, and the scan prints them in the order the query above
+        /// needs, so the column is some entry of the scanned plan's root and no more can be said.  It is proved when
+        /// one entry at least is proved of a type that carries to the column's, and every other either is too or is
+        /// of a type that cannot reach it (<see cref="WalkScope.NoCastAcrossFamilies" />).
+        /// </summary>
+        public bool ProvedThroughScan(OutputReference reference, long columnType) =>
+            !_scope.OldAndNewMayBeNamed
+            && plansFollowed < Plans.MaxDepth
+            && columnType != TotalFunctions.UnknownType
+            && InstanceOf(reference) is { Instance: { Kind: InstanceKind.Plan, NullExtended: false, Child: { } child } }
+            && child.Output is { Count: > 0 } entries
+            && plans.InstancesOf(child) is { Reason: null, HasSetOperation: false } scanned
+            && new Expressions(plans, child, scanned, plans.OnlyAliasOf(child), plansFollowed + 1).EveryEntryProves(
+                entries,
+                columnType
+            );
+
+        private bool EveryEntryProves(IReadOnlyList<string> entries, long columnType)
+        {
+            var proved = false;
+            foreach (var entry in entries)
+            {
+                if (EntryProves(entry, columnType))
+                {
+                    proved = true;
+                }
+                else if (!RuledOut(entry, columnType))
+                {
+                    return false;
+                }
+            }
+
+            return proved;
+        }
+
+        // Whether the entry is proved not NULL of a type that carries to the column's, through a scan inside it too.
+        private bool EntryProves(string entry, long columnType) =>
+            OutputReference.Parse(entry) is { } reference
+            && InstanceOf(reference) is { Instance.Kind: InstanceKind.Plan }
+                ? ProvedThroughScan(reference, columnType)
+                : ValueTypeOf(entry) is { } type
+                    && type != TotalFunctions.UnknownType
+                    && SetOperationTypes.Carries(type, columnType);
+
+        // Whether the entry's type, which holds whether or not it is NULL, cannot be the column's.
+        private bool RuledOut(string entry, long columnType) =>
+            _scope.NoCastAcrossFamilies
+            && TypeRegardlessOfNull(entry) is { } type
+            && SetOperationTypes.CannotReach(type, columnType);
+
+        // The type of an entry whether or not it is NULL: every reference is read by its declared type and every
+        // aggregate as if its groups had rows, so the proofs of types give the result of the signature they find.
+        private long? TypeRegardlessOfNull(string entry) =>
+            OutputReference.Parse(entry) is { } reference
+                ? DeclaredTypeOf(reference)
+                : PlanExpression.TypeRegardlessOfNull(
+                    entry,
+                    new ExpressionContext(
+                        _scope.CatalogFunctionsFirst,
+                        DeclaredTypeOf,
+                        GroupsHaveRows: true,
+                        CatalogAlone: _scope.CatalogAlone
+                    )
+                );
+
+        // The declared type of the column a reference names, when each row of its instance gives it one type.
+        private long? DeclaredTypeOf(OutputReference reference) =>
+            InstanceOf(reference) is { } found
+                ? OneTypeOf(
+                    RowsOf(found.Instance),
+                    row =>
+                        row.Columns.FirstOrDefault(column =>
+                            string.Equals(column.Name, reference.Column, StringComparison.Ordinal)
+                        )
+                            is { } attribute
+                            ? attribute.TypeOid
+                            : null
+                )
+                : null;
 
         // The type of an entry of the root's Output when the walk proves it is not NULL, read as NullableOf reads it:
         // a reference's declared type, or the type of an expression the reader proves.  A subquery's value is none

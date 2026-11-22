@@ -1,3 +1,4 @@
+using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
@@ -74,4 +75,36 @@ public sealed class SetOperationTypesTests
     [InlineData(16500)]
     [InlineData(TotalFunctions.UnknownType)]
     public void InFamily_TypeOfNoFamily_IsFalse(long oid) => SetOperationTypes.InFamily(oid).ShouldBeFalse();
+
+    // Two families apart, to a type that no assignment cast through a type's text form reaches.
+    [Theory]
+    [InlineData(BuiltInTypes.Text, BuiltInTypes.Int8)]
+    [InlineData(BuiltInTypes.Date, BuiltInTypes.Numeric)]
+    [InlineData(BuiltInTypes.Int4, BuiltInTypes.Timestamptz)]
+    [InlineData(BuiltInTypes.Varchar, BuiltInTypes.Date)]
+    public void CannotReach_TwoFamiliesToANumberOrATime_IsTrue(long from, long to) =>
+        SetOperationTypes.CannotReach(from, to).ShouldBeTrue();
+
+    // Any type reaches a text type by an assignment cast, one family holds its casts, and a type of no family may have
+    // any cast.
+    [Theory]
+    [InlineData(BuiltInTypes.Int4, BuiltInTypes.Text)]
+    [InlineData(BuiltInTypes.Date, BuiltInTypes.Varchar)]
+    [InlineData(BuiltInTypes.Int4, BuiltInTypes.Int8)]
+    [InlineData(BuiltInTypes.Int4, BuiltInTypes.Int4)]
+    [InlineData(BuiltInTypes.Bool, BuiltInTypes.Int8)]
+    [InlineData(BuiltInTypes.Int8, BuiltInTypes.Bool)]
+    public void CannotReach_ToTextWithinAFamilyOrOfNoFamily_IsFalse(long from, long to) =>
+        SetOperationTypes.CannotReach(from, to).ShouldBeFalse();
+
+    // Six numbers from six others, and three times from nine others.
+    [Fact]
+    public void CrossFamilyPairs_OfTheFamilies_AreEveryPairCannotReachHoldsFor()
+    {
+        var pairs = SetOperationTypes.CrossFamilyPairs;
+
+        pairs.Sources.Count.ShouldBe(63);
+        pairs.Targets.Count.ShouldBe(63);
+        pairs.Sources.Zip(pairs.Targets).ShouldAllBe(pair => SetOperationTypes.CannotReach(pair.First, pair.Second));
+    }
 }

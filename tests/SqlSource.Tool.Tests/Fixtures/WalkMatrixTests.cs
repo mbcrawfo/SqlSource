@@ -72,6 +72,7 @@ public sealed class WalkMatrixTests
         ["walk-natural"] = (Walked, [Expression, Expression, Joined, Joined]),
         ["walk-aggregate"] = (Walked, [Kept, Joined, Expression]),
         ["walk-count-argument"] = (Walked, [Kept, Expression]),
+        ["walk-scan-column"] = (Walked, [Expression, NoOrigin]),
         ["walk-union"] = (Walked, [NoOrigin, NoOrigin]),
         ["walk-returning"] = (Walked, [Kept, Kept, Joined]),
         ["walk-proved-empty"] = (Walked, [Kept, Heuristic]),

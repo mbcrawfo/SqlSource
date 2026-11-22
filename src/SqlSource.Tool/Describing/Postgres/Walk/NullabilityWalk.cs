@@ -72,6 +72,11 @@ internal sealed record WalkOutcome(
 /// <c>o.id &lt;&gt; $1</c> and so makes a <c>LEFT JOIN</c> inner, while an empty list, as the query runs, keeps the
 /// rows whose <c>o.id</c> is <c>NULL</c>.  Every join but a semi join is then read as extending both of its sides.
 /// </param>
+/// <param name="NoCastAcrossFamilies">
+/// Whether <c>casts</c> answered that <c>pg_cast</c> holds no row for any pair of
+/// <see cref="SetOperationTypes.CrossFamilyPairs" />, so that an entry of a scanned plan whose type
+/// <see cref="SetOperationTypes.CannotReach" /> the column's is not that column.
+/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
@@ -79,7 +84,8 @@ internal sealed record WalkScope(
     IReadOnlyDictionary<long, PostgresTableRow> Tables,
     IReadOnlyList<long> ColumnTypes,
     CatalogNames? CatalogAlone = null,
-    bool DistrustsJoinReduction = false
+    bool DistrustsJoinReduction = false,
+    bool NoCastAcrossFamilies = false
 );
 
 /// <summary>
@@ -193,6 +199,16 @@ internal static partial class NullabilityWalk
             walked
         );
     }
+
+    /// <summary>Whether two walks of one plan give every column the same answer.</summary>
+    public static bool SameAnswers(WalkOutcome first, WalkOutcome second) =>
+        first.Columns.Count == second.Columns.Count
+        && first
+            .Columns.Zip(second.Columns)
+            .All(static pair =>
+                pair.First.Column.Nullable == pair.Second.Column.Nullable
+                && pair.First.Column.NullableSource == pair.Second.Column.NullableSource
+            );
 
     /// <summary>
     /// The outcome of a walk that had no plan to read: the server gave none, or its text is no plan.  Every column

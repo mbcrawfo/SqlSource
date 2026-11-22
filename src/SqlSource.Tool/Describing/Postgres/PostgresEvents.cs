@@ -294,6 +294,27 @@ internal static class PostgresEvents
         );
 
     /// <summary>
+    /// <c>postgres.casts</c>: how many ordered pairs of types were asked for, and whether <c>pg_cast</c> holds a row
+    /// for any of them, or the error.
+    /// </summary>
+    public static void Casts(
+        IRunLog log,
+        string query,
+        PostgresCastsRequest request,
+        PostgresCastsAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            PostgresCallNames.Casts,
+            new("query", query),
+            new("pairs", request.Sources.Count),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember("anyCast", answer.AnyCast == true),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
     /// The events of a walk, in this order: <c>postgres.walk.node</c> for each node that was visited,
     /// <c>postgres.walk.column</c> for each column, and <c>postgres.walk</c> with the plan's value and the reason when
     /// there is one: why the plan is <c>unavailable</c>, or <c>output-differs</c> for a <c>walked</c> one.  It is the
