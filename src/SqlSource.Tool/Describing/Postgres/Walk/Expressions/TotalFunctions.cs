@@ -30,8 +30,12 @@ namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 /// <c>int82lt</c>, <c>numeric_eq</c>, <c>float84ge</c>, <c>texteq</c>, <c>text_lt</c>, <c>bpchareq</c>,
 /// <c>date_eq</c>, <c>timestamp_lt</c>, which compares a <c>timestamp with time zone</c> too, <c>booleq</c> and the
 /// rest of the comparisons; <c>xideq</c>, which compares an <c>xid</c> with an <c>integer</c> too, <c>textcat</c>,
-/// <c>lower</c>, <c>upper</c>, <c>textlen</c>, <c>timestamp_trunc</c> and <c>timestamptz_trunc</c>.  Each raises an
-/// error where it cannot compute, an overflow or a division by zero, and returns a value otherwise.
+/// <c>lower</c>, <c>upper</c>, <c>textlen</c>, <c>timestamp_trunc</c>, <c>timestamptz_trunc</c>, <c>int2abs</c> and the
+/// rest of <c>abs</c>, <c>dceil</c>, <c>numeric_ceil</c>, <c>dfloor</c>, <c>numeric_floor</c>, <c>dround</c>,
+/// <c>numeric_round</c>, <c>dtrunc</c> and <c>numeric_trunc</c>.  <c>round(numeric)</c> and <c>trunc(numeric)</c> are
+/// SQL functions the planner inlines, printed <c>round(a, 0)</c> and <c>trunc(a, 0)</c>, so the rows are of two
+/// arguments.  Each raises an error where it cannot compute, an overflow or a division by zero, and returns a value
+/// otherwise.
 /// <c>Catalog_TotalFunctions_ArePgCatalogsOwn</c> in <c>CatalogPinTests</c> holds every row to the catalog, its
 /// implementation included.
 /// </para>
@@ -100,6 +104,20 @@ internal static class TotalFunctions
         ("length", [BuiltInTypes.Text], BuiltInTypes.Int4, "textlen"),
         ("date_trunc", [BuiltInTypes.Text, BuiltInTypes.Timestamp], BuiltInTypes.Timestamp, "timestamp_trunc"),
         ("date_trunc", [BuiltInTypes.Text, BuiltInTypes.Timestamptz], BuiltInTypes.Timestamptz, "timestamptz_trunc"),
+        ("abs", [BuiltInTypes.Int2], BuiltInTypes.Int2, "int2abs"),
+        ("abs", [BuiltInTypes.Int4], BuiltInTypes.Int4, "int4abs"),
+        ("abs", [BuiltInTypes.Int8], BuiltInTypes.Int8, "int8abs"),
+        ("abs", [BuiltInTypes.Float4], BuiltInTypes.Float4, "float4abs"),
+        ("abs", [BuiltInTypes.Float8], BuiltInTypes.Float8, "float8abs"),
+        ("abs", [BuiltInTypes.Numeric], BuiltInTypes.Numeric, "numeric_abs"),
+        ("ceil", [BuiltInTypes.Float8], BuiltInTypes.Float8, "dceil"),
+        ("ceil", [BuiltInTypes.Numeric], BuiltInTypes.Numeric, "numeric_ceil"),
+        ("floor", [BuiltInTypes.Float8], BuiltInTypes.Float8, "dfloor"),
+        ("floor", [BuiltInTypes.Numeric], BuiltInTypes.Numeric, "numeric_floor"),
+        ("round", [BuiltInTypes.Float8], BuiltInTypes.Float8, "dround"),
+        ("round", [BuiltInTypes.Numeric, BuiltInTypes.Int4], BuiltInTypes.Numeric, "numeric_round"),
+        ("trunc", [BuiltInTypes.Float8], BuiltInTypes.Float8, "dtrunc"),
+        ("trunc", [BuiltInTypes.Numeric, BuiltInTypes.Int4], BuiltInTypes.Numeric, "numeric_trunc"),
     ];
 
     // The types max and min take, with the transition function of each.

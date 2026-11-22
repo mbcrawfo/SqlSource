@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres.Columns;
@@ -82,6 +83,11 @@ internal sealed record WalkOutcome(
 /// <c>$k</c>, numbered from 0, as it prints the statement's parameter <c>$k</c>, so a <c>$k</c> from 1 to this count is
 /// never read as an <c>InitPlan</c>'s.
 /// </param>
+/// <param name="ValuesNeverNull">
+/// For a statement that is a <c>VALUES</c> alone, whether every row holds a literal in each column
+/// (<see cref="Statements.ValuesStatement" />), or null for any other statement.  It answers a column only for a plan
+/// that is a <c>Values Scan</c> under nodes that never project.
+/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
@@ -91,7 +97,8 @@ internal sealed record WalkScope(
     CatalogNames? CatalogAlone = null,
     bool DistrustsJoinReduction = false,
     bool NoCastAcrossFamilies = false,
-    int ParameterCount = 0
+    int ParameterCount = 0,
+    IReadOnlyList<bool>? ValuesNeverNull = null
 );
 
 /// <summary>
@@ -161,7 +168,12 @@ internal static partial class NullabilityWalk
 
         if (instances.Reason is { } reason)
         {
-            return Unusable(reason, root, instances, columns);
+            return
+                instances.OnlyGroupingSetsAgainst
+                && !instances.HasSetOperation
+                && OutputFits(entries, origins, instances)
+                ? RunGroupingSets(plans, root, instances, columns, origins, entries)
+                : Unusable(reason, root, instances, columns);
         }
 
         // A plan whose root's Output does not agree with the row description (OutputFits) is read for no expression.  A
@@ -177,6 +189,7 @@ internal static partial class NullabilityWalk
         var expressions =
             fits && !instances.HasSetOperation ? new Expressions(plans, root, instances, onlyAlias) : null;
 
+        var valuesNeverNull = ValuesColumnsOf(root, entries, columns.Count, scope);
         var walked = new List<WalkedColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
         {
@@ -184,6 +197,12 @@ internal static partial class NullabilityWalk
             walked.Add(
                 origins[index] switch
                 {
+                    null when valuesNeverNull?[index] == true => Answered(
+                        columns[index],
+                        false,
+                        SidecarValues.NullableSource.Expression,
+                        entries[index]
+                    ),
                     null => ExpressionOf(columns[index], entries[index], type, expressions),
                     { } origin when scope.Gated => ColumnOf(
                         columns[index],
@@ -204,6 +223,86 @@ internal static partial class NullabilityWalk
             instances.Nodes,
             walked
         );
+    }
+
+    // A plan with grouping sets answers only a column of no origin that is never NULL in any group.  A column with an
+    // origin keeps the heuristic, since a grouping column is NULL on a subtotal row.  The plan counts as walked when it
+    // answered one, and the reason stays, as it does for a plan whose expressions were not read.
+    private static WalkOutcome RunGroupingSets(
+        Plans plans,
+        PlanNode root,
+        PlanInstances instances,
+        IReadOnlyList<SidecarColumn> columns,
+        IReadOnlyList<ColumnOrigin?> origins,
+        IReadOnlyList<string> entries
+    )
+    {
+        var expressions = new Expressions(plans, root, instances, plans.OnlyAliasOf(root));
+        var walked = new List<WalkedColumn>(columns.Count);
+        var answered = false;
+        for (var index = 0; index < columns.Count; index++)
+        {
+            if (origins[index] is null && expressions.ProvedInEveryGroup(entries[index]))
+            {
+                answered = true;
+                walked.Add(Answered(columns[index], false, SidecarValues.NullableSource.Expression, entries[index]));
+            }
+            else
+            {
+                walked.Add(Kept(columns[index], entries[index]));
+            }
+        }
+
+        return new WalkOutcome(
+            answered ? SidecarValues.Plan.Walked : SidecarValues.Plan.Unavailable,
+            WalkReasons.GroupingSets,
+            instances.Nodes,
+            walked
+        );
+    }
+
+    // What the statement's VALUES rows say of each column, when the plan is a Values Scan under nodes that never
+    // project and the root prints its columns in order: the SQL's rows are then the plan's.  Null otherwise.
+    private static IReadOnlyList<bool>? ValuesColumnsOf(
+        PlanNode root,
+        IReadOnlyList<string> entries,
+        int count,
+        WalkScope scope
+    )
+    {
+        if (scope.ValuesNeverNull is not { } neverNull || neverNull.Count != count)
+        {
+            return null;
+        }
+
+        var node = root;
+        while (NeverProjectedChildOf(node) is { } child)
+        {
+            node = child;
+        }
+
+        if (node.NodeType != PlanNodeTypes.ValuesScan)
+        {
+            return null;
+        }
+
+        for (var index = 0; index < count; index++)
+        {
+            if (
+                OutputReference.Parse(entries[index]) is not { } reference
+                || reference.Alias is not (null or "*VALUES*")
+                || !string.Equals(
+                    reference.Column,
+                    "column" + (index + 1).ToString(CultureInfo.InvariantCulture),
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return null;
+            }
+        }
+
+        return neverNull;
     }
 
     /// <summary>Whether two walks of one plan give every column the same answer.</summary>

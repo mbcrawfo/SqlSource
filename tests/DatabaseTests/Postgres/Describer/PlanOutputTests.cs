@@ -778,6 +778,80 @@ public sealed class PlanOutputTests(PostgresDatabases postgres)
         join.Output.ShouldContain("u.id");
     }
 
+    // PostgreSQL 18 prints a window's definition with its frame, and 14 to 17 print none.
+    [Theory]
+    [InlineData("PARTITION BY u.status ORDER BY u.id", "w1 AS (PARTITION BY u.status ORDER BY u.id)")]
+    [InlineData("ORDER BY u.id ROWS UNBOUNDED PRECEDING", "w1 AS (ORDER BY u.id ROWS UNBOUNDED PRECEDING)")]
+    [InlineData(
+        "ORDER BY u.id ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING",
+        "w1 AS (ORDER BY u.id ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)"
+    )]
+    [InlineData(
+        "ORDER BY u.id ROWS BETWEEN 1 PRECEDING AND CURRENT ROW",
+        "w1 AS (ORDER BY u.id ROWS BETWEEN '1'::bigint PRECEDING AND CURRENT ROW)"
+    )]
+    [InlineData(
+        "ORDER BY u.id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW",
+        "w1 AS (ORDER BY u.id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW)"
+    )]
+    public async Task Explain_WindowAggregate_PrintsItsFrameFromEighteen(string definition, string printed)
+    {
+        var root = await ExplainAsync($"SELECT max(u.id) OVER ({definition}) FROM users u");
+
+        var window = All(root).First(static node => node.NodeType == PlanNodeTypes.WindowAgg);
+        window.Output.ShouldNotBeNull()[0].ShouldBe(postgres.Major >= 18 ? "max(id) OVER w1" : "max(id) OVER (?)");
+        window.Window.ShouldBe(postgres.Major >= 18 ? printed : null);
+    }
+
+    // Under grouping sets a count and GROUPING(...) print at the Aggregate, and in parentheses at a Sort above it,
+    // which 14 does not need for this query.
+    [Fact]
+    public async Task Explain_GroupingSets_PrintsCountAndGroupingAtTheAggregate()
+    {
+        var root = await ExplainAsync(
+            "SELECT u.status, count(*), count(DISTINCT u.id), grouping(u.status) FROM users u "
+                + "GROUP BY ROLLUP (u.status) ORDER BY u.status"
+        );
+
+        var grouped = All(root).Single(static node => node.HasGroupingSets);
+        grouped.NodeType.ShouldBe(PlanNodeTypes.Aggregate);
+        grouped.Output.ShouldBe(["status", "count(*)", "count(DISTINCT id)", "GROUPING(status)"]);
+        if (!ReferenceEquals(root, grouped))
+        {
+            root.Output.ShouldBe(["status", "(count(*))", "(count(DISTINCT id))", "(GROUPING(status))"]);
+        }
+    }
+
+    // A VALUES statement of several rows is a Values Scan, which prints its columns by their place, and of one row a
+    // Result of its constants.
+    [Fact]
+    public async Task Explain_Values_PrintsItsColumnsByTheirPlace()
+    {
+        var sorted = await ExplainAsync("VALUES ('a', 1), ('b', 2) ORDER BY 2");
+        var single = await ExplainAsync("VALUES ('a', 1)");
+
+        sorted.NodeType.ShouldBe(PlanNodeTypes.Sort);
+        sorted.Output.ShouldBe(["column1", "column2"]);
+        var scan = sorted.Plans.ShouldHaveSingleItem();
+        scan.NodeType.ShouldBe(PlanNodeTypes.ValuesScan);
+        scan.Output.ShouldBe(["column1", "column2"]);
+        single.NodeType.ShouldBe("Result");
+    }
+
+    // round(numeric) and trunc(numeric) are SQL functions the planner inlines into their two-argument forms.
+    [Theory]
+    [InlineData("round(o.total)", "round(total, 0)")]
+    [InlineData("trunc(o.total)", "trunc(total, 0)")]
+    [InlineData("round(o.total, 2)", "round(total, 2)")]
+    [InlineData("ceil(o.total)", "ceil(total)")]
+    [InlineData("abs(o.total)", "abs(total)")]
+    public async Task Explain_FunctionOfTheTable_PrintsItsSignature(string expression, string printed)
+    {
+        var root = await ExplainAsync($"SELECT {expression} FROM orders o");
+
+        root.Output.ShouldBe([printed]);
+    }
+
     // The node and every node under it, whatever the relationship.
     private static PlanNode[] All(PlanNode node) => [node, .. node.Plans.SelectMany(All)];
 }

@@ -603,7 +603,7 @@ public sealed class ColumnTests(PostgresDatabases postgres)
     }
 
     // A subtotal row holds NULL in a NOT NULL grouping column, with no outer join in sight, and the column keeps
-    // its origin.  The walk refuses a plan with a grouping set, so the heuristic stands.
+    // its origin.  A plan with a grouping set answers only its count, so the heuristic stands for the column.
     [Theory]
     [InlineData("SELECT status, count(*) FROM users GROUP BY ROLLUP (status)")]
     [InlineData("SELECT status, count(*) FROM users GROUP BY CUBE (status)")]
@@ -612,10 +612,12 @@ public sealed class ColumnTests(PostgresDatabases postgres)
     {
         var description = await ShouldDescribeAsync(sql);
 
-        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
-        var status = description.Columns.ShouldNotBeNull()[0];
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        var columns = description.Columns.ShouldNotBeNull();
+        var status = columns[0];
         status.Origin.ShouldBe(Origin("users", "status"));
         (status.Nullable, status.NullableSource).ShouldBe(NullableHeuristic);
+        columns[1].Nullable.ShouldBe(false);
     }
 
     // PostgreSQL 18's old row of a RETURNING list is NULL for a row an INSERT adds.  Each column keeps its table as

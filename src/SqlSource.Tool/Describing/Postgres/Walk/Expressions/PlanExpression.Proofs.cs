@@ -46,7 +46,7 @@ internal static partial class PlanExpression
         /// </summary>
         public long? Proved(int from, int to)
         {
-            var key = (from, to, _groupsHaveRows);
+            var key = (from, to, _groupsHaveRows, _readsWindow);
             if (!_proved.TryGetValue(key, out var proved))
             {
                 proved = ProvedOnce(from, to);
