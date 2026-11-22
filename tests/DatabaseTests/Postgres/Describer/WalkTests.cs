@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Npgsql;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
@@ -426,5 +427,36 @@ public sealed class WalkTests(PostgresDatabases postgres)
         compact.ShouldContain("\"JoinType\":\"Full\"", Case.Sensitive, "the plan holds no full join");
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         Of(description.Columns.ShouldNotBeNull()).ShouldBe([UnknownNoOrigin]);
+    }
+
+    // IS [NOT] DISTINCT FROM calls the = the parser chose for its operands, and is NULL when that = answers NULL for
+    // two values that are not.  The plan prints the test the same whichever = it is.
+    [Theory]
+    [InlineData("n.a IS DISTINCT FROM n.b")]
+    [InlineData("n.a IS NOT DISTINCT FROM n.b")]
+    [InlineData("CASE WHEN n.a > 0 THEN n.a IS DISTINCT FROM n.b ELSE false END")]
+    [InlineData("COALESCE(n.a IS DISTINCT FROM n.b, NULL)")]
+    [InlineData("(n.a IS DISTINCT FROM n.b) = true")]
+    public async Task DescribeAsync_DistinctTestOverAnEqualsThatAnswersNull_IsNotAnsweredNotNull(string test)
+    {
+        var connection = $"{postgres.ConnectionString};{ScratchSchema.NullEqualsPath}";
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.NullEquals);
+            await using var source = NpgsqlDataSource.Create(connection);
+            await using var command = source.CreateCommand($"SELECT ({test}) IS NULL FROM null_equals.t AS n");
+
+            (await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)).ShouldBe(true);
+
+            var description = await Sessions.ShouldDescribeAsync(
+                connection,
+                $"SELECT {test} AS d FROM null_equals.t AS n"
+            );
+            Of(description.Columns.ShouldNotBeNull()).ShouldHaveSingleItem().Nullable.ShouldNotBe(false);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropNullEquals);
+        }
     }
 }

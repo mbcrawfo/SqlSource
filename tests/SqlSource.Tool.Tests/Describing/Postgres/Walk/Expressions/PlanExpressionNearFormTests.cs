@@ -56,10 +56,6 @@ public sealed class PlanExpressionNearFormTests
     [InlineData("(a.x = NULL)")]
     [InlineData("(a.x = b NULL)")]
     [InlineData("(a.x = NOT NULL)")]
-    [InlineData("(foo (a IS DISTINCT FROM b))")]
-    [InlineData("(a b c FROM d)")]
-    [InlineData("(a IS b FROM c)")]
-    [InlineData("(a + b IS DISTINCT FROM c)")]
     [InlineData("(= IS NULL)")]
     // A literal whose cast names no type.
     [InlineData("'x' foo bar")]
@@ -69,6 +65,35 @@ public sealed class PlanExpressionNearFormTests
     [InlineData("'x'::text()")]
     public void NullableOf_TextOneTokenFromAForm_IsUnknown(string entry) =>
         PlanExpression.NullableOf(entry, ProvingAll()).ShouldBeNull();
+
+    // IS [NOT] DISTINCT FROM calls the = the parser chose, which may answer NULL, so neither it nor a form over it is
+    // proved, even over operands that are.
+    [Theory]
+    [InlineData("(a.x IS DISTINCT FROM a.y)")]
+    [InlineData("(NOT (a.x IS DISTINCT FROM a.y))")]
+    [InlineData("CASE WHEN (a.x > 0) THEN (a.x IS DISTINCT FROM a.y) ELSE false END")]
+    [InlineData("COALESCE((a.x IS DISTINCT FROM a.y), NULL::boolean)")]
+    [InlineData("((a.x IS DISTINCT FROM a.y) = true)")]
+    public void NullableOfAndProvedTypeOf_DistinctTest_AreUnknown(string entry)
+    {
+        PlanExpression.NullableOf(entry, ProvingAll()).ShouldBeNull();
+        PlanExpression.ProvedTypeOf(entry, ProvingAll()).ShouldBeNull();
+    }
+
+    // Such a test is a boolean all the same, which only the type of an entry says.
+    [Theory]
+    [InlineData("(a.x IS DISTINCT FROM a.y)")]
+    [InlineData("(NOT (a.x IS DISTINCT FROM a.y))")]
+    public void TypeOf_DistinctTest_IsBoolean(string entry) =>
+        PlanExpression.TypeOf(entry, catalogFunctions: true).ShouldBe(BuiltInTypes.Bool);
+
+    [Theory]
+    [InlineData("(foo (a IS DISTINCT FROM b))")]
+    [InlineData("(a b c FROM d)")]
+    [InlineData("(a IS b FROM c)")]
+    [InlineData("(a + b IS DISTINCT FROM c)")]
+    public void TypeOf_TextOneTokenFromADistinctTest_IsNull(string entry) =>
+        PlanExpression.TypeOf(entry, catalogFunctions: true).ShouldBeNull();
 
     // A word alone that starts a form is no call of it, however the whole entry is asked.
     [Theory]

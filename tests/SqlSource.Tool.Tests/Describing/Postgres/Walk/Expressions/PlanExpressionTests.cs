@@ -63,8 +63,6 @@ public sealed class PlanExpressionTests
     [InlineData("((InitPlan 1).col1 IS NULL)")]
     [InlineData("((InitPlan 2).col1 IS NOT NULL)")]
     [InlineData("((deleted_at IS NULL))")]
-    [InlineData("((u.email)::text IS DISTINCT FROM (u.name)::text)")]
-    [InlineData("(NOT ((u.email)::text IS DISTINCT FROM (u.name)::text))")]
     [InlineData("COALESCE(max((email)::text), 'x'::text)")]
     [InlineData("(COALESCE((email)::character varying, 'x'::character varying))")]
     [InlineData("LEAST(1, u.id)")]

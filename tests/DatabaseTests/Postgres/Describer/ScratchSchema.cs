@@ -10,7 +10,8 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // as any other would.  An object that changes what another test sees while it exists, public."numeric", the schema
 // "user", the schema shadow of ShadowCount and ShadowOperators, the aggregate pg_catalog.count(text) of CatalogCount,
 // the operator pg_catalog.* of CatalogOperator, the schema zz of OperatorsAfterTheCatalog, the schema
-// shadowing_operators of ShadowingOperators, the schema shadowing_equals of ShadowingEquals, describer_canary,
+// shadowing_operators of ShadowingOperators, the schema shadowing_equals of ShadowingEquals, the schema null_equals of
+// NullEquals, describer_canary,
 // command_widgets, the schemas command_old and command_new, error_path_widgets, session_gone and transaction_kept, is
 // made by its test and dropped in a finally.
 internal static class ScratchSchema
@@ -250,6 +251,30 @@ internal static class ScratchSchema
     /// <c>=</c>, <c>overloads</c> answers that name for any other test.
     /// </summary>
     public const string DropShadowingEquals = "DROP SCHEMA IF EXISTS shadowing_equals CASCADE";
+
+    /// <summary>
+    /// The schema <c>null_equals</c>, of a table <c>t</c> with one row of two <c>NOT NULL</c> columns and an operator
+    /// <c>=(integer, text)</c> that answers <c>NULL</c>, which <c>IS DISTINCT FROM</c> over the two columns calls on
+    /// <see cref="NullEqualsPath" />.
+    /// </summary>
+    public const string NullEquals = """
+        DROP SCHEMA IF EXISTS null_equals CASCADE;
+        CREATE SCHEMA null_equals;
+        CREATE TABLE null_equals.t (a integer NOT NULL, b text NOT NULL);
+        INSERT INTO null_equals.t VALUES (1, 'x');
+        CREATE FUNCTION null_equals.eq(integer, text) RETURNS boolean LANGUAGE plpgsql
+            AS $body$ BEGIN RETURN NULL; END $body$;
+        CREATE OPERATOR null_equals.= (LEFTARG = integer, RIGHTARG = text, FUNCTION = null_equals.eq);
+        """;
+
+    /// <summary>The part of a connection string that finds the operator of <see cref="NullEquals" />.</summary>
+    public const string NullEqualsPath = "Search Path=null_equals,pg_catalog,public";
+
+    /// <summary>
+    /// Drops the schema <c>null_equals</c>.  Every test that makes it runs this in a finally: while it holds a
+    /// <c>=</c>, <c>overloads</c> answers that name for any other test.
+    /// </summary>
+    public const string DropNullEquals = "DROP SCHEMA IF EXISTS null_equals CASCADE";
 
     /// <summary>
     /// The extension <c>postgres_fdw</c> and one loopback server, <c>scratch_loop</c>, to the container's own

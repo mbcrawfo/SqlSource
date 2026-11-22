@@ -22,17 +22,20 @@ namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 /// The forms: <c>count(*)</c>, with an optional <c>FILTER</c> and an optional <c>OVER</c>; <c>row_number()</c>,
 /// <c>rank()</c>, <c>dense_rank()</c>, <c>percent_rank()</c> and <c>cume_dist()</c> with an <c>OVER</c>; a constant,
 /// a quoted literal with its cast, a number, <c>true</c> or <c>false</c>, and <c>NULL::type</c>, which is the one
-/// that can be <c>NULL</c>; the tests <c>IS NULL</c>, <c>IS NOT NULL</c> and <c>IS DISTINCT FROM</c>, of a primary
-/// or of a parameter or an <c>InitPlan</c>'s value, and the <c>NOT</c> of the last, which is how
-/// <c>IS NOT DISTINCT FROM</c> prints; <c>COALESCE</c>, <c>GREATEST</c> and
+/// that can be <c>NULL</c>; the null tests <c>IS NULL</c> and <c>IS NOT NULL</c>, of a primary or of a parameter or
+/// an <c>InitPlan</c>'s value; <c>COALESCE</c>, <c>GREATEST</c> and
 /// <c>LEAST</c> with an argument that cannot be <c>NULL</c>, or with a plain reference to each side of the full join
 /// that computes the entry (<see cref="ExpressionContext.ProvedOnFullJoinSide" />), since each row of such a join has
 /// a row of one side at least; and a <c>CASE</c> with an <c>ELSE</c> whose every result cannot be.  A <c>CASE</c>
 /// written without an <c>ELSE</c> prints <c>ELSE NULL::type</c>.  Each of the forms that is not <c>NULL</c> is typed
 /// from its arguments or results that are proved of a known type, as the next paragraph says.
+/// <c>IS DISTINCT FROM</c>, and the <c>NOT</c> of it, which is how <c>IS NOT DISTINCT FROM</c> prints, is no such
+/// form: it calls the <c>=</c> the parser chose, which may be a user's that answers <c>NULL</c> for two values that
+/// are not, and the plan prints the test the same whichever <c>=</c> it is.  <see cref="TypeOf" /> alone reads it, as
+/// a <c>boolean</c>.
 /// </para>
 /// <para>
-/// A value is also proved with its type (<see cref="ProvedTypeOf" />): a constant, a test, <c>count(*)</c> or a
+/// A value is also proved with its type (<see cref="ProvedTypeOf" />): a constant, a null test, <c>count(*)</c> or a
 /// ranking of the type <see cref="TypeOf" /> gives, and a reference that is part of the entry of the type the walk
 /// proves.  Over such values, an operator in parentheses of its own, <c>(A op B)</c>, and a function,
 /// <c>name(a, ...)</c>, are not <c>NULL</c> when <see cref="TotalFunctions" /> holds their name with exactly the
@@ -79,8 +82,8 @@ namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 /// <c>pg_catalog</c>'s functions first (<see cref="PostgresSearchPath" />): the plan prints a function bare whenever
 /// the search path finds it, so <c>count(*)</c> may be another schema's aggregate.  An operator, a cast and a
 /// literal's type are read only then too, since the plan prints an operator and a type's name bare whenever the path
-/// finds them.  <c>COALESCE</c>, <c>GREATEST</c>, <c>LEAST</c>, <c>CASE</c> and the tests are syntax, and no search
-/// path changes them.
+/// finds them.  <c>COALESCE</c>, <c>GREATEST</c>, <c>LEAST</c>, <c>CASE</c> and the null tests are syntax, and no
+/// search path changes them.
 /// </para>
 /// <para>
 /// The text alone cannot tell a value the root computes from one a node under a join computed and printed by its
@@ -118,8 +121,8 @@ internal static partial class PlanExpression
 
     /// <summary>
     /// The type of an entry that is, as a whole, a value proved not <c>NULL</c> of a known type, or null: a constant,
-    /// a test, <c>count(*)</c> or a ranking as <see cref="TypeOf" /> types them, or an operator, a function or a cast
-    /// of the forms the remarks give, a <c>COALESCE</c>, a <c>GREATEST</c>, a <c>LEAST</c> and a <c>CASE</c> among
+    /// a null test, <c>count(*)</c> or a ranking as <see cref="TypeOf" /> types them, or an operator, a function or a
+    /// cast of the forms the remarks give, a <c>COALESCE</c>, a <c>GREATEST</c>, a <c>LEAST</c> and a <c>CASE</c> among
     /// them, of the type their proved arguments or results share.  A reference that is the whole entry is never asked.
     /// </summary>
     /// <param name="entry">The entry as the plan prints it.</param>
@@ -542,33 +545,33 @@ internal static partial class PlanExpression
             _tokens[at].Kind is Kind.Open or Kind.Word or Kind.Number or Kind.String or Kind.QuotedName
             || (Is(at, Kind.Other) && Text(at).StartsWith('$'));
 
-        // Inside one pair of parentheses: x IS NULL, x IS NOT NULL, x IS DISTINCT FROM y, or NOT of the last in a
-        // pair of its own.  Each operand is one primary, or a parameter or an InitPlan's value (IsOperand), with an
-        // optional cast.
-        private bool IsTest(int from, int to)
+        // Inside one pair of parentheses: x IS NULL or x IS NOT NULL, never NULL whatever x is.  The operand is one
+        // primary, or a parameter or an InitPlan's value (IsOperand), with an optional cast.
+        private bool IsNullTest(int from, int to)
+        {
+            if (to - from >= 3 && IsWord(to - 2, "IS") && IsWord(to - 1, "NULL") && IsOperand(from, to - 2))
+            {
+                return true;
+            }
+
+            return to - from >= 4
+                && IsWord(to - 3, "IS")
+                && IsWord(to - 2, "NOT")
+                && IsWord(to - 1, "NULL")
+                && IsOperand(from, to - 3);
+        }
+
+        // Inside one pair of parentheses: a null test, x IS DISTINCT FROM y, or NOT of the last in a pair of its own.
+        // Each is a boolean, but only a null test is never NULL: the others call the = the parser chose, which may be
+        // a user's that answers NULL, and the plan prints them the same whichever = it is.
+        private bool IsBooleanTest(int from, int to)
         {
             if (to - from >= 2 && IsWord(from, "NOT") && IsGroup(from + 1, to))
             {
                 return IsDistinct(from + 2, to - 1);
             }
 
-            if (to - from >= 3 && IsWord(to - 2, "IS") && IsWord(to - 1, "NULL") && IsOperand(from, to - 2))
-            {
-                return true;
-            }
-
-            if (
-                to - from >= 4
-                && IsWord(to - 3, "IS")
-                && IsWord(to - 2, "NOT")
-                && IsWord(to - 1, "NULL")
-                && IsOperand(from, to - 3)
-            )
-            {
-                return true;
-            }
-
-            return IsDistinct(from, to);
+            return IsNullTest(from, to) || IsDistinct(from, to);
         }
 
         private bool IsDistinct(int from, int to)
@@ -589,8 +592,8 @@ internal static partial class PlanExpression
         // The index after the token, or after the group a parenthesis or a bracket opens.
         private int Next(int at) => _closes[at] >= 0 ? _closes[at] + 1 : at + 1;
 
-        // The operand of a test: one primary, or a value the plan computes elsewhere, with an optional cast.  A test
-        // is never null whatever its operand, so the operand need not be proved.
+        // The operand of a test: one primary, or a value the plan computes elsewhere, with an optional cast.  A null
+        // test is never null whatever its operand, so the operand need not be proved.
         private bool IsOperand(int from, int to)
         {
             if ((Computed(from, to) ?? Primary(from, to)) is not { } end)
