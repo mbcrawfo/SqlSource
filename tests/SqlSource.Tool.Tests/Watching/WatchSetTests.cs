@@ -301,6 +301,7 @@ public sealed class WatchSetTests
     [InlineData("App/obj/Debug/net8.0/Generated.cs")]
     [InlineData("App/obj/App.csproj.nuget.g.props")]
     [InlineData(".git/index")]
+    [InlineData("App/.git/x/New.cs")]
     [InlineData("App/Queries/bin/New.sql")]
     public void Classify_UnderBinObjOrGit_IsNone(string path)
     {
