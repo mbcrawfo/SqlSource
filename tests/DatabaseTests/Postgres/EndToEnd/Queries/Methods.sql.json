@@ -902,8 +902,8 @@
             "schema": "pg_catalog",
             "internalName": "int4"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "set-operation",
           "origin": null,
           "identity": null,
           "computed": null
@@ -946,8 +946,8 @@
             "schema": "pg_catalog",
             "internalName": "int4"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "set-operation",
           "origin": null,
           "identity": null,
           "computed": null
@@ -990,8 +990,8 @@
             "schema": "pg_catalog",
             "internalName": "int4"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "set-operation",
           "origin": null,
           "identity": null,
           "computed": null
@@ -1034,8 +1034,8 @@
             "schema": "pg_catalog",
             "internalName": "int4"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "set-operation",
           "origin": null,
           "identity": null,
           "computed": null
@@ -1078,8 +1078,8 @@
             "schema": "pg_catalog",
             "internalName": "int4"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "set-operation",
           "origin": null,
           "identity": null,
           "computed": null
@@ -1122,8 +1122,8 @@
             "schema": "pg_catalog",
             "internalName": "int4"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "set-operation",
           "origin": null,
           "identity": null,
           "computed": null

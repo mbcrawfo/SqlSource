@@ -24,9 +24,10 @@ namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 /// a quoted literal with its cast, a number, <c>true</c> or <c>false</c>, and <c>NULL::type</c>, which is the one
 /// that can be <c>NULL</c>; the null tests <c>IS NULL</c> and <c>IS NOT NULL</c>, of a primary or of a parameter or
 /// an <c>InitPlan</c>'s value; <c>COALESCE</c>, <c>GREATEST</c> and
-/// <c>LEAST</c> with an argument that cannot be <c>NULL</c>, or with a plain reference to each side of the full join
-/// that computes the entry (<see cref="ExpressionContext.ProvedOnFullJoinSide" />), since each row of such a join has
-/// a row of one side at least; and a <c>CASE</c> with an <c>ELSE</c> whose every result cannot be.  A <c>CASE</c>
+/// <c>LEAST</c> with an argument that cannot be <c>NULL</c>, or with a plain reference or its cast within a family
+/// for each side of a full join at or under the node that computes the entry
+/// (<see cref="ExpressionContext.ProvedOnFullJoinSides" />), since each row of such a join has a row of one side at
+/// least; and a <c>CASE</c> with an <c>ELSE</c> whose every result cannot be.  A <c>CASE</c>
 /// written without an <c>ELSE</c> prints <c>ELSE NULL::type</c>.  Each of the forms that is not <c>NULL</c> is typed
 /// from its arguments or results that are proved of a known type, as the next paragraph says.
 /// <c>IS DISTINCT FROM</c>, and the <c>NOT</c> of it, which is how <c>IS NOT DISTINCT FROM</c> prints, is no such
@@ -622,7 +623,8 @@ internal static partial class PlanExpression
 
         // The index after a value the plan computes elsewhere that starts the span, or null: a parameter, $1, which
         // PostgreSQL 14 to 16 also print for an InitPlan's value, or an InitPlan's value as 17 and later print it,
-        // (InitPlan 1).col1.  A list's null test is described with such a value.  It is read as a test's operand alone.
+        // (InitPlan 1).col1.  A list's null test is described with such a value.  It is read as a test's operand, and
+        // as an InitPlan's value only through ExpressionContext.InitPlanTypeOf, which answers for the whole entry.
         private int? Computed(int from, int to)
         {
             if (
@@ -647,6 +649,9 @@ internal static partial class PlanExpression
                 ? from + 6
                 : null;
         }
+
+        // Whether the span is wholly a value the plan computes elsewhere.
+        private bool IsComputedValue(int from, int to) => Computed(from, to) == to;
 
         // The index after one primary that starts the span, or null: a group, a literal, a number, a name with its
         // dots, or such a name called with a group.

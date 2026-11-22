@@ -402,14 +402,32 @@ public sealed class WalkTests(PostgresDatabases postgres)
         Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullExpression]);
     }
 
+    // A cast within a family is NULL only for a NULL, and a LEFT JOIN under a side leaves the relation it keeps as it
+    // was, so each form is over one NOT NULL column of each side.
+    [Theory]
+    [InlineData("SELECT coalesce(o.id, u.id) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
+    [InlineData(
+        "SELECT coalesce(u.id, o.user_id) AS k "
+            + "FROM (users u LEFT JOIN bookings b ON b.user_id = u.id) FULL JOIN orders o ON o.user_id = u.id"
+    )]
+    public async Task DescribeAsync_CoalesceAtAFullJoinOverACastOrAKeptRelation_IsProved(string sql)
+    {
+        var (description, plan) = await DescribeWithSettingsAsync(sql);
+
+        var compact = plan.Replace("\\", "", StringComparison.Ordinal).Replace(" ", "", StringComparison.Ordinal);
+        compact.ShouldContain("\"JoinType\":\"Full\"", Case.Sensitive, "the plan holds no full join");
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullExpression]);
+    }
+
     // A COALESCE at a full join that is not over one NOT NULL column of each side, each extended by that join alone:
-    // both of one side, a side with a LEFT JOIN under it, the full join on the side a LEFT JOIN extends, a cast of a
-    // side's column, and a side's column that may be NULL.  The upper condition of the third is not strict in either
-    // side, so the planner keeps the full join, and each plan is asserted to hold one.
+    // both of one side, a column a LEFT JOIN under its side extends, the full join on the side a LEFT JOIN extends, a
+    // cast out of the column's family, and a side's column that may be NULL.  The upper condition of the third is not
+    // strict in either side, so the planner keeps the full join, and each plan is asserted to hold one.
     [Theory]
     [InlineData("SELECT coalesce(o.user_id, o.user_id) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
     [InlineData(
-        "SELECT coalesce(u.id, o.user_id) AS k "
+        "SELECT coalesce(b.user_id, o.user_id) AS k "
             + "FROM (users u LEFT JOIN bookings b ON b.user_id = u.id) FULL JOIN orders o ON o.user_id = u.id"
     )]
     [InlineData(
@@ -417,7 +435,7 @@ public sealed class WalkTests(PostgresDatabases postgres)
             + "FROM bookings b LEFT JOIN (users u FULL JOIN orders o ON o.user_id = u.id) "
             + "ON b.user_id = coalesce(u.id, o.user_id)"
     )]
-    [InlineData("SELECT coalesce(o.id, u.id) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
+    [InlineData("SELECT coalesce(u.id::text, o.id::text) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
     [InlineData("SELECT coalesce(u.deleted_at, o.placed_at) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
     public async Task DescribeAsync_CoalesceAtAFullJoinNotOverEachSide_KeepsNoOrigin(string sql)
     {

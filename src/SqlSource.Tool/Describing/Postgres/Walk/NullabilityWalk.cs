@@ -77,6 +77,11 @@ internal sealed record WalkOutcome(
 /// <see cref="SetOperationTypes.CrossFamilyPairs" />, so that an entry of a scanned plan whose type
 /// <see cref="SetOperationTypes.CannotReach" /> the column's is not that column.
 /// </param>
+/// <param name="ParameterCount">
+/// How many parameters the statement has, numbered from 1.  PostgreSQL before 17 prints an <c>InitPlan</c>'s value as
+/// <c>$k</c>, numbered from 0, as it prints the statement's parameter <c>$k</c>, so a <c>$k</c> from 1 to this count is
+/// never read as an <c>InitPlan</c>'s.
+/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
@@ -85,7 +90,8 @@ internal sealed record WalkScope(
     IReadOnlyList<long> ColumnTypes,
     CatalogNames? CatalogAlone = null,
     bool DistrustsJoinReduction = false,
-    bool NoCastAcrossFamilies = false
+    bool NoCastAcrossFamilies = false,
+    int ParameterCount = 0
 );
 
 /// <summary>
