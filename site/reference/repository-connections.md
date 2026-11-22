@@ -42,6 +42,7 @@ A [synchronous method](repositories.md#synchronous-repository-methods) gets its 
 - **Once one member is marked, only marked members count.**  The build then finds no member of the repository by its name or type.  A factory or a static member of the project still gives the connection of a database that no marked member is for.
 - **The build uses a member of a base type when the generated code reaches that member by its name, as in C#.**  A member of the repository, or of a base type between them, can hide it.  A member that the repository cannot reach, such as a `private` member of a base type between them, hides nothing.
   - A method hides a base method of the same parameters.  It also hides one whose call it accepts.  So `Open(int retries)` leaves a marked `Open()` in use, and `Open(int retries = 3)` hides it.
+  - An `override` counts as the method it overrides, in the type that declares that method.  So an override of a virtual `Open(int retries = 3)` of the same base type leaves a marked `Open()` in use.
   - A field, property or event hides a base method only when you can invoke it, as with a delegate type.
   - Any member but a generic nested type hides a base field or property of its name.
 - **An override of a marked member is marked as the member it overrides.**

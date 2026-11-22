@@ -690,6 +690,52 @@ public sealed class HeldFactoryReaderTests
         shape.HeldCandidates.ShouldHaveSingleItem().Name.ShouldBe("Open");
     }
 
+    // An override stands for the virtual it overrides, so a class constraint's override of an object member leaves the
+    // interface's member to the call, and an override of a class's virtual hides it as that virtual does.
+    [Theory]
+    [InlineData("string ToString();", "public class FactoryBase { public override string ToString() => \"\"; }", 1)]
+    [InlineData("string ToString();", "public record FactoryBase;", 1)]
+    [InlineData(
+        "string ToString();",
+        "public class Lower { public override string ToString() => \"\"; }\npublic class FactoryBase : Lower;",
+        1
+    )]
+    [InlineData("int GetHashCode();", "public class FactoryBase { public override int GetHashCode() => 0; }", 1)]
+    [InlineData("bool Equals(object? other);", "public record FactoryBase;", 1)]
+    [InlineData(
+        "DbConnection Open();",
+        "public class Lower { public virtual DbConnection Open() => null!; }\n"
+            + "public class FactoryBase : Lower { public override DbConnection Open() => null!; }",
+        0
+    )]
+    public void Read_InterfaceMemberBesideAClassConstraintsOverride_IsHiddenOnlyByAClassVirtual(
+        string interfaceMember,
+        string classes,
+        int candidates
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    {{interfaceMember}}
+                }
+
+                {{classes}}
+
+                [SqlSourceGenerate]
+                public partial class UserRepository<TFactory>(TFactory dbf)
+                    where TFactory : FactoryBase, IDatabaseFactory;
+            }
+            """
+        );
+
+        shape.HeldCandidates.Count.ShouldBe(candidates);
+    }
+
     // object is no class constraint, so its ToString leaves an interface's member of that name to the call.
     [Fact]
     public void Read_InterfaceMemberNamedForAnObjectMember_StaysACandidate()

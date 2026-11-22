@@ -506,6 +506,7 @@ public sealed class ConnectionCandidateReaderTests
     [InlineData("Open(params int[] retries)", false)]
     [InlineData("Open(in int retries = 3)", false)]
     [InlineData("Open(int retries)", true)]
+    [InlineData("Open(int required, int retries = 3)", true)]
     [InlineData("Open<T>()", true)]
     [InlineData("Open<T>(T value = default!)", true)]
     [InlineData("Open(ref int retries)", true)]
@@ -632,6 +633,7 @@ public sealed class ConnectionCandidateReaderTests
     [Theory]
     [InlineData("~RepositoryBase() { }", "private int Finalize(int retries = 3) => retries;")]
     [InlineData("protected NpgsqlConnection Open<T>() => null!;", "private int Open(int retries = 3) => retries;")]
+    [InlineData("protected NpgsqlConnection Open(int value) => null!;", "private int Open(object value) => 0;")]
     public void Read_MarkedMethodThatIsNeverCalled_IsNotHiddenByAnOverload(string marked, string overload)
     {
         var shape = RepositoryShapes.Of(
@@ -654,6 +656,82 @@ public sealed class ConnectionCandidateReaderTests
         );
 
         shape.Candidates.ShouldHaveSingleItem().Type.ShouldBe(CandidateType.Unsupported);
+    }
+
+    // Signatures are compared by their parts: an array's rank, a generic type's arguments and the type it is nested in.
+    [Theory]
+    [InlineData("Open(int[] values)", "private int Open(int[,] values) => 0;", 1)]
+    [InlineData("Open<T>(List<T> values)", "private new int Open<T>(List<T> values) => 0;", 0)]
+    [InlineData("Open<T>(Dictionary<T, int> values)", "private int Open<T>(Dictionary<T, string> values) => 0;", 1)]
+    [InlineData("Open<T>(Outer<T>.Inner value)", "private new int Open<T>(Outer<T>.Inner value) => 0;", 0)]
+    [InlineData("Open<T>(Outer<T>.Inner value)", "private int Open<T>(Outer<T[]>.Inner value) => 0;", 1)]
+    public void Read_MarkedMethodBesideAnOverloadOfACompositeType_IsHiddenOnlyByItsSignature(
+        string marked,
+        string overload,
+        int candidates
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                using System.Collections.Generic;
+
+                public sealed class Outer<T>
+                {
+                    public sealed class Inner;
+                }
+
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    protected NpgsqlConnection {{marked}} => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    {{overload}}
+                }
+            }
+            """
+        );
+
+        shape.Candidates.Count.ShouldBe(candidates);
+    }
+
+    // An override of a property replaces only the accessors that it declares, so a marked one it leaves is still read.
+    [Theory]
+    [InlineData("{ [SqlSourceConnection] get; set; }", "{ set { } }", true)]
+    [InlineData("{ get; [SqlSourceConnection] set; }", "{ get => \"\"; }", true)]
+    [InlineData("{ [SqlSourceConnection] get; set; }", "{ get => \"\"; }", false)]
+    public void Read_MarkedAccessorBesideAnOverrideOfItsProperty_IsOneUnsupportedCandidate(
+        string accessors,
+        string overrideAccessors,
+        bool isInherited
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    protected virtual string Source {{accessors}} = "";
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    protected override string Source {{overrideAccessors}}
+                }
+            }
+            """
+        );
+
+        var candidate = shape.Candidates.ShouldHaveSingleItem();
+        candidate.Type.ShouldBe(CandidateType.Unsupported);
+        candidate.IsInherited.ShouldBe(isInherited);
     }
 
     // C# leaves an override out of overload resolution and looks at the virtual it overrides, so an override hides a

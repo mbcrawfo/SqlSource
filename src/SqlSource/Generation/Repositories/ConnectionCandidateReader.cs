@@ -103,7 +103,8 @@ internal static class ConnectionCandidateReader
     /// <summary>
     /// The members of the type and of its base types, the type's own first, with whether each is a base type's: the
     /// type's own all, and a base type's only when the type can reach it and <see cref="MemberHiding" /> says that no
-    /// member of a more derived type overrides or hides it.
+    /// member of a more derived type overrides or hides it.  A base type's method comes only when it is marked, since
+    /// nothing reads one that is not, and the hiding of each overload is the costly part of this walk.
     /// </summary>
     /// <param name="type">The repository.</param>
     /// <param name="compilation">The compilation, which says which members of a base type the type can reach.</param>
@@ -121,7 +122,8 @@ internal static class ConnectionCandidateReader
                 if (
                     !isInherited
                     || (
-                        IsReachable(member, type, compilation)
+                        (member is not IMethodSymbol || FindMarking(member) is not null)
+                        && IsReachable(member, type, compilation)
                         && !MemberHiding.IsHidden(member, current, lookedIn, type, compilation, throughType: null)
                     )
                 )

@@ -26,12 +26,13 @@ internal static class MemberHiding
 
     /// <summary>
     /// Whether a member that the type can reach, of a type that the lookup prefers to the member's, hides the member
-    /// from the read or call that a repository's method writes.  A method hides a method of its signature or whose call
-    /// it can take, and a value of its name.  A member that is not a method hides a value of its name, and a method
-    /// only when it can be invoked.  A generic nested type hides nothing, since the code names no type arguments.  An
-    /// indexer hides an indexer of its signature, and an accessor or a backing field is hidden with the member it
-    /// belongs to.  Two interfaces that neither derives from the other hide nothing of each other, so a call that both
-    /// answer is ambiguous.  Only the members of the name are looked at.
+    /// from the read or call that a repository's method writes.  A method hides a method of its signature, a method
+    /// whose call it can take unless it is an override, and a value of its name.  A member that is not a method hides a
+    /// value of its name, and a method only when it can be invoked.  A generic nested type hides nothing, since the
+    /// code names no type arguments.  An indexer hides an indexer of its signature, and an accessor or a backing field
+    /// is hidden with the member it belongs to, by an override only if that declares the accessor.  Two interfaces that
+    /// neither derives from the other hide nothing of each other, so a call that both answer is ambiguous.  Only the
+    /// members of the name are looked at.
     /// </summary>
     /// <param name="member">The member.</param>
     /// <param name="declaring">The type the walk found it in.</param>
@@ -52,7 +53,8 @@ internal static class MemberHiding
         for (var index = 0; index < lookedIn.Count; index++)
         {
             var derived = lookedIn[index];
-            if (!DerivesFrom(derived, declaring) && !IsClassOverInterface(derived, declaring))
+            var isDerived = DerivesFrom(derived, declaring);
+            if (!isDerived && !IsClassOverInterface(derived, declaring))
             {
                 continue;
             }
@@ -60,10 +62,13 @@ internal static class MemberHiding
             var named = derived.GetMembers(hidden.Name);
             for (var each = 0; each < named.Length; each++)
             {
-                // The member's own access and not its getter's: C# binds to a property it can reach, then fails on a
-                // getter it cannot.
+                // Over an interface, an override stands for the virtual it overrides, which this walk reaches unless it
+                // is object's, which hides no interface member.  The member's own access counts and not its getter's:
+                // C# binds to a property it can reach, then fails on a getter it cannot.
                 if (
-                    Hides(named[each], hidden, compilation)
+                    (isDerived || !named[each].IsOverride)
+                    && DeclaresTheAccessor(named[each], member)
+                    && Hides(named[each], hidden, compilation)
                     && compilation.IsSymbolAccessibleWithin(named[each], type, throughType)
                 )
                 {
@@ -74,6 +79,16 @@ internal static class MemberHiding
 
         return false;
     }
+
+    // An override of a property replaces only the accessors it declares, so it leaves the others of the base's.
+    private static bool DeclaresTheAccessor(ISymbol hiding, ISymbol member) =>
+        hiding is not IPropertySymbol { IsOverride: true } property
+        || member switch
+        {
+            IMethodSymbol { MethodKind: MethodKind.PropertyGet } => property.GetMethod is not null,
+            IMethodSymbol { MethodKind: MethodKind.PropertySet } => property.SetMethod is not null,
+            _ => true,
+        };
 
     // A member that no code can name hides only its own kind: an indexer, or a destructor or operator of its signature.
     // An override takes no call: C# leaves it out of overload resolution for the virtual it overrides, which is walked.
