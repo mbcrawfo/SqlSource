@@ -984,8 +984,9 @@ internal static class MethodPlanner
         return true;
     }
 
-    // What a token of the name would hide of the source, as SQLSRC275 says it: the primary-constructor parameter that
-    // gives the connection or holds the factory that does.  Null when it hides nothing.
+    // What a token of the name would hide of the source, as SQLSRC275 says it: the primary-constructor parameter, or
+    // the static member reached by its name, that gives the connection or holds the factory that does.  Null when it
+    // hides nothing.
     private static string? HiddenSourceReason(ConnectionSource? source, string name)
     {
         if (source?.LeadingName is not { } leadingName || !string.Equals(leadingName, name, StringComparison.Ordinal))
@@ -993,16 +994,20 @@ internal static class MethodPlanner
             return null;
         }
 
-        if (source.Member == CandidateMember.Parameter)
+        var what =
+            (source.HolderMember ?? source.Member) == CandidateMember.Parameter
+                ? "the primary-constructor parameter '"
+                : "the static member '";
+        if (source.HolderName is null)
         {
-            return "the primary-constructor parameter '"
+            return what
                 + leadingName
                 + "', which gives the repository methods of '"
                 + source.TypeName
                 + "' their connection";
         }
 
-        return "the primary-constructor parameter '"
+        return what
             + leadingName
             + "', through which the repository methods of '"
             + source.TypeName

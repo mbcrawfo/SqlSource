@@ -261,7 +261,7 @@ internal sealed class QueryMethodLocals
             return (local, source.AccessText, local, empty, empty);
         }
 
-        // An instance member's access is this, a dot and its name; a static one's starts with its type, from global::.
+        // An instance member's access is this, a dot and its name; a static one's starts with its type or its name.
         if (!source.AccessText.StartsWith(This, StringComparison.Ordinal))
         {
             return (empty, empty, source.AccessText, empty, empty);

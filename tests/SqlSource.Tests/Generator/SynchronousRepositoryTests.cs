@@ -473,19 +473,23 @@ public sealed class SynchronousRepositoryTests
             .ShouldBe(1);
     }
 
-    // A pair's synchronous source, a parameter, is hidden by a token of its name, though its asynchronous one, a
-    // method, is not: each form's own source is checked.
+    // A pair held through two parameters: a token of the asynchronous factory's holder hides only the second form's
+    // source, so that form is checked too.
     [Fact]
-    public void Run_MethodTypeBothTokenNamedAsTheSynchronousParameter_ReportsSqlsrc275()
+    public void Run_MethodTypeBothTokenNamedAsTheAsynchronousHolder_ReportsSqlsrc275()
     {
         var source = SampleOf(
-            "public partial class Sample([SqlSourceConnection] string open)\n    {\n"
+            "public partial class Sample(SyncFactory a, AsyncFactory b);\n\n"
+                + "    public sealed class SyncFactory\n    {\n"
                 + "        [SqlSourceConnection]\n"
-                + "        private static Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken) =>\n"
+                + "        public NpgsqlConnection Open() => new NpgsqlConnection();\n    }\n\n"
+                + "    public sealed class AsyncFactory\n    {\n"
+                + "        [SqlSourceConnection]\n"
+                + "        public Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken) =>\n"
                 + "            Task.FromResult(new NpgsqlConnection());\n    }"
         );
         var file = UsersFile(
-            "-- generator: method-type=both\n-- name: GetFrom\n-- token: {{open:users}}\nSELECT id FROM {{open}};\n"
+            "-- generator: method-type=both\n-- name: GetFrom\n-- token: {{b:users}}\nSELECT id FROM {{b}};\n"
         );
 
         var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], source);
@@ -493,7 +497,8 @@ public sealed class SynchronousRepositoryTests
         var problems = run.Problems();
         problems.Count.ShouldBe(1);
         problems[0].ShouldStartWith("SQLSRC275 ");
-        problems[0].ShouldContain("the primary-constructor parameter 'open'");
+        problems[0].ShouldContain("the primary-constructor parameter 'b', through which");
+        problems[0].ShouldContain("'b.OpenAsync'");
     }
 
     // A method of no argument named Finalize has the signature of object.Finalize, which the compiler warns about

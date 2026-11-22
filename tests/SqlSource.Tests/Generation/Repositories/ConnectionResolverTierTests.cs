@@ -146,6 +146,7 @@ public sealed class ConnectionResolverTierTests
         resolved.HolderAccessText.ShouldBe("this.@event");
         resolved.HolderName.ShouldBe("event");
         resolved.MemberName.ShouldBe("event.default");
+        resolved.HolderMember.ShouldBe(CandidateMember.Field);
     }
 
     // A static holder of a generic repository is reached through the type in full, with its type parameters.
@@ -161,6 +162,29 @@ public sealed class ConnectionResolverTierTests
         resolved.AccessText.ShouldBe("global::App.UserRepository<T>.F.Open");
         resolved.HolderAccessText.ShouldBe("global::App.UserRepository<T>.F");
         resolved.LeadingName.ShouldBeNull();
+    }
+
+    // A static holder of a type that repeats a type parameter is reached by its own name, which a local could hide.
+    [Fact]
+    public void Resolve_StaticHolderInATypeThatRepeatsATypeParameter_IsReachedByItsName()
+    {
+        var type = TestModels.Type(
+            types:
+            [
+                new TypeDeclaration("class", "Outer", "Outer", "<T>", 1),
+                new TypeDeclaration("class", "Repo", "Repo", "<T>", 1, RepeatsATypeParameter: true),
+            ]
+        );
+        var held = Held("F", "Open", holderMember: CandidateMember.Field, holderIsStatic: true);
+
+        var resolved = ConnectionResolver
+            .Resolve(type, Tiers([], held: [held]), [Main])
+            .Sources.ShouldHaveSingleItem()
+            .Asynchronous;
+
+        resolved.AccessText.ShouldBe("F.Open");
+        resolved.HolderAccessText.ShouldBe("F");
+        resolved.LeadingName.ShouldBe("F");
     }
 
     // A holder of a struct cannot be null, so a method reads its member unchecked; any other holder is checked.

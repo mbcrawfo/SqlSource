@@ -571,6 +571,71 @@ public sealed class ConnectionResolverTests
             .Asynchronous.AccessText.ShouldBe("global::App.@class<@int>.ConnectionString");
     }
 
+    // An asynchronous method cannot use a bare await as a name, so each whole await of the path gets its @, and a name
+    // that holds the word or already has the @ stays as it is.
+    [Theory]
+    [InlineData("App", "await", "", "global::App.@await.X")]
+    [InlineData("await.Inner", "Repo", "", "global::@await.Inner.Repo.X")]
+    [InlineData("App", "@await", "", "global::App.@await.X")]
+    [InlineData("App", "awaiter", "", "global::App.awaiter.X")]
+    [InlineData("App", "Repo", "<await, Tawait, await2>", "global::App.Repo<@await, Tawait, await2>.X")]
+    public void Resolve_StaticMemberWithAwaitInItsPath_EscapesEachWholeAwait(
+        string @namespace,
+        string name,
+        string typeParameters,
+        string access
+    )
+    {
+        var value = name.TrimStart('@');
+        var arity = typeParameters.Length == 0 ? 0 : typeParameters.Split(',').Length;
+        var type = TestModels.Type(
+            @namespace: @namespace,
+            types: [new TypeDeclaration("class", name, value, typeParameters, arity)]
+        );
+        var candidate = Candidate("X", CandidateType.ConnectionString, CandidateMember.Property) with
+        {
+            IsStatic = true,
+        };
+
+        var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
+
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe(access);
+    }
+
+    // A type that repeats a type parameter at any level has no path that names it as constructed, so a static member is
+    // reached by its own name, which a local could hide, with an @ on a name an asynchronous method cannot use.
+    [Theory]
+    [InlineData(0, "X", "X")]
+    [InlineData(1, "X", "X")]
+    [InlineData(1, "await", "@await")]
+    [InlineData(1, "class", "@class")]
+    public void Resolve_StaticMemberInATypeThatRepeatsATypeParameter_IsReachedByItsName(
+        int repeatingLevel,
+        string name,
+        string access
+    )
+    {
+        var type = TestModels.Type(
+            types:
+            [
+                new TypeDeclaration("class", "Outer", "Outer", "<T>", 1, RepeatsATypeParameter: repeatingLevel == 0),
+                new TypeDeclaration("class", "Repo", "Repo", "<T>", 1, RepeatsATypeParameter: repeatingLevel == 1),
+            ]
+        );
+        var candidate = Candidate(name, CandidateType.ConnectionString, CandidateMember.Property) with
+        {
+            IsStatic = true,
+        };
+
+        var source = ConnectionResolver
+            .Resolve(type, Shape(candidate), [Main])
+            .Sources.ShouldHaveSingleItem()
+            .Asynchronous;
+
+        source.AccessText.ShouldBe(access);
+        source.LeadingName.ShouldBe(name);
+    }
+
     // A source that returns no task serves both kinds of method.
     [Fact]
     public void Resolve_OneSourceThatReturnsNoTask_IsTheSourceOfBothKindsOfMethod()

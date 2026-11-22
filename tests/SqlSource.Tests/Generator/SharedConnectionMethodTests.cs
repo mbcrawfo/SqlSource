@@ -518,6 +518,39 @@ public sealed class SharedConnectionMethodTests
         run.Sources[MethodsFile].ShouldContain("global::App.Sample.Sample");
     }
 
+    // A static holder of a type that repeats a type parameter is reached by its own name, which a token of that name
+    // would hide.
+    [Fact]
+    public void Run_TokenNamedLikeAStaticHolderInATypeThatRepeatsATypeParameter_ReportsSqlsrc275()
+    {
+        const string Source =
+            Factory
+            + """
+                    public partial class Outer<T>
+                    {
+                        [SqlSourceGenerate(Source = ".", GenerateInterface = false)]
+                        public partial class Sample<T>
+                        {
+                            private static readonly IDatabaseFactory? dbf = null;
+                        }
+                    }
+                }
+                """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetFrom\n-- token: {{dbf:users}}\nSELECT id FROM {{dbf}};\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], Source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,17): The token 'dbf' of the query 'GetFrom' has the name of "
+                    + "the static member 'dbf', through which the repository methods of 'App.Outer<T>.Sample<T>' "
+                    + "reach their connection 'dbf.Open'.  Rename the token.",
+            ]);
+    }
+
     // Under method-type=both, each method of a held pair calls its own member through the holder: the asynchronous
     // method awaits the asynchronous one with its token, and the synchronous method calls the synchronous one.
     [Fact]

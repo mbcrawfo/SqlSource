@@ -1133,7 +1133,98 @@ public sealed class MethodCompileTests
                 "[SqlSourceGenerate(Source = \".\")] public partial class Sample<T> : RepositoryBase;",
                 "global::App.Sample<T>.Sample"
             },
+            {
+                "namespace App {",
+                "}",
+                "Sample",
+                "public partial class await { [SqlSourceGenerate(Source = \".\")] "
+                    + "public partial class Sample : RepositoryBase; }",
+                "global::App.@await.Sample.Sample"
+            },
+            {
+                "namespace App {",
+                "}",
+                "Sample",
+                "public partial class Outer<await> { [SqlSourceGenerate(Source = \".\")] "
+                    + "public partial class Sample : RepositoryBase; }",
+                "global::App.Outer<@await>.Sample.Sample"
+            },
+            {
+                "namespace App {",
+                "}",
+                "Sample",
+                "[SqlSourceGenerate(Source = \".\")] public partial class Sample<await> : RepositoryBase;",
+                "global::App.Sample<@await>.Sample"
+            },
         };
+
+    // A type parameter that repeats one of a type around it hides the outer one, so no path can name the repository as
+    // it is constructed, and a simple generic name can bind to a nested type it inherits: the method reaches the member
+    // by its own name.  The interface is off, whose own declaration repeats the parameter and warns.
+    [Theory]
+    [InlineData(
+        "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : RepositoryBase; }"
+    )]
+    [InlineData(
+        "public partial class Outer<@T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : RepositoryBase; }"
+    )]
+    [InlineData(
+        "public partial class A<T> { public partial class B<T> { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : RepositoryBase; } }"
+    )]
+    [InlineData(
+        "public partial class A<T, U> { public partial class B<U> { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : RepositoryBase; } }"
+    )]
+    [InlineData(
+        "public class HidingBase : RepositoryBase { public static class Repo<U> { public static string? Source "
+            + "{ get; set; } } } public partial class Outer<T> { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : HidingBase; }"
+    )]
+    public void Run_StaticAccessInATypeThatRepeatsATypeParameter_UsesTheMembersName(string repository)
+    {
+        var sources =
+            SourcesUsings
+            + "public class Factory\n{\n"
+            + MembersOf("factory", string.Empty)
+            + "}\n\npublic abstract class RepositoryBase\n{\n"
+            + "    [SqlSourceConnection(Database = \"postgres\")]\n"
+            + "    protected static string? Source { get; set; }\n\n"
+            + "    [SqlSourceConnection(Database = \"mssql\")]\n"
+            + "    protected static string? Other { get; set; }\n}\n\n"
+            + repository
+            + "\n}\n";
+        var holders = sources
+            .Replace(
+                "[SqlSourceConnection(Database = \"postgres\")]\n    protected",
+                "protected",
+                StringComparison.Ordinal
+            )
+            .Replace(
+                "[SqlSourceConnection(Database = \"mssql\")]\n    protected",
+                "protected",
+                StringComparison.Ordinal
+            )
+            .Replace("static string? Source", "static Factory? Source", StringComparison.Ordinal)
+            .Replace("    protected static string? Other { get; set; }\n", string.Empty, StringComparison.Ordinal);
+
+        foreach (var source in new[] { sources, holders })
+        {
+            var run = RunRepositories(source);
+
+            run.ShouldBeClean();
+            var methods = run
+                .Sources.Single(file => file.Key.EndsWith("-Methods.g.cs", StringComparison.Ordinal))
+                .Value;
+            methods.ShouldContain("(Source ?? ");
+            methods.ShouldNotContain(".Source ?? ");
+        }
+    }
 
     // A marked member of each engine, of the kind of connection source, instance or static as the modifier says, at
     // the indent of a type's members in a namespace.

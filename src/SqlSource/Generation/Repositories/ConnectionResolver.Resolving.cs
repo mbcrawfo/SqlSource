@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
+using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Placement;
@@ -182,7 +184,7 @@ internal static partial class ConnectionResolver
                 AccessTextOf(candidate.Name, candidate.Member, candidate.IsStatic),
                 candidate.IsAsync,
                 candidate.TakesCancellationToken,
-                LeadingNameOf(candidate.Name, candidate.Member),
+                LeadingNameOf(candidate.Name, candidate.Member, candidate.IsStatic),
                 TypeName,
                 type.IsStruct
             );
@@ -211,21 +213,28 @@ internal static partial class ConnectionResolver
             {
                 MemberName = holder.Name + "." + candidate.Name,
                 AccessText = holderAccess + "." + Escaped(candidate.Name),
-                LeadingName = LeadingNameOf(holder.Name, holder.Member),
+                LeadingName = LeadingNameOf(holder.Name, holder.Member, holder.IsStatic),
                 HolderAccessText = holderAccess,
                 HolderName = holder.Name,
                 HolderCanBeNull = holder.CanBeNull,
+                HolderMember = holder.Member,
                 HolderCastText = candidate.CastTypeText,
             };
         }
 
-        // The name the access starts with, which an argument or a local of the method could hide: only a parameter's.
-        // An instance member is reached through this and a static one from global::, which nothing hides.
-        private static string? LeadingNameOf(string name, CandidateMember member) =>
-            member == CandidateMember.Parameter ? name : null;
+        // Whether a type parameter of the type, or of a type around it, hides an outer one of its name.  No path from
+        // global:: can then name the type as it is constructed, since the outer parameter has no name left to write.
+        private bool RepeatsATypeParameter => type.Types.Any(static each => each.RepeatsATypeParameter);
 
-        // A parameter by its name, a static member through the type in full, which reaches a base type's static member
-        // too and which a member of the type's name cannot hide, and an instance member through this.
+        // The name the access starts with, which an argument or a local of the method could hide: a parameter's, and a
+        // static member's when it is reached by its name.  An instance member is reached through this and any other
+        // static one from global::, which nothing hides.
+        private string? LeadingNameOf(string name, CandidateMember member, bool isStatic) =>
+            member == CandidateMember.Parameter || (isStatic && RepeatsATypeParameter) ? name : null;
+
+        // A parameter by its name, an instance member through this, and a static member through the type in full, which
+        // reaches a base type's static member too and which a member of the type's name cannot hide.  In a type that
+        // repeats a type parameter, a static member is reached by its own name, which binds as the type's code does.
         private string AccessTextOf(string name, CandidateMember member, bool isStatic)
         {
             var escaped = Escaped(name);
@@ -234,14 +243,52 @@ internal static partial class ConnectionResolver
                 return escaped;
             }
 
-            return (isStatic ? FullTypeText() : "this") + "." + escaped;
+            if (!isStatic)
+            {
+                return "this." + escaped;
+            }
+
+            return RepeatsATypeParameter ? WithAwaitEscaped(escaped) : FullTypeText() + "." + escaped;
         }
 
-        // The type from global::, each name and its type parameters as they are written, so a keyword keeps its @.
+        // The type from global::, each name and its type parameters as they are written, so a keyword keeps its @, and
+        // an await gets one, which an asynchronous method needs.
         private string FullTypeText() =>
             "global::"
-            + (type.Namespace.Length > 0 ? type.Namespace + "." : string.Empty)
-            + string.Join(".", type.Types.Select(static declaration => declaration.Name + declaration.TypeParameters));
+            + WithAwaitEscaped(
+                (type.Namespace.Length > 0 ? type.Namespace + "." : string.Empty)
+                    + string.Join(
+                        ".",
+                        type.Types.Select(static declaration => declaration.Name + declaration.TypeParameters)
+                    )
+            );
+
+        // The text with an @ before each identifier that is exactly await, unless it already has one.
+        private static string WithAwaitEscaped(string text)
+        {
+            const string Await = "await";
+            var at = text.IndexOf(Await, StringComparison.Ordinal);
+            if (at < 0)
+            {
+                return text;
+            }
+
+            var escaped = new StringBuilder(text.Length + 1);
+            var copied = 0;
+            for (; at >= 0; at = text.IndexOf(Await, at + Await.Length, StringComparison.Ordinal))
+            {
+                var end = at + Await.Length;
+                var startsAName =
+                    at == 0 || (text[at - 1] != '@' && !SyntaxFacts.IsIdentifierPartCharacter(text[at - 1]));
+                if (startsAName && (end == text.Length || !SyntaxFacts.IsIdentifierPartCharacter(text[end])))
+                {
+                    _ = escaped.Append(text, copied, at - copied).Append('@');
+                    copied = at;
+                }
+            }
+
+            return escaped.Append(text, copied, text.Length - copied).ToString();
+        }
 
         private static string Escaped(string name) => SqlIdentifier.IsReservedKeyword(name) ? "@" + name : name;
 

@@ -270,6 +270,41 @@ public sealed class RepositoryMethodTests
         run.Sources[MethodsFile].ShouldNotContain(" async ");
     }
 
+    // A static source of a type that repeats a type parameter is reached by its own name, which a token of that name
+    // would hide.
+    [Fact]
+    public void Run_TokenNamedLikeAStaticSourceInATypeThatRepeatsATypeParameter_ReportsSqlsrc275()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                public partial class Outer<T>
+                {
+                    [SqlSourceGenerate(Source = ".", GenerateInterface = false)]
+                    public partial class Sample<T>
+                    {
+                        private static readonly string ConnectionString = "";
+                    }
+                }
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetFrom\n-- token: {{ConnectionString:users}}\nSELECT id FROM {{ConnectionString}};\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], Source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,17): The token 'ConnectionString' of the query 'GetFrom' has "
+                    + "the name of the static member 'ConnectionString', which gives the repository methods of "
+                    + "'App.Outer<T>.Sample<T>' their connection.  Rename the token.",
+            ]);
+    }
+
     // A token named like the type hides nothing of a static source, which is reached from global::.
     [Theory]
     [InlineData("Sample", "App.Sample-Methods.g.cs", "global::App.Sample.ConnectionString ?? ")]
