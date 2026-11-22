@@ -380,13 +380,15 @@ public sealed class MethodCompileTests
         run.Sources["App.Strings-Methods.g.cs"]
             .ShouldContain("new global::Microsoft.Data.SqlClient.SqlConnection(sqlServer ?? ");
         run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("(this.Postgres() ?? ");
-        run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("(StringMethods.SqlServer(cancellationToken) ?? ");
+        run.Sources["App.StringMethods-Methods.g.cs"]
+            .ShouldContain("(global::App.StringMethods.SqlServer(cancellationToken) ?? ");
         run.Sources["App.DataSources-Methods.g.cs"].ShouldContain("await (this._postgres ?? ");
         run.Sources["App.DataSources-Methods.g.cs"].ShouldContain("await (this.SqlServer ?? ");
-        run.Sources["App.Factories-Methods.g.cs"].ShouldContain("= Factories.Open() ?? ");
+        run.Sources["App.Factories-Methods.g.cs"].ShouldContain("= global::App.Factories.Open() ?? ");
         run.Sources["App.Factories-Methods.g.cs"]
             .ShouldContain("= await this.OpenAsync(cancellationToken).ConfigureAwait(false) ?? ");
-        run.Sources["App.Borrowed-1-Methods.g.cs"].ShouldContain("var connection = Borrowed<T>.Postgres ?? ");
+        run.Sources["App.Borrowed-1-Methods.g.cs"]
+            .ShouldContain("var connection = global::App.Borrowed<T>.Postgres ?? ");
         run.Sources["App.Borrowed-1-Methods.g.cs"].ShouldContain("var connection = sqlServer ?? ");
     }
 
@@ -846,7 +848,8 @@ public sealed class MethodCompileTests
         run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
         run.Sources["App.Fields-Methods.g.cs"].ShouldContain("((global::App.IFactory)(this._factory ?? throw ");
         run.Sources["App.Properties-Methods.g.cs"].ShouldContain("((global::App.IFactory)(this.Holder ?? throw ");
-        run.Sources["App.Statics-Methods.g.cs"].ShouldContain("((global::App.IFactory)(Statics.Shared ?? throw ");
+        run.Sources["App.Statics-Methods.g.cs"]
+            .ShouldContain("((global::App.IFactory)(global::App.Statics.Shared ?? throw ");
         run.Sources["App.NullableStructs-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
         run.Sources["App.Structs-Methods.g.cs"].ShouldContain("((global::App.IFactory)factory).");
         run.Sources["App.Constrained-1-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
@@ -1016,10 +1019,121 @@ public sealed class MethodCompileTests
         run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("var source = factory ?? throw ");
         run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("= source.Postgres() ?? throw ");
         run.Sources["App.Fields-Methods.g.cs"].ShouldContain("var source = this._factory ?? throw ");
-        run.Sources["App.Statics-Methods.g.cs"].ShouldContain("var source = Statics.Shared ?? throw ");
+        run.Sources["App.Statics-Methods.g.cs"].ShouldContain("var source = global::App.Statics.Shared ?? throw ");
         run.Sources["App.Statics-Methods.g.cs"]
             .ShouldContain("= await source.SqlServer(cancellationToken).ConfigureAwait(false) ?? throw ");
     }
+
+    // A static source of a base type may have the repository's name, which inside the repository binds to the member
+    // before the type: the access goes through the type in full, wherever the type is declared.
+    [Theory]
+    [MemberData(nameof(RepositoriesNamedAsTheirBaseMember))]
+    public void Run_StaticSourceWithTheRepositorysName_Compiles(
+        string open,
+        string close,
+        string member,
+        string repository,
+        string access
+    )
+    {
+        var source =
+            SourcesUsings.Replace("namespace App\n{\n", string.Empty, StringComparison.Ordinal)
+            + open
+            + "\npublic abstract class RepositoryBase\n{\n"
+            + "    [SqlSourceConnection(Database = \"postgres\")]\n"
+            + $"    protected static string? {member} {{ get; set; }}\n\n"
+            + "    [SqlSourceConnection(Database = \"mssql\")]\n"
+            + "    protected static string? Other { get; set; }\n}\n\n"
+            + repository
+            + "\n"
+            + close
+            + "\n";
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources.Values.ShouldContain(text => text.Contains(access, StringComparison.Ordinal));
+    }
+
+    // A static holder of a base type may have the repository's name too, and its factory's members are reached through
+    // the same access.
+    [Theory]
+    [MemberData(nameof(RepositoriesNamedAsTheirBaseMember))]
+    public void Run_StaticHolderWithTheRepositorysName_Compiles(
+        string open,
+        string close,
+        string member,
+        string repository,
+        string access
+    )
+    {
+        var source =
+            SourcesUsings.Replace("namespace App\n{\n", string.Empty, StringComparison.Ordinal)
+            + open
+            + "\npublic class Factory\n{\n"
+            + MembersOf("factory", string.Empty)
+            + "}\n\npublic abstract class RepositoryBase\n{\n"
+            + $"    protected static Factory? {member} {{ get; set; }}\n}}\n\n"
+            + repository
+            + "\n"
+            + close
+            + "\n";
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources.Values.ShouldContain(text => text.Contains(access, StringComparison.Ordinal));
+    }
+
+    // Where a repository named as its base type's static member can be declared: what opens and closes its namespace,
+    // the member's name as written, the repository's declaration, and the access the method writes.
+    public static TheoryData<string, string, string, string, string> RepositoriesNamedAsTheirBaseMember =>
+        new()
+        {
+            {
+                "namespace App {",
+                "}",
+                "Sample",
+                "[SqlSourceGenerate(Source = \".\")] public partial class Sample : RepositoryBase;",
+                "global::App.Sample.Sample"
+            },
+            {
+                string.Empty,
+                string.Empty,
+                "Sample",
+                "[SqlSourceGenerate(Source = \".\")] public partial class Sample : RepositoryBase;",
+                "global::Sample.Sample"
+            },
+            {
+                "namespace Sample {",
+                "}",
+                "Sample",
+                "[SqlSourceGenerate(Source = \".\")] public partial class Sample : RepositoryBase;",
+                "global::Sample.Sample.Sample"
+            },
+            {
+                "namespace @class {",
+                "}",
+                "@event",
+                "[SqlSourceGenerate(Source = \".\")] public partial class @event : RepositoryBase;",
+                "global::@class.@event.@event"
+            },
+            {
+                "namespace App {",
+                "}",
+                "Sample",
+                "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\")] "
+                    + "public partial class Sample : RepositoryBase; }",
+                "global::App.Outer<T>.Sample.Sample"
+            },
+            {
+                "namespace App {",
+                "}",
+                "Sample",
+                "[SqlSourceGenerate(Source = \".\")] public partial class Sample<T> : RepositoryBase;",
+                "global::App.Sample<T>.Sample"
+            },
+        };
 
     // A marked member of each engine, of the kind of connection source, instance or static as the modifier says, at
     // the indent of a type's members in a namespace.

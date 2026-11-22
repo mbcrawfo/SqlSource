@@ -236,41 +236,33 @@ public sealed class RepositoryMethodTests
         methods.ShouldContain("var command = connection1.CreateCommand();\n");
     }
 
-    // A token is an argument of the method, which would hide the parameter, or the type of the static member, that the
-    // method reaches its connection through.
-    [Theory]
-    [InlineData(
-        "public partial class Sample(NpgsqlDataSource dataSource);",
-        "dataSource",
-        "the primary-constructor parameter 'dataSource', which gives the repository methods of 'App.Sample' their "
-            + "connection"
-    )]
-    [InlineData(
-        "public partial class Sample { private static readonly string ConnectionString = \"\"; }",
-        "Sample",
-        "the type 'Sample', through which the repository methods of 'App.Sample' reach their connection "
-            + "'ConnectionString'"
-    )]
-    public void Run_TokenNamedLikeTheStartOfTheSource_ReportsSqlsrc275(string type, string token, string reason)
+    // A token is an argument of the method, which would hide the parameter that the method reaches its connection
+    // through.
+    [Fact]
+    public void Run_TokenNamedLikeTheStartOfTheSource_ReportsSqlsrc275()
     {
-        var source =
-            "using Npgsql;\nusing SqlSource;\n\nnamespace App\n{\n    [SqlSourceGenerate(Source = \".\")]\n    "
-            + type
-            + "\n}\n";
+        const string Source = """
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample(NpgsqlDataSource dataSource);
+            }
+            """;
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: GetFrom\n-- token: {{" + token + ":users}}\nSELECT id FROM {{" + token + "}};\n"
+            "-- name: GetFrom\n-- token: {{dataSource:users}}\nSELECT id FROM {{dataSource}};\n"
         );
 
-        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], source);
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], Source);
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,17): The token '"
-                    + token
-                    + "' of the query 'GetFrom' has the name of "
-                    + reason
-                    + ".  Rename the token.",
+                "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,17): The token 'dataSource' of the query 'GetFrom' has the "
+                    + "name of the primary-constructor parameter 'dataSource', which gives the repository methods of "
+                    + "'App.Sample' their connection.  Rename the token.",
             ]);
 
         // The file holds the type's interface alone, empty.
@@ -278,31 +270,25 @@ public sealed class RepositoryMethodTests
         run.Sources[MethodsFile].ShouldNotContain(" async ");
     }
 
-    // A token named like a generic type hides nothing: a name with type arguments is never a local's.
-    [Fact]
-    public void Run_TokenNamedLikeAGenericTypeOfAStaticSource_ReportsNothing()
+    // A token named like the type hides nothing of a static source, which is reached from global::.
+    [Theory]
+    [InlineData("Sample", "App.Sample-Methods.g.cs", "global::App.Sample.ConnectionString ?? ")]
+    [InlineData("Sample<T>", "App.Sample-1-Methods.g.cs", "global::App.Sample<T>.ConnectionString ?? ")]
+    public void Run_TokenNamedLikeTheTypeOfAStaticSource_ReportsNothing(string type, string hintName, string access)
     {
-        const string Source = """
-            using SqlSource;
-
-            namespace App
-            {
-                [SqlSourceGenerate(Source = ".")]
-                public partial class Sample<T>
-                {
-                    private static readonly string ConnectionString = "";
-                }
-            }
-            """;
+        var source =
+            "using SqlSource;\n\nnamespace App\n{\n    [SqlSourceGenerate(Source = \".\")]\n    public partial class "
+            + type
+            + "\n    {\n        private static readonly string ConnectionString = \"\";\n    }\n}\n";
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
             "-- name: GetFrom\n-- token: {{Sample:users}}\nSELECT id FROM {{Sample}};\n"
         );
 
-        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], Source);
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], source);
 
         run.ShouldBeClean();
-        run.Sources["App.Sample-1-Methods.g.cs"].ShouldContain("Sample<T>.ConnectionString ?? ");
+        run.Sources[hintName].ShouldContain(access);
     }
 
     // The entry of GetUser, of the file given or UsersFile: the parameter id and the column id.

@@ -260,7 +260,7 @@ public sealed class SharedConnectionMethodTests
     )]
     [InlineData(
         "public partial class Sample { private static readonly DatabaseFactory dbf = new(); }",
-        "await ((global::App.IDatabaseFactory)(Sample.dbf ?? " + HolderIsNull + CastOpen
+        "await ((global::App.IDatabaseFactory)(global::App.Sample.dbf ?? " + HolderIsNull + CastOpen
     )]
     [InlineData(
         "public partial class Sample { private DatabaseFactory dbf { get; } = new(); }",
@@ -490,10 +490,10 @@ public sealed class SharedConnectionMethodTests
             ]);
     }
 
-    // A static holder of a base type may have the repository's name, through which the method reaches it: the token
-    // hides the type, not a parameter.
+    // A static holder of a base type may have the repository's name, and a token of that name hides nothing of it,
+    // since the method reaches it from global::.
     [Fact]
-    public void Run_TokenNamedLikeAStaticHolderOfTheTypesName_ReportsSqlsrc275ForTheType()
+    public void Run_TokenNamedLikeAStaticHolderOfTheTypesName_ReportsNothing()
     {
         const string Source =
             Factory
@@ -514,12 +514,8 @@ public sealed class SharedConnectionMethodTests
 
         var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], Source);
 
-        run.Problems()
-            .ShouldBe([
-                "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,17): The token 'Sample' of the query 'GetFrom' has the name "
-                    + "of the type 'Sample', through which the repository methods of 'App.Sample' reach their "
-                    + "connection 'Sample.Open'.  Rename the token.",
-            ]);
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain("global::App.Sample.Sample");
     }
 
     // Under method-type=both, each method of a held pair calls its own member through the holder: the asynchronous

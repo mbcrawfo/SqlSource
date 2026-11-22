@@ -51,7 +51,7 @@ A type that claims the file of a query gives the query its methods when all of t
   - Nothing else takes the name of any of its methods ([SQLSRC274](../diagnostics.md#sqlsrc274)).
   - The query does not stream its rows under `method-type=sync` ([SQLSRC298](../diagnostics.md#sqlsrc298)).
   - No token has the name of an argument that a query method can have ([SQLSRC275](../diagnostics.md#sqlsrc275)).
-  - For a repository query, no token has the name of the primary-constructor parameter that gives the connection, or that holds the factory it comes from ([SQLSRC275](../diagnostics.md#sqlsrc275)).  Nor does a token have the name of the repository, when the repository is not generic and a `static` member of it, or of a base type, gives the connection or holds the factory.
+  - For a repository query, no token has the name of the primary-constructor parameter that gives the connection, or that holds the factory it comes from ([SQLSRC275](../diagnostics.md#sqlsrc275)).
   - If the method goes in the extension class, that class can be written ([SQLSRC276](../diagnostics.md#sqlsrc276)).
 - **For a repository query, the type has the connection of the query.**  All of these are true:
   - The type is not static ([SQLSRC034](../diagnostics.md#sqlsrc034)).

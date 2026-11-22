@@ -182,7 +182,7 @@ internal static partial class ConnectionResolver
                 AccessTextOf(candidate.Name, candidate.Member, candidate.IsStatic),
                 candidate.IsAsync,
                 candidate.TakesCancellationToken,
-                LeadingNameOf(candidate.Name, candidate.Member, candidate.IsStatic),
+                LeadingNameOf(candidate.Name, candidate.Member),
                 TypeName,
                 type.IsStruct
             );
@@ -211,33 +211,21 @@ internal static partial class ConnectionResolver
             {
                 MemberName = holder.Name + "." + candidate.Name,
                 AccessText = holderAccess + "." + Escaped(candidate.Name),
-                LeadingName = LeadingNameOf(holder.Name, holder.Member, holder.IsStatic),
+                LeadingName = LeadingNameOf(holder.Name, holder.Member),
                 HolderAccessText = holderAccess,
                 HolderName = holder.Name,
                 HolderCanBeNull = holder.CanBeNull,
-                HolderMember = holder.Member,
                 HolderCastText = candidate.CastTypeText,
             };
         }
 
-        // The name the access starts with, which an argument or a local of the method could hide: a parameter's own,
-        // and the type's for a static member of a type that is not generic.  An instance member is reached through
-        // this, which nothing hides.
-        private string? LeadingNameOf(string name, CandidateMember member, bool isStatic)
-        {
-            if (member == CandidateMember.Parameter)
-            {
-                return name;
-            }
+        // The name the access starts with, which an argument or a local of the method could hide: only a parameter's.
+        // An instance member is reached through this and a static one from global::, which nothing hides.
+        private static string? LeadingNameOf(string name, CandidateMember member) =>
+            member == CandidateMember.Parameter ? name : null;
 
-            // A local of the type's name hides it only when the type is not generic: a name with type arguments is
-            // never a local's.
-            return isStatic && type.Types[type.Types.Count - 1].Arity == 0 ? type.Name : null;
-        }
-
-        // A parameter by its name, a static member through the type as its own code writes it, which reaches a base
-        // type's static member too, and an instance member through this.  The type's name and type parameters are as
-        // they are written, so a keyword among them keeps its @.
+        // A parameter by its name, a static member through the type in full, which reaches a base type's static member
+        // too and which a member of the type's name cannot hide, and an instance member through this.
         private string AccessTextOf(string name, CandidateMember member, bool isStatic)
         {
             var escaped = Escaped(name);
@@ -246,14 +234,14 @@ internal static partial class ConnectionResolver
                 return escaped;
             }
 
-            if (isStatic)
-            {
-                var declaration = type.Types[type.Types.Count - 1];
-                return declaration.Name + declaration.TypeParameters + "." + escaped;
-            }
-
-            return "this." + escaped;
+            return (isStatic ? FullTypeText() : "this") + "." + escaped;
         }
+
+        // The type from global::, each name and its type parameters as they are written, so a keyword keeps its @.
+        private string FullTypeText() =>
+            "global::"
+            + (type.Namespace.Length > 0 ? type.Namespace + "." : string.Empty)
+            + string.Join(".", type.Types.Select(static declaration => declaration.Name + declaration.TypeParameters));
 
         private static string Escaped(string name) => SqlIdentifier.IsReservedKeyword(name) ? "@" + name : name;
 

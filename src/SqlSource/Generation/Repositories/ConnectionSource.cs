@@ -15,8 +15,8 @@ namespace SqlSource.Generation.Repositories;
 /// </param>
 /// <param name="AccessText">
 /// The member as a method of the type reaches it, without the call of a method: <c>this.X</c> for an instance member,
-/// <c>X</c> for a primary-constructor parameter, and the type's name as its own code writes it, with its type
-/// parameters, then <c>.X</c>, for a static member, a base type's included.  A keyword gets its <c>@</c>.
+/// <c>X</c> for a primary-constructor parameter, and the type in full from <c>global::</c>, with its type parameters,
+/// then <c>.X</c>, for a static member, a base type's included.  A keyword gets its <c>@</c>.
 /// </param>
 /// <param name="IsAsync">
 /// Whether it is a method that returns a <c>Task</c> or a <c>ValueTask</c> of a connection.
@@ -24,9 +24,8 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="TakesCancellationToken">Whether it is a method that takes a <c>CancellationToken</c>.</param>
 /// <param name="LeadingName">
 /// The name, as a value, that <paramref name="AccessText" /> starts with and that an argument or a local of the method
-/// of that name would hide: the parameter's, or the type's for a static member of a type that is not generic.  Null
-/// for an instance member, reached through <c>this</c>, and a static member of a generic type, whose type arguments no
-/// local has.
+/// of that name would hide: the primary-constructor parameter's, the source's or its holder's.  Null for an instance
+/// member, reached through <c>this</c>, and a static member, reached from <c>global::</c>.
 /// </param>
 /// <param name="TypeName">
 /// The repository's name, as a diagnostic gives it, which the method's exception names when the member is null.
@@ -43,10 +42,6 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="HolderCanBeNull">
 /// Whether the holder of a held candidate can be null, so that a method checks it before it reads the member; false
 /// for a struct's, and for a candidate that is not held.
-/// </param>
-/// <param name="HolderMember">
-/// What kind of member the holder of a held candidate is, which says what a token of its leading name would hide;
-/// else null.
 /// </param>
 /// <param name="HolderCastText">
 /// The candidate's <see cref="ConnectionCandidate.CastTypeText" />: the interface that a method casts the holder to,
@@ -65,6 +60,5 @@ internal sealed record ConnectionSource(
     string? HolderAccessText = null,
     string? HolderName = null,
     bool HolderCanBeNull = false,
-    CandidateMember? HolderMember = null,
     string? HolderCastText = null
 );

@@ -492,7 +492,7 @@ public sealed class ConnectionResolverTests
         source.AccessText.ShouldBe("@string");
     }
 
-    // A static member, the type's own or a base type's, is reached through the type's name as its code writes it.
+    // A static member, the type's own or a base type's, is reached through the type in full, which nothing hides.
     [Fact]
     public void Resolve_StaticMemberOfAGenericType_IsAccessedThroughTheType()
     {
@@ -505,14 +505,14 @@ public sealed class ConnectionResolverTests
         var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
 
         var source = resolution.Sources.ShouldHaveSingleItem().Asynchronous;
-        source.AccessText.ShouldBe("Repo<T>.ConnectionString");
+        source.AccessText.ShouldBe("global::App.Repo<T>.ConnectionString");
         source.LeadingName.ShouldBeNull();
         source.TypeName.ShouldBe("App.Repo<T>");
     }
 
-    // A local of the type's name would hide a type that is not generic, which a static member is reached through.
+    // A local of the type's name cannot hide a type reached from global::, so the access has no leading name.
     [Fact]
-    public void Resolve_StaticMemberOfATypeThatIsNotGeneric_StartsWithTheType()
+    public void Resolve_StaticMemberOfATypeThatIsNotGeneric_HasNoLeadingName()
     {
         var type = TestModels.Type(types: [new TypeDeclaration("class", "Repo", "Repo", "", 0)]);
         var candidate = Candidate("ConnectionString", CandidateType.ConnectionString, CandidateMember.Property) with
@@ -525,8 +525,33 @@ public sealed class ConnectionResolverTests
             .Sources.ShouldHaveSingleItem()
             .Asynchronous;
 
-        source.AccessText.ShouldBe("Repo.ConnectionString");
-        source.LeadingName.ShouldBe("Repo");
+        source.AccessText.ShouldBe("global::App.Repo.ConnectionString");
+        source.LeadingName.ShouldBeNull();
+    }
+
+    // Each type around the repository is in the access, with its type parameters, and a repository in no namespace
+    // starts at global::.
+    [Theory]
+    [InlineData("App", "global::App.Outer<TOuter>.Repo.ConnectionString")]
+    [InlineData("", "global::Outer<TOuter>.Repo.ConnectionString")]
+    public void Resolve_StaticMemberOfANestedType_NamesEachTypeInTheAccess(string @namespace, string access)
+    {
+        var type = TestModels.Type(
+            @namespace: @namespace,
+            types:
+            [
+                new TypeDeclaration("class", "Outer", "Outer", "<TOuter>", 1),
+                new TypeDeclaration("class", "Repo", "Repo", "", 0),
+            ]
+        );
+        var candidate = Candidate("ConnectionString", CandidateType.ConnectionString, CandidateMember.Property) with
+        {
+            IsStatic = true,
+        };
+
+        var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
+
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe(access);
     }
 
     // The type's name is as its declaration writes it, so a keyword keeps its @.
@@ -541,7 +566,9 @@ public sealed class ConnectionResolverTests
 
         var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
 
-        resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe("@class<@int>.ConnectionString");
+        resolution
+            .Sources.ShouldHaveSingleItem()
+            .Asynchronous.AccessText.ShouldBe("global::App.@class<@int>.ConnectionString");
     }
 
     // A source that returns no task serves both kinds of method.

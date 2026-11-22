@@ -4814,7 +4814,7 @@ A token of a query whose output is `repository` or `methods` has the name of an 
 
 A token is an argument of the method too, so it cannot take one of these names.  That holds even in a query without parameters, whose method has no `parameters`.  So the method is not generated.
 
-A token of a `repository` query also cannot take the name of what its method gets its connection through.  The argument of the token would hide it.  That is the primary-constructor parameter that gives the connection or holds the factory it comes from, or the type, when the connection comes from a `static` member of the type or a factory in one.
+A token of a `repository` query also cannot take the name of what its method gets its connection through.  The argument of the token would hide it.  That is the primary-constructor parameter that gives the connection or holds the factory it comes from.
 
 The first sample is a token with the name of an argument.  The second is a token with the name of the primary-constructor parameter:
 

@@ -473,22 +473,19 @@ public sealed class SynchronousRepositoryTests
             .ShouldBe(1);
     }
 
-    // A pair's synchronous factory, an instance member, hides no type, and its asynchronous one, a static member, is
-    // reached through the type, which a token of the type's name would hide: the second form is checked too.
+    // A pair's synchronous source, a parameter, is hidden by a token of its name, though its asynchronous one, a
+    // method, is not: each form's own source is checked.
     [Fact]
-    public void Run_MethodTypeBothTokenNamedAsTheTypeOfTheAsynchronousFactory_ReportsSqlsrc275()
+    public void Run_MethodTypeBothTokenNamedAsTheSynchronousParameter_ReportsSqlsrc275()
     {
         var source = SampleOf(
-            "public partial class Sample\n    {\n"
+            "public partial class Sample([SqlSourceConnection] string open)\n    {\n"
                 + "        [SqlSourceConnection]\n"
                 + "        private static Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken) =>\n"
-                + "            Task.FromResult(new NpgsqlConnection());\n\n"
-                + "        [SqlSourceConnection]\n"
-                + "        private NpgsqlConnection Open() => new NpgsqlConnection();\n    }"
+                + "            Task.FromResult(new NpgsqlConnection());\n    }"
         );
         var file = UsersFile(
-            "-- generator: method-type=both\n-- name: GetFrom\n-- token: {{Sample:users}}\n"
-                + "SELECT id FROM {{Sample}};\n"
+            "-- generator: method-type=both\n-- name: GetFrom\n-- token: {{open:users}}\nSELECT id FROM {{open}};\n"
         );
 
         var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], source);
@@ -496,7 +493,7 @@ public sealed class SynchronousRepositoryTests
         var problems = run.Problems();
         problems.Count.ShouldBe(1);
         problems[0].ShouldStartWith("SQLSRC275 ");
-        problems[0].ShouldContain("'Sample'");
+        problems[0].ShouldContain("the primary-constructor parameter 'open'");
     }
 
     // A method of no argument named Finalize has the signature of object.Finalize, which the compiler warns about

@@ -87,12 +87,19 @@ public sealed class ConnectionResolverTierTests
         resolved.Synchronous.ShouldBe(resolved.Asynchronous);
     }
 
-    // Each source is reached as the generated method reaches it: a held member through its holder, as the repository's
-    // code reaches the holder, and a global through its type in full, which no name of the method can hide.
+    // Each source is reached as the generated method reaches it: a held member through its holder, a static holder and
+    // a global through its type in full, which no name of the method can hide.
     [Theory]
     [InlineData("parameter", "dbf.Open", "dbf", "dbf", "dbf", "dbf.Open")]
     [InlineData("field", "this._dbf.Open", null, "this._dbf", "_dbf", "_dbf.Open")]
-    [InlineData("static field", "UserRepository.F.Open", "UserRepository", "UserRepository.F", "F", "F.Open")]
+    [InlineData(
+        "static field",
+        "global::App.UserRepository.F.Open",
+        null,
+        "global::App.UserRepository.F",
+        "F",
+        "F.Open"
+    )]
     [InlineData("global", "global::App.Db.Reports", null, null, null, "Db.Reports")]
     public void Resolve_SharedSource_IsReachedThroughItsHolderOrType(
         string source,
@@ -139,10 +146,9 @@ public sealed class ConnectionResolverTierTests
         resolved.HolderAccessText.ShouldBe("this.@event");
         resolved.HolderName.ShouldBe("event");
         resolved.MemberName.ShouldBe("event.default");
-        resolved.HolderMember.ShouldBe(CandidateMember.Field);
     }
 
-    // A static holder of a generic repository is reached with its type parameters, which no local's name has.
+    // A static holder of a generic repository is reached through the type in full, with its type parameters.
     [Fact]
     public void Resolve_StaticHolderOfAGenericType_HasNoLeadingName()
     {
@@ -152,8 +158,8 @@ public sealed class ConnectionResolverTierTests
         var resolution = ConnectionResolver.Resolve(type, Tiers([], held: [held]), [Main]);
 
         var resolved = resolution.Sources.ShouldHaveSingleItem().Asynchronous;
-        resolved.AccessText.ShouldBe("UserRepository<T>.F.Open");
-        resolved.HolderAccessText.ShouldBe("UserRepository<T>.F");
+        resolved.AccessText.ShouldBe("global::App.UserRepository<T>.F.Open");
+        resolved.HolderAccessText.ShouldBe("global::App.UserRepository<T>.F");
         resolved.LeadingName.ShouldBeNull();
     }
 
