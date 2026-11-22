@@ -88,6 +88,45 @@ public sealed class NullabilityWalkAggregateTests
             .ShouldBe([UnknownNoOrigin]);
     }
 
+    // A WindowAgg whose frame holds the current row computes the aggregate over a frame with a row.
+    private static PlanNode WindowOverOrders(string aggregate, string? window) =>
+        Over(
+            "Sort",
+            Over("WindowAgg", Scan("o", "o.placed_at", "o.note")) with
+            {
+                Output = [aggregate],
+                Window = window,
+            }
+        ) with
+        {
+            Output = ["(" + aggregate + ")"],
+        };
+
+    [Theory]
+    [InlineData("w1 AS (ORDER BY o.id)")]
+    [InlineData("w1 AS (ORDER BY o.id ROWS UNBOUNDED PRECEDING)")]
+    public void Run_WindowAggregateOverAFrameWithTheCurrentRow_IsNotNull(string window) =>
+        AnswersOf(RunOverOrders(WindowOverOrders("max(o.placed_at) OVER w1", window))).ShouldBe([NotNullExpression]);
+
+    // No frame known, a frame that may be empty, another window's name, a value that may be NULL, a FILTER, and an
+    // aggregate outside the table.
+    [Theory]
+    [InlineData("max(o.placed_at) OVER (?)", null)]
+    [InlineData("max(o.placed_at) OVER w1", null)]
+    [InlineData("max(o.placed_at) OVER w1", "w1 AS (ROWS BETWEEN '1'::bigint FOLLOWING AND '2'::bigint FOLLOWING)")]
+    [InlineData("max(o.placed_at) OVER w2", "w1 AS (ORDER BY o.id)")]
+    [InlineData("max(o.note) OVER w1", "w1 AS (ORDER BY o.id)")]
+    [InlineData("max(o.placed_at) FILTER (WHERE (o.id > 1)) OVER w1", "w1 AS (ORDER BY o.id)")]
+    [InlineData("lag(o.placed_at) OVER w1", "w1 AS (ORDER BY o.id)")]
+    public void Run_WindowAggregateThatMayBeNull_KeepsNoOrigin(string aggregate, string? window) =>
+        AnswersOf(RunOverOrders(WindowOverOrders(aggregate, window))).ShouldBe([UnknownNoOrigin]);
+
+    // The same text at a node that is no WindowAgg says nothing of a frame.
+    [Fact]
+    public void Run_WindowTextAtANodeThatIsNoWindowAgg_KeepsNoOrigin() =>
+        AnswersOf(RunOverOrders(Scan("o", "max(o.placed_at) OVER w1") with { Window = "w1 AS (ORDER BY o.id)" }))
+            .ShouldBe([UnknownNoOrigin]);
+
     // A node with Grouping Sets may have a group of no row, the one of the empty set: the walk does not use its plan.
     [Fact]
     public void Run_AggregateOfANodeWithGroupingSets_KeepsNoOrigin() =>

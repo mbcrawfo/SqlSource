@@ -58,6 +58,7 @@ internal static partial class PostgresPlanRenamer
         [PlanKeys.Output] = KeyKind.Expression,
         [PlanKeys.Filter] = KeyKind.Expression,
         [PlanKeys.GroupKey] = KeyKind.Expression,
+        [PlanKeys.Window] = KeyKind.Expression,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     // The class of a new name of each name key.

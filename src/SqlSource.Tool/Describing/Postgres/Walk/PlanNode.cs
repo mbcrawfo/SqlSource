@@ -42,6 +42,9 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// members from the plan: their number, and 0 when the key is absent.  Such a node does not show every partition.
 /// </param>
 /// <param name="Plans"><c>Plans</c>: the children, empty when the node has none.</param>
+/// <param name="Window">
+/// <c>Window</c>, the definition of a <c>WindowAgg</c>'s window, which PostgreSQL 18 prints and 14 to 17 do not.
+/// </param>
 internal sealed record PlanNode(
     string NodeType,
     string? JoinType,
@@ -58,7 +61,8 @@ internal sealed record PlanNode(
     bool HasGroupKey,
     bool HasFilter,
     int SubplansRemoved,
-    IReadOnlyList<PlanNode> Plans
+    IReadOnlyList<PlanNode> Plans,
+    string? Window = null
 )
 {
     /// <summary>
@@ -190,6 +194,7 @@ internal sealed record PlanNode(
             || !TryText(element, PlanKeys.CteName, out var cte)
             || !TryText(element, PlanKeys.Command, out var command)
             || !TryText(element, PlanKeys.Strategy, out var strategy)
+            || !TryText(element, PlanKeys.Window, out var window)
             || !TryCount(element, PlanKeys.SubplansRemoved, out var removed)
             || !TryNodes(element, out var plans)
         )
@@ -215,7 +220,8 @@ internal sealed record PlanNode(
                 && key.GetArrayLength() > 0,
             element.TryGetProperty(PlanKeys.Filter, out _),
             removed,
-            plans
+            plans,
+            window
         );
     }
 

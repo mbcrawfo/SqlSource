@@ -278,7 +278,8 @@ internal sealed partial class PostgresSession : DescriberSession
                     ColumnTypes: [.. columns.Select(static column => column.TypeOid)],
                     DistrustsJoinReduction: gated
                         && request.Parameters.Any(static parameter => parameter.HasNegatedUse),
-                    ParameterCount: parameterOids.Count
+                    ParameterCount: parameterOids.Count,
+                    ValuesNeverNull: ValuesStatement.NeverNullColumns(request.Sql)
                 ),
                 cancellationToken
             );

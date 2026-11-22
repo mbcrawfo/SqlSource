@@ -121,6 +121,17 @@ internal static partial class PlanExpression
             : null;
 
     /// <summary>
+    /// Whether the entry is, as a whole, a value that is never <c>NULL</c> in any group of grouping sets, the empty
+    /// group included: a <c>count</c> as <see cref="NullableOf(string, ExpressionContext)" /> reads one, or
+    /// <c>GROUPING(...)</c>, which is syntax, since a function of that name prints in quotes.
+    /// </summary>
+    /// <param name="entry">The entry as the plan prints it.</param>
+    /// <param name="context">What the walk says of the plan the entry is read in.</param>
+    public static bool IsNeverNullInAnyGroup(string entry, ExpressionContext context) =>
+        PlanTokens.Read(entry) is { Count: > 0 } tokens
+        && new Reader(entry, tokens, context).IsCountOrGrouping(tokens.Count);
+
+    /// <summary>
     /// The type of an entry that is, as a whole, a value proved not <c>NULL</c> of a known type, or null: a constant,
     /// a null test, <c>count(*)</c> or a ranking as <see cref="TypeOf" /> types them, or an operator, a function or a
     /// cast of the forms the remarks give, a <c>COALESCE</c>, a <c>GREATEST</c>, a <c>LEAST</c> and a <c>CASE</c> among
@@ -508,6 +519,11 @@ internal static partial class PlanExpression
         // function of the name: then it is count("any"), which is never NULL.
         private bool IsCatalogsCount(int from, int to) =>
             IsWord(from, "count") && HeldAlone("count") && IsCountOrRanking(from, to, anyArgument: true);
+
+        // Whether the first to tokens are a count the catalog answers for, or GROUPING(...).
+        public bool IsCountOrGrouping(int to) =>
+            (IsWord(0, "count") && ((_context.CatalogFunctions && IsCountOrRanking(0, to)) || IsCatalogsCount(0, to)))
+            || (IsWord(0, "GROUPING") && ClosesAtTheEnd(0, to));
 
         // The names of CatalogOverloads the tokens call, as CatalogNamesIn gives them.
         public (IReadOnlyList<string> Functions, IReadOnlyList<string> Operators) CatalogNames()

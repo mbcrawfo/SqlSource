@@ -75,7 +75,100 @@ public sealed class ExpressionColumnTests(PostgresDatabases postgres)
             { $"SELECT t.id + 1 AS v FROM {T} t UNION ALL SELECT x.n + 1 FROM {T} x", "?" },
             { $"SELECT upper(t.label) AS v FROM {T} t UNION SELECT upper(x.note) FROM {T} x", "?" },
             { "SELECT p.n + 1 AS v FROM scan_columns.p p", "?" },
+            // The functions of the table: total, so never NULL over a value that is not.
+            {
+                "SELECT abs(t.id) AS a, abs(t.big) AS b, abs(t.amount) AS c, ceil(t.amount) AS d, "
+                    + "floor(t.amount) AS e, round(t.amount) AS f, round(t.amount, 2) AS g, trunc(t.amount) AS h, "
+                    + "trunc(t.amount, 2) AS i, "
+                    + "abs(t.amount::float8) AS j, ceil(t.amount::float8) AS k, floor(t.amount::float8) AS l, "
+                    + $"round(t.amount::float8) AS m, trunc(t.amount::float8) AS o FROM {T} t",
+                "nnnnnnnnnnnnnn"
+            },
+            { $"SELECT abs(t.n) AS a, round(t.n::numeric, 1) AS b, ceil(t.n::numeric) AS c FROM {T} t", "???" },
+            // Under grouping sets: a count and GROUPING are never NULL, in the empty group too.
+            {
+                "SELECT t.id, count(*) AS a, count(DISTINCT t.label) AS b, count(t.n) AS c, grouping(t.id) AS d, "
+                    + $"sum(t.amount) AS e, grouping(t.id) + 1 AS f FROM {T} t GROUP BY ROLLUP (t.id) ORDER BY t.id",
+                "?nnnn??"
+            },
+            { $"SELECT count(*) AS c FROM {T} t WHERE t.id < 0 GROUP BY GROUPING SETS ((t.id), ())", "n" },
+            { $"SELECT t.label, grouping(t.label) AS g FROM {T} t GROUP BY CUBE (t.label)", "?n" },
+            // A user's function of the name, a value of the group, and grouping sets on the side a join extends.
+            { $"SELECT scan_columns.\"grouping\"(t.id) AS g FROM {T} t GROUP BY ROLLUP (t.id)", "?" },
+            { $"SELECT max(t.id) AS m, coalesce(t.n, 0) AS c FROM {T} t GROUP BY ROLLUP (t.n)", "??" },
+            {
+                $"SELECT s.c FROM {T} a LEFT JOIN (SELECT b.id, count(*) AS c FROM {T} b GROUP BY ROLLUP (b.id)) s "
+                    + "ON s.id = a.n",
+                "?"
+            },
+            // A VALUES statement's columns of literals, and one a row holds NULL, a parameter or a cast in.
+            { "VALUES ('a', 1, NULL), ('b', 2, 3) ORDER BY 2", "nn?" },
+            { "VALUES (1, true), (-2, false) LIMIT 1", "nn" },
+            { "VALUES (1, 'a'), (2, NULL)", "n?" },
+            { "VALUES (@p::bigint, 1), (1, 2)", "?n" },
+            { "VALUES (1::bigint, 1), (2, 2)", "?n" },
+            { "VALUES (1 + 1, 1), (2, 2)", "?n" },
+            { "VALUES (NULLIF(1, 1), 1), (2, 2)", "?n" },
+            { "VALUES (1), (2) UNION ALL SELECT NULL::integer", "?" },
+            { "SELECT v.column1 FROM (VALUES (1), (NULL)) v", "?" },
         };
+
+    // Only PostgreSQL 18 prints a window's frame, so a query below is read there alone.
+    public static TheoryData<string, string> Windows =>
+        new()
+        {
+            { $"SELECT sum(t.amount) OVER (PARTITION BY t.label ORDER BY t.id) AS v FROM {T} t", "n" },
+            { $"SELECT sum(t.amount) OVER () AS v FROM {T} t", "n" },
+            { $"SELECT max(t.amount) OVER (ORDER BY t.id ROWS UNBOUNDED PRECEDING) AS v FROM {T} t", "n" },
+            {
+                "SELECT avg(t.id) OVER (ORDER BY t.id ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS v "
+                    + $"FROM {T} t",
+                "n"
+            },
+            { $"SELECT sum(t.big) OVER w AS a, min(t.label) OVER w AS b FROM {T} t WINDOW w AS (ORDER BY t.id)", "nn" },
+            // A frame that leaves the current row out, and one with an offset.
+            {
+                $"SELECT sum(t.amount) OVER (ORDER BY t.id ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING) AS v FROM {T} t",
+                "?"
+            },
+            {
+                $"SELECT sum(t.amount) OVER (ORDER BY t.id ROWS BETWEEN 2 PRECEDING AND 1 PRECEDING) AS v FROM {T} t",
+                "?"
+            },
+            {
+                "SELECT sum(t.amount) OVER (ORDER BY t.id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING "
+                    + $"EXCLUDE CURRENT ROW) AS v FROM {T} t",
+                "?"
+            },
+            {
+                $"SELECT sum(t.amount) OVER (ORDER BY t.id ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS v FROM {T} t",
+                "?"
+            },
+            // A FILTER, a value that may be NULL, and the side a join extends.
+            { $"SELECT sum(t.amount) FILTER (WHERE t.id < 0) OVER () AS v FROM {T} t", "?" },
+            { $"SELECT sum(t.n) OVER (ORDER BY t.id) AS v FROM {T} t", "?" },
+            { $"SELECT sum(b.amount) OVER () AS v FROM {T} a LEFT JOIN {T} b ON b.id = a.id + 100", "?" },
+        };
+
+    [Theory]
+    [MemberData(nameof(Windows))]
+    public async Task DescribeAsync_WindowAggregate_IsProvedOnlyWhenItsFrameHoldsTheCurrentRow(
+        string sql,
+        string fromEighteen
+    )
+    {
+        var expected = postgres.Major >= 18 ? fromEighteen : new string('?', fromEighteen.Length);
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ScanColumns);
+
+            await ProvedColumns.ShouldAnswerAsync(postgres, sql, expected);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropScanColumns);
+        }
+    }
 
     [Theory]
     [MemberData(nameof(Queries))]
