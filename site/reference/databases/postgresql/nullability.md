@@ -22,7 +22,7 @@ SqlSource can tell that a column is never null when the column is one of these:
 - **A `NOT NULL` column of a table**, when no outer join of the query can fill it with null.
 - **`count(*)`, or `count(x)` of anything**, or a ranking over a window: `row_number()`, `rank()`, `dense_rank()`, `percent_rank()` or `cume_dist()`.  A count is `0` for no rows, never null.
 - **A constant** other than `NULL`, such as `1` or `'active'`.
-- **A test**: `IS NULL`, `IS NOT NULL`, `IS DISTINCT FROM` or `IS NOT DISTINCT FROM`.
+- **A test**: `IS NULL` or `IS NOT NULL`.
 - **Arithmetic or a comparison of values that are never null**, in one of these forms:
   - `+`, `-`, `*` or `/` of two numbers;
   - `=`, `<>`, `<`, `<=`, `>` or `>=` of two numbers, two texts, two booleans, or two values of one of `date`, `timestamp` and `timestamp with time zone`;
@@ -180,6 +180,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - `EXISTS (...)` as a column before PostgreSQL 17;
 - the rows of `VALUES`;
 - a function that the rules do not list;
+- `IS DISTINCT FROM` and `IS NOT DISTINCT FROM`, which are null when a user's `=` operator returns null;
 - an expression, when the search path puts another schema before `pg_catalog`;
 - a `count(*)` or a `sum` that a `WITH` query computes;
 - a `sum` or an `array_agg` in a query whose `WHERE` sets every column of the `GROUP BY` to one value;

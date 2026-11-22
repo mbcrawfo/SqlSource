@@ -123,14 +123,14 @@ public sealed class PlanOutputTests(PostgresDatabases postgres)
         2,
         "((u.email)::text IS DISTINCT FROM (u.name)::text)",
         "((u.email)::text IS DISTINCT FROM (u.name)::text)",
-        false
+        null
     )]
     [InlineData(
         Tests,
         3,
         "(NOT ((u.email)::text IS DISTINCT FROM (u.name)::text))",
         "(NOT ((u.email)::text IS DISTINCT FROM (u.name)::text))",
-        false
+        null
     )]
     [InlineData(
         Tests,

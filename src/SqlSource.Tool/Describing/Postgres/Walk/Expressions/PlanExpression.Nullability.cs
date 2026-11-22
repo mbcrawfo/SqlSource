@@ -32,7 +32,7 @@ internal static partial class PlanExpression
                     return null;
                 }
 
-                if (IsTest(from + 1, to - 1))
+                if (IsNullTest(from + 1, to - 1))
                 {
                     return false;
                 }
