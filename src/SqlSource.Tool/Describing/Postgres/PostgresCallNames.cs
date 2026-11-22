@@ -22,5 +22,6 @@ internal static class PostgresCallNames
     public const string Partitions = "partitions";
     public const string Relations = "relations";
     public const string Overloads = "overloads";
+    public const string Casts = "casts";
     public const string Deallocate = "deallocate";
 }

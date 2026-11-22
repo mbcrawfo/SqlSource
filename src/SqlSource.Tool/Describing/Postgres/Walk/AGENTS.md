@@ -14,17 +14,19 @@ How the walk reads a plan is [the plan walk](../../../../../docs/architecture/po
 - **`PostgresSession.WalkAsync` builds one `PlanInstancesCache` a walk**, after `partitions`, for `NullabilityWalk.Run` to find the instances of each plan once.
 - **A `ModifyTable` at the root is its target, and the scan of the target under it is that same instance**, which is never null-extended ([a root `ModifyTable`](../../../../../docs/architecture/postgres-nullability.md#a-root-modifytable)).  When `OuterJoinGate.NamesOldOrNew` finds `OLD` or `NEW`, a qualified reference at a root `ModifyTable` maps only to the target's own alias.
 - **An entry of `Output` is a reference or it is nothing** (`OutputReference`, [output entries](../../../../../docs/architecture/postgres-nullability.md#output-entries)).  A reference to a `Subquery Scan` or a `CTE Scan` is resolved in the scanned plan by the column's origin, and never by its place or its name.  A bare name is only ever the plan's one relation's (`PlanInstances.BareAlias`).
+- **A column of no origin through a scan is proved only by every entry it can be** (`Expressions.ProvedThroughScan`, [output entries](../../../../../docs/architecture/postgres-nullability.md#output-entries)).  An entry is ruled out by its type only through `SetOperationTypes.CannotReach` and a `casts` that found no row, and never for a column of a text type, which an inlined SQL function's unprinted cast can make of any type.
 
 ## Expressions
 
 - **A column of no origin is answered from its entry of the root's `Output` as an expression, or not at all** ([expressions](../../../../../docs/architecture/postgres-nullability.md#expressions)).  An entry is read as a whole, never as a prefix, and only in a plan with no set operation.
 - **A form is pinned in `tests/DatabaseTests/Postgres/Describer/PlanOutputTests.cs`, as 14 and 18 print it, before it is read.**
 - **Where a join null-extends, an entry is read only at the node that computes it and only when that node is preserved.**  An aggregate is read only at the grouped `Aggregate` that computes it, never inside a value a child printed.
+- **Before 17 a `$k` from 1 to `WalkScope.ParameterCount` is the statement's parameter and never an `InitPlan`'s value**, which prints the same ([expressions](../../../../../docs/architecture/postgres-nullability.md#expressions)).
 - **An operator, a function or an aggregate other than `count(*)` and the rankings is read only by an exact signature of `TotalFunctions` or by a name of `CatalogOverloads`**, a cast only within a family of `SetOperationTypes`.  Any of them, a ranking and a literal's type name are read only when the session finds `pg_catalog` first (`PostgresSearchPath`).  What a row of either table needs is in the table's remarks.
 
 ## Set operations
 
-- **A set operation's column of no origin is answered from its inputs** (`NullabilityWalk.SetOperations.cs`, [set operations](../../../../../docs/architecture/postgres-nullability.md#set-operations)).  A `*SELECT* <k>` alias alone proves nothing.  A branch's value counts only when its type carries to the column's (`SetOperationTypes.Carries`).
+- **A set operation's column of no origin is answered from its inputs** (`NullabilityWalk.SetOperations.cs`, [set operations](../../../../../docs/architecture/postgres-nullability.md#set-operations)).  A `*SELECT* <k>` alias alone proves no position.  A branch's value counts only when its type carries to the column's (`SetOperationTypes.Carries`).
 
 ## Fixtures
 

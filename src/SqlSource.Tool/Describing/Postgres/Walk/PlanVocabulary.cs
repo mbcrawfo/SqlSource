@@ -55,6 +55,7 @@ internal static class PlanRelationships
 internal static class AggregateStrategies
 {
     public const string Plain = "Plain";
+    public const string Sorted = "Sorted";
 }
 
 /// <summary>The values of <c>Join Type</c>.</summary>

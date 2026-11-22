@@ -72,6 +72,16 @@ internal sealed record WalkOutcome(
 /// <c>o.id &lt;&gt; $1</c> and so makes a <c>LEFT JOIN</c> inner, while an empty list, as the query runs, keeps the
 /// rows whose <c>o.id</c> is <c>NULL</c>.  Every join but a semi join is then read as extending both of its sides.
 /// </param>
+/// <param name="NoCastAcrossFamilies">
+/// Whether <c>casts</c> answered that <c>pg_cast</c> holds no row for any pair of
+/// <see cref="SetOperationTypes.CrossFamilyPairs" />, so that an entry of a scanned plan whose type
+/// <see cref="SetOperationTypes.CannotReach" /> the column's is not that column.
+/// </param>
+/// <param name="ParameterCount">
+/// How many parameters the statement has, numbered from 1.  PostgreSQL before 17 prints an <c>InitPlan</c>'s value as
+/// <c>$k</c>, numbered from 0, as it prints the statement's parameter <c>$k</c>, so a <c>$k</c> from 1 to this count is
+/// never read as an <c>InitPlan</c>'s.
+/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
@@ -79,7 +89,9 @@ internal sealed record WalkScope(
     IReadOnlyDictionary<long, PostgresTableRow> Tables,
     IReadOnlyList<long> ColumnTypes,
     CatalogNames? CatalogAlone = null,
-    bool DistrustsJoinReduction = false
+    bool DistrustsJoinReduction = false,
+    bool NoCastAcrossFamilies = false,
+    int ParameterCount = 0
 );
 
 /// <summary>
@@ -193,6 +205,16 @@ internal static partial class NullabilityWalk
             walked
         );
     }
+
+    /// <summary>Whether two walks of one plan give every column the same answer.</summary>
+    public static bool SameAnswers(WalkOutcome first, WalkOutcome second) =>
+        first.Columns.Count == second.Columns.Count
+        && first
+            .Columns.Zip(second.Columns)
+            .All(static pair =>
+                pair.First.Column.Nullable == pair.Second.Column.Nullable
+                && pair.First.Column.NullableSource == pair.Second.Column.NullableSource
+            );
 
     /// <summary>
     /// The outcome of a walk that had no plan to read: the server gave none, or its text is no plan.  Every column
@@ -354,6 +376,19 @@ internal static partial class NullabilityWalk
         /// </summary>
         public const int MaxDepth = 16;
 
+        // What each scanned plan answers, by the plan's root and what is asked of it, so that a chain of scans reads
+        // each plan once and not once for every path to it.  An answer cut short by MaxDepth is the unknown one, which
+        // keeping can only leave a column as it was built.
+        private readonly Dictionary<PlanNode, Dictionary<long, bool>> _scanProofs =
+        [
+            with(ReferenceEqualityComparer.Instance),
+        ];
+
+        private readonly Dictionary<PlanNode, Dictionary<(long Table, string Column), Resolution>> _resolutions =
+        [
+            with(ReferenceEqualityComparer.Instance),
+        ];
+
         // The root of the whole plan.
         public PlanNode Tree => cache.Tree;
 
@@ -407,10 +442,52 @@ internal static partial class NullabilityWalk
                 : null;
         }
 
-        // The column of the origin in the plan of the child, as the entries of its root's Output that it can be say.
+        // Whether the scanned plan proves a column of the type, read once for the plan and the type.
+        public bool ScanProves(PlanNode child, long columnType, Func<bool> read)
+        {
+            if (!_scanProofs.TryGetValue(child, out var byType))
+            {
+                byType = [];
+                _scanProofs[child] = byType;
+            }
+
+            if (!byType.TryGetValue(columnType, out var proved))
+            {
+                proved = read();
+                byType[columnType] = proved;
+            }
+
+            return proved;
+        }
+
+        // The column of the origin in the plan of the child, read once for the plan and the column.
         public Resolution Resolve(PlanNode? child, ColumnOrigin origin, int depth)
         {
-            if (child is null || depth > MaxDepth || child.Output is not { } entries)
+            if (child is null || depth > MaxDepth)
+            {
+                return Resolution.Unknown;
+            }
+
+            if (!_resolutions.TryGetValue(child, out var byColumn))
+            {
+                byColumn = [];
+                _resolutions[child] = byColumn;
+            }
+
+            var column = (origin.Table.Oid, origin.Attribute.Name);
+            if (!byColumn.TryGetValue(column, out var resolved))
+            {
+                resolved = ResolveOnce(child, origin, depth);
+                byColumn[column] = resolved;
+            }
+
+            return resolved;
+        }
+
+        // The column of the origin in the plan of the child, as the entries of its root's Output that it can be say.
+        private Resolution ResolveOnce(PlanNode child, ColumnOrigin origin, int depth)
+        {
+            if (child.Output is not { } entries)
             {
                 return Resolution.Unknown;
             }

@@ -709,13 +709,17 @@ public sealed class PlanExpressionTests
         };
 
     private static ExpressionContext AtAFullJoin(bool catalogFunctions = true) =>
-        new(catalogFunctions, static _ => null, ProvedOnFullJoinSide: SideOf);
+        new(catalogFunctions, static _ => null, ProvedOnFullJoinSides: [SideOf]);
 
     // A row of a full join has a row of one side at least, and COALESCE, GREATEST and LEAST are NULL only when every
     // argument is: over a plain reference to each side the walk proves but for the join, the form is not NULL, of
-    // their type when they share one.  Both of one side, a cast of a side's column, a reference in parentheses, a CASE
-    // and an operator prove nothing.
+    // their type when they share one.  A cast within a family is NULL only for a NULL, and is of the type it names.
+    // Both of one side, a cast out of the family, a reference in parentheses, a CASE and an operator prove nothing.
     [Theory]
+    [InlineData("COALESCE(r.id, (a.id)::bigint)", false, BuiltInTypes.Int8)]
+    [InlineData("COALESCE(a.id, (r.account_id)::bigint)", false, null)]
+    [InlineData("COALESCE((a.id)::text, r.account_id)", null, null)]
+    [InlineData("COALESCE(((a.id))::bigint, r.id)", null, null)]
     [InlineData("COALESCE(a.id, r.account_id)", false, BuiltInTypes.Int4)]
     [InlineData("GREATEST(a.id, r.account_id)", false, BuiltInTypes.Int4)]
     [InlineData("LEAST(r.account_id, a.id)", false, BuiltInTypes.Int4)]
@@ -724,7 +728,6 @@ public sealed class PlanExpressionTests
     [InlineData("COALESCE(a.id, a.id, r.account_id)", false, BuiltInTypes.Int4)]
     [InlineData("COALESCE(a.id, r.id)", false, null)]
     [InlineData("COALESCE(a.id, a.id)", null, null)]
-    [InlineData("COALESCE(a.id, (r.account_id)::bigint)", null, null)]
     [InlineData("COALESCE((a.id), r.account_id)", null, null)]
     [InlineData("COALESCE(a.id, x.id)", null, null)]
     [InlineData("CASE WHEN (a.id > 1) THEN a.id ELSE r.account_id END", null, null)]

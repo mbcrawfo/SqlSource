@@ -38,7 +38,9 @@ internal static partial class NullabilityWalk
     // "*SELECT* 2".sku over a branch that prints p2.sku first.  On 18 the planner drops its own leaf scan when it
     // adds nothing, and a SetOp's input may be a user's subquery of that very name, through a view, an inlined SQL
     // function or a U&"..." identifier the SQL does not show, which prints its columns in the order its query needs.
-    // A constant the planner put in the scan's place is read where it is.
+    // A constant the planner put in the scan's place is read where it is.  Any other such scan is read without its
+    // place, as a scan of another plan is (Expressions.ProvedThroughScan): every entry of its branch that the column
+    // can be must prove it.
     //
     // Any other node that prints the value is walked as a plan of its own, as the walk walks the root: a reference by
     // the catalog's answer of an instance that no join of that plan extends, and an expression by PlanExpression.  A
@@ -402,13 +404,18 @@ internal static partial class NullabilityWalk
             var entry = output[ordinal];
             if (OutputReference.Parse(entry) is { } reference)
             {
-                return expressions.ProvedTypeOf(reference) is { } attribute
-                    && SetOperationTypes.Carries(attribute, type);
+                return expressions.ProvedThroughScan(reference, type)
+                    || (
+                        expressions.ProvedTypeOf(reference) is { } attribute
+                        && SetOperationTypes.Carries(attribute, type)
+                    );
             }
 
             return expressions.NullableOf(entry, TotalFunctions.UnknownType) == false
-                && PlanExpression.TypeOf(entry, plans.Scope.CatalogFunctionsFirst) is { } constant
-                && SetOperationTypes.Carries(constant, type);
+                && (PlanExpression.TypeOf(entry, plans.Scope.CatalogFunctionsFirst) ?? expressions.ValueTypeOf(entry))
+                    is { } value
+                && value != TotalFunctions.UnknownType
+                && SetOperationTypes.Carries(value, type);
         }
     }
 }

@@ -5,6 +5,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
 using static SqlSource.Tool.Tests.PostgresPlans;
@@ -108,6 +109,43 @@ public sealed class NullabilityWalkSetOperationTests
         AnswersOf(outcome).ShouldBe([NotNullSetOperation, NotNullSetOperation]);
     }
 
+    // A branch that is an expression counts by the type the walk proves it of, which carries to the column's.
+    [Fact]
+    public void Run_UnionAllOfExpressionsOfTheFamily_IsFalseFromTheBranches() =>
+        AnswersOf(RunSet(AppendOf(Scan("u", "(u.id + 1)"), Scan("o", "(o.user_id + 1)")), Int8Oid))
+            .ShouldBe([NotNullSetOperation]);
+
+    // A branch's expression over a nullable column proves nothing, nor does one whose type cannot carry to the
+    // column's.
+    [Theory]
+    [InlineData("(o.ref + 1)", Int4Oid)]
+    [InlineData("(o.user_id + 1)", TextOid)]
+    public void Run_UnionAllOfAnExpressionThatProvesNothing_KeepsNoOrigin(string branch, long type) =>
+        AnswersOf(RunSet(AppendOf(Scan("u", "(u.id + 1)"), Scan("o", branch)), type)).ShouldBe([UnknownNoOrigin]);
+
+    // array_agg of a group is never NULL and of no known type, so that no branch of it carries to the column's type.
+    [Fact]
+    public void Run_UnionAllOfValuesOfNoKnownType_KeepsNoOrigin()
+    {
+        const long IntegerArrayOid = 1007;
+        var alone = new CatalogNames(new HashSet<string>(["array_agg"], StringComparer.Ordinal), new HashSet<string>());
+        var root = AppendOf(
+            Aggregate("Sorted", true, Scan("u", "u.id"), "array_agg(u.id)"),
+            Aggregate("Sorted", true, Scan("o", "o.user_id"), "array_agg(o.user_id)")
+        );
+        var (columns, origins) = Built(false, Expression);
+
+        AnswersOf(
+                NullabilityWalk.Run(
+                    new PlanInstancesCache(root, null),
+                    columns,
+                    origins,
+                    new WalkScope(false, false, true, SetTables, [IntegerArrayOid], CatalogAlone: alone)
+                )
+            )
+            .ShouldBe([UnknownNoOrigin]);
+    }
+
     // An Append that partition pruning removed a member of shows not every partition, and another execution may read
     // the removed one's rows.
     [Fact]
@@ -149,14 +187,20 @@ public sealed class NullabilityWalkSetOperationTests
         { "unanswered-relation", Text(Scan("w", "w.name")) },
         {
             "user-subquery-scan",
-            Text(Over("Subquery Scan", Scan("u", "u.name"), "Subquery") with { Alias = "s", Output = ["s.name"] })
+            Text(
+                Over("Subquery Scan", Scan("u", "u.name", "u.email"), "Subquery") with
+                {
+                    Alias = "s",
+                    Output = ["s.name"],
+                }
+            )
         },
     };
 
     public static TheoryData<string> BranchesThatMayBeNull => [.. BranchesThatMayBeNullRows.Keys];
 
     // A NULL, a nullable column, the side a LEFT JOIN extends, a relation that "tables" and "relations" did not
-    // answer, and a user subquery's scan, which is mapped by no position.
+    // answer, and a user subquery's scan, which is mapped by no position, so that its nullable column may be the one.
     [Theory]
     [MemberData(nameof(BranchesThatMayBeNull))]
     public void Run_UnionAllWithABranchThatMayBeNull_KeepsNoOrigin(string name) =>
@@ -191,7 +235,7 @@ public sealed class NullabilityWalkSetOperationTests
                 RunSet(
                     AppendOf(
                         Scan("u", "'a'::text", "u.name"),
-                        Select(2, Scan("o", "o.label"), "'b'::text", "\"*SELECT* 2\".label")
+                        Select(2, Scan("o", "o.label", "o.note"), "'b'::text", "\"*SELECT* 2\".label")
                     ),
                     TextOid,
                     TextOid

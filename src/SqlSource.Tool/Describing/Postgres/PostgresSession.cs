@@ -166,7 +166,8 @@ internal sealed partial class PostgresSession : DescriberSession
     // gated or has a column of no origin, its generic plan, then the ancestors of the relations an Append of the plan
     // may scan as partitions, and, for a column of no origin, the relations the plan scans that "tables" did not
     // answer and which of the names of CatalogOverloads the plan prints another schema holds, or pg_catalog holds as
-    // an object that is not built in.
+    // an object that is not built in, and, when it changes an answer, whether any cast joins two families of
+    // SetOperationTypes.
     // The table match is made last and asks nothing: it reads the nullability the walk set.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
@@ -275,7 +276,9 @@ internal sealed partial class PostgresSession : DescriberSession
                     PostgresSearchPath.PutsCatalogFirst(SettingOf("search_path")),
                     tables.Value,
                     ColumnTypes: [.. columns.Select(static column => column.TypeOid)],
-                    DistrustsJoinReduction: gated && request.Parameters.Any(static parameter => parameter.HasNegatedUse)
+                    DistrustsJoinReduction: gated
+                        && request.Parameters.Any(static parameter => parameter.HasNegatedUse),
+                    ParameterCount: parameterOids.Count
                 ),
                 cancellationToken
             );
@@ -339,16 +342,20 @@ internal sealed partial class PostgresSession : DescriberSession
             var cache = new PlanInstancesCache(root, partitions, scope.DistrustsJoinReduction);
             var relations = await RelationsOfAsync(request, root, origins, scope.Tables, cancellationToken);
             var alone = await OverloadsOfAsync(request, root, origins, scope, cancellationToken);
-            outcome = NullabilityWalk.Run(
-                cache,
-                columns,
-                origins,
-                scope with
+            var read = scope with { Tables = relations, CatalogAlone = alone };
+            outcome = NullabilityWalk.Run(cache, columns, origins, read);
+            if (scope.CatalogFunctionsFirst && origins.Any(static origin => origin is null))
+            {
+                var typed = NullabilityWalk.Run(cache, columns, origins, read with { NoCastAcrossFamilies = true });
+                if (
+                    !NullabilityWalk.SameAnswers(outcome, typed)
+                    && await CastsAsync(request.Name, SetOperationTypes.CrossFamilyPairs, cancellationToken)
+                        is { Error: null, AnyCast: false }
+                )
                 {
-                    Tables = relations,
-                    CatalogAlone = alone,
+                    outcome = typed;
                 }
-            );
+            }
         }
         else
         {

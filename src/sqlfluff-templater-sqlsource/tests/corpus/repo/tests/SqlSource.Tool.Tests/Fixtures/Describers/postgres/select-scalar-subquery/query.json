@@ -3,7 +3,7 @@
   "settings": [
     "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
   ],
-  "input": "-- name: GetUsersWithOrderStats\nSELECT\n    u.id,\n    (SELECT max(o.total) FROM orders o WHERE o.user_id = u.id) AS biggest_order,\n    (SELECT count(*) FROM bookings) AS booking_count\nFROM users u\nWHERE u.id > @min_id;\n",
+  "input": "-- name: GetUsersWithOrderStats\nSELECT\n    u.id,\n    (SELECT count(*) FROM bookings) AS booking_count,\n    (SELECT max(o.total) FROM orders o WHERE o.user_id = u.id) AS biggest_order\nFROM users u\nWHERE u.id > @min_id;\n",
   "expected": {
     "startDialect": "ansi",
     "startOptions": [],

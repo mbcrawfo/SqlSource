@@ -91,7 +91,8 @@ internal static partial class PlanExpression
                     from,
                     to,
                     () =>
-                        OperatorAt(from + 1, to - 1) is null && !IsWord(from + 1, "ANY")
+                        IsComputedValue(from + 1, to - 1)
+                        || (OperatorAt(from + 1, to - 1) is null && !IsWord(from + 1, "ANY"))
                             ? Proved(from + 1, to - 1)
                             : CatalogForm(from, to)
                 );
@@ -125,12 +126,55 @@ internal static partial class PlanExpression
                 return _context.CatalogFunctions ? CaseType(from, to) : null;
             }
 
+            if (IsComputedValue(from, to))
+            {
+                return _context.InitPlanTypeOf?.Invoke(Text(from, to));
+            }
+
             if (OutputReference.Parse(Text(from, to)) is { } reference)
             {
                 return from > 0 || to < _tokens.Count ? _context.ProvedTypeOf(reference) : null;
             }
 
             return CatalogForm(from, to);
+        }
+
+        /// <summary>
+        /// The type of the span whether or not it is <c>NULL</c>, as
+        /// <see cref="TypeRegardlessOfNull" /> says.
+        /// </summary>
+        public long? TypeRegardless(int from, int to)
+        {
+            if (!_context.CatalogFunctions)
+            {
+                return null;
+            }
+
+            while (to - from > 2 && IsGroup(from, to) && OperatorAt(from + 1, to - 1) is null)
+            {
+                from++;
+                to--;
+            }
+
+            if (to - from >= 3 && IsWord(from, "NULL") && Is(from + 1, Kind.Cast) && IsTypeName(from + 2, to))
+            {
+                return BuiltInType(from + 2, to);
+            }
+
+            if (
+                Is(from, Kind.Open)
+                && _closes[from] is var close and >= 0
+                && close + 2 < to
+                && Is(close + 1, Kind.Cast)
+                && IsTypeName(close + 2, to)
+            )
+            {
+                return BuiltInType(close + 2, to);
+            }
+
+            return OutputReference.Parse(Text(from, to)) is { } reference
+                ? _context.ProvedTypeOf(reference)
+                : Proved(from, to);
         }
 
         // The type of COALESCE(...), GREATEST(...) or LEAST(...), [from, to) its arguments, when it cannot be NULL:

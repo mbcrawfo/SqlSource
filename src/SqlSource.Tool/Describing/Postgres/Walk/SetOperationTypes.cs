@@ -43,6 +43,10 @@ internal static class SetOperationTypes
         [BuiltInTypes.Date, BuiltInTypes.Timestamp, BuiltInTypes.Timestamptz],
     ];
 
+    // The index of the family of text in Families: any type reaches one of its types by an assignment cast through its
+    // text form, which pg_cast holds no row for.
+    private const int TextFamily = 1;
+
     // Each type of a family, with the family's index.
     private static readonly FrozenDictionary<long, int> FamilyOf = Families
         .SelectMany(static (family, index) => family.Select(oid => (oid, index)))
@@ -55,6 +59,38 @@ internal static class SetOperationTypes
     public static bool Carries(long from, long to) =>
         from == to
         || (FamilyOf.TryGetValue(from, out var family) && FamilyOf.TryGetValue(to, out var other) && family == other);
+
+    /// <summary>
+    /// Whether a value of the type <paramref name="from" /> can never be a column of the type <paramref name="to" />,
+    /// when <c>pg_cast</c> holds no row for any pair of <see cref="CrossFamilyPairs" />: the two are in different
+    /// families and the target is no text type.
+    /// </summary>
+    /// <remarks>
+    /// The parser joins a set operation's branches only within one type category, and a SQL function's result reaches
+    /// its declared type by an assignment cast, which the plan does not print.  Outside <c>pg_cast</c> the one such
+    /// cast is the automatic one through a type's text form, whose target is a string type, so a text column may hold
+    /// any value: <c>RETURNS TABLE (t text)</c> over a nullable <c>integer</c> is planned with no cast to show it.
+    /// </remarks>
+    public static bool CannotReach(long from, long to) =>
+        FamilyOf.TryGetValue(from, out var family)
+        && FamilyOf.TryGetValue(to, out var other)
+        && family != other
+        && other != TextFamily;
+
+    /// <summary>The ordered pairs <see cref="CannotReach" /> holds for, as the request of <c>casts</c>.</summary>
+    public static PostgresCastsRequest CrossFamilyPairs { get; } = PairsOfFamilies();
+
+    private static PostgresCastsRequest PairsOfFamilies()
+    {
+        long[] types = [.. Families.SelectMany(static family => family)];
+        (long From, long To)[] pairs =
+        [
+            .. types
+                .SelectMany(from => types.Select(to => (from, to)))
+                .Where(static pair => CannotReach(pair.from, pair.to)),
+        ];
+        return new PostgresCastsRequest([.. pairs.Select(static p => p.From)], [.. pairs.Select(static p => p.To)]);
+    }
 
     /// <summary>Whether the type is in one of the <see cref="Families" />.</summary>
     public static bool InFamily(long type) => FamilyOf.ContainsKey(type);

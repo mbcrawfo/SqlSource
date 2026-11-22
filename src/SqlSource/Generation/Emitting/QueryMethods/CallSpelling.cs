@@ -43,7 +43,7 @@ internal abstract class CallSpelling
 
     /// <summary>
     /// Appends the argument of a repository's connection source that takes a cancellation token: the method's token, or
-    /// <c>default</c> for a method that takes none.
+    /// a <c>default</c> of the token's type for a method that takes none, so that both bind to the same overload.
     /// </summary>
     public abstract StringBuilder AppendSourceToken(StringBuilder builder, string token);
 
