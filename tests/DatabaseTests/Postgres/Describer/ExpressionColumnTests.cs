@@ -25,6 +25,17 @@ public sealed class ExpressionColumnTests(PostgresDatabases postgres)
             { $"SELECT t.big, sum(t.amount) FROM {T} t WHERE t.big = @p GROUP BY t.big", "nn" },
             { $"SELECT max(t.amount) FROM {T} t GROUP BY 'x'::text", "n" },
             { $"SELECT max(t.n) FROM {T} t WHERE t.id = 1 GROUP BY t.id", "?" },
+            // An upper aggregate of the same text as a subquery's grouped one is computed over no group at all.
+            {
+                $"SELECT sum(s.id) AS a, max(s.c) AS b FROM (SELECT t.id, sum(t.id) AS c FROM {T} t WHERE t.id < 0 "
+                    + "GROUP BY t.id) s",
+                "??"
+            },
+            {
+                $"SELECT sum(s.id) + 1 AS a, max(s.c) AS b FROM (SELECT t.id, sum(t.id) + 1 AS c FROM {T} t "
+                    + "WHERE t.id < 0 GROUP BY t.id) s",
+                "??"
+            },
             // No GROUP BY, or an empty one, returns one row of NULL for no input.
             { $"SELECT max(t.amount) FROM {T} t WHERE t.id = -5", "?" },
             { $"SELECT max(t.amount) FROM {T} t WHERE t.id = -5 GROUP BY ()", "?" },
@@ -126,6 +137,28 @@ public sealed class ExpressionColumnTests(PostgresDatabases postgres)
                 "n"
             },
             { $"SELECT sum(t.big) OVER w AS a, min(t.label) OVER w AS b FROM {T} t WINDOW w AS (ORDER BY t.id)", "nn" },
+            // Several windows of one level, whose values pass up through each other's nodes.
+            {
+                "SELECT sum(t.amount) OVER (ORDER BY t.id) AS a, sum(t.amount) OVER (PARTITION BY t.label) AS b "
+                    + $"FROM {T} t",
+                "nn"
+            },
+            // A window's name is unique within its query level alone, so a subquery's w1 may have another frame.
+            {
+                "SELECT sum(s.id) OVER (ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING) AS a, s.c "
+                    + $"FROM (SELECT t.id, sum(t.id) OVER () AS c FROM {T} t) s",
+                "?n"
+            },
+            {
+                "SELECT sum(s.id) OVER () + s.c AS a FROM (SELECT t.id, sum(t.id) OVER (ROWS BETWEEN 1 FOLLOWING AND "
+                    + $"2 FOLLOWING) AS c FROM {T} t) s",
+                "?"
+            },
+            {
+                "SELECT sum(s.id) OVER w AS a, s.c FROM (SELECT t.id, sum(t.id) OVER w AS c "
+                    + $"FROM {T} t WINDOW w AS ()) s WINDOW w AS (ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING)",
+                "?n"
+            },
             // A frame that leaves the current row out, and one with an offset.
             {
                 $"SELECT sum(t.amount) OVER (ORDER BY t.id ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING) AS v FROM {T} t",

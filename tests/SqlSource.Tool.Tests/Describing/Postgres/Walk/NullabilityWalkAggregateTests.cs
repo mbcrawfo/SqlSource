@@ -121,6 +121,70 @@ public sealed class NullabilityWalkAggregateTests
     public void Run_WindowAggregateThatMayBeNull_KeepsNoOrigin(string aggregate, string? window) =>
         AnswersOf(RunOverOrders(WindowOverOrders(aggregate, window))).ShouldBe([UnknownNoOrigin]);
 
+    // A node prints a value of a child in parentheses, so a bare aggregate of the same text as its child's is its own:
+    // a Plain Aggregate over a grouped one returns a row for no input.
+    [Theory]
+    [InlineData("max(o.placed_at)", "max(o.placed_at)")]
+    [InlineData("(max(o.placed_at) + '1 day'::interval)", "(max(o.placed_at) + '1 day'::interval)")]
+    public void Run_PlainAggregateOfTheSameTextAsItsGroupedChild_KeepsNoOrigin(string entry, string child) =>
+        AnswersOf(
+                RunOverOrders(Aggregate("Plain", false, Aggregate("Sorted", true, JoinOfAAndO("Inner"), child), entry))
+            )
+            .ShouldBe([UnknownNoOrigin]);
+
+    // A value the Plain Aggregate takes from its grouped child, in parentheses, is the child's.
+    [Fact]
+    public void Run_ValueAnAggregateTakesFromAGroupedChild_IsTheChilds() =>
+        AnswersOf(
+                RunOverOrders(
+                    Aggregate(
+                        "Sorted",
+                        true,
+                        Aggregate("Sorted", true, JoinOfAAndO("Inner"), "max(o.placed_at)"),
+                        "(max(o.placed_at))"
+                    )
+                )
+            )
+            .ShouldBe([NotNullExpression]);
+
+    // A WindowAgg over another of a window of the same name: its own aggregate is read under its own frame.
+    [Theory]
+    [InlineData("w1 AS (ROWS BETWEEN '1'::bigint FOLLOWING AND '2'::bigint FOLLOWING)", "w1 AS ()", false)]
+    [InlineData("w1 AS ()", "w1 AS (ROWS BETWEEN '1'::bigint FOLLOWING AND '2'::bigint FOLLOWING)", true)]
+    public void Run_WindowAggregateOfTheSameTextAsItsChild_IsReadUnderItsOwnWindow(
+        string upper,
+        string lower,
+        bool proved
+    )
+    {
+        var child = Over("WindowAgg", Scan("o", "o.placed_at")) with
+        {
+            Output = ["max(o.placed_at) OVER w1"],
+            Window = lower,
+        };
+        var root = Over("WindowAgg", child) with { Output = ["max(o.placed_at) OVER w1"], Window = upper };
+
+        AnswersOf(RunOverOrders(root)).ShouldBe([proved ? NotNullExpression : UnknownNoOrigin]);
+    }
+
+    // The value of a child's window, inside an expression of the node above, is not read under the node's own window.
+    [Fact]
+    public void Run_ValueOfAChildsWindowOfTheSameName_IsNotReadUnderTheNodesWindow()
+    {
+        var child = Over("WindowAgg", Scan("o", "o.quantity")) with
+        {
+            Output = ["sum(o.quantity) OVER w1"],
+            Window = "w1 AS (ROWS BETWEEN '1'::bigint FOLLOWING AND '2'::bigint FOLLOWING)",
+        };
+        var root = Over("WindowAgg", child) with
+        {
+            Output = ["(sum(o.quantity) OVER w1 + (sum(o.quantity) OVER w1))"],
+            Window = "w1 AS ()",
+        };
+
+        AnswersOf(RunOverOrders(root)).ShouldBe([UnknownNoOrigin]);
+    }
+
     // The same text at a node that is no WindowAgg says nothing of a frame.
     [Fact]
     public void Run_WindowTextAtANodeThatIsNoWindowAgg_KeepsNoOrigin() =>

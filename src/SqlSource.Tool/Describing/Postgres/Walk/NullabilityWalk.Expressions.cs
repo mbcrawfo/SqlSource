@@ -196,7 +196,7 @@ internal static partial class NullabilityWalk
                 }
 
                 PlanNode[] children = [.. node.JoinChildren];
-                if (children is not [_] || Printing(children, text).ToArray() is not [var found])
+                if (children is not [_] || PrintedBelow(node, children, text) is not [var found])
                 {
                     return false;
                 }
@@ -377,7 +377,7 @@ internal static partial class NullabilityWalk
                 return null;
             }
 
-            var printing = Printing(children, entry).ToArray();
+            var printing = PrintedBelow(node, children, entry);
             if (printing.Length == 0)
             {
                 return instances.IsExtended(node)
@@ -438,7 +438,7 @@ internal static partial class NullabilityWalk
                 return false;
             }
 
-            var printing = Printing(children, entry).ToArray();
+            var printing = PrintedBelow(node, children, entry);
             if (printing.Length > 0)
             {
                 return printing.All(found => Preserved(found.Child, found.Printed, depth + 1));
@@ -468,6 +468,21 @@ internal static partial class NullabilityWalk
         // A child that prints no Output, and is extended or has a join under it that extends.
         private bool OpaqueAndNotPreserved(PlanNode child) =>
             child.Output is null && (instances.IsExtended(child) || instances.ExtendsUnder(child));
+
+        // Each child the node takes the entry from.  An Aggregate or a WindowAgg computes an entry that is its own
+        // value (PlanExpression.IsOwnValue), though a child prints the same text: an upper sum(x) over a subquery's
+        // sum(x), or a window w1 over a subquery's own w1, since a window's name is unique within its query level
+        // alone.
+        private static (PlanNode Child, string Printed)[] PrintedBelow(
+            PlanNode node,
+            PlanNode[] children,
+            string entry
+        ) =>
+            node.NodeType is PlanNodeTypes.Aggregate or PlanNodeTypes.WindowAgg
+            && OutputReference.Parse(entry) is null
+            && PlanExpression.IsOwnValue(entry)
+                ? []
+                : [.. Printing(children, entry)];
 
         // Each child that prints the value, and how: as it is, wrapped whole in parentheses, or without the
         // parentheses that wrap it whole.

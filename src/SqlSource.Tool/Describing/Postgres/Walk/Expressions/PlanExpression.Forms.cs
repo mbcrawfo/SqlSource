@@ -273,7 +273,7 @@ internal static partial class PlanExpression
         // NULL.  A FILTER may leave the frame no row, so it makes this no such form.
         private long? WindowAggregate(int from, int to)
         {
-            if (!IsLowerWord(from) || from + 1 >= to || !Is(from + 1, Kind.Open))
+            if (!_readsWindow || !IsLowerWord(from) || from + 1 >= to || !Is(from + 1, Kind.Open))
             {
                 return null;
             }

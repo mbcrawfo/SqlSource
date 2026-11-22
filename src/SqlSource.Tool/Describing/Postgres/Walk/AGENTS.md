@@ -22,6 +22,7 @@ How the walk reads a plan is [the plan walk](../../../../../docs/architecture/po
 - **A form is pinned in `tests/DatabaseTests/Postgres/Describer/PlanOutputTests.cs`, as 14 and 18 print it, before it is read.**
 - **Where a join null-extends, an entry is read only at the node that computes it and only when that node is preserved.**  An aggregate is read only at the grouped `Aggregate` that computes it, never inside a value a child printed.
 - **Before 17 a `$k` from 1 to `WalkScope.ParameterCount` is the statement's parameter and never an `InitPlan`'s value**, which prints the same ([expressions](../../../../../docs/architecture/postgres-nullability.md#expressions)).
+- **An `Aggregate` or a `WindowAgg` computes its own value, though a child prints the same text** (`PlanExpression.IsOwnValue`).
 - **A window aggregate is read only by a frame `PlanWindows` proves holds the current row**, and a `VALUES` column only for a plan that is a `Values Scan` under nodes that never project.
 - **An operator, a function or an aggregate other than `count(*)` and the rankings is read only by an exact signature of `TotalFunctions` or by a name of `CatalogOverloads`**, a cast only within a family of `SetOperationTypes`.  Any of them, a ranking and a literal's type name are read only when the session finds `pg_catalog` first (`PostgresSearchPath`).  What a row of either table needs is in the table's remarks.
 
