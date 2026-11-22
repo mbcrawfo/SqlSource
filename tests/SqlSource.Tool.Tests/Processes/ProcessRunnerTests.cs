@@ -22,17 +22,19 @@ public sealed class ProcessRunnerTests
     private static ProcessRequest Request(string program, params string[] arguments) =>
         Programs.Request(program, arguments);
 
-    // Waits for half a minute.
+    // Waits for longer than Eventually's patience, so that on a loaded machine its own timer cannot end a run that a
+    // test is about to cancel.
     private static ProcessRequest Wait()
     {
-        var (program, arguments) = Programs.Waiter(30);
+        var (program, arguments) = Programs.Waiter((int)Eventually.Patience.TotalSeconds + 30);
         return Request(program, arguments);
     }
 
     // Writes its id to one file, starts a program that waits, writes that one's id to the other, and waits for it.
-    // Windows has no shell that knows its own id but PowerShell.  The files reach the script as variables, which
-    // need no quoting, and with their full paths: the programs do not run in the folder of the files, since Windows
-    // does not delete a folder that a process runs in.
+    // That program waits ten minutes, longer than Eventually's patience, so only a kill of the whole tree ends it
+    // before a test gives up on it.  Windows has no shell that knows its own id but PowerShell.  The files reach the
+    // script as variables, which need no quoting, and with their full paths: the programs do not run in the folder
+    // of the files, since Windows does not delete a folder that a process runs in.
     private static ProcessRequest WaitWithAChild(string parentFile, string childFile)
     {
         var request = OperatingSystem.IsWindows()
@@ -42,14 +44,14 @@ public sealed class ProcessRunnerTests
                 "-NonInteractive",
                 "-Command",
                 "[IO.File]::WriteAllText($env:SQLSOURCE_TEST_PARENT, $PID);"
-                    + " $child = Start-Process ping -ArgumentList '-n', '30', '127.0.0.1' -NoNewWindow -PassThru;"
+                    + " $child = Start-Process ping -ArgumentList '-n', '600', '127.0.0.1' -NoNewWindow -PassThru;"
                     + " [IO.File]::WriteAllText($env:SQLSOURCE_TEST_CHILD, $child.Id);"
                     + " $child.WaitForExit()"
             )
             : Request(
                 "sh",
                 "-c",
-                "echo $$ > \"$SQLSOURCE_TEST_PARENT\"; sleep 30 & echo $! > \"$SQLSOURCE_TEST_CHILD\"; wait"
+                "echo $$ > \"$SQLSOURCE_TEST_PARENT\"; sleep 600 & echo $! > \"$SQLSOURCE_TEST_CHILD\"; wait"
             );
         return request with
         {
@@ -75,13 +77,16 @@ public sealed class ProcessRunnerTests
     [Fact]
     public async Task Run_ProgramThatFails_GivesItsExitCodeAndItsErrorOutput()
     {
-        var result = await Runner.RunAsync(
-            Request(Programs.Dotnet, "sqlsource-no-such-command"),
-            TestContext.Current.CancellationToken
-        );
+        var request = OperatingSystem.IsWindows()
+            ? Request("cmd", "/c", "echo sqlsource-error>&2& exit /b 3")
+            : Request("sh", "-c", "echo sqlsource-error >&2; exit 3");
+        Programs.SkipUnlessOnPath(request.Program);
 
-        result.ExitCode.ShouldNotBe(0);
-        (result.Output + result.Error).Trim().ShouldNotBeEmpty();
+        var result = await Runner.RunAsync(request, TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(3);
+        result.Error.Trim().ShouldBe("sqlsource-error");
+        result.Output.ShouldBeEmpty();
     }
 
     [Fact]
@@ -134,71 +139,113 @@ public sealed class ProcessRunnerTests
         Programs.SkipUnlessOnPath(Wait().Program);
 
         var run = Runner.RunAsync(request, cancel.Token);
-        var parent = await ReadIdAsync(folder.PathOf("parent"));
-        var child = await ReadIdAsync(folder.PathOf("child"));
-        IsRunning(parent).ShouldBeTrue();
-        IsRunning(child).ShouldBeTrue();
-        await cancel.CancelAsync();
+        Process? held = null;
+        try
+        {
+            using var parent = Hold(await ReadIdAsync(folder.PathOf("parent")));
+            var child = held = Hold(await ReadIdAsync(folder.PathOf("child")));
+            parent.HasExited.ShouldBeFalse();
+            child.HasExited.ShouldBeFalse();
+            await cancel.CancelAsync();
 
-        _ = await Should.ThrowAsync<OperationCanceledException>(run);
-        await Eventually.TrueAsync(() => !IsRunning(parent), "the program is still running");
-        await Eventually.TrueAsync(() => !IsRunning(child), "the program that the program started is still running");
+            _ = await Should.ThrowAsync<OperationCanceledException>(run);
+            await Eventually.TrueAsync(() => parent.HasExited, "the program is still running");
+            await Eventually.TrueAsync(() => child.HasExited, "the program that the program started is still running");
+        }
+        finally
+        {
+            // A failure at any step leaves neither program for ten minutes.
+            await cancel.CancelAsync();
+            _ = await Task.WhenAny(run, Task.Delay(Eventually.Patience, TestContext.Current.CancellationToken));
+            if (held is { HasExited: false })
+            {
+                held.Kill();
+            }
+
+            held?.Dispose();
+        }
     }
 
     // The id that a script wrote to a file, once it has.  PowerShell takes seconds to start on a machine that has
-    // not run it.
+    // not run it, and on Windows the file cannot be read while the script still has it open.
     private static async Task<int> ReadIdAsync(string file) =>
         await Eventually.ValueAsync<int>(
-            async () => File.Exists(file) && int.TryParse(await File.ReadAllTextAsync(file), out var id) ? id : null,
+            async () =>
+            {
+                try
+                {
+                    return File.Exists(file) && int.TryParse(await File.ReadAllTextAsync(file), out var id) ? id : null;
+                }
+                catch (IOException)
+                {
+                    return null;
+                }
+            },
             $"Nothing wrote an id to '{file}'."
         );
 
-    private static bool IsRunning(int id)
+    // The process of an id, with its handle open: on Windows the id then cannot pass to another process while this
+    // is held, which GetProcessById alone does not promise.
+    private static Process Hold(int id)
     {
-        try
-        {
-            using var process = Process.GetProcessById(id);
-            return !process.HasExited;
-        }
-        catch (ArgumentException)
-        {
-            // No process has the id.
-            return false;
-        }
+        var process = Process.GetProcessById(id);
+        _ = process.SafeHandle;
+        return process;
     }
 
     // A kill only asks, and on Windows the program ends some time after.  The run waits for that: what its caller
     // deletes next, the folder that MSBuild writes its manifest to, is then no longer held by it.  The kill here
-    // is done only when the test lets it, after the runner asked for it, so it is late on every system.
+    // is done only when the test lets it, after the runner asked for it, so it is late on every system.  The run may
+    // wait as long as the test does, so a loaded machine cannot end its wait first.  The kill is held for a moment
+    // that only a run that does not wait can use: load can make this miss such a run, never fail one that waits.
     [Fact]
     public async Task Run_Cancelled_EndsOnlyWhenTheProgramHas()
     {
         var wait = Wait();
         Programs.SkipUnlessOnPath(wait.Program);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var asked = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var asked = new TaskCompletionSource<Process>(TaskCreationOptions.RunContinuationsAsynchronously);
         var let = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var runner = new ProcessRunner(process =>
-        {
-            var id = process.Id;
-            _ = Task.Run(async () =>
+        var killed = Task.CompletedTask;
+        var runner = new ProcessRunner(
+            process =>
             {
-                await let.Task;
-                using var late = Process.GetProcessById(id);
-                late.Kill();
-            });
-            asked.SetResult(id);
-        });
+                var held = Hold(process.Id);
+                killed = Task.Run(async () =>
+                {
+                    await let.Task;
+                    held.Kill();
+                });
+                asked.SetResult(held);
+            },
+            Eventually.Patience
+        );
 
         var run = runner.RunAsync(wait, cancel.Token);
         await cancel.CancelAsync();
-        var program = await asked.Task;
-        IsRunning(program).ShouldBeTrue();
-        let.SetResult();
+        using var program = await Eventually.WithinAsync(asked.Task, "the run never asked for the kill");
+        try
+        {
+            _ = await Task.WhenAny(
+                run,
+                Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken)
+            );
+            run.IsCompleted.ShouldBeFalse("the run ended while its program was still running");
+            program.HasExited.ShouldBeFalse();
+        }
+        finally
+        {
+            let.SetResult();
+            await killed;
+        }
 
         _ = await Should.ThrowAsync<OperationCanceledException>(run);
-        IsRunning(program).ShouldBeFalse();
+        program.HasExited.ShouldBeTrue();
     }
+
+    // The test above gives its own wait, so this holds the one that a real run uses.
+    [Fact]
+    public void WaitAfterKill_OfARealRun_IsFiveSeconds() => Runner.WaitAfterKill.ShouldBe(TimeSpan.FromSeconds(5));
 
     // A kill of the whole tree can fail, as when a process of it belongs to another user.  The run was cancelled
     // all the same, and that is what its caller is told: anything else would be reported as SQLSRC200.
@@ -211,12 +258,15 @@ public sealed class ProcessRunnerTests
         var wait = Wait();
         Programs.SkipUnlessOnPath(wait.Program);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var runner = new ProcessRunner(process =>
-        {
-            // The program is ended, so that the test leaves none, and the kill fails as the system's would.
-            process.Kill(entireProcessTree: true);
-            throw (Exception)Activator.CreateInstance(failure)!;
-        });
+        var runner = new ProcessRunner(
+            process =>
+            {
+                // The program is ended, so that the test leaves none, and the kill fails as the system's would.
+                process.Kill(entireProcessTree: true);
+                throw (Exception)Activator.CreateInstance(failure)!;
+            },
+            Eventually.Patience
+        );
 
         var run = runner.RunAsync(wait, cancel.Token);
         await cancel.CancelAsync();
