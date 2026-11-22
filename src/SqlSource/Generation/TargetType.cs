@@ -71,4 +71,24 @@ internal sealed record TargetType(
     /// takes no part in equality.
     /// </summary>
     public bool IsStruct => Types[Types.Count - 1].Keyword is "struct" or "record struct";
+
+    /// <summary>
+    /// Whether a type around this one is generic, so that a name written from <c>global::</c> may not be able to name
+    /// this type as it is constructed.  It is computed, so it takes no part in equality.
+    /// </summary>
+    public bool IsNestedInAGenericType
+    {
+        get
+        {
+            for (var index = 0; index < Types.Count - 1; index++)
+            {
+                if (Types[index].Arity > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
 }

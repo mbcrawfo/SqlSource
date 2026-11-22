@@ -164,9 +164,9 @@ public sealed class ConnectionResolverTierTests
         resolved.LeadingName.ShouldBeNull();
     }
 
-    // A static holder of a repository around which a type parameter has no name is reached through its own name.
+    // A static holder of a repository nested in a generic type is reached through the repository's own name.
     [Fact]
-    public void Resolve_StaticHolderOfATypeThatHidesATypeParameter_UsesTheTypesOwnName()
+    public void Resolve_StaticHolderNestedInAGenericType_UsesTheTypesOwnName()
     {
         var type = TestModels.Type(
             types:
@@ -178,7 +178,7 @@ public sealed class ConnectionResolverTierTests
         var held = Held("F", "Open", holderMember: CandidateMember.Field, holderIsStatic: true);
 
         var resolved = ConnectionResolver
-            .Resolve(type, Tiers([], held: [held]) with { HidesATypeParameter = true }, [Main])
+            .Resolve(type, Tiers([], held: [held]), [Main])
             .Sources.ShouldHaveSingleItem()
             .Asynchronous;
 

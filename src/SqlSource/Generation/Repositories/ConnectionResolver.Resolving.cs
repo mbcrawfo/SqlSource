@@ -17,11 +17,12 @@ internal static partial class ConnectionResolver
     private sealed class Resolving(
         TargetType type,
         IReadOnlyCollection<NeededDatabase> needed,
-        bool hidesATypeParameter
+        string? simpleNameTakenBy
     )
     {
         private readonly List<ResolvedConnection> _sources = [];
         private readonly List<string> _failed = [];
+        private readonly HashSet<string> _hiddenNames = [];
         private readonly ImmutableArray<DiagnosticInfo>.Builder _diagnostics =
             ImmutableArray.CreateBuilder<DiagnosticInfo>();
 
@@ -147,6 +148,25 @@ internal static partial class ConnectionResolver
                 return false;
             }
 
+            if (simpleNameTakenBy is { } takenBy && IsReachedThroughTheTypesName(candidate))
+            {
+                var reached = candidate.Holder?.Name ?? candidate.Name;
+                if (_hiddenNames.Add(reached))
+                {
+                    Report(
+                        DiagnosticInfo.Create(
+                            SqlDiagnostics.RepositoryNameHidden,
+                            type.AttributeLocation,
+                            TypeName,
+                            reached,
+                            takenBy
+                        )
+                    );
+                }
+
+                return false;
+            }
+
             if (DriverEngineOf(candidate.DeclaredTypeName) is { } other && other != database.Engine)
             {
                 Report(
@@ -166,6 +186,13 @@ internal static partial class ConnectionResolver
 
             return true;
         }
+
+        // Whether a method reaches the member through the type's name: a static member of the type or of a base type,
+        // or a static holder.  A global is reached through its own type.
+        private static bool IsReachedThroughTheTypesName(ConnectionCandidate candidate) =>
+            candidate.Holder is { } holder
+                ? holder.IsStatic
+                : candidate.Tier == CandidateTier.Own && candidate.IsStatic;
 
         // The resolution, its databases in the order they are needed.
         public ConnectionResolution ToResolution() =>
@@ -237,12 +264,14 @@ internal static partial class ConnectionResolver
                 return name;
             }
 
-            return isStatic && hidesATypeParameter && type.Types[type.Types.Count - 1].Arity == 0 ? type.Name : null;
+            return isStatic && type.IsNestedInAGenericType && type.Types[type.Types.Count - 1].Arity == 0
+                ? type.Name
+                : null;
         }
 
         // A parameter by its name, an instance member through this, and a static member through the type, which reaches
-        // a base type's static member too: in full, which a member of the type's name cannot hide, unless a type
-        // parameter around the type has no name inside it, when only the type's simple name means the constructed type.
+        // a base type's static member too: in full, which a member of the type's name cannot hide, unless a type around
+        // it is generic, whose type parameters a nearer name can hide, when only the simple name is sure of the type.
         private string AccessTextOf(string name, CandidateMember member, bool isStatic)
         {
             var escaped = Escaped(name);
@@ -256,7 +285,7 @@ internal static partial class ConnectionResolver
                 return "this." + escaped;
             }
 
-            return (hidesATypeParameter ? SimpleTypeText() : FullTypeText()) + "." + escaped;
+            return (type.IsNestedInAGenericType ? SimpleTypeText() : FullTypeText()) + "." + escaped;
         }
 
         // The type by its own name and type parameters as they are written, with an @ on an await.

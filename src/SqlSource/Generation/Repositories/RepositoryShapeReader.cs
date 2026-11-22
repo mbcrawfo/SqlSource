@@ -66,7 +66,7 @@ internal static class RepositoryShapeReader
                     interfaceOn,
                     interfaceName,
                     symbol is not null && interfaceOn ? FindTaken(symbol, interfaceName, compilation, token) : null,
-                    symbol is not null && HidesATypeParameter(symbol)
+                    symbol is not null && type.IsNestedInAGenericType ? FindSimpleNameTaker(symbol, compilation) : null
                 )
             );
         }
@@ -76,44 +76,47 @@ internal static class RepositoryShapeReader
         );
     }
 
-    // Whether a type parameter of a type around the type binds to something else inside it: a type nearer the type,
-    // or the type itself, repeats its name or has a nested type of its name.
-    private static bool HidesATypeParameter(INamedTypeSymbol type)
-    {
-        for (var inner = type; inner is not null; inner = inner.ContainingType)
-        {
-            for (var outer = inner.ContainingType; outer is not null; outer = outer.ContainingType)
-            {
-                if (outer.TypeParameters.Any(parameter => Hides(inner, parameter.Name)))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    // Whether a name in the type means something of the type's rather than a type parameter around it.
-    private static bool Hides(INamedTypeSymbol type, string name) =>
-        type.TypeParameters.Any(each => each.Name == name) || HasNestedType(type, name);
-
-    // Whether the type or a base type has a nested type of the name with no type parameters, which a name in the type
-    // binds to.  An interface's base interfaces count, and a class's interfaces do not, since a name in a class does
-    // not bind to their members.  One it cannot reach counts too: the access it costs is the type's own name.
-    private static bool HasNestedType(INamedTypeSymbol type, string name)
+    // What the type's simple name means inside it, when that is not the type: the nearest members of the name and the
+    // type's arity that the type can reach, its own or inherited, as C# looks up a simple name.  A field or property
+    // whose type is the type itself is C#'s Color Color rule, through which the name still reaches its static members.
+    private static string? FindSimpleNameTaker(INamedTypeSymbol type, Compilation compilation)
     {
         for (var each = type; each is not null; each = each.BaseType)
         {
-            if (!each.GetTypeMembers(name, 0).IsEmpty)
+            var members = each.GetMembers(type.Name)
+                .Where(member => HasTheArity(member, type.Arity) && compilation.IsSymbolAccessibleWithin(member, type))
+                .ToList();
+            if (members.Count > 0)
             {
-                return true;
+                return IsOfTheType(members[0], type) ? null : DescribeMember(members[0]);
             }
         }
 
-        return type.TypeKind == TypeKind.Interface
-            && type.AllInterfaces.Any(each => !each.GetTypeMembers(name, 0).IsEmpty);
+        return null;
     }
+
+    // Whether a simple name of the arity finds the member: a generic method answers a name with no type arguments too.
+    private static bool HasTheArity(ISymbol member, int arity) =>
+        member switch
+        {
+            INamedTypeSymbol nested => nested.Arity == arity,
+            IMethodSymbol method => arity == 0 || method.Arity == arity,
+            _ => arity == 0,
+        };
+
+    private static bool IsOfTheType(ISymbol member, INamedTypeSymbol type) =>
+        member switch
+        {
+            IFieldSymbol field => SymbolEqualityComparer.Default.Equals(field.Type, type),
+            IPropertySymbol property => SymbolEqualityComparer.Default.Equals(property.Type, type),
+            _ => false,
+        };
+
+    private static string DescribeMember(ISymbol member) =>
+        "the "
+        + (member is INamedTypeSymbol type ? KindOf(type) : MemberKindOf(member))
+        + " "
+        + member.ToDisplayString();
 
     // What takes the interface's full name, in the type's namespace or the type it is nested in, with the type's arity:
     // a type of the project's own assembly, unless it is an interface that every declaration of makes partial, which

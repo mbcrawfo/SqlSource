@@ -529,18 +529,17 @@ public sealed class ConnectionResolverTests
         source.LeadingName.ShouldBeNull();
     }
 
-    // Each type around the repository is in the access, with its type parameters, and a repository in no namespace
-    // starts at global::.
+    // Each type around the repository is in the access, and a repository in no namespace starts at global::.
     [Theory]
-    [InlineData("App", "global::App.Outer<TOuter>.Repo.ConnectionString")]
-    [InlineData("", "global::Outer<TOuter>.Repo.ConnectionString")]
+    [InlineData("App", "global::App.Outer.Repo.ConnectionString")]
+    [InlineData("", "global::Outer.Repo.ConnectionString")]
     public void Resolve_StaticMemberOfANestedType_NamesEachTypeInTheAccess(string @namespace, string access)
     {
         var type = TestModels.Type(
             @namespace: @namespace,
             types:
             [
-                new TypeDeclaration("class", "Outer", "Outer", "<TOuter>", 1),
+                new TypeDeclaration("class", "Outer", "Outer", "", 0),
                 new TypeDeclaration("class", "Repo", "Repo", "", 0),
             ]
         );
@@ -552,23 +551,6 @@ public sealed class ConnectionResolverTests
         var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
 
         resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe(access);
-    }
-
-    // The type's name is as its declaration writes it, so a keyword keeps its @.
-    [Fact]
-    public void Resolve_StaticMemberOfATypeNamedByAKeyword_EscapesTheTypesName()
-    {
-        var type = TestModels.Type(types: [new TypeDeclaration("class", "@class", "class", "<@int>", 1)]);
-        var candidate = Candidate("ConnectionString", CandidateType.ConnectionString, CandidateMember.Property) with
-        {
-            IsStatic = true,
-        };
-
-        var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
-
-        resolution
-            .Sources.ShouldHaveSingleItem()
-            .Asynchronous.AccessText.ShouldBe("global::App.@class<@int>.ConnectionString");
     }
 
     // An asynchronous method cannot use a bare await as a name, so each whole await of the path gets its @, and a name
@@ -602,15 +584,15 @@ public sealed class ConnectionResolverTests
         resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe(access);
     }
 
-    // A repository around which a type parameter has no name reaches a static member through its own name, whose first
-    // name a local can hide only when the repository is not generic, with an @ on each await.
+    // A repository nested in a generic type reaches a static member through its own name, whose first name a local can
+    // hide only when the repository is not generic, with an @ on each await.
     [Theory]
     [InlineData("Repo", "<T>", 1, "X", "Repo<T>.X", null)]
     [InlineData("Repo", "", 0, "X", "Repo.X", "Repo")]
     [InlineData("await", "", 0, "X", "@await.X", "await")]
     [InlineData("Repo", "<await>", 1, "X", "Repo<@await>.X", null)]
     [InlineData("Repo", "", 0, "await", "Repo.@await", "Repo")]
-    public void Resolve_StaticMemberOfATypeThatHidesATypeParameter_UsesTheTypesOwnName(
+    public void Resolve_StaticMemberNestedInAGenericType_UsesTheTypesOwnName(
         string name,
         string typeParameters,
         int arity,
@@ -632,7 +614,7 @@ public sealed class ConnectionResolverTests
         };
 
         var source = ConnectionResolver
-            .Resolve(type, Shape(candidate) with { HidesATypeParameter = true }, [Main])
+            .Resolve(type, Shape(candidate), [Main])
             .Sources.ShouldHaveSingleItem()
             .Asynchronous;
 

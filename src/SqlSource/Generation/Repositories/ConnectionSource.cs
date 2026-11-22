@@ -16,9 +16,9 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="AccessText">
 /// The member as a method of the type reaches it, without the call of a method: <c>this.X</c> for an instance member,
 /// <c>X</c> for a primary-constructor parameter, and the type in full from <c>global::</c>, with its type parameters,
-/// then <c>.X</c>, for a static member, a base type's included.  When a type parameter around the type has no name
-/// inside it, which <see cref="RepositoryShape.HidesATypeParameter" /> says, a static member is reached through the
-/// type's own name and type parameters instead.  A keyword and <c>await</c> get their <c>@</c>.
+/// then <c>.X</c>, for a static member, a base type's included.  In a type nested in a generic type, whose outer type
+/// parameters a nearer name can hide, a static member is reached through the type's own name and type parameters
+/// instead.  A keyword and <c>await</c> get their <c>@</c>.
 /// </param>
 /// <param name="IsAsync">
 /// Whether it is a method that returns a <c>Task</c> or a <c>ValueTask</c> of a connection.

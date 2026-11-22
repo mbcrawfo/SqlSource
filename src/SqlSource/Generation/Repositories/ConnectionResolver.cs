@@ -33,7 +33,7 @@ internal static partial class ConnectionResolver
         IReadOnlyCollection<NeededDatabase> needed
     )
     {
-        var resolving = new Resolving(type, needed, shape.HidesATypeParameter);
+        var resolving = new Resolving(type, needed, shape.SimpleNameTakenBy);
         if (needed.Count == 0)
         {
             return resolving.ToResolution();

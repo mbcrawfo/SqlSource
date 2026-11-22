@@ -1,21 +1,21 @@
-# TD-0119: A static source or holder with the repository's name fails when a type parameter around it is hidden
+# TD-0119: A repository nested in a generic type cannot use a static connection when a member takes its name
 
 ## Problem
 
-[`ConnectionResolver`](../../src/SqlSource/Generation/Repositories/ConnectionResolver.Resolving.cs) writes a static access through the repository's type in full from `global::`.  That path cannot name the repository when a nearer type repeats a type parameter of a type around it, or has a nested type of its name, `RepositoryShape.HidesATypeParameter`, since the outer parameter has no name inside the repository.  Such a repository is reached through its own simple name instead, as `Sample.Sample` for a static member `Sample` of a base type of `Sample`.  Inside the repository, `Sample` binds to the inherited member before the type, so the generated method fails to compile with `CS1061`.  A generic repository is hidden the same way only by a generic member or nested type of its name and arity, and an inherited nested type of that name and arity that has a static member of the source's name is read in its place.
+[`ConnectionResolver`](../../src/SqlSource/Generation/Repositories/ConnectionResolver.Resolving.cs) writes a static access through the repository's type in full from `global::`, except for a repository nested in a generic type.  There, a nearer type parameter or nested type, a generated one too, can hide an outer type parameter, and the path would name another constructed type or fail to compile, so the access starts at the repository's simple name.  An inherited member of that name then takes the name from the type, and `Sample.ConnectionString` would read through the member.  [`RepositoryShapeReader`](../../src/SqlSource/Generation/Repositories/RepositoryShapeReader.cs) finds such a member, and `SQLSRC039` refuses the repository's static source or holder, unless the member is a field or property of the repository's own type, which C#'s Color Color rule lets through.
 
 ## Why it exists
 
-The full path fixed every other repository.  Reaching this one by the member's bare name would make a token of that name an error, and could not reach a member named as a method's argument or a type parameter, each of which builds today.
+The full path fixed every repository that is not nested in a generic type.  For the rest, the owner chose today's access over a check of every name a path could meet, since generated nested classes do not exist when the check runs, and chose to refuse the shape over a method that could silently read another member.
 
 ## Impact
 
-Low.  The repository needs both a hidden type parameter and a base type's member with its name.  The build fails in the generated code, at the method, with an error that does not name the cause.  Renaming the member or the type parameter is the workaround.
+Low.  The repository must be nested in a generic type, use a static source or holder, and inherit a member with its name.  The build reports the cause at the repository.  Renaming the member, using an instance source or moving the repository are the workarounds.
 
 ## Proposed fix
 
-Decide from the symbols whether the simple name binds to the repository, and when it does not, reach the member by its bare name if no argument or type parameter has that name, with a diagnostic for what remains.  Add a compile test to `MethodCompileTests` of each shape, and remove the limit "A static member of a base type with the repository's name" from `site/reference/repository-connections.md` with its row of `site/guides/troubleshooting.md`.
+Give such a repository a way to reach its static member that no name can hide, such as a generated private accessor, and remove `SQLSRC039`'s refusal.  Add a compile test of each shape to `MethodCompileTests`, and remove the limit "A static member of a base type with the repository's name" from `site/reference/repository-connections.md` with its row of `site/guides/troubleshooting.md`.
 
 ## Trigger
 
-A user report of `CS1061` in a repository's generated methods, or the next change to how a static source is reached.
+A user report of `SQLSRC039`, or the next change to how a static source is reached.

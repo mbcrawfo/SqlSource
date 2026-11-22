@@ -245,13 +245,14 @@ The marks of a factory and of the static members of the project are shared: one 
 
 ### A static member of a base type with the repository's name
 
-**What you see.**  The build fails in the repository's generated methods with CS1061, such as "'string' does not contain a definition for 'Sample'".
+**What you see.**  The build reports [SQLSRC039](../diagnostics.md#sqlsrc039), and the repository queries of that database get no method.
 
-This happens only when a type parameter of a type around the repository is hidden inside it.  A nearer type parameter or nested type of the same name hides it, as in `Outer<T>.Sample<T>`.
+This happens only when the repository is nested in a generic type, and a `static` member gives its connection or holds its factory.
 
-**Why.**  In that case, the methods reach a `static` connection source, or a `static` member that holds your factory, through the repository's name: `Sample.Sample` for a member `Sample` of the base type of `Sample`.  Inside the repository, `Sample` names the member it inherits, not the type.
+**Why.**  The methods reach that member through the repository's name, such as `Sample.ConnectionString`.  A member that `Sample` inherits has the name `Sample`, so inside the repository the name means that member, not the type.  A field or property whose type is the repository itself does not cause this.
 
 **What to do.**  Do one of these:
 
 - Give the member of the base type another name.
-- Give the hidden type parameter, or what hides it, another name.
+- Give the connection from an instance member of the repository.
+- Move the repository out of the generic type.

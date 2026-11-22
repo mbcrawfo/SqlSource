@@ -518,10 +518,10 @@ public sealed class SharedConnectionMethodTests
         run.Sources[MethodsFile].ShouldContain("global::App.Sample.Sample");
     }
 
-    // A repository whose outer type parameter has no name inside it reaches a static holder through its own name, which
-    // a token of that name would hide when the repository is not generic.
+    // A repository nested in a generic type reaches a static holder through its own name, which a token of that name
+    // would hide when the repository is not generic.
     [Fact]
-    public void Run_TokenNamedLikeATypeThatHidesATypeParameter_ReportsSqlsrc275ForTheHolder()
+    public void Run_TokenNamedLikeATypeNestedInAGenericType_ReportsSqlsrc275ForTheHolder()
     {
         const string Source =
             Factory

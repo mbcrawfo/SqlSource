@@ -35,10 +35,10 @@ namespace SqlSource.Generation.Repositories;
 /// unless it is a partial interface, a type of a referenced assembly that the project sees, or a member of the
 /// containing type.  Null when nothing does, or the type gets no interface.
 /// </param>
-/// <param name="HidesATypeParameter">
-/// Whether a type parameter of a type around the repository has no name inside it, since a type nearer the repository
-/// repeats the name as a type parameter, or has a nested type of the name, its own or inherited.  A path from
-/// <c>global::</c> would then name another constructed type.
+/// <param name="SimpleNameTakenBy">
+/// What the type's simple name means inside it when that is not the type, such as
+/// <c>the property App.Base.Sample</c>, for a type nested in a generic type, whose methods reach a static member
+/// through that name.  Null when the name reaches the type, or the type is not nested in a generic type.
 /// </param>
 internal sealed record RepositoryShape(
     string TypeKey,
@@ -49,5 +49,5 @@ internal sealed record RepositoryShape(
     bool InterfaceOn,
     string InterfaceName,
     string? InterfaceTakenBy,
-    bool HidesATypeParameter = false
+    string? SimpleNameTakenBy = null
 );

@@ -270,10 +270,10 @@ public sealed class RepositoryMethodTests
         run.Sources[MethodsFile].ShouldNotContain(" async ");
     }
 
-    // A repository whose outer type parameter has no name inside it reaches a static source through its own name, which
-    // a token of that name would hide when the repository is not generic.
+    // A repository nested in a generic type reaches a static source through its own name, which a token of that name
+    // would hide when the repository is not generic.
     [Fact]
-    public void Run_TokenNamedLikeATypeThatHidesATypeParameter_ReportsSqlsrc275()
+    public void Run_TokenNamedLikeATypeNestedInAGenericType_ReportsSqlsrc275()
     {
         const string Source = """
             using SqlSource;
@@ -306,6 +306,36 @@ public sealed class RepositoryMethodTests
                     + "of the type 'Sample', through which the repository methods of 'App.A<T>.B<T>.Sample' reach "
                     + "their connection 'ConnectionString'.  Rename the token.",
             ]);
+    }
+
+    // SqlSource can write a nested class with the name of an outer type parameter, which the access must not write.
+    [Fact]
+    public void Run_GeneratedNestedClassNamedAsAnOuterTypeParameter_Compiles()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                public partial class Outer<T>
+                {
+                    [SqlSourceGenerate(Source = ".", GenerateInterface = false)]
+                    public partial class Sample
+                    {
+                        private static readonly string ConnectionString = "";
+                    }
+                }
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetFrom\nSELECT id FROM users;\n-- name: Plain\n-- output: sql\n-- nested-class: T\nSELECT 1;\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], Source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Outer-1.Sample-Methods.g.cs"].ShouldContain("(Sample.ConnectionString ?? ");
     }
 
     // A token named like the type hides nothing of a static source, which is reached from global::.

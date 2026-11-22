@@ -3,6 +3,8 @@
 using System;
 using System.Linq;
 using Shouldly;
+using SqlSource.Generation;
+using SqlSource.Generation.Methods;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
@@ -1128,14 +1130,6 @@ public sealed class MethodCompileTests
                 "namespace App {",
                 "}",
                 "Sample",
-                "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\")] "
-                    + "public partial class Sample : RepositoryBase; }",
-                "global::App.Outer<T>.Sample.Sample"
-            },
-            {
-                "namespace App {",
-                "}",
-                "Sample",
                 "[SqlSourceGenerate(Source = \".\")] public partial class Sample<T> : RepositoryBase;",
                 "global::App.Sample<T>.Sample"
             },
@@ -1151,23 +1145,20 @@ public sealed class MethodCompileTests
                 "namespace App {",
                 "}",
                 "Sample",
-                "public partial class Outer<await> { [SqlSourceGenerate(Source = \".\")] "
-                    + "public partial class Sample : RepositoryBase; }",
-                "global::App.Outer<@await>.Sample.Sample"
-            },
-            {
-                "namespace App {",
-                "}",
-                "Sample",
                 "[SqlSourceGenerate(Source = \".\")] public partial class Sample<await> : RepositoryBase;",
                 "global::App.Sample<@await>.Sample"
             },
         };
 
-    // A type parameter around the repository that a nearer type repeats, or that a nested type of its name hides, has
-    // no name inside the repository, so a path from global:: would name another constructed type.  The method reaches
-    // the member through the repository's own name.  The interface is off, whose declaration repeats the parameter.
+    // A type parameter around the repository can have no name inside it, when a nearer type repeats it or has a nested
+    // type of its name, so a path from global:: could name another constructed type.  A repository nested in a generic
+    // type is reached through its own name.  The interface is off, whose declaration repeats the parameter.
     [Theory]
+    [InlineData(
+        "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : RepositoryBase; }",
+        "Repo.Source"
+    )]
     [InlineData(
         "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
             + "public partial class Repo<T> : RepositoryBase; }",
@@ -1180,6 +1171,18 @@ public sealed class MethodCompileTests
     )]
     [InlineData(
         "public partial class A<T> { public partial class B<T> { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : RepositoryBase; } }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class A<T> { public partial class B { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : RepositoryBase; } }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class A { public partial class B<T> { "
             + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
             + "public partial class Repo : RepositoryBase; } }",
         "Repo.Source"
@@ -1207,14 +1210,7 @@ public sealed class MethodCompileTests
             + "public partial class Repo : RepositoryBase { public class T { } } }",
         "Repo.Source"
     )]
-    [InlineData(
-        "public interface IHiding { public class T { } } public partial class Outer<T> { "
-            + "public partial interface IMiddle : IHiding { "
-            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
-            + "public partial class Repo : RepositoryBase; } }",
-        "Repo.Source"
-    )]
-    public void Run_StaticAccessInATypeThatHidesATypeParameter_UsesTheTypesOwnName(string repository, string access)
+    public void Run_StaticAccessNestedInAGenericType_UsesTheTypesOwnName(string repository, string access)
     {
         foreach (var source in StaticSourceAndHolderOf("Source", repository))
         {
@@ -1229,15 +1225,13 @@ public sealed class MethodCompileTests
         }
     }
 
-    // A type parameter of an outer type only: the class implements an interface with a nested type of that name, which
-    // a name in the class does not bind to, so the path from global:: still names the repository.
+    // Only a type nested in a generic type is reached by its simple name: nesting in other types keeps the full path.
     [Fact]
-    public void Run_StaticAccessBesideAnInterfacesNestedType_GoesThroughTheTypeInFull()
+    public void Run_StaticAccessNestedInATypeThatIsNotGeneric_GoesThroughTheTypeInFull()
     {
         const string Repository =
-            "public interface IHiding { public class T { } } public partial class Outer<T> { "
-            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
-            + "public partial class Repo : RepositoryBase, IHiding; }";
+            "public partial class Outer { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : RepositoryBase; }";
 
         foreach (var source in StaticSourceAndHolderOf("Source", Repository))
         {
@@ -1245,9 +1239,144 @@ public sealed class MethodCompileTests
 
             run.ShouldBeClean();
             run.Sources.Values.ShouldContain(text =>
-                text.Contains("global::App.Outer<T>.Repo.Source", StringComparison.Ordinal)
+                text.Contains("global::App.Outer.Repo<T>.Source", StringComparison.Ordinal)
             );
         }
+    }
+
+    // Inside a repository nested in a generic type, a member that the simple name finds takes it from the repository,
+    // and a static access through it would read that member: the repository is refused, once for each static member
+    // it reaches through the name.
+    [Theory]
+    [InlineData("protected static string? Repo { get; set; }", "Repo", "the property App.Hiding.Repo")]
+    [InlineData("protected static string? Repo = null;", "Repo", "the field App.Hiding.Repo")]
+    [InlineData("protected static void Repo() { }", "Repo", "the method App.Hiding.Repo()")]
+    [InlineData("protected static void Repo<X>() { }", "Repo", "the method App.Hiding.Repo<X>()")]
+    [InlineData("protected class Repo { }", "Repo", "the class App.Hiding.Repo")]
+    [InlineData("protected static event System.Action? Repo;", "Repo", "the event App.Hiding.Repo")]
+    [InlineData("protected class Repo<X> { }", "Repo<U>", "the class App.Hiding.Repo<X>")]
+    [InlineData("protected static void Repo<X>() { }", "Repo<U>", "the method App.Hiding.Repo<X>()")]
+    public void Run_SimpleNameOfTheRepositoryTakenByAMember_ReportsSqlsrc039(
+        string member,
+        string repository,
+        string takenBy
+    )
+    {
+        var declarations =
+            "public class Hiding : RepositoryBase { "
+            + member
+            + " } public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class "
+            + repository
+            + " : Hiding; }";
+        var sources = StaticSourceAndHolderOf("Source", declarations);
+
+        var bySource = RunRepositories(sources[0]).Problems();
+        var holderRun = RunRepositories(sources[1]);
+        var byHolder = holderRun.Problems();
+
+        bySource.Count.ShouldBe(2);
+        _ = byHolder.ShouldHaveSingleItem();
+        foreach (var problem in bySource.Concat(byHolder))
+        {
+            problem.ShouldStartWith("SQLSRC039 ");
+            problem.ShouldContain("inside the type that name means " + takenBy + ".");
+        }
+
+        // The holder serves both databases and is reported once: the run's report lists a problem once whatever the
+        // planner found, so the planner's own list says it too.
+        StepOutputs
+            .Single<TypeMethods>(holderRun, TrackingNames.TypeMethods)
+            .Diagnostics.Count(diagnostic => diagnostic.Descriptor.Id == "SQLSRC039")
+            .ShouldBe(1);
+    }
+
+    // The simple name still reaches the repository: a field or property of the repository's own type, which is C#'s
+    // Color Color rule; a member of another arity; and a member the repository cannot reach.
+    [Theory]
+    [InlineData(
+        "public class Hiding<X> : RepositoryBase { protected static Outer<X>.Repo? Repo { get; set; } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Hiding<T>; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Hiding<X> : RepositoryBase { protected static readonly Outer<X>.Repo? Repo = null; } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Hiding<T>; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { protected class Repo<X> { } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Hiding; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { protected static string? Repo { get; set; } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<U> : Hiding; }",
+        "Repo<U>.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { protected static void Repo() { } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<U> : Hiding; }",
+        "Repo<U>.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { private static string? Repo { get; set; } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Hiding; }",
+        "Repo.Source"
+    )]
+    public void Run_SimpleNameThatStillReachesTheRepository_Compiles(string declarations, string access)
+    {
+        foreach (var source in StaticSourceAndHolderOf("Source", declarations))
+        {
+            var run = RunRepositories(source);
+
+            run.ShouldBeClean();
+            run.Sources.Values.ShouldContain(text => text.Contains(access, StringComparison.Ordinal));
+        }
+    }
+
+    // A source that a method does not reach through the type's name is not refused, whatever that name means: an
+    // instance member, the member of an instance holder, and a global.
+    [Theory]
+    [InlineData(
+        "public partial class Repo : Hiding { "
+            + PostgresMark
+            + " public string? Pg { get; set; } "
+            + SqlServerMark
+            + " public string? Ms { get; set; } }"
+    )]
+    [InlineData(
+        "public partial class Repo(F f) : Hiding; public class F { "
+            + PostgresMark
+            + " public string? Pg => \"\"; "
+            + SqlServerMark
+            + " public string? Ms => null; }"
+    )]
+    [InlineData("public partial class Repo : Hiding;")]
+    public void Run_SourceNotReachedThroughTheTakenName_Compiles(string repository)
+    {
+        var global = repository.EndsWith("Repo : Hiding;", StringComparison.Ordinal)
+            ? "public static class Db { "
+                + PostgresMark
+                + " public static string? Pg { get; set; } "
+                + SqlServerMark
+                + " public static string? Ms { get; set; } } "
+            : string.Empty;
+        var source =
+            SourcesUsings
+            + global
+            + "public class Hiding { protected static string? Repo { get; set; } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + repository
+            + " }\n}\n";
+
+        RunRepositories(source).ShouldBeClean();
     }
 
     // Through the type's own name, a static member can have a name that an argument or a type parameter has.
@@ -1255,7 +1384,7 @@ public sealed class MethodCompileTests
     [InlineData("cancellationToken")]
     [InlineData("parameters")]
     [InlineData("T")]
-    public void Run_StaticMemberNamedAsAnArgumentInATypeThatHidesATypeParameter_Compiles(string member)
+    public void Run_StaticMemberNamedAsAnArgumentNestedInAGenericType_Compiles(string member)
     {
         const string Repository =
             "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
