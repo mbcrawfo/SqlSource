@@ -136,13 +136,14 @@ internal static partial class PlanExpression
     /// <summary>
     /// The type of an entry that is a whole constant or a form of this class whose type is fixed, or null.  The forms
     /// are those of <see cref="NullableOf(string, ExpressionContext)" /> with a type that does not depend on its
-    /// arguments: a quoted literal with a cast to a built-in type, a number, <c>true</c> or <c>false</c>, a test,
-    /// <c>count</c> and the rankings.  <c>NULL::type</c>, <c>COALESCE</c>, <c>CASE</c>, a reference and a cast of
-    /// anything else have none, and neither has a text that merely starts with a form.  A literal's type, and a
-    /// function's, is known only when the session finds <c>pg_catalog</c> first, since the plan prints a type's name
-    /// and a function's bare whenever the path finds them.  The <c>bigint</c> of <c>count</c> with an argument is an
-    /// assumption about which <c>count</c> the server chose, and never by itself a proof that the entry is not
-    /// <c>NULL</c>: that is <see cref="NullableOf(string, ExpressionContext)" />'s to say.
+    /// arguments: a quoted literal with a cast to a built-in type, a number, <c>true</c> or <c>false</c>, a null test,
+    /// <c>count</c> and the rankings.  <c>IS [NOT] DISTINCT FROM</c> is a <c>boolean</c> here too, though it is no form
+    /// of <see cref="NullableOf(string, ExpressionContext)" />.  <c>NULL::type</c>, <c>COALESCE</c>, <c>CASE</c>, a
+    /// reference and a cast of anything else have none, and neither has a text that merely starts with a form.  A
+    /// literal's type, and a function's, is known only when the session finds <c>pg_catalog</c> first, since the plan
+    /// prints a type's name and a function's bare whenever the path finds them.  The <c>bigint</c> of <c>count</c>
+    /// with an argument is an assumption about which <c>count</c> the server chose, and never by itself a proof that
+    /// the entry is not <c>NULL</c>: that is <see cref="NullableOf(string, ExpressionContext)" />'s to say.
     /// </summary>
     /// <param name="entry">The entry as the plan prints it.</param>
     /// <param name="catalogFunctions">Whether an unqualified function or type name is <c>pg_catalog</c>'s.</param>

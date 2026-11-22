@@ -267,8 +267,12 @@ internal static class ScratchSchema
         CREATE OPERATOR null_equals.= (LEFTARG = integer, RIGHTARG = text, FUNCTION = null_equals.eq);
         """;
 
-    /// <summary>The part of a connection string that finds the operator of <see cref="NullEquals" />.</summary>
-    public const string NullEqualsPath = "Search Path=null_equals,pg_catalog,public";
+    /// <summary>
+    /// The part of a connection string that finds the operator of <see cref="NullEquals" />, with <c>pg_catalog</c>
+    /// first so that the describer reads the catalog's operators over the test.  <c>pg_catalog</c> holds no
+    /// <c>=(integer, text)</c>, so the parser still chooses that one.
+    /// </summary>
+    public const string NullEqualsPath = "Search Path=pg_catalog,null_equals,public";
 
     /// <summary>
     /// Drops the schema <c>null_equals</c>.  Every test that makes it runs this in a finally: while it holds a

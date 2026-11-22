@@ -436,7 +436,7 @@ public sealed class WalkTests(PostgresDatabases postgres)
     [InlineData("n.a IS NOT DISTINCT FROM n.b")]
     [InlineData("CASE WHEN n.a > 0 THEN n.a IS DISTINCT FROM n.b ELSE false END")]
     [InlineData("COALESCE(n.a IS DISTINCT FROM n.b, NULL)")]
-    [InlineData("(n.a IS DISTINCT FROM n.b) = true")]
+    [InlineData("(n.a IS DISTINCT FROM n.b) = (n.a > 0)")]
     public async Task DescribeAsync_DistinctTestOverAnEqualsThatAnswersNull_IsNotAnsweredNotNull(string test)
     {
         var connection = $"{postgres.ConnectionString};{ScratchSchema.NullEqualsPath}";
