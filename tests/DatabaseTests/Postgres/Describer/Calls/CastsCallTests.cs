@@ -24,10 +24,13 @@ public sealed class CastsCallTests(PostgresDatabases postgres)
         answer.AnyCast.ShouldBe(false);
     }
 
-    // The arrays are paired by index: integer to bigint has a row, and neither crossed pair has.
+    // The arrays are paired by index, each source with its target: integer to bigint has a row, text to bigint has
+    // none, and boolean to text has one that text to boolean does not.
     [Theory]
     [InlineData(23, 20, true)]
     [InlineData(25, 20, false)]
+    [InlineData(16, 25, true)]
+    [InlineData(25, 16, false)]
     public async Task CastsAsync_PairAsked_AnswersWhetherItHasARow(long source, long target, bool expected)
     {
         await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);

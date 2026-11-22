@@ -90,9 +90,10 @@ flowchart TD
     explain -->|"a plan"| partitions["partitions, when needed"]
     partitions --> relations["relations, when needed"]
     relations --> overloads["overloads, when needed"]
-    overloads --> casts["casts, when it changes an answer"]
-    casts --> walk["The walk"]
-    walk --> match
+    overloads --> walk["The walk, without and with the type rule"]
+    walk -->|"the two answers differ"| casts["casts"]
+    walk -->|"they agree"| match
+    casts --> match
     explain -->|"an error: logged, the heuristic stands"| match
     explain -->|"26000"| gone["SQLSRC236"]
     match --> deallocate
@@ -112,7 +113,7 @@ The steps of `DescribePreparedAsync`, in the order it runs them:
 8. **The parameters typed**, as [parameters](#parameters) says.
 9. **The columns built.**  `OuterJoinGate.IsGated` decides whether a statement with rows is gated, and each column is built with the catalog's answer or the heuristic's, as [the nullability page](postgres-nullability.md#nullability) says.  A column of a pseudo-type ends the describe.
 10. **`check`.**  Npgsql describes the SQL as generated code will send it, as [the check against Npgsql](#the-check-against-npgsql) says.
-11. **The plan.**  For a statement with rows that is gated or has a column of no origin, `explain` asks for the plan, `partitions`, `relations`, `overloads` and `casts` answer what the walk needs of it, and `NullabilityWalk` walks it, as [the plan](postgres-nullability.md#the-plan) and [the plan walk](postgres-nullability.md#the-plan-walk) say.  A query that is neither asks nothing more, and pays nothing.
+11. **The plan.**  For a statement with rows that is gated or has a column of no origin, `explain` asks for the plan, `partitions`, `relations` and `overloads` answer what the walk needs of it, and `NullabilityWalk` walks it, and for a column of no origin on a session that finds `pg_catalog` first walks it again with the [type rule of a scan](postgres-nullability.md#output-entries), whose answer counts only when `casts` then finds no cast across its families, as [the plan](postgres-nullability.md#the-plan) and [the plan walk](postgres-nullability.md#the-plan-walk) say.  A query that is neither asks nothing more, and pays nothing.
 12. **The table match**, which asks nothing, as [matching a table](#matching-a-table) says.
 
 A statement without rows is `SidecarResultKind.None`, with its parameters and no columns, no table and no provenance.  What one with rows records as `plan` is in [the plan](postgres-nullability.md#the-plan).  The events each step writes, and their order, are in the remarks of [`PostgresEvents`](../../src/SqlSource.Tool/Describing/Postgres/PostgresEvents.cs).

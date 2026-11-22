@@ -53,6 +53,17 @@ public sealed class ScanColumnTests(PostgresDatabases postgres)
                 "?"
             },
             { $"SELECT s.a FROM (SELECT t.id + 1 AS a, NULL::integer AS b FROM {T} t OFFSET 0) s WHERE s.a > 0", "?" },
+            // A column of the same kind that the query does not read, which only a MATERIALIZED query keeps.
+            {
+                $"WITH c AS (SELECT t.label, count(*) AS n, sum(t.id) AS total FROM {T} t GROUP BY t.label) "
+                    + "SELECT c.n FROM c",
+                "?"
+            },
+            {
+                $"WITH c AS MATERIALIZED (SELECT t.label, count(*) AS n, sum(t.id) AS total FROM {T} t "
+                    + "GROUP BY t.label) SELECT c.n FROM c",
+                "n"
+            },
             // A cast the plan does not print: an inlined function's result is text, whatever its entry's type.
             { "SELECT f.t, f.c FROM scan_columns.as_text() f", "??" },
             { "SELECT f.t FROM scan_columns.union_as_text() f", "?" },
@@ -111,7 +122,8 @@ public sealed class ScanColumnTests(PostgresDatabases postgres)
     }
 
     // A user's cast joins two families, so an entry of the other family may be the column: the date here, which is
-    // NULL in a row, and which the walk would rule out on a server without the cast.
+    // NULL in a row, and which the walk would rule out on a server without the cast.  Both columns are read, since an
+    // unread one prints as a NULL that blocks the proof whatever the casts are.
     [Fact]
     public async Task DescribeAsync_UsersCastAcrossFamilies_RulesNoEntryOut()
     {
@@ -120,7 +132,7 @@ public sealed class ScanColumnTests(PostgresDatabases postgres)
             await postgres.ExecuteAsync(ScratchSchema.ScanColumns);
             await postgres.ExecuteAsync(ScratchSchema.ScanColumnsCast);
 
-            await ShouldAnswerAsync("SELECT f.d FROM scan_columns.as_bigint() f", "?");
+            await ShouldAnswerAsync("SELECT f.d, f.c FROM scan_columns.as_bigint() f", "??");
         }
         finally
         {

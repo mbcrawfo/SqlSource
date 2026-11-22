@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
@@ -119,12 +121,73 @@ public sealed class NullabilityWalkScanTests
         AnswerOf(nested, BuiltInTypes.Int8).ShouldBe(proved ? NotNullExpression : UnknownNoOrigin);
     }
 
-    // A set operation inside the scan prints its first branch, which says nothing of the others.
+    // A set operation inside the scan prints its first input, here a proved column, which says nothing of the other.
     [Fact]
     public void Run_SetOperationInsideTheScan_IsUnknown()
     {
-        var append = Append(Member("o", "o", "o.id"), Member("a", "a", "a.opt")) with { Output = ["o.id"] };
+        var setOp = Join("Inner", Scan("o", "o.id"), Scan("a", "a.opt")) with
+        {
+            NodeType = "SetOp",
+            JoinType = null,
+            Output = ["o.id"],
+        };
 
-        AnswerOf(Subquery(append, "s", "s.c") with { Output = ["s.c"] }, BuiltInTypes.Int4).ShouldBe(UnknownNoOrigin);
+        AnswerOf(Subquery(setOp, "s", "s.c") with { Output = ["s.c"] }, BuiltInTypes.Int4).ShouldBe(UnknownNoOrigin);
+    }
+
+    // Every entry of a scan may be the column, so a chain of scans reads the plan under it once for each path to it
+    // unless each answer is kept: 2^7 reads of the deepest plan here, and W^D for a chain of W columns and D scans.
+    [Fact]
+    public void Run_ColumnOfNoOriginThroughAChainOfScans_ReadsTheDeepestPlanOnce()
+    {
+        var entries = new CountedEntries("o.id", "count(*)");
+
+        AnswerOf(Chain(Grouped("o.id") with { Output = entries }, 8), BuiltInTypes.Int8).ShouldBe(NotNullExpression);
+
+        entries.Reads.ShouldBe(1);
+    }
+
+    // A column with an origin is resolved through the same chain, by every entry it can be.
+    [Fact]
+    public void Run_ColumnWithAnOriginThroughAChainOfScans_ReadsTheDeepestPlanOnce()
+    {
+        var entries = new CountedEntries("t.id", "t.opt");
+
+        AnswersOf(Run(Chain(Scan("t") with { Output = entries }, 8), NotNull)).ShouldBe([NotNullCatalog]);
+
+        entries.Reads.ShouldBe(1);
+    }
+
+    // Scans of two columns each over the plan given, the root printing one of them.
+    private static PlanNode Chain(PlanNode deepest, int levels)
+    {
+        var plan = deepest;
+        for (var level = 0; level < levels; level++)
+        {
+            plan = Subquery(plan, $"s{level}", $"s{level}.a", $"s{level}.b");
+        }
+
+        return plan with
+        {
+            Output = [$"s{levels - 1}.a"],
+        };
+    }
+
+    // An Output that counts how many times a reader goes through it.
+    private sealed class CountedEntries(params string[] entries) : IReadOnlyList<string>
+    {
+        public int Reads { get; private set; }
+
+        public int Count => entries.Length;
+
+        public string this[int index] => entries[index];
+
+        public IEnumerator<string> GetEnumerator()
+        {
+            Reads++;
+            return ((IEnumerable<string>)entries).GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

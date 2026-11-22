@@ -262,11 +262,12 @@ internal static class ScratchSchema
     /// <summary>
     /// On <see cref="ScanColumns" />, a user's assignment cast from <c>date</c> to <c>bigint</c>, which joins two
     /// families of <c>SetOperationTypes</c>, and a function the planner inlines whose <c>d</c> is a nullable
-    /// <c>date</c> through it.  Dropping the schema drops the cast with its function.
+    /// <c>date</c> through it.  The cast's function is in PL/pgSQL, which the planner does not inline, so that the plan
+    /// prints the <c>date</c> alone.  Dropping the schema drops the cast with its function.
     /// </summary>
     public const string ScanColumnsCast = """
-        CREATE FUNCTION scan_columns.day_number(date) RETURNS bigint LANGUAGE sql IMMUTABLE AS
-            'SELECT ($1 - DATE ''2000-01-01'')::bigint';
+        CREATE FUNCTION scan_columns.day_number(date) RETURNS bigint LANGUAGE plpgsql IMMUTABLE AS
+            'BEGIN RETURN ($1 - DATE ''2000-01-01'')::bigint; END';
         CREATE CAST (date AS bigint) WITH FUNCTION scan_columns.day_number(date) AS ASSIGNMENT;
         CREATE FUNCTION scan_columns.as_bigint() RETURNS TABLE (d bigint, c bigint) LANGUAGE sql STABLE AS
             'SELECT s.day, count(*) FROM scan_columns.t s GROUP BY s.day OFFSET 0';

@@ -69,7 +69,11 @@ internal static partial class NullabilityWalk
             && plansFollowed < Plans.MaxDepth
             && columnType != TotalFunctions.UnknownType
             && InstanceOf(reference) is { Instance: { Kind: InstanceKind.Plan, NullExtended: false, Child: { } child } }
-            && child.Output is { Count: > 0 } entries
+            && plans.ScanProves(child, columnType, () => ScannedPlanProves(child, columnType));
+
+        // The scanned plan's answer for a column of the type, which is the same whichever of its columns is asked.
+        private bool ScannedPlanProves(PlanNode child, long columnType) =>
+            child.Output is { Count: > 0 } entries
             && plans.InstancesOf(child) is { Reason: null, HasSetOperation: false } scanned
             && new Expressions(plans, child, scanned, plans.OnlyAliasOf(child), plansFollowed + 1).EveryEntryProves(
                 entries,

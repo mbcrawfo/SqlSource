@@ -69,8 +69,9 @@ SqlSource can tell that a column is never null when the column is one of these:
   - for an `EXCEPT`, the values of the left side.
 - **A column that a subquery in `FROM` or a `WITH` query computes**, such as a `count(*)`.  It counts when all of these are true:
   - An outer join cannot fill it with null.
-  - One column of the subquery at least is never null by the rules above and is of the same kind of type: a number, a text type, or a date or time.
-  - Every other column of the subquery is never null and of that kind, or is of one of the other two kinds.  A column of any other type, such as a `boolean` or a domain, keeps the column from counting.  For a column of a text type, every other column must be a text type that is never null.
+  - One column of the subquery at least is never null by the rules above and is of the same kind of type.  The kinds are the numbers (`smallint`, `integer`, `bigint`, `numeric`, `real` and `double precision`), the text types (`text`, `varchar` and `char`), and the dates (`date`, `timestamp` and `timestamp with time zone`).
+  - Every other column of the subquery is never null and of that kind, or is of one of the other two kinds.  A column of any other type, such as `boolean`, `time`, `interval`, `money` or a domain, keeps the column from counting.  For a column of a text type, every other column must be a text type that is never null.
+  - A column of the same kind that the outer query does not read counts as one that can be null, unless it is in the subquery's `GROUP BY` or the `WITH` query is `MATERIALIZED`.
   - The subquery has no `UNION`, `INTERSECT` or `EXCEPT`, and is not recursive.
   - No cast was added between two of these kinds of type.
 
@@ -126,7 +127,7 @@ SqlSource treats a column as one that can be null when one of these is true:
 - **It is a function or an operator of a name that another schema of the database holds as well.**  An example is a `count` or a `*` that an extension installs, in its own schema or in `pg_catalog`.  This holds even for a column that the list above would count as never null.  The tool cannot tell which one the query calls.
 - **It is a column of a `UNION`, an `INTERSECT` or an `EXCEPT` where a branch can give null.**  The same holds where SqlSource cannot tell whether a branch gives null.
 - **It is an expression computed in one of these places:**
-  - in a subquery in `FROM` or a `WITH` query that does not meet the conditions in the list above, such as a `count(*)` beside a number that can be null;
+  - in a subquery in `FROM` or a `WITH` query that does not meet the conditions in the list above, such as a `count(*)` beside a number that can be null or that the outer query does not read;
   - in a recursive `WITH` query;
   - over a `UNION`, an `INTERSECT` or an `EXCEPT`, such as `count(*)` of a subquery that holds one.
 
@@ -189,7 +190,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - a function that the rules do not list;
 - `IS DISTINCT FROM` and `IS NOT DISTINCT FROM`, which are null when a user's `=` operator returns null;
 - an expression, when the search path puts another schema before `pg_catalog`;
-- a `count(*)` or a `sum` that a `WITH` query computes beside a column of the same kind of type that can be null;
+- a `count(*)` or a `sum` that a `WITH` query computes beside a column of the same kind of type that can be null or that the outer query does not read;
 - a `sum` or an `array_agg` in a query whose `WHERE` sets every column of the `GROUP BY` to one value;
 - a `COALESCE` over a column of each side of a `FULL JOIN` that is cast or computed above the join;
 - a recursive `WITH` query;
