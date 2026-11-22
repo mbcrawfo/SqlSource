@@ -66,7 +66,7 @@ internal static class GlobalConnections
                 IParameterSymbol parameter => IsRepositoryParameter(parameter, token) ? null : parameter.Name,
                 null => null,
                 _ when IsOwnMember(symbol) || IsInheritedByARepository(symbol, repositoryTypes) => null,
-                _ => BrokenNameOf(symbol, mark.Location),
+                _ => BrokenNameOf(symbol, compilation, mark.Location),
             };
             if (name is not null && symbol?.ContainingType is { } type)
             {
@@ -121,7 +121,12 @@ internal static class GlobalConnections
                 continue;
             }
 
-            var read = ConnectionCandidateReader.ReadMarkedMember(member, isInherited: false, mark.Location);
+            var read = ConnectionCandidateReader.ReadMarkedMember(
+                member,
+                compilation,
+                isInherited: false,
+                mark.Location
+            );
             if (GlobalOf(member, read) is { } candidate)
             {
                 candidates.Add(candidate);
@@ -145,9 +150,9 @@ internal static class GlobalConnections
             };
 
     // The name a message gives a broken member, the property's for an accessor, or null when it is a valid global.
-    private static string? BrokenNameOf(ISymbol member, LocationInfo fallback)
+    private static string? BrokenNameOf(ISymbol member, Compilation compilation, LocationInfo fallback)
     {
-        var read = ConnectionCandidateReader.ReadMarkedMember(member, isInherited: false, fallback);
+        var read = ConnectionCandidateReader.ReadMarkedMember(member, compilation, isInherited: false, fallback);
         if (GlobalOf(member, read) is not null)
         {
             return null;

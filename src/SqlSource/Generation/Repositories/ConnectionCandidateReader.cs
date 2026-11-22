@@ -61,7 +61,7 @@ internal static class ConnectionCandidateReader
         var members = new List<ConnectionCandidate>();
         foreach (var (member, isInherited) in ReachableMembersOf(type, compilation))
         {
-            if (ReadMarkedMember(member, isInherited, fallback) is { } candidate)
+            if (ReadMarkedMember(member, compilation, isInherited, fallback) is { } candidate)
             {
                 members.Add(candidate);
             }
@@ -141,6 +141,7 @@ internal static class ConnectionCandidateReader
     /// data source, or a string of a convention's name.
     /// </summary>
     /// <param name="member">The member, of any kind.</param>
+    /// <param name="compilation">The compilation, which says whether an override can read an inherited getter.</param>
     /// <param name="isInherited">Whether it is a member of a base type.</param>
     /// <param name="fallback">The location of a member that has none in source.</param>
     /// <param name="implementer">
@@ -150,11 +151,12 @@ internal static class ConnectionCandidateReader
     /// <returns>The candidate, or null when the member gives none.</returns>
     public static ConnectionCandidate? ReadMarkedMember(
         ISymbol member,
+        Compilation compilation,
         bool isInherited,
         LocationInfo fallback,
         INamedTypeSymbol? implementer = null
     ) =>
-        ValueOf(member) is (var kind, var type)
+        ValueOf(member, compilation) is (var kind, var type)
             ? Held(member, kind, type, member.IsStatic, isInherited, fallback, implementer)
             : member switch
             {
@@ -168,18 +170,18 @@ internal static class ConnectionCandidateReader
             };
 
     /// <summary>
-    /// A member whose value a call can read by its name, with its kind and type: a field, or a property with a getter
-    /// that is not an indexer.  A write-only property gives nothing, and an indexer needs an argument.
+    /// A member whose value a call can read by its name, with its kind and type: a field, or a property with a getter,
+    /// its own or one it inherits as an override, that is not an indexer.  A write-only property gives nothing, and an
+    /// indexer needs an argument.
     /// </summary>
     /// <param name="member">The member, of any kind.</param>
-    internal static (CandidateMember Member, ITypeSymbol Type)? ValueOf(ISymbol member) =>
+    /// <param name="compilation">The compilation, which says whether an override can read an inherited getter.</param>
+    internal static (CandidateMember Member, ITypeSymbol Type)? ValueOf(ISymbol member, Compilation compilation) =>
         member switch
         {
             IFieldSymbol { CanBeReferencedByName: true } field => (CandidateMember.Field, field.Type),
-            IPropertySymbol { CanBeReferencedByName: true, IsIndexer: false, GetMethod: not null } property => (
-                CandidateMember.Property,
-                property.Type
-            ),
+            IPropertySymbol { CanBeReferencedByName: true, IsIndexer: false } property
+                when HasReadableGetter(property, compilation) => (CandidateMember.Property, property.Type),
             _ => null,
         };
 
@@ -199,9 +201,31 @@ internal static class ConnectionCandidateReader
     ) =>
         compilation.IsSymbolAccessibleWithin(member, type, throughType)
         && (
-            member is not IPropertySymbol { GetMethod: { } getter }
+            member is not IPropertySymbol property
+            || GetterOf(property) is not { } getter
             || compilation.IsSymbolAccessibleWithin(getter, type, throughType)
         );
+
+    // Whether the property has a getter that its own type can call: an inherited one may be out of its reach, and C#
+    // then fails on the read.
+    private static bool HasReadableGetter(IPropertySymbol property, Compilation compilation) =>
+        GetterOf(property) is { } getter
+        && (property.GetMethod is not null || compilation.IsSymbolAccessibleWithin(getter, property.ContainingType));
+
+    // The getter that a read of the property calls: its own, or for an override that declares none, the nearest one it
+    // overrides.
+    private static IMethodSymbol? GetterOf(IPropertySymbol property)
+    {
+        for (var current = property; current is not null; current = current.OverriddenProperty)
+        {
+            if (current.GetMethod is { } getter)
+            {
+                return getter;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>Where the symbol is declared in source, or the fallback when it has no such location.</summary>
     /// <param name="symbol">The symbol.</param>

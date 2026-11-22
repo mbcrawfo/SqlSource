@@ -736,6 +736,66 @@ public sealed class HeldFactoryReaderTests
         shape.HeldCandidates.Count.ShouldBe(candidates);
     }
 
+    // A read of an override that declares no getter calls the one it inherits, on a factory and on a holder.
+    [Fact]
+    public void Read_FactoryPropertyOverrideWithoutAGetter_IsACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public class FactoryBase
+                {
+                    [SqlSourceConnection]
+                    public virtual DbConnection Connection { get; set; } = null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public override DbConnection Connection { set { } }
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Connection");
+        candidate.Type.ShouldBe(CandidateType.Connection);
+    }
+
+    [Fact]
+    public void Read_HolderPropertyOverrideWithoutAGetter_IsAHolder()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public abstract class RepositoryBase
+                {
+                    protected virtual IDatabaseFactory Factory { get; set; } = null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    protected override IDatabaseFactory Factory { set { } }
+                }
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldHaveSingleItem().Holder.ShouldNotBeNull().Name.ShouldBe("Factory");
+    }
+
     // object is no class constraint, so its ToString leaves an interface's member of that name to the call.
     [Fact]
     public void Read_InterfaceMemberNamedForAnObjectMember_StaysACandidate()

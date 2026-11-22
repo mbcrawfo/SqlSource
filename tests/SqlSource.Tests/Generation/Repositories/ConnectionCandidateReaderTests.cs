@@ -700,6 +700,69 @@ public sealed class ConnectionCandidateReaderTests
         shape.Candidates.Count.ShouldBe(candidates);
     }
 
+    // A read of an override that declares no getter calls the one it inherits, so the property still gives its value.
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("[SqlSourceConnection]", true)]
+    public void Read_PropertyOverrideWithoutAGetter_ReadsTheInheritedGetter(string mark, bool isMarked)
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class LowestBase
+                {
+                    {{mark}}
+                    protected virtual string ConnectionString { get; set; } = "";
+                }
+
+                public abstract class RepositoryBase : LowestBase
+                {
+                    protected override string ConnectionString { set { } }
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    protected override string ConnectionString { set { } }
+                }
+            }
+            """
+        );
+
+        var candidate = shape.Candidates.ShouldHaveSingleItem();
+        candidate.Type.ShouldBe(CandidateType.ConnectionString);
+        candidate.IsMarked.ShouldBe(isMarked);
+        candidate.IsInherited.ShouldBeFalse();
+    }
+
+    // An override with no getter gives nothing when no getter is inherited, or none that the repository can reach.
+    [Theory]
+    [InlineData("protected virtual string ConnectionString { set { } }")]
+    [InlineData("protected virtual string ConnectionString { private get; set; } = \"\";")]
+    public void Read_PropertyOverrideWithNoGetterToInherit_IsNotACandidate(string baseProperty)
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    {{baseProperty}}
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    protected override string ConnectionString { set { } }
+                }
+            }
+            """
+        );
+
+        shape.Candidates.ShouldBeEmpty();
+    }
+
     // An override of a property replaces only the accessors that it declares, so a marked one it leaves is still read.
     [Theory]
     [InlineData("{ [SqlSourceConnection] get; set; }", "{ set { } }", true)]

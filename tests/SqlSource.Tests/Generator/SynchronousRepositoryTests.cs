@@ -160,6 +160,12 @@ public sealed class SynchronousRepositoryTests
             + "=> new(); }",
         "var connection = " + TypedDefaultCall + " ?? "
     )]
+    [InlineData(
+        "public partial class Sample : RepositoryBase { protected override string ConnectionString { set { } } }\n"
+            + "public abstract class RepositoryBase "
+            + "{ protected virtual string ConnectionString { get; set; } = \"\"; }",
+        "var connection = new global::Npgsql.NpgsqlConnection(this.ConnectionString ?? "
+    )]
     public void Run_MethodTypeSyncWithEachSource_WritesASynchronousMethod(string declaration, string acquire)
     {
         var run = RunGetUser("method-type=sync", SampleOf(declaration));
