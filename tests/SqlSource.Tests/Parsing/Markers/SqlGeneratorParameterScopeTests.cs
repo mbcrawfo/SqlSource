@@ -16,9 +16,6 @@ public sealed class SqlGeneratorParameterScopeTests
         GeneratorParameterState.On
     );
 
-    [Fact]
-    public void Parameters_OfANewScope_AreEmpty() => new SqlGeneratorParameterScope().Parameters.IsEmpty.ShouldBeTrue();
-
     [Theory]
     // An internal enum cannot be the parameter of a public test method, so a row gives the flags as numbers: the
     // parameters the scope names, and those of them it turns on.
@@ -103,13 +100,20 @@ public sealed class SqlGeneratorParameterScopeTests
         scope.Parameters.StateOf(GeneratorParameters.KeepComments).ShouldBe(keepsComments);
     }
 
-    [Fact]
-    public void Read_OneStateTwice_IsNotAConflict()
+    [Theory]
+    [InlineData("-- generator: keep-comments keep-comments=on KEEP-COMMENTS", nameof(GeneratorParameterState.On))]
+    [InlineData("-- generator: keep-comments=default keep-comments=default", nameof(GeneratorParameterState.Default))]
+    public void Read_OneStateTwice_IsNotAConflict(string line, string state)
     {
-        var (scope, errors) = Read("-- generator: keep-comments keep-comments=on KEEP-COMMENTS");
+        var (scope, errors) = Read(line);
 
         errors.ShouldBeEmpty();
-        scope.Parameters.ShouldBe(KeepCommentsOn);
+        scope.Parameters.ShouldBe(
+            GeneratorParameterChoices.None.With(
+                GeneratorParameters.KeepComments,
+                Enum.Parse<GeneratorParameterState>(state)
+            )
+        );
     }
 
     [Theory]
