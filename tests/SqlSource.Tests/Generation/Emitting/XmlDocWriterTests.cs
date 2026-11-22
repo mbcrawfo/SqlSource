@@ -46,19 +46,13 @@ public sealed class XmlDocWriterTests
     }
 
     [Theory]
+    [InlineData("SELECT id FROM users")]
     [InlineData("a\tb")]
     [InlineData("a\uD83D\uDE00b")]
+    [InlineData("a\uE000b")]
     [InlineData("a\uFFFDb")]
     [InlineData("a\u0085\u2028b")]
     public void Escape_CharacterThatXmlCanHold_IsKept(string text) => XmlDocWriter.Escape(text).ShouldBeSameAs(text);
-
-    [Fact]
-    public void Escape_TextWithNothingToEscape_IsTheSameString()
-    {
-        const string Text = "SELECT id FROM users";
-
-        XmlDocWriter.Escape(Text).ShouldBeSameAs(Text);
-    }
 
     [Fact]
     public void AppendMember_SummaryAndSql_WritesOneCommentLineForEachLine()
@@ -142,12 +136,15 @@ public sealed class XmlDocWriterTests
             );
     }
 
-    [Fact]
-    public void AppendMember_TextEndingInALineTerminator_EndsWithAnEmptyCommentLine()
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r")]
+    [InlineData("\r\n")]
+    public void AppendMember_TextEndingInALineTerminator_EndsWithAnEmptyCommentLine(string terminator)
     {
         var builder = new StringBuilder();
 
-        XmlDocWriter.AppendMember(builder, "", "S", "SELECT 1\n");
+        XmlDocWriter.AppendMember(builder, "", "S", "SELECT 1" + terminator);
 
         builder.ToString().ShouldContain("/// <code>\n/// SELECT 1\n///\n/// </code>\n");
     }

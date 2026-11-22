@@ -23,6 +23,7 @@ public sealed class SqlFileParserTokenTests
         "SELECT 1 -- c"
     )]
     [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: default\nSELECT 1 -- c\n", true, null)]
+    [InlineData("-- generator: default\n\n-- name: Q\nSELECT 1 -- c\n", true, null)]
     // Neither names it: the file's input.
     [InlineData("-- name: Q\n-- generator: sort-input\nSELECT 1 -- c\n", true, "SELECT 1 -- c")]
     [InlineData("-- generator: sort-input\n-- name: Q\nSELECT 1 -- c\n", true, "SELECT 1 -- c")]
@@ -142,19 +143,8 @@ public sealed class SqlFileParserTokenTests
         Sql(Blocks(Text).ShouldHaveSingleItem()).ShouldBe("SELECT {{class}}");
     }
 
-    // The comment is stripped with the braces it holds, so the default of f would run on to the braces of o and take
-    // that token with it.
-    [Fact]
-    public void Parse_LineCommentThatHoldsTheClosingBraces_IsReported()
-    {
-        const string Text = "-- name: Q\nSELECT 1 {{f:AND a = 1 -- note}}\nORDER BY {{o:name}}\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, TextSpans.Of(Text, "-- note}}"), "f"),
-            ]);
-    }
-
+    // The comment is stripped with the braces it holds, so the default would run on to the next braces and take any
+    // token before them with it.
     [Theory]
     [InlineData("SELECT 1 {{f:a -- note}}", "-- note}}", "f")]
     [InlineData("SELECT {{f:a /* }} */ b}}", "/* }} */", "f")]
@@ -180,27 +170,13 @@ public sealed class SqlFileParserTokenTests
             .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, TextSpans.Of(Text, "-- }}"), "f")]);
     }
 
-    // Under postgres a line comment may stand in the gap between the parts of a continued string.  The lexer gives
-    // each part as a quoted region, its prefix in the text before it, and the comment as a line comment between them,
-    // so it is reported as any other.
+    // Under postgres a line comment may stand in the gap between the parts of a continued string, and it is reported
+    // as any other.
     [Fact]
     public void Parse_CommentInTheGapOfAContinuedStringInADefault_IsReported()
     {
         const string Text = "-- name: Q\nSELECT {{f:E'a' -- }}\n'b'}}\n";
 
-        SqlLexer
-            .Lex(Text, SqlDialectRules.PostgreSql)
-            .Lexemes.Select(lexeme => lexeme.Kind + ":" + Text.Substring(lexeme.Span.Start, lexeme.Span.Length))
-            .ShouldBe([
-                "LineComment:-- name: Q",
-                "Text:\nSELECT {{f:E",
-                "Quoted:'a'",
-                "Text: ",
-                "LineComment:-- }}",
-                "Text:\n",
-                "Quoted:'b'",
-                "Text:}}\n",
-            ]);
         Errors(Text, dialect: SqlDialect.PostgreSql)
             .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, TextSpans.Of(Text, "-- }}"), "f")]);
     }
@@ -335,6 +311,7 @@ public sealed class SqlFileParserTokenTests
     [InlineData("SELECT {{f/* c */:x {{g}} y}}", new string[0], new[] { "g" })]
     [InlineData("SELECT {{f/* c */}}", new string[0], new string[0])]
     [InlineData("SELECT {{f/* c */:x}}, {{h}}", new[] { "h" }, new[] { "h" })]
+    [InlineData("SELECT {{h}}, {{f/* c */:x}}", new[] { "h" }, new[] { "h" })]
     public void Parse_CommentInTheHeadOfAnIgnoredToken_IsAnErrorOfTheKeptForm(
         string sql,
         string[] stripped,
@@ -428,6 +405,8 @@ public sealed class SqlFileParserTokenTests
     [InlineData("-- name: Q\n-- token: {{a:x}}\n-- token: {{a:y}}\nSELECT {{a}}\n", "{{a:y}}", "token: {{a:y}}")]
     // A marker, then an inline default: at the inline one.
     [InlineData("-- name: Q\n-- token: {{a:x}}\nSELECT {{a:y}}\n", "{{a:y}}", "{{a:y}}")]
+    // The same, after another token's default.
+    [InlineData("-- name: Q\n-- token: {{a:x}}\nSELECT {{b:z}} {{a:y}}\n", "{{a:y}}", "{{a:y}}")]
     // An inline default, then a marker: at the marker's value.
     [InlineData("-- name: Q\nSELECT {{a:y}}\n-- token: {{a:x}}\nFROM t\n", "{{a:x}}", "token: {{a:x}}")]
     public void Parse_TwoDefaultsForOneTokenThatDiffer_ConflictAtTheSecond(string text, string at, string argument) =>

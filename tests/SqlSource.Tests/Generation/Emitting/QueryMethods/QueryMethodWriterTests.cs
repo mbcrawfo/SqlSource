@@ -838,8 +838,13 @@ public sealed class QueryMethodWriterTests
                 + "    var sql = string.Create(\n"
         );
         Regex
-            .Count(text, "\\.Connection is null\\)\n", RegexOptions.None, TimeSpan.FromSeconds(1))
-            .ShouldBe(shapeName is nameof(ResultShape.None) or nameof(ResultShape.RowCount) ? 1 : 3);
+            .Count(
+                text,
+                "transaction is not null && transaction\\.Connection is null",
+                RegexOptions.None,
+                TimeSpan.FromSeconds(1)
+            )
+            .ShouldBe(1);
         text.IndexOf(CompletedTransactionCheck("    "), StringComparison.Ordinal)
             .ShouldBeLessThan(text.IndexOf("var wasClosed", StringComparison.Ordinal));
     }
@@ -940,7 +945,7 @@ public sealed class QueryMethodWriterTests
             }
         );
 
-        text.ShouldContain("        var rows = " + buffer);
+        text.ShouldContain("        var rows = " + buffer + "global::App.GetUserDto>();\n");
         text.ShouldContain("        return " + result + ";\n");
         text.ShouldNotContain("SqlSourceRowBuffer");
     }
@@ -1570,59 +1575,33 @@ public sealed class QueryMethodWriterTests
     // A loop left at a row, by a break, a throw in its body or a disposal, disposes the iterator at its yield, and the
     // finally reads the later results then, so that an error the rest of the batch raises is thrown.  It reads them
     // without the token, as the reader's disposal would, so a token the caller cancelled neither throws nor cancels the
-    // command.  The row is built before the flag is set, so an exception of the iterator's own, from a read, a check or
-    // a converter, reads none.
+    // command.
     [Fact]
     public void Append_SqlServerStreams_DrainsInAFinallyWhenLeftAtARow()
     {
-        Write(SqlServerStream with { Output = VectorOutput(isNullable: false) })
-            .ShouldContain(
-                "            await using var readerScope = "
-                    + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);\n"
-                    + "            var atRow = false;\n"
-                    + "            try\n"
-                    + "            {\n"
-                    + CheckedRead("                ")
-                    + "                    global::App.GetUserDto row;\n"
-                    + "                    try\n"
-                    + "                    {\n"
-                    + "                        var value1 = reader.GetFieldValue<"
-                    + Vector
-                    + ">(1);\n"
-                    + "                        if (value1.IsNull)\n"
-                    + "                        {\n"
-                    + "                            throw new global::System.InvalidCastException("
-                    + "\"Column 'embedding' is null.\");\n"
-                    + "                        }\n"
-                    + "\n"
-                    + "                        row = new global::App.GetUserDto("
-                    + "reader.GetFieldValue<int>(0), value1);\n"
-                    + "                    }\n"
-                    + TransactionCheck("                    ")
-                    + "\n"
-                    + "                    atRow = true;\n"
-                    + "                    yield return row;\n"
-                    + "                    atRow = false;\n"
-                    + "                }\n"
-                    + "\n"
-                    + CheckedDrain("                ")
-                    + "            }\n"
-                    + "            finally\n"
-                    + "            {\n"
-                    + "                if (atRow)\n"
-                    + "                {\n"
-                    + CheckedDrain("                    ", "global::System.Threading.CancellationToken.None")
-                    + "                }\n"
-                    + "            }\n"
-                    + "        }\n"
-                    + "        finally\n"
-            );
+        var text = Write(SqlServerStream);
+
+        text.ShouldContain(
+            "                    atRow = true;\n"
+                + "                    yield return row;\n"
+                + "                    atRow = false;\n"
+        );
+        text.ShouldContain(
+            "            finally\n"
+                + "            {\n"
+                + "                if (atRow)\n"
+                + "                {\n"
+                + CheckedDrain("                    ", "global::System.Threading.CancellationToken.None")
+                + "                }\n"
+                + "            }\n"
+        );
         Write(Stream).ShouldNotContain("atRow");
     }
 
     // C# allows no catch on a try that holds a yield return, so the iterator builds each row in a try of its own, whose
     // catch disposes the reader and, when the transaction is gone, throws the exception that says so in place of the
-    // iterator's own.
+    // iterator's own.  The row is built before the flag is set, so an exception of the iterator's own, from a read, a
+    // check or a converter, reads no later result in the finally.
     [Fact]
     public void Append_SqlServerStreams_ChecksTheTransactionWhenARowFails() =>
         Write(SqlServerStream with { Output = VectorOutput(isNullable: false) })
