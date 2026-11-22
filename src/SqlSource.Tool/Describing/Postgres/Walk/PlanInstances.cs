@@ -188,6 +188,16 @@ internal sealed class PlanInstances
     /// </summary>
     public string? Reason { get; private set; }
 
+    /// <summary>
+    /// Whether a grouping set is all that stands against the plan, so that a value never <c>NULL</c> in any group can
+    /// still be read from it.
+    /// </summary>
+    public bool OnlyGroupingSetsAgainst
+    {
+        get => Reason == WalkReasons.GroupingSets && !field;
+        private set;
+    }
+
     /// <summary>Every node that was visited, in the order of the visit.</summary>
     public IReadOnlyList<VisitedNode> Nodes => _nodes;
 
@@ -326,6 +336,7 @@ internal sealed class PlanInstances
         if (extends is null)
         {
             Reason ??= WalkReasons.UnknownJoinType;
+            OnlyGroupingSetsAgainst = true;
         }
 
         // EXPLAIN (FORMAT JSON) writes every aggregate as "Aggregate", with its strategy apart, and one that mixes
@@ -402,6 +413,7 @@ internal sealed class PlanInstances
         if (!_instances.TryAdd(alias, instance))
         {
             Reason ??= WalkReasons.DoubledAlias;
+            OnlyGroupingSetsAgainst = true;
             return;
         }
 

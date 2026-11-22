@@ -18,16 +18,22 @@ internal static class ProvedColumns
     private const string Parameter = "@p";
 
     // For each column 'n' where the walk proves it not null and '?' where it does not.
-    public static async Task ShouldAnswerAsync(PostgresDatabases postgres, string sql, string expected)
+    public static async Task ShouldAnswerAsync(
+        PostgresDatabases postgres,
+        string sql,
+        string expected,
+        string? connection = null
+    )
     {
+        connection ??= postgres.ConnectionString;
         var request = sql.Contains(Parameter, StringComparison.Ordinal)
             ? DescribeRequests.Of(sql, ("p", "bigint"))
             : DescribeRequests.Of(sql);
-        var description = await Sessions.ShouldDescribeAsync(postgres.ConnectionString, request);
+        var description = await Sessions.ShouldDescribeAsync(connection, request);
         var columns = description.Columns.ShouldNotBeNull();
         string.Concat(columns.Select(static column => column.Nullable == false ? 'n' : '?')).ShouldBe(expected, sql);
 
-        var nulls = await ColumnsWithANullAsync(postgres, sql);
+        var nulls = await ColumnsWithANullAsync(connection, sql);
         for (var index = 0; index < columns.Count; index++)
         {
             if (columns[index].Nullable == false)
@@ -37,10 +43,10 @@ internal static class ProvedColumns
         }
     }
 
-    private static async Task<HashSet<int>> ColumnsWithANullAsync(PostgresDatabases postgres, string sql)
+    private static async Task<HashSet<int>> ColumnsWithANullAsync(string connection, string sql)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var source = NpgsqlDataSource.Create(connection);
         await using var command = source.CreateCommand(sql);
         if (sql.Contains(Parameter, StringComparison.Ordinal))
         {

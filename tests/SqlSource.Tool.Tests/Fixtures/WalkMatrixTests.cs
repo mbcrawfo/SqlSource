@@ -38,7 +38,6 @@ public sealed class WalkMatrixTests
     private const string Expression = "false expression";
 
     private const string Walked = "walked";
-    private const string Unavailable = "unavailable";
 
     private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.Of(SidecarValues.Engine.Postgres);
 
@@ -79,9 +78,9 @@ public sealed class WalkMatrixTests
         ["walk-quoted-alias"] = (Walked, [Kept, Joined]),
         ["walk-semi-anti"] = (Walked, [Kept, NoOrigin]),
         ["walk-anti"] = (Walked, [Kept, Joined, Joined]),
-        ["walk-rollup"] = (Unavailable, [Heuristic, NoOrigin]),
-        ["walk-cube"] = (Unavailable, [Heuristic, Heuristic, NoOrigin]),
-        ["walk-grouping-sets"] = (Unavailable, [Heuristic, NoOrigin]),
+        ["walk-rollup"] = (Walked, [Heuristic, Expression]),
+        ["walk-cube"] = (Walked, [Heuristic, Heuristic, Expression]),
+        ["walk-grouping-sets"] = (Walked, [Heuristic, Expression]),
         ["walk-order-by-unselected"] = (Walked, [Kept, Joined]),
     };
 

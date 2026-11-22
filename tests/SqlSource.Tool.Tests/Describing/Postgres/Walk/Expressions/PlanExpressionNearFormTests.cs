@@ -12,6 +12,26 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Walk.Expressions;
 // silent wrong not null, so each must stay unknown.  No server need print them: the reader is what keeps them out.
 public sealed class PlanExpressionNearFormTests
 {
+    // A node prints a value of a child in one pair of parentheses, and an operator or a test in a pair of its own.
+    [Theory]
+    [InlineData("sum(x)", true)]
+    [InlineData("sum(x) OVER w1", true)]
+    [InlineData("(sum(x) + 1)", true)]
+    [InlineData("(x IS NULL)", true)]
+    [InlineData("(a AND b)", true)]
+    [InlineData("(a OR b)", true)]
+    [InlineData("(NOT a)", true)]
+    [InlineData("'x'::text", true)]
+    [InlineData("(sum(x))", false)]
+    [InlineData("(sum(x) OVER w1)", false)]
+    [InlineData("((sum(x) + 1))", false)]
+    [InlineData("('x'::text)", false)]
+    [InlineData("($0)", false)]
+    [InlineData("((InitPlan 1).col1)", false)]
+    [InlineData("(sum(x", false)]
+    public void IsOwnValue_Entry_IsWhetherTheNodeComputesIt(string entry, bool expected) =>
+        PlanExpression.IsOwnValue(entry).ShouldBe(expected);
+
     private static readonly CatalogNames AllNames = new(
         CatalogOverloads.FunctionNames.ToFrozenSet(StringComparer.Ordinal),
         CatalogOverloads.OperatorNames.ToFrozenSet(StringComparer.Ordinal)

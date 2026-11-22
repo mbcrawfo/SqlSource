@@ -201,7 +201,7 @@ public sealed class CatalogPinTests(PostgresDatabases postgres)
 
         mismatches.ShouldBeEmpty();
         operators.Length.ShouldBe(178);
-        functions.Length.ShouldBe(5);
+        functions.Length.ShouldBe(19);
 
         static NpgsqlParameter Oids(IEnumerable<long> oids) =>
             new() { Value = oids.Select(static oid => (uint)oid).ToArray(), DataTypeName = "oid[]" };
@@ -277,6 +277,56 @@ public sealed class CatalogPinTests(PostgresDatabases postgres)
 
         mismatches.ShouldBeEmpty();
         aggregates.Length.ShouldBe(38);
+    }
+
+    // A window whose frame moves may compute an aggregate by its moving functions.  The final function of each table
+    // aggregate that has them is NULL only for a state that counted no value, so a frame with a row whose value is not
+    // NULL gives a value.  A new one must be read in the source of 14 and 18 before it is listed here.
+    [Fact]
+    public async Task Catalog_TotalAggregates_MovingFinalFunctionsAreKnown()
+    {
+        string[] known =
+        [
+            "int2int4_sum",
+            "int8_avg",
+            "numeric_avg",
+            "numeric_poly_avg",
+            "numeric_poly_sum",
+            "numeric_sum",
+            "bool_alltrue",
+            "bool_anytrue",
+        ];
+        var aggregates = TotalFunctions.Aggregates.ToArray();
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var command = source.CreateCommand(
+            """
+            SELECT r.name || '(' || r.arguments || ') by ' || f.proname
+            FROM unnest($1::text[], $2::text[]) AS r (name, arguments)
+            JOIN pg_catalog.pg_proc AS p
+                ON p.pronamespace = 'pg_catalog'::regnamespace
+                AND p.proname = r.name
+                AND p.proargtypes = r.arguments::oidvector
+            JOIN pg_catalog.pg_aggregate AS a ON a.aggfnoid = p.oid
+            JOIN pg_catalog.pg_proc AS f ON f.oid = a.aggmfinalfn
+            WHERE a.aggmtransfn <> 0
+                AND f.proname <> ALL ($3::text[])
+            """
+        );
+        _ = command.Parameters.Add(new NpgsqlParameter { Value = aggregates.Select(static row => row.Name).ToArray() });
+        _ = command.Parameters.Add(
+            new NpgsqlParameter { Value = aggregates.Select(static row => string.Join(' ', row.Arguments)).ToArray() }
+        );
+        _ = command.Parameters.Add(new NpgsqlParameter { Value = known });
+
+        var token = TestContext.Current.CancellationToken;
+        var unknown = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+        {
+            unknown.Add(reader.GetString(0));
+        }
+
+        unknown.ShouldBeEmpty();
     }
 
     // Every overload pg_catalog holds of each function name CatalogOverloads reads is a row of the table, with the

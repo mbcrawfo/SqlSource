@@ -30,7 +30,10 @@ SqlSource can tell that a column is never null when the column is one of these:
 - **One of these functions, over values that are never null**:
   - `lower` or `upper` of a text;
   - `length` of a `text` or a `varchar` (not of a `character(n)`);
-  - `date_trunc` of a `date`, a `timestamp` or a `timestamp with time zone`, without a time zone argument.
+  - `date_trunc` of a `date`, a `timestamp` or a `timestamp with time zone`, without a time zone argument;
+  - `abs` of a number;
+  - `ceil` or `floor` of a `double precision` or a `numeric`;
+  - `round` or `trunc` of a `double precision`, or of a `numeric` with a scale or without one.
 - **A cast of a value that is never null**, in one of these ways:
   - from one number type to another;
   - from one text type to another;
@@ -46,13 +49,20 @@ SqlSource can tell that a column is never null when the column is one of these:
   - The column of each side is never null.  A cast of it counts when the cast stays within the numbers, the text types or the dates.
   - No outer join under a side can fill that column with null.  An outer join that fills only another table with null is fine.
   - The form uses the two columns themselves.  It can be above the join, as in a query that groups by both columns.
-- **An aggregate of values that are never null, in a query with a `GROUP BY` of one column or more.**  It counts only when it has no `FILTER` and no `OVER`.  It is one of these:
+- **An aggregate of values that are never null, in a query with a `GROUP BY` of one column or more.**  It counts only when it has no `FILTER` and no `OVER`.  A rule below covers an aggregate with `OVER`.  It is one of these:
   - `max`, `min`, `sum` or `avg` of numbers;
   - `max` or `min` of texts or of `date`, `timestamp` or `timestamp with time zone`;
   - `string_agg` of two texts;
   - `bool_and`, `bool_or` or `every`.
 
   Each group of such a query has a row.  Without `GROUP BY`, a query over no rows returns one row whose `sum` is null.
+- **One of those aggregates with `OVER`, of values that are never null, on PostgreSQL 18 and later**, such as `sum(total) OVER (PARTITION BY account_id ORDER BY placed_at)`.  Its window always holds the current row, so the aggregate has a value to read.  It counts only when all of these are true:
+  - It has no `FILTER`.
+  - The window has no frame clause, or each bound of its frame is `UNBOUNDED PRECEDING`, `CURRENT ROW` or `UNBOUNDED FOLLOWING`.
+  - The frame has no `EXCLUDE`.
+  - Its argument is a table column or an expression of this list, and not a column of a subquery or a `WITH` query.
+- **`count(...)` without `OVER`, or `grouping(...)`, as the whole column of a query with `ROLLUP`, `CUBE` or `GROUPING SETS`.**  Each is a number in every group, the grand total included.
+- **A column of a statement that is a `VALUES` alone**, when every row holds a literal in that column: a number with or without a `-`, a string in single quotes, `TRUE` or `FALSE`.  An `ORDER BY`, a `LIMIT`, an `OFFSET` or a `FETCH` after the rows changes nothing.  This holds only on a connection with `standard_conforming_strings` on, which is the default.
 - **A subquery that is the whole column and returns one row**, such as `(SELECT count(*) FROM orders o WHERE o.account_id = a.id)`.  It counts only when all of these are true:
   - It has an aggregate, and no `GROUP BY`, `HAVING`, `LIMIT` or `OFFSET`.
   - Its value is `count(*)`, or arithmetic, a function or a cast of the list above over values that are never null.
@@ -131,6 +141,8 @@ SqlSource treats a column as one that can be null when one of these is true:
   - `upper(during)` of a range;
   - `price * quantity` where either column can hold null;
   - `sum(total)` without `GROUP BY`;
+  - `sum(total) OVER (...)` before PostgreSQL 18, over a column of a subquery or a `WITH` query, or with a `FILTER`, an `EXCLUDE` or a frame bound such as `1 PRECEDING`;
+  - a column of `VALUES` where a row holds `NULL`, a parameter, a cast or another expression;
   - `EXISTS (...)` before PostgreSQL 17.
 - **It is a function or an operator of a name that another schema of the database holds as well.**  An example is a `count` or a `*` that an extension installs, in its own schema or in `pg_catalog`.  This holds even for a column that the list above would count as never null.  The tool cannot tell which one the query calls.
 - **It is a column of a `UNION`, an `INTERSECT` or an `EXCEPT` where a branch can give null.**  The same holds where SqlSource cannot tell whether a branch gives null.
@@ -140,7 +152,7 @@ SqlSource treats a column as one that can be null when one of these is true:
   - over a `UNION`, an `INTERSECT` or an `EXCEPT`, such as `count(*)` of a subquery that holds one.
 
   SqlSource can treat such a column as one that can be null even when the list above says it is never null.
-- **The query has `ROLLUP`, `CUBE` or `GROUPING SETS`.**  SqlSource treats every column of such a query as one that can be null.
+- **The query has `ROLLUP`, `CUBE` or `GROUPING SETS`.**  SqlSource treats every column of such a query as one that can be null, except a `count(...)` without `OVER` or a `grouping(...)` that is the whole column.
 - **The query names `OLD` or `NEW`, and the column is a subquery, an `IN (SELECT ...)`, an `= ANY (SELECT ...)`, or an expression that a subquery in `FROM` or a `WITH` query computes.**  This holds even for one that the list above says is never null.
 - **The search path of the connection puts another schema before `pg_catalog`, and the column is one of these.**  This holds even for one that the list above says is never null:
   - `count(*)`, `count(x)`, a ranking, `array_agg`, a JSON builder, or a range constructor or intersection;
@@ -148,7 +160,7 @@ SqlSource treats a column as one that can be null when one of these is true:
   - an `EXISTS (...)` that PostgreSQL runs as an `IN`.  PostgreSQL can do so when the subquery of the `EXISTS` compares one of its columns with one of the outer query's.  The list above says so too;
   - a `COALESCE`, `GREATEST` or `LEAST` over both sides of a `FULL JOIN`.
 
-  These are not affected: constants, tests, `COALESCE` over columns that are never null, any other `EXISTS (...)`, and `merge_action()`.  To avoid this, keep `pg_catalog` first on the search path of the connection that the tool uses.  Or leave `pg_catalog` off the path: PostgreSQL then searches it first.
+  These are not affected: constants, tests, `COALESCE` over columns that are never null, any other `EXISTS (...)`, `merge_action()`, `grouping(...)` and a column of literals of a `VALUES` statement.  To avoid this, keep `pg_catalog` first on the search path of the connection that the tool uses.  Or leave `pg_catalog` off the path: PostgreSQL then searches it first.
 - **The query has an outer join, `MERGE`, `OLD` or `NEW`, and the column comes from one of these places:**
   - through a subquery or a `WITH` query;
   - from a table that an extension such as Citus or TimescaleDB manages.
@@ -194,7 +206,8 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 **Why.**  The rules of [which columns can be null](#nullability) leave out many columns that a person can see are never null.  SqlSource treats each of them as one that can be null.  Nothing is wrong when that happens.  These are some of the columns that the rules leave out:
 
 - `EXISTS (...)` as a column before PostgreSQL 17;
-- the rows of `VALUES`;
+- a column of `VALUES` where a row holds anything but a literal;
+- a window aggregate before PostgreSQL 18, or one over a column of a subquery or a `WITH` query;
 - a function that the rules do not list;
 - `IS DISTINCT FROM` and `IS NOT DISTINCT FROM`, which are null when a user's `=` operator returns null;
 - an expression, when the search path puts another schema before `pg_catalog`;

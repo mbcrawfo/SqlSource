@@ -22,6 +22,7 @@ internal static class PlanKeys
     public const string GroupingSets = "Grouping Sets";
     public const string GroupKey = "Group Key";
     public const string Filter = "Filter";
+    public const string Window = "Window";
 
     /// <summary>Every key above.</summary>
     public static IReadOnlyList<string> All { get; } =
@@ -43,5 +44,6 @@ internal static class PlanKeys
         GroupingSets,
         GroupKey,
         Filter,
+        Window,
     ];
 }

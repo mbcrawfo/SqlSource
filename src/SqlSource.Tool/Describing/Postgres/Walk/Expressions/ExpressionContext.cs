@@ -55,6 +55,11 @@ namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 /// when its plan always returns one row whose value the walk proves not <c>NULL</c>; or null.  The walk answers it only
 /// for a value that is the whole entry, of the column's type.
 /// </param>
+/// <param name="WindowHoldsCurrentRow">
+/// Where the node that computes the entry is a <c>WindowAgg</c>: whether the window of the name printed after
+/// <c>OVER</c> is the node's, with a frame that holds the current row (<see cref="PlanWindows" />).  It is null at any
+/// other node.
+/// </param>
 internal sealed record ExpressionContext(
     bool CatalogFunctions,
     Func<OutputReference, long?> ProvedTypeOf,
@@ -65,5 +70,6 @@ internal sealed record ExpressionContext(
     Func<string, int, long?>? SubPlanColumnTypeOf = null,
     CatalogNames? CatalogAlone = null,
     IReadOnlyList<Func<OutputReference, (bool OuterSide, long Type)?>>? ProvedOnFullJoinSides = null,
-    Func<string, long?>? InitPlanTypeOf = null
+    Func<string, long?>? InitPlanTypeOf = null,
+    Func<string, bool>? WindowHoldsCurrentRow = null
 );
