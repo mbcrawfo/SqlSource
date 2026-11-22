@@ -60,7 +60,12 @@ SqlSource can tell that a column is never null when the column is one of these:
 
   SqlSource treats the same subquery inside an expression, as in `(SELECT count(*) ...) + 1`, as one that can be null.  On PostgreSQL 16 and earlier, in a query with query parameters, it can also treat a subquery that uses no column of the outer query as one that can be null.
 
-  SqlSource can treat a subquery of `min` or `max` as one that can be null when PostgreSQL reads the value from an index.  PostgreSQL can do so for an indexed column of all but the smallest tables, and of a table that was never analyzed, even an empty one.  So the answer can change with the table's rows and after `ANALYZE`.
+  SqlSource also treats such a subquery as one that can be null in these places:
+
+  - as the `y` of `x IN (SELECT y ...)` or `x = ANY (SELECT y ...)`;
+  - as a branch of a `UNION`, an `INTERSECT` or an `EXCEPT`.
+
+  SqlSource can treat a subquery of `min` or `max` as one that can be null when PostgreSQL reads the value from an index.  PostgreSQL can do so for an indexed column of all but the smallest tables.  It can also do so for a new or truncated table that has no size statistics, even an empty one.  So the answer can change with the table's rows and after `ANALYZE`, `VACUUM`, `TRUNCATE` or `CREATE INDEX`.
 - **`EXISTS (...)` whose subquery uses a column of the outer query, on PostgreSQL 17 and later.**  PostgreSQL can run such an `EXISTS` as an `IN` when its subquery compares one of its columns with one of the outer query's.  Such an `EXISTS` is never null only when that `IN` would be.
 - **`x IN (SELECT y ...)` or `x = ANY (SELECT y ...)`, on PostgreSQL 17 and later.**  It counts when `x` and the subquery's `y` are never null by the rules above, and the comparison is one of those above.
 - **`merge_action()`** in the `RETURNING` list of a `MERGE`, on PostgreSQL 17 and later.
@@ -196,6 +201,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - a `count(*)` or a `sum` that a `WITH` query computes beside a column that keeps it from counting, such as a number that can be null or that the outer query does not read, or an `initcap(name)`;
 - a subquery that uses no column of the outer query, in a query with query parameters, on PostgreSQL 16 and earlier;
 - a subquery of `min` or `max` that PostgreSQL reads from an index, such as `coalesce(max(id), 0)`;
+- a subquery as the `y` of an `IN` or an `= ANY`, or as a branch of a `UNION`, an `INTERSECT` or an `EXCEPT`;
 - a recursive `WITH` query;
 - the columns of a view.
 
