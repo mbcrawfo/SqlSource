@@ -6,9 +6,9 @@ using Kind = SqlSource.Tool.Describing.Postgres.Walk.Expressions.PlanTokens.Kind
 namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 // The proofs of types: the type of a span that is a value never NULL of a known type, the type of a constant, a
-// test, count or a ranking that the text alone fixes, with the built-in types a quoted literal's cast names, and the
-// common type of COALESCE, GREATEST, LEAST and a CASE.  The catalog's operators, functions, casts and aggregates that
-// a proof reads are in PlanExpression.Forms.cs.
+// null test, count or a ranking that the text alone fixes, with the built-in types a quoted literal's cast names, and
+// the common type of COALESCE, GREATEST, LEAST and a CASE.  The catalog's operators, functions, casts and aggregates
+// that a proof reads are in PlanExpression.Forms.cs.
 internal static partial class PlanExpression
 {
     // The built-in types of a quoted literal's cast, as the plan spells them without a modifier.
@@ -34,8 +34,8 @@ internal static partial class PlanExpression
     {
         /// <summary>
         /// The type of the span as a whole when it is a value that is never <c>NULL</c> of a known type, or null.  A
-        /// constant, a test, <c>count(*)</c>, a ranking or a <c>count</c> only <c>pg_catalog</c> holds is of the type
-        /// <see cref="TypeOid" /> gives; a reference that is part of the entry is of the type the walk proves; an
+        /// constant, a null test, <c>count(*)</c>, a ranking or a <c>count</c> only <c>pg_catalog</c> holds is of the
+        /// type <see cref="TypeOid" /> gives; a reference that is part of the entry is of the type the walk proves; an
         /// operator, a function or a cast of <c>pg_catalog</c> over such values is of the type
         /// <see cref="TotalFunctions" /> or the cast gives, and a call of <see cref="CatalogOverloads" /> of the type
         /// it gives; and a <c>COALESCE</c>, a <c>GREATEST</c>, a <c>LEAST</c> or a <c>CASE</c> that cannot be
@@ -70,7 +70,7 @@ internal static partial class PlanExpression
                     return null;
                 }
 
-                if (IsTest(from + 1, to - 1))
+                if (IsNullTest(from + 1, to - 1))
                 {
                     return BuiltInTypes.Bool;
                 }
@@ -185,7 +185,7 @@ internal static partial class PlanExpression
 
             if (IsGroup(from, to))
             {
-                return IsTest(from + 1, to - 1) ? BuiltInTypes.Bool : TypeOid(from + 1, to - 1);
+                return IsBooleanTest(from + 1, to - 1) ? BuiltInTypes.Bool : TypeOid(from + 1, to - 1);
             }
 
             if (to - from == 1)

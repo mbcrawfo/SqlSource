@@ -210,6 +210,24 @@ public sealed class ExpressionProofsTests
     [InlineData("SUM(t.a)", "GROUP BY t.b HAVING SUM(t.a) > 0", true, false, "t.a")]
     [InlineData("NTILE(4) OVER (ORDER BY t.b)", "GROUP BY ROLLUP (t.b)", true, true, "")]
     [InlineData("COUNT(*) WITHIN GROUP (ORDER BY t.a)", "", false, false, "")]
+    // A form with a clause it does not take, or the wrong arguments, proves nothing and is not asked.
+    [InlineData("COALESCE(COALESCE(1, 2) WITHIN GROUP (ORDER BY t.a), NULL)", "", false, false, "")]
+    [InlineData("COALESCE(1, 2) OVER (ORDER BY t.a)", "", false, false, "")]
+    [InlineData("CAST(1 AS int) OVER (ORDER BY t.a)", "", false, false, "")]
+    [InlineData("CONVERT(int, 1) OVER (ORDER BY t.a)", "", false, false, "")]
+    [InlineData("JSON_ARRAY(1) OVER (ORDER BY t.a)", "", false, false, "")]
+    [InlineData("NTILE(4)", "", false, false, "")]
+    [InlineData("NTILE(2, 3) OVER (ORDER BY t.a)", "", false, false, "")]
+    [InlineData("SUM(1, 2)", "GROUP BY t.b", false, false, "")]
+    // A frame that may leave out the current row, of either word, whatever its first bound looks like.
+    [InlineData("SUM(1) OVER (ORDER BY t.id RANGE BETWEEN 1 FOLLOWING AND 2 FOLLOWING)", "", false, false, "")]
+    [InlineData(
+        "SUM(1) OVER (ORDER BY t.id ROWS BETWEEN CURRENT FOLLOWING AND UNBOUNDED FOLLOWING)",
+        "",
+        false,
+        false,
+        ""
+    )]
     // Anything else inside a form is asked whole.
     [InlineData("COALESCE(t.a & t.b, NULL)", "", true, false, "t.a & t.b")]
     [InlineData("COALESCE(t.a COLLATE Latin1_General_BIN, NULL)", "", true, false, "t.a COLLATE Latin1_General_BIN")]
