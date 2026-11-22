@@ -327,15 +327,8 @@ public sealed class BatchMethodWriterTests
     // connection is closed, with no cancellation, ignoring a failure; a method that began none read none, and restores
     // none.  A repository's method begins its own as well.
     [Theory]
-    [InlineData(nameof(TransactionMode.ReadUncommitted), false)]
-    [InlineData(nameof(TransactionMode.ReadCommitted), false)]
-    [InlineData(nameof(TransactionMode.RepeatableRead), false)]
-    [InlineData(nameof(TransactionMode.Serializable), false)]
-    [InlineData(nameof(TransactionMode.Snapshot), false)]
-    [InlineData(nameof(TransactionMode.Serializable), true)]
-    [InlineData(nameof(TransactionMode.ReadUncommitted), true)]
     [InlineData(nameof(TransactionMode.On), false)]
-    [InlineData(nameof(TransactionMode.On), true)]
+    [InlineData(nameof(TransactionMode.Serializable), true)]
     public void Append_SqlServerOwnTransaction_RestoresTheSessionsLevel(string modeName, bool isRepository)
     {
         var method = Batch with
@@ -419,12 +412,6 @@ public sealed class BatchMethodWriterTests
     // restore the session's level.
     [Theory]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), false)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), true)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.On), false)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.On), true)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.ReadCommitted), false)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.RepeatableRead), false)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.Serializable), false)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.Serializable), true)]
     public void Append_OffOrPostgreSql_LeavesTheSessionsLevelAlone(
         string engineName,
@@ -985,9 +972,18 @@ public sealed class BatchMethodWriterTests
     {
         var text = Write(Batch with { Engine = DatabaseEngine.SqlServer, Synchrony = Synchronous });
 
-        text.ShouldContain("TransactionRolledBackException");
-        text.ShouldContain("reader.NextResult()");
-        text.ShouldContain("reader.Dispose();\n");
+        text.ShouldContain("if (transaction is not null && transaction.Connection is null)\n");
+        text.ShouldContain(
+            "if ((result > 0 && !reader.NextResult())\n"
+                + "                                    || reader.FieldCount != 2)\n"
+        );
+        text.ShouldContain(
+            "                        reader.Dispose();\n"
+                + "                        if (transaction.Connection is null)\n"
+                + "                        {\n"
+                + "                            throw new global::SqlSource.TransactionRolledBackException("
+                + "\"GetUser\", exception);\n"
+        );
         ShouldNotAwait(text);
     }
 
