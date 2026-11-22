@@ -6,7 +6,7 @@
 
 ## Why it exists
 
-The text of a model's type is shared by every place that names the model, and only the body of an asynchronous method needs the `@`.  The review of TD-0119's fix found it, and the owner chose to record it.
+The text of a model's type is shared by every place that names the model, and only the body of an asynchronous method needs the `@`.  A review of the static connection access found it, and the owner chose to record it.
 
 ## Impact
 

@@ -602,38 +602,42 @@ public sealed class ConnectionResolverTests
         resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe(access);
     }
 
-    // A type that repeats a type parameter at any level has no path that names it as constructed, so a static member is
-    // reached by its own name, which a local could hide, with an @ on a name an asynchronous method cannot use.
+    // A repository around which a type parameter has no name reaches a static member through its own name, whose first
+    // name a local can hide only when the repository is not generic, with an @ on each await.
     [Theory]
-    [InlineData(0, "X", "X")]
-    [InlineData(1, "X", "X")]
-    [InlineData(1, "await", "@await")]
-    [InlineData(1, "class", "@class")]
-    public void Resolve_StaticMemberInATypeThatRepeatsATypeParameter_IsReachedByItsName(
-        int repeatingLevel,
+    [InlineData("Repo", "<T>", 1, "X", "Repo<T>.X", null)]
+    [InlineData("Repo", "", 0, "X", "Repo.X", "Repo")]
+    [InlineData("await", "", 0, "X", "@await.X", "await")]
+    [InlineData("Repo", "<await>", 1, "X", "Repo<@await>.X", null)]
+    [InlineData("Repo", "", 0, "await", "Repo.@await", "Repo")]
+    public void Resolve_StaticMemberOfATypeThatHidesATypeParameter_UsesTheTypesOwnName(
         string name,
-        string access
+        string typeParameters,
+        int arity,
+        string member,
+        string access,
+        string? leading
     )
     {
         var type = TestModels.Type(
             types:
             [
-                new TypeDeclaration("class", "Outer", "Outer", "<T>", 1, RepeatsATypeParameter: repeatingLevel == 0),
-                new TypeDeclaration("class", "Repo", "Repo", "<T>", 1, RepeatsATypeParameter: repeatingLevel == 1),
+                new TypeDeclaration("class", "Outer", "Outer", "<T>", 1),
+                new TypeDeclaration("class", name, name, typeParameters, arity),
             ]
         );
-        var candidate = Candidate(name, CandidateType.ConnectionString, CandidateMember.Property) with
+        var candidate = Candidate(member, CandidateType.ConnectionString, CandidateMember.Property) with
         {
             IsStatic = true,
         };
 
         var source = ConnectionResolver
-            .Resolve(type, Shape(candidate), [Main])
+            .Resolve(type, Shape(candidate) with { HidesATypeParameter = true }, [Main])
             .Sources.ShouldHaveSingleItem()
             .Asynchronous;
 
         source.AccessText.ShouldBe(access);
-        source.LeadingName.ShouldBe(name);
+        source.LeadingName.ShouldBe(leading);
     }
 
     // A source that returns no task serves both kinds of method.

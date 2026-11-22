@@ -6,7 +6,7 @@
 
 ## Why it exists
 
-The reference was written for the usual case, where no type parameter repeats an outer one.  The review of TD-0119's fix found it, and the owner chose to record it, since the interface is separate generated code from the connection access that change made.
+The reference was written for the usual case, where no type parameter repeats an outer one.  A review of the static connection access found it, and the owner chose to record it, since the interface is separate generated code from that access.
 
 ## Impact
 
@@ -14,7 +14,7 @@ Low.  The shape is legal but rare, and C# already warns on the user's own declar
 
 ## Proposed fix
 
-Name the interface in the base list by its simple name with the repository's type parameters when `TypeDeclaration.RepeatsATypeParameter` holds at any level, so that the outer parameters stay the repository's own, and check that an inherited type of that name cannot take the reference.  Stop the generated interface from raising CS0693, then add a compile test of each shape to `MethodCompileTests` and remove the limit "A type parameter that repeats one of an outer type" from `site/reference/repositories.md` with its row of `site/guides/troubleshooting.md`.
+Name the interface in the base list by its simple name with the repository's type parameters when `RepositoryShape.HidesATypeParameter` holds, so that the outer parameters stay the repository's own, and check that an inherited type of that name cannot take the reference.  Stop the generated interface from raising CS0693, then add a compile test of each shape to `MethodCompileTests` and remove the limit "A type parameter that repeats one of an outer type" from `site/reference/repositories.md` with its row of `site/guides/troubleshooting.md`.
 
 ## Trigger
 

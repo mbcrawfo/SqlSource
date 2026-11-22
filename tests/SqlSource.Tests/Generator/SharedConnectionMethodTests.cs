@@ -518,36 +518,39 @@ public sealed class SharedConnectionMethodTests
         run.Sources[MethodsFile].ShouldContain("global::App.Sample.Sample");
     }
 
-    // A static holder of a type that repeats a type parameter is reached by its own name, which a token of that name
-    // would hide.
+    // A repository whose outer type parameter has no name inside it reaches a static holder through its own name, which
+    // a token of that name would hide when the repository is not generic.
     [Fact]
-    public void Run_TokenNamedLikeAStaticHolderInATypeThatRepeatsATypeParameter_ReportsSqlsrc275()
+    public void Run_TokenNamedLikeATypeThatHidesATypeParameter_ReportsSqlsrc275ForTheHolder()
     {
         const string Source =
             Factory
             + """
-                    public partial class Outer<T>
+                    public partial class A<T>
                     {
-                        [SqlSourceGenerate(Source = ".", GenerateInterface = false)]
-                        public partial class Sample<T>
+                        public partial class B<T>
                         {
-                            private static readonly IDatabaseFactory? dbf = null;
+                            [SqlSourceGenerate(Source = ".", GenerateInterface = false)]
+                            public partial class Sample
+                            {
+                                private static readonly IDatabaseFactory? dbf = null;
+                            }
                         }
                     }
                 }
                 """;
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: GetFrom\n-- token: {{dbf:users}}\nSELECT id FROM {{dbf}};\n"
+            "-- name: GetFrom\n-- token: {{Sample:users}}\nSELECT id FROM {{Sample}};\n"
         );
 
         var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], Source);
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,17): The token 'dbf' of the query 'GetFrom' has the name of "
-                    + "the static member 'dbf', through which the repository methods of 'App.Outer<T>.Sample<T>' "
-                    + "reach their connection 'dbf.Open'.  Rename the token.",
+                "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,17): The token 'Sample' of the query 'GetFrom' has the name "
+                    + "of the type 'Sample', through which the repository methods of 'App.A<T>.B<T>.Sample' reach "
+                    + "their connection 'dbf.Open'.  Rename the token.",
             ]);
     }
 

@@ -14,7 +14,11 @@ namespace SqlSource.Generation.Repositories;
 internal static partial class ConnectionResolver
 {
     // What the resolution of one type has found so far.
-    private sealed class Resolving(TargetType type, IReadOnlyCollection<NeededDatabase> needed)
+    private sealed class Resolving(
+        TargetType type,
+        IReadOnlyCollection<NeededDatabase> needed,
+        bool hidesATypeParameter
+    )
     {
         private readonly List<ResolvedConnection> _sources = [];
         private readonly List<string> _failed = [];
@@ -174,7 +178,7 @@ internal static partial class ConnectionResolver
             );
 
         // A held member is reached through its holder, as the type reaches the holder, and a global through its type in
-        // full, which no argument or local can hide.
+        // full, which no argument or local can hide, with an @ on each await.
         private ConnectionSource SourceOf(ConnectionCandidate candidate)
         {
             var source = new ConnectionSource(
@@ -195,7 +199,7 @@ internal static partial class ConnectionResolver
                 { Tier: CandidateTier.Held, Holder: { } holder } => HeldThrough(source, candidate, holder),
                 { Tier: CandidateTier.Global, GlobalTypeText: { } typeText } => source with
                 {
-                    AccessText = typeText + "." + Escaped(candidate.Name),
+                    AccessText = WithAwaitEscaped(typeText) + "." + Escaped(candidate.Name),
                     LeadingName = null,
                 },
                 _ => source,
@@ -218,23 +222,27 @@ internal static partial class ConnectionResolver
                 HolderName = holder.Name,
                 HolderCanBeNull = holder.CanBeNull,
                 HolderMember = holder.Member,
-                HolderCastText = candidate.CastTypeText,
+                HolderCastText = candidate.CastTypeText is { } cast ? WithAwaitEscaped(cast) : null,
             };
         }
 
-        // Whether a type parameter of the type, or of a type around it, hides an outer one of its name.  No path from
-        // global:: can then name the type as it is constructed, since the outer parameter has no name left to write.
-        private bool RepeatsATypeParameter => type.Types.Any(static each => each.RepeatsATypeParameter);
+        // The name the access starts with, which an argument or a local of the method could hide: a parameter's, and
+        // the type's for a static member reached by the type's simple name when the type is not generic, since a name
+        // with type arguments is never a local's.  An instance member is reached through this and any other static one
+        // from global::, which nothing hides.
+        private string? LeadingNameOf(string name, CandidateMember member, bool isStatic)
+        {
+            if (member == CandidateMember.Parameter)
+            {
+                return name;
+            }
 
-        // The name the access starts with, which an argument or a local of the method could hide: a parameter's, and a
-        // static member's when it is reached by its name.  An instance member is reached through this and any other
-        // static one from global::, which nothing hides.
-        private string? LeadingNameOf(string name, CandidateMember member, bool isStatic) =>
-            member == CandidateMember.Parameter || (isStatic && RepeatsATypeParameter) ? name : null;
+            return isStatic && hidesATypeParameter && type.Types[type.Types.Count - 1].Arity == 0 ? type.Name : null;
+        }
 
-        // A parameter by its name, an instance member through this, and a static member through the type in full, which
-        // reaches a base type's static member too and which a member of the type's name cannot hide.  In a type that
-        // repeats a type parameter, a static member is reached by its own name, which binds as the type's code does.
+        // A parameter by its name, an instance member through this, and a static member through the type, which reaches
+        // a base type's static member too: in full, which a member of the type's name cannot hide, unless a type
+        // parameter around the type has no name inside it, when only the type's simple name means the constructed type.
         private string AccessTextOf(string name, CandidateMember member, bool isStatic)
         {
             var escaped = Escaped(name);
@@ -248,7 +256,14 @@ internal static partial class ConnectionResolver
                 return "this." + escaped;
             }
 
-            return RepeatsATypeParameter ? WithAwaitEscaped(escaped) : FullTypeText() + "." + escaped;
+            return (hidesATypeParameter ? SimpleTypeText() : FullTypeText()) + "." + escaped;
+        }
+
+        // The type by its own name and type parameters as they are written, with an @ on an await.
+        private string SimpleTypeText()
+        {
+            var declaration = type.Types[type.Types.Count - 1];
+            return WithAwaitEscaped(declaration.Name + declaration.TypeParameters);
         }
 
         // The type from global::, each name and its type parameters as they are written, so a keyword keeps its @, and
@@ -290,7 +305,9 @@ internal static partial class ConnectionResolver
             return escaped.Append(text, copied, text.Length - copied).ToString();
         }
 
-        private static string Escaped(string name) => SqlIdentifier.IsReservedKeyword(name) ? "@" + name : name;
+        // A name as a method writes it: with an @ on a keyword, and on await, which an asynchronous method cannot use.
+        private static string Escaped(string name) =>
+            SqlIdentifier.IsReservedKeyword(name) || name == "await" ? "@" + name : name;
 
         private static ConnectionSourceKind KindOf(CandidateType type) =>
             type switch

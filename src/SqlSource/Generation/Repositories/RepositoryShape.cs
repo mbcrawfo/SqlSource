@@ -35,6 +35,11 @@ namespace SqlSource.Generation.Repositories;
 /// unless it is a partial interface, a type of a referenced assembly that the project sees, or a member of the
 /// containing type.  Null when nothing does, or the type gets no interface.
 /// </param>
+/// <param name="HidesATypeParameter">
+/// Whether a type parameter of a type around the repository has no name inside it, since a type nearer the repository
+/// repeats the name as a type parameter, or has a nested type of the name, its own or inherited.  A path from
+/// <c>global::</c> would then name another constructed type.
+/// </param>
 internal sealed record RepositoryShape(
     string TypeKey,
     EquatableArray<ConnectionCandidate> Candidates,
@@ -43,5 +48,6 @@ internal sealed record RepositoryShape(
     EquatableArray<string> HeldParameters,
     bool InterfaceOn,
     string InterfaceName,
-    string? InterfaceTakenBy
+    string? InterfaceTakenBy,
+    bool HidesATypeParameter = false
 );

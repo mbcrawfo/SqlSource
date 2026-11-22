@@ -16,8 +16,9 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="AccessText">
 /// The member as a method of the type reaches it, without the call of a method: <c>this.X</c> for an instance member,
 /// <c>X</c> for a primary-constructor parameter, and the type in full from <c>global::</c>, with its type parameters,
-/// then <c>.X</c>, for a static member, a base type's included, or <c>X</c> alone when a type parameter of the type or
-/// of a type around it repeats an outer one, which no such path can name.  A keyword gets its <c>@</c>.
+/// then <c>.X</c>, for a static member, a base type's included.  When a type parameter around the type has no name
+/// inside it, which <see cref="RepositoryShape.HidesATypeParameter" /> says, a static member is reached through the
+/// type's own name and type parameters instead.  A keyword and <c>await</c> get their <c>@</c>.
 /// </param>
 /// <param name="IsAsync">
 /// Whether it is a method that returns a <c>Task</c> or a <c>ValueTask</c> of a connection.
@@ -25,9 +26,9 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="TakesCancellationToken">Whether it is a method that takes a <c>CancellationToken</c>.</param>
 /// <param name="LeadingName">
 /// The name, as a value, that <paramref name="AccessText" /> starts with and that an argument or a local of the method
-/// of that name would hide: the primary-constructor parameter's, the source's or its holder's, or a static member's
-/// that is reached by its name.  Null for an instance member, reached through <c>this</c>, and a static member reached
-/// from <c>global::</c>.
+/// of that name would hide: the primary-constructor parameter's, the source's or its holder's, or the type's for a
+/// static member reached through the simple name of a type that is not generic.  Null for an instance member, reached
+/// through <c>this</c>, and any other static member, reached from <c>global::</c> or with type arguments.
 /// </param>
 /// <param name="TypeName">
 /// The repository's name, as a diagnostic gives it, which the method's exception names when the member is null.

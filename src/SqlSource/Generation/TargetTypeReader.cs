@@ -185,7 +185,6 @@ internal static class TargetTypeReader
         }
 
         var types = ImmutableArray.CreateBuilder<TypeDeclaration>(chain.Count);
-        var outerTypeParameters = new HashSet<string>(StringComparer.Ordinal);
         foreach (var type in chain)
         {
             var location = LocationInfo.From(type.Identifier.GetLocation());
@@ -203,20 +202,15 @@ internal static class TargetTypeReader
                 );
             }
 
-            var parameters = type
-                .TypeParameterList?.Parameters.Select(static each => each.Identifier.ValueText)
-                .ToList();
             types.Add(
                 new TypeDeclaration(
                     GetKeyword(type),
                     type.Identifier.Text,
                     type.Identifier.ValueText,
                     GetTypeParameters(type.TypeParameterList),
-                    type.TypeParameterList?.Parameters.Count ?? 0,
-                    parameters?.Exists(outerTypeParameters.Contains) ?? false
+                    type.TypeParameterList?.Parameters.Count ?? 0
                 )
             );
-            outerTypeParameters.UnionWith(parameters ?? []);
         }
 
         return types.MoveToImmutable();

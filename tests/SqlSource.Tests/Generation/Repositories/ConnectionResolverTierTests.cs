@@ -164,27 +164,27 @@ public sealed class ConnectionResolverTierTests
         resolved.LeadingName.ShouldBeNull();
     }
 
-    // A static holder of a type that repeats a type parameter is reached by its own name, which a local could hide.
+    // A static holder of a repository around which a type parameter has no name is reached through its own name.
     [Fact]
-    public void Resolve_StaticHolderInATypeThatRepeatsATypeParameter_IsReachedByItsName()
+    public void Resolve_StaticHolderOfATypeThatHidesATypeParameter_UsesTheTypesOwnName()
     {
         var type = TestModels.Type(
             types:
             [
                 new TypeDeclaration("class", "Outer", "Outer", "<T>", 1),
-                new TypeDeclaration("class", "Repo", "Repo", "<T>", 1, RepeatsATypeParameter: true),
+                new TypeDeclaration("class", "Repo", "Repo", "<T>", 1),
             ]
         );
         var held = Held("F", "Open", holderMember: CandidateMember.Field, holderIsStatic: true);
 
         var resolved = ConnectionResolver
-            .Resolve(type, Tiers([], held: [held]), [Main])
+            .Resolve(type, Tiers([], held: [held]) with { HidesATypeParameter = true }, [Main])
             .Sources.ShouldHaveSingleItem()
             .Asynchronous;
 
-        resolved.AccessText.ShouldBe("F.Open");
-        resolved.HolderAccessText.ShouldBe("F");
-        resolved.LeadingName.ShouldBe("F");
+        resolved.AccessText.ShouldBe("Repo<T>.F.Open");
+        resolved.HolderAccessText.ShouldBe("Repo<T>.F");
+        resolved.LeadingName.ShouldBeNull();
     }
 
     // A holder of a struct cannot be null, so a method reads its member unchecked; any other holder is checked.

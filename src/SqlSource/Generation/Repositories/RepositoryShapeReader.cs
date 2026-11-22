@@ -65,7 +65,8 @@ internal static class RepositoryShapeReader
                     heldParameters,
                     interfaceOn,
                     interfaceName,
-                    symbol is not null && interfaceOn ? FindTaken(symbol, interfaceName, compilation, token) : null
+                    symbol is not null && interfaceOn ? FindTaken(symbol, interfaceName, compilation, token) : null,
+                    symbol is not null && HidesATypeParameter(symbol)
                 )
             );
         }
@@ -73,6 +74,45 @@ internal static class RepositoryShapeReader
         return new EquatableArray<RepositoryShape>(
             shapes.OrderBy(static shape => shape.TypeKey, StringComparer.Ordinal).ToImmutableArray()
         );
+    }
+
+    // Whether a type parameter of a type around the type binds to something else inside it: a type nearer the type,
+    // or the type itself, repeats its name or has a nested type of its name.
+    private static bool HidesATypeParameter(INamedTypeSymbol type)
+    {
+        for (var inner = type; inner is not null; inner = inner.ContainingType)
+        {
+            for (var outer = inner.ContainingType; outer is not null; outer = outer.ContainingType)
+            {
+                if (outer.TypeParameters.Any(parameter => Hides(inner, parameter.Name)))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // Whether a name in the type means something of the type's rather than a type parameter around it.
+    private static bool Hides(INamedTypeSymbol type, string name) =>
+        type.TypeParameters.Any(each => each.Name == name) || HasNestedType(type, name);
+
+    // Whether the type or a base type has a nested type of the name with no type parameters, which a name in the type
+    // binds to.  An interface's base interfaces count, and a class's interfaces do not, since a name in a class does
+    // not bind to their members.  One it cannot reach counts too: the access it costs is the type's own name.
+    private static bool HasNestedType(INamedTypeSymbol type, string name)
+    {
+        for (var each = type; each is not null; each = each.BaseType)
+        {
+            if (!each.GetTypeMembers(name, 0).IsEmpty)
+            {
+                return true;
+            }
+        }
+
+        return type.TypeKind == TypeKind.Interface
+            && type.AllInterfaces.Any(each => !each.GetTypeMembers(name, 0).IsEmpty);
     }
 
     // What takes the interface's full name, in the type's namespace or the type it is nested in, with the type's arity:

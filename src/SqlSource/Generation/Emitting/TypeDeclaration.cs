@@ -15,15 +15,4 @@ namespace SqlSource.Generation.Emitting;
 /// The names of the type parameters as written: <c>&lt;TKey, TValue&gt;</c>.  Empty when the type is not generic.
 /// </param>
 /// <param name="Arity">The number of type parameters.</param>
-/// <param name="RepeatsATypeParameter">
-/// Whether a type parameter has the identifier of one of a type around it, which it hides, so that a name written
-/// inside the type cannot reach the outer one.
-/// </param>
-internal sealed record TypeDeclaration(
-    string Keyword,
-    string Name,
-    string ValueName,
-    string TypeParameters,
-    int Arity,
-    bool RepeatsATypeParameter = false
-);
+internal sealed record TypeDeclaration(string Keyword, string Name, string ValueName, string TypeParameters, int Arity);
