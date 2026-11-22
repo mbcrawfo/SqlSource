@@ -226,7 +226,7 @@ public sealed class WatchSetTests
         ShouldBeForEveryKind(set, envFile, WatchEffect.Describe);
         set.Classify(Created(P("App/obj/Other.cs"))).ShouldBe(WatchEffect.None);
         set.Classify(Created(P("App/bin/Other.csproj"))).ShouldBe(WatchEffect.None);
-        set.Classify(Changed(P(".git/index"))).ShouldBe(WatchEffect.None);
+        set.Classify(Created(P("App/.git/x/New.cs"))).ShouldBe(WatchEffect.None);
         if (!path.EndsWith(".sql.json", StringComparison.Ordinal))
         {
             set.Classify(Created(beside)).ShouldBe(WatchEffect.None);
