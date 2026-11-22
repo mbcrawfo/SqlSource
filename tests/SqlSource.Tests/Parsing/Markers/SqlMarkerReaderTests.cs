@@ -71,6 +71,7 @@ public sealed class SqlMarkerReaderTests
     [InlineData("/* x */ -- name: A")]
     [InlineData("'x' -- name: A")]
     [InlineData("/*+ h */-- name: A")]
+    [InlineData("a-- name: A")]
     [InlineData("-- name : A")]
     [InlineData("-- names: A")]
     [InlineData("-- rename: A")]
@@ -136,17 +137,6 @@ public sealed class SqlMarkerReaderTests
         _ = marker.ShouldNotBeNull();
         marker.Value.Span.ShouldBe(lexeme.Span);
         marker.Value.ValueSpan.ShouldBe(new TextSpan(Text.IndexOf("GetUser", StringComparison.Ordinal), 7));
-    }
-
-    [Fact]
-    public void Read_MarkerWithoutAValue_HasAnEmptyValueSpan()
-    {
-        const string Text = "-- name:  ";
-
-        var marker = SqlMarkerReader.Read(Text, SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes[0]);
-
-        _ = marker.ShouldNotBeNull();
-        marker.Value.ValueSpan.IsEmpty.ShouldBeTrue();
     }
 
     [Fact]

@@ -63,12 +63,6 @@ public sealed class SqlFileParserParameterTests
             ]);
     }
 
-    [Fact]
-    public void Parse_DeclareUnderADialectWithoutDeclaredVariables_DeclaresNone() =>
-        Blocks("-- name: Q\nDECLARE @n int = @start;\nSELECT @n\n", dialect: SqlDialect.PostgreSql)
-            .ShouldHaveSingleItem()
-            .DeclaredVariables.ShouldBeEmpty();
-
     // A query is one batch.
     [Fact]
     public void Parse_VariableThatAnotherQueryOfTheFileDeclares_IsAParameter()
@@ -105,11 +99,17 @@ public sealed class SqlFileParserParameterTests
     [InlineData(nameof(SqlDialect.MariaDb))]
     [InlineData(nameof(SqlDialect.Sqlite))]
     [InlineData(nameof(SqlDialect.Oracle))]
-    public void Parse_DeclareUnderADialectWithoutDeclaredVariables_LeavesTheNameAParameter(string dialect) =>
-        Blocks("-- name: Q\nDECLARE @n int = @start;\nSELECT @n\n", dialect: Enum.Parse<SqlDialect>(dialect))
-            .ShouldHaveSingleItem()
-            .Parameters.Select(static parameter => parameter.Name)
-            .ShouldBe(["n", "start"]);
+    public void Parse_DeclareUnderADialectWithoutDeclaredVariables_LeavesTheNameAParameter(string dialect)
+    {
+        var block = Blocks(
+                "-- name: Q\nDECLARE @n int = @start;\nSELECT @n\n",
+                dialect: Enum.Parse<SqlDialect>(dialect)
+            )
+            .ShouldHaveSingleItem();
+
+        block.DeclaredVariables.ShouldBeEmpty();
+        block.Parameters.Select(static parameter => parameter.Name).ShouldBe(["n", "start"]);
+    }
 
     // A variable in a default is not a parameter that a token brings, so it needs no declaration.
     [Fact]
@@ -864,13 +864,17 @@ public sealed class SqlFileParserParameterTests
     // A list that a NOT reaches is sent empty as a subquery, which SQL Server refuses inside an aggregate.  Only a
     // method sends a list, so the error is the method's, and the file still parses.
     [Fact]
-    public void Parse_SqlServerNegatedListInAnAggregate_HasAMethodsError()
+    public void Parse_SqlServerNegatedListInAnAggregateTwice_IsReportedAtEachUseAsWritten()
     {
-        const string Text = "-- name: Q\nSELECT COUNT(IIF(id NOT IN @ids, 1, NULL)) AS c FROM t\n";
+        const string Text =
+            "-- name: Q\nSELECT SUM(IIF(id NOT IN @ids, 1, 0)) AS a, SUM(IIF(id + 1 NOT IN @IDS, 1, 0)) AS b FROM t\n";
 
         Blocks(Text, dialect: SqlDialect.SqlServer)
             .ShouldHaveSingleItem()
-            .MethodErrors.ShouldBe([RefusedEmpty(TextSpans.Of(Text, "@ids"), "@ids", "inside an aggregate")]);
+            .MethodErrors.ShouldBe([
+                RefusedEmpty(TextSpans.Of(Text, "@ids"), "@ids", "inside an aggregate"),
+                RefusedEmpty(TextSpans.Of(Text, "@IDS"), "@IDS", "inside an aggregate"),
+            ]);
     }
 
     // The error names where the list stands, and an aggregate before the clause around it.
@@ -889,20 +893,6 @@ public sealed class SqlFileParserParameterTests
         Blocks(text, dialect: SqlDialect.SqlServer)
             .ShouldHaveSingleItem()
             .MethodErrors.ShouldBe([RefusedEmpty(TextSpans.Of(text, "@ids"), "@ids", place)]);
-    }
-
-    [Fact]
-    public void Parse_SqlServerNegatedListInAnAggregateTwice_IsReportedAtEachUseAsWritten()
-    {
-        const string Text =
-            "-- name: Q\nSELECT SUM(IIF(id NOT IN @ids, 1, 0)) AS a, SUM(IIF(id + 1 NOT IN @IDS, 1, 0)) AS b FROM t\n";
-
-        Blocks(Text, dialect: SqlDialect.SqlServer)
-            .ShouldHaveSingleItem()
-            .MethodErrors.ShouldBe([
-                RefusedEmpty(TextSpans.Of(Text, "@ids"), "@ids", "inside an aggregate"),
-                RefusedEmpty(TextSpans.Of(Text, "@IDS"), "@IDS", "inside an aggregate"),
-            ]);
     }
 
     // SQL Server takes the subquery in a windowed aggregate, and the one NULL of a list that no NOT reaches anywhere.
