@@ -763,6 +763,42 @@ public sealed class ConnectionCandidateReaderTests
         shape.Candidates.ShouldBeEmpty();
     }
 
+    // A marked override whose inherited getter the repository cannot call gives no value, and is still reported.
+    [Theory]
+    [InlineData("[SqlSourceConnection]", "")]
+    [InlineData("", "[SqlSourceConnection]")]
+    public void Read_MarkedPropertyOverrideWithAnUnreachableInheritedGetter_IsUnsupported(
+        string markOnTheVirtual,
+        string markOnTheOverride
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class LowestBase
+                {
+                    {{markOnTheVirtual}}
+                    protected virtual string Source { private get; set; } = "";
+                }
+
+                public abstract class RepositoryBase : LowestBase
+                {
+                    {{markOnTheOverride}}
+                    protected override string Source { set { } }
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase;
+            }
+            """
+        );
+
+        var candidate = shape.Candidates.ShouldHaveSingleItem();
+        candidate.Type.ShouldBe(CandidateType.Unsupported);
+        candidate.IsInherited.ShouldBeTrue();
+    }
+
     // An override of a property replaces only the accessors that it declares, so a marked one it leaves is still read.
     [Theory]
     [InlineData("{ [SqlSourceConnection] get; set; }", "{ set { } }", true)]

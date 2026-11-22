@@ -124,6 +124,8 @@ internal static class GlobalConnections
             var read = ConnectionCandidateReader.ReadMarkedMember(
                 member,
                 compilation,
+                repository,
+                throughType: null,
                 isInherited: false,
                 mark.Location
             );
@@ -152,7 +154,14 @@ internal static class GlobalConnections
     // The name a message gives a broken member, the property's for an accessor, or null when it is a valid global.
     private static string? BrokenNameOf(ISymbol member, Compilation compilation, LocationInfo fallback)
     {
-        var read = ConnectionCandidateReader.ReadMarkedMember(member, compilation, isInherited: false, fallback);
+        var read = ConnectionCandidateReader.ReadMarkedMember(
+            member,
+            compilation,
+            member.ContainingType,
+            throughType: null,
+            isInherited: false,
+            fallback
+        );
         if (GlobalOf(member, read) is not null)
         {
             return null;

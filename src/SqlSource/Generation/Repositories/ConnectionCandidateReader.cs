@@ -61,7 +61,7 @@ internal static class ConnectionCandidateReader
         var members = new List<ConnectionCandidate>();
         foreach (var (member, isInherited) in ReachableMembersOf(type, compilation))
         {
-            if (ReadMarkedMember(member, compilation, isInherited, fallback) is { } candidate)
+            if (ReadMarkedMember(member, compilation, type, throughType: null, isInherited, fallback) is { } candidate)
             {
                 members.Add(candidate);
             }
@@ -141,7 +141,9 @@ internal static class ConnectionCandidateReader
     /// data source, or a string of a convention's name.
     /// </summary>
     /// <param name="member">The member, of any kind.</param>
-    /// <param name="compilation">The compilation, which says whether an override can read an inherited getter.</param>
+    /// <param name="compilation">The compilation, which says whether the reader can call an inherited getter.</param>
+    /// <param name="reader">The type whose code reads the member.</param>
+    /// <param name="throughType">The type of the value it is read through, or null for the reader itself.</param>
     /// <param name="isInherited">Whether it is a member of a base type.</param>
     /// <param name="fallback">The location of a member that has none in source.</param>
     /// <param name="implementer">
@@ -152,11 +154,13 @@ internal static class ConnectionCandidateReader
     public static ConnectionCandidate? ReadMarkedMember(
         ISymbol member,
         Compilation compilation,
+        INamedTypeSymbol reader,
+        ITypeSymbol? throughType,
         bool isInherited,
         LocationInfo fallback,
         INamedTypeSymbol? implementer = null
     ) =>
-        ValueOf(member, compilation) is (var kind, var type)
+        ValueOf(member, compilation, reader, throughType) is (var kind, var type)
             ? Held(member, kind, type, member.IsStatic, isInherited, fallback, implementer)
             : member switch
             {
@@ -171,17 +175,27 @@ internal static class ConnectionCandidateReader
 
     /// <summary>
     /// A member whose value a call can read by its name, with its kind and type: a field, or a property with a getter,
-    /// its own or one it inherits as an override, that is not an indexer.  A write-only property gives nothing, and an
-    /// indexer needs an argument.
+    /// its own or one it inherits as an override that the reader can call, that is not an indexer.  A write-only
+    /// property gives nothing, and an indexer needs an argument.
     /// </summary>
     /// <param name="member">The member, of any kind.</param>
-    /// <param name="compilation">The compilation, which says whether an override can read an inherited getter.</param>
-    internal static (CandidateMember Member, ITypeSymbol Type)? ValueOf(ISymbol member, Compilation compilation) =>
+    /// <param name="compilation">The compilation, which says whether the reader can call an inherited getter.</param>
+    /// <param name="reader">The type whose code reads the member.</param>
+    /// <param name="throughType">The type of the value it is read through, or null for the reader itself.</param>
+    internal static (CandidateMember Member, ITypeSymbol Type)? ValueOf(
+        ISymbol member,
+        Compilation compilation,
+        INamedTypeSymbol reader,
+        ITypeSymbol? throughType
+    ) =>
         member switch
         {
             IFieldSymbol { CanBeReferencedByName: true } field => (CandidateMember.Field, field.Type),
             IPropertySymbol { CanBeReferencedByName: true, IsIndexer: false } property
-                when HasReadableGetter(property, compilation) => (CandidateMember.Property, property.Type),
+                when HasReadableGetter(property, compilation, reader, throughType) => (
+                CandidateMember.Property,
+                property.Type
+            ),
             _ => null,
         };
 
@@ -201,16 +215,20 @@ internal static class ConnectionCandidateReader
     ) =>
         compilation.IsSymbolAccessibleWithin(member, type, throughType)
         && (
-            member is not IPropertySymbol property
-            || GetterOf(property) is not { } getter
+            member is not IPropertySymbol { GetMethod: { } getter }
             || compilation.IsSymbolAccessibleWithin(getter, type, throughType)
         );
 
-    // Whether the property has a getter that its own type can call: an inherited one may be out of its reach, and C#
-    // then fails on the read.
-    private static bool HasReadableGetter(IPropertySymbol property, Compilation compilation) =>
+    // Whether the property has a getter to read: its own, whose reach IsReachable asks, or an inherited one that the
+    // reader can call, since C# fails on a read of one it cannot.
+    private static bool HasReadableGetter(
+        IPropertySymbol property,
+        Compilation compilation,
+        INamedTypeSymbol reader,
+        ITypeSymbol? throughType
+    ) =>
         GetterOf(property) is { } getter
-        && (property.GetMethod is not null || compilation.IsSymbolAccessibleWithin(getter, property.ContainingType));
+        && (property.GetMethod is not null || compilation.IsSymbolAccessibleWithin(getter, reader, throughType));
 
     // The getter that a read of the property calls: its own, or for an override that declares none, the nearest one it
     // overrides.

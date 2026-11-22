@@ -766,6 +766,37 @@ public sealed class HeldFactoryReaderTests
         candidate.Type.ShouldBe(CandidateType.Connection);
     }
 
+    // The repository cannot call a protected getter through the factory, even when it derives from the getter's type,
+    // so the marked override is still reported.
+    [Theory]
+    [InlineData("")]
+    [InlineData(" : FactoryBase")]
+    public void Read_FactoryPropertyOverrideWithAnUnreachableInheritedGetter_IsUnsupported(string baseList)
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public class FactoryBase
+                {
+                    [SqlSourceConnection]
+                    public virtual DbConnection Connection { protected get; set; } = null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public override DbConnection Connection { set { } }
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf){{baseList}};
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldHaveSingleItem().Type.ShouldBe(CandidateType.Unsupported);
+    }
+
     [Fact]
     public void Read_HolderPropertyOverrideWithoutAGetter_IsAHolder()
     {

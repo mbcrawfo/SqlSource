@@ -937,7 +937,7 @@ A connection comes from one of these members:
 - a field, property or primary-constructor parameter of a `string`, of a type that derives from `DbDataSource`, or of a type that derives from `DbConnection`;
 - a method that is not generic and takes nothing or one `CancellationToken`.  It must return a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of such a type.
 
-An indexer, a property with no getter of its own or inherited, an accessor, an operator and an explicit implementation of an interface's member are none of these either.
+An indexer, a property with no getter of its own, unless it is an `override` that inherits one the repository can call, an accessor, an operator and an explicit implementation of an interface's member are none of these either.
 
 A marked interface member that a `ref struct` factory implements explicitly cannot give the connection either, since a `ref struct` cannot be cast to its interface.  Implement it implicitly, as a `public` member of the `ref struct`.
 

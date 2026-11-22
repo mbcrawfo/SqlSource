@@ -54,7 +54,7 @@ internal static class HeldFactoryReader
         var held = ImmutableArray.CreateBuilder<ConnectionCandidate>();
         foreach (var (member, isInherited) in ConnectionCandidateReader.ReachableMembersOf(type, compilation))
         {
-            if (HolderOf(member, compilation, fallback) is (var holder, var holderType))
+            if (HolderOf(member, type, compilation, fallback) is (var holder, var holderType))
             {
                 held.AddRange(ReadFactory(holderType, holder, isInherited, type, compilation));
             }
@@ -69,7 +69,7 @@ internal static class HeldFactoryReader
         foreach (var parameter in primary?.Parameters ?? ImmutableArray<IParameterSymbol>.Empty)
         {
             if (
-                HolderOf(parameter, compilation, fallback) is (var holder, var holderType)
+                HolderOf(parameter, type, compilation, fallback) is (var holder, var holderType)
                 && ReadFactory(holderType, holder, isInherited: false, type, compilation) is { Count: > 0 } candidates
                 && !ConnectionCandidateReader.IsReadBesides(parameter, type, compilation, cancellationToken)
             )
@@ -86,13 +86,14 @@ internal static class HeldFactoryReader
     // own, and when its type has a factory's type to read, as FactoryTypesOf says.
     private static (CandidateHolder Holder, ITypeSymbol Type)? HolderOf(
         ISymbol symbol,
+        INamedTypeSymbol repository,
         Compilation compilation,
         LocationInfo fallback
     )
     {
         var value = symbol is IParameterSymbol parameter
             ? (CandidateMember.Parameter, parameter.Type)
-            : ConnectionCandidateReader.ValueOf(symbol, compilation);
+            : ConnectionCandidateReader.ValueOf(symbol, compilation, repository, throughType: null);
         if (value is not (var member, var type) || ConnectionCandidateReader.FindMarking(symbol) is not null)
         {
             return null;
@@ -166,6 +167,8 @@ internal static class HeldFactoryReader
                     && ConnectionCandidateReader.ReadMarkedMember(
                         member,
                         compilation,
+                        type,
+                        factory,
                         isInherited,
                         holder.Location,
                         implementer
@@ -223,7 +226,14 @@ internal static class HeldFactoryReader
                         || IsHiddenFromTheCall(implementation, lookedIn, type, compilation, factory)
                     )
                     && ConnectionCandidateReader.IsReachable(member, type, compilation, @interface)
-                    && ConnectionCandidateReader.ReadMarkedMember(member, compilation, isInherited, holder.Location)
+                    && ConnectionCandidateReader.ReadMarkedMember(
+                        member,
+                        compilation,
+                        type,
+                        @interface,
+                        isInherited,
+                        holder.Location
+                    )
                         is { } candidate
                 )
                 {
