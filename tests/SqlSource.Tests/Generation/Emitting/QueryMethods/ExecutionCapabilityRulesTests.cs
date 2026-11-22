@@ -15,31 +15,90 @@ public sealed class ExecutionCapabilityRulesTests
         | ExecutionCapabilities.ChecksRollbackAtRead
         | ExecutionCapabilities.ChecksRollbackAfterDatabaseError;
 
+    private const ExecutionCapabilities SqlServerBatchReadsNoRows =
+        ExecutionCapabilities.RefusesCompletedTransaction | ExecutionCapabilities.RestoresSessionIsolation;
+
+    private const ExecutionCapabilities SqlServerBatchReadsRows =
+        SqlServerBatchReadsNoRows
+        | ExecutionCapabilities.ChecksRollbackAtRead
+        | ExecutionCapabilities.ChecksRollbackAfterDatabaseError
+        | ExecutionCapabilities.ChecksResultSetsMatchItems;
+
     // PostgreSQL runs one statement and needs none of SQL Server's behaviours.  SQL Server refuses a completed
     // transaction on every method, drains and checks for a rollback after its own exception and after a database error
     // on one that reads rows, and drains in a finally on one that streams.
     [Theory]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.None), nameof(CollectionKind.List), 0)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.RowCount), nameof(CollectionKind.List), 0)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.One), nameof(CollectionKind.List), 0)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.OneOptional), nameof(CollectionKind.List), 0)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.Many), nameof(CollectionKind.List), 0)]
+    [InlineData(
+        nameof(DatabaseEngine.PostgreSql),
+        nameof(ResultShape.None),
+        nameof(CollectionKind.List),
+        (int)ExecutionCapabilities.None
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.PostgreSql),
+        nameof(ResultShape.RowCount),
+        nameof(CollectionKind.List),
+        (int)ExecutionCapabilities.None
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.PostgreSql),
+        nameof(ResultShape.One),
+        nameof(CollectionKind.List),
+        (int)ExecutionCapabilities.None
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.PostgreSql),
+        nameof(ResultShape.OneOptional),
+        nameof(CollectionKind.List),
+        (int)ExecutionCapabilities.None
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.PostgreSql),
+        nameof(ResultShape.Many),
+        nameof(CollectionKind.List),
+        (int)ExecutionCapabilities.None
+    )]
     [InlineData(
         nameof(DatabaseEngine.PostgreSql),
         nameof(ResultShape.Many),
         nameof(CollectionKind.IAsyncEnumerable),
-        0
+        (int)ExecutionCapabilities.None
     )]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.None), nameof(CollectionKind.List), 1)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), nameof(CollectionKind.List), 1)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.One), nameof(CollectionKind.List), 23)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.OneOptional), nameof(CollectionKind.List), 23)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), nameof(CollectionKind.List), 23)]
+    [InlineData(
+        nameof(DatabaseEngine.SqlServer),
+        nameof(ResultShape.None),
+        nameof(CollectionKind.List),
+        (int)ExecutionCapabilities.RefusesCompletedTransaction
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.SqlServer),
+        nameof(ResultShape.RowCount),
+        nameof(CollectionKind.List),
+        (int)ExecutionCapabilities.RefusesCompletedTransaction
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.SqlServer),
+        nameof(ResultShape.One),
+        nameof(CollectionKind.List),
+        (int)SqlServerReadsRows
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.SqlServer),
+        nameof(ResultShape.OneOptional),
+        nameof(CollectionKind.List),
+        (int)SqlServerReadsRows
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.SqlServer),
+        nameof(ResultShape.Many),
+        nameof(CollectionKind.List),
+        (int)SqlServerReadsRows
+    )]
     [InlineData(
         nameof(DatabaseEngine.SqlServer),
         nameof(ResultShape.Many),
         nameof(CollectionKind.IAsyncEnumerable),
-        31
+        (int)(SqlServerReadsRows | ExecutionCapabilities.DrainsWhenLeftAtARow)
     )]
     public void Of_EachEngineShapeAndStreaming_GivesItsFlags(
         string engineName,
@@ -61,12 +120,20 @@ public sealed class ExecutionCapabilityRulesTests
     // A repository's method takes no transaction, so it neither refuses nor checks one; it still drains the later
     // results, and drains in a finally when it streams.
     [Theory]
-    [InlineData(nameof(ResultShape.None), nameof(CollectionKind.List), 0)]
-    [InlineData(nameof(ResultShape.RowCount), nameof(CollectionKind.List), 0)]
-    [InlineData(nameof(ResultShape.One), nameof(CollectionKind.List), 2)]
-    [InlineData(nameof(ResultShape.OneOptional), nameof(CollectionKind.List), 2)]
-    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.List), 2)]
-    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.IAsyncEnumerable), 10)]
+    [InlineData(nameof(ResultShape.None), nameof(CollectionKind.List), (int)ExecutionCapabilities.None)]
+    [InlineData(nameof(ResultShape.RowCount), nameof(CollectionKind.List), (int)ExecutionCapabilities.None)]
+    [InlineData(nameof(ResultShape.One), nameof(CollectionKind.List), (int)ExecutionCapabilities.DrainsLaterResults)]
+    [InlineData(
+        nameof(ResultShape.OneOptional),
+        nameof(CollectionKind.List),
+        (int)ExecutionCapabilities.DrainsLaterResults
+    )]
+    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.List), (int)ExecutionCapabilities.DrainsLaterResults)]
+    [InlineData(
+        nameof(ResultShape.Many),
+        nameof(CollectionKind.IAsyncEnumerable),
+        (int)(ExecutionCapabilities.DrainsLaterResults | ExecutionCapabilities.DrainsWhenLeftAtARow)
+    )]
     public void Of_RepositoryOnSqlServer_KeepsOnlyTheDrains(string shapeName, string collectionName, int expected)
     {
         var method = QueryMethodWriterTests.GetUser with
@@ -87,17 +154,47 @@ public sealed class ExecutionCapabilityRulesTests
     // own and restores the session's level after it, a repository's method too.  On PostgreSQL it finds the failed item
     // by the first command that did not complete, whatever its shape, and as a repository's method too.
     [Theory]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), false, 213)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.One), false, 213)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.OneOptional), false, 213)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), false, 129)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.None), false, 129)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), true, 192)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), true, 128)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.Many), false, 32)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.None), false, 32)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.RowCount), false, 32)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.One), true, 32)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), false, (int)SqlServerBatchReadsRows)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.One), false, (int)SqlServerBatchReadsRows)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.OneOptional), false, (int)SqlServerBatchReadsRows)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), false, (int)SqlServerBatchReadsNoRows)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.None), false, (int)SqlServerBatchReadsNoRows)]
+    [InlineData(
+        nameof(DatabaseEngine.SqlServer),
+        nameof(ResultShape.Many),
+        true,
+        (int)(ExecutionCapabilities.ChecksResultSetsMatchItems | ExecutionCapabilities.RestoresSessionIsolation)
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.SqlServer),
+        nameof(ResultShape.RowCount),
+        true,
+        (int)ExecutionCapabilities.RestoresSessionIsolation
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.PostgreSql),
+        nameof(ResultShape.Many),
+        false,
+        (int)ExecutionCapabilities.FindsFailedItemByCompletion
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.PostgreSql),
+        nameof(ResultShape.None),
+        false,
+        (int)ExecutionCapabilities.FindsFailedItemByCompletion
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.PostgreSql),
+        nameof(ResultShape.RowCount),
+        false,
+        (int)ExecutionCapabilities.FindsFailedItemByCompletion
+    )]
+    [InlineData(
+        nameof(DatabaseEngine.PostgreSql),
+        nameof(ResultShape.One),
+        true,
+        (int)ExecutionCapabilities.FindsFailedItemByCompletion
+    )]
     public void Of_CollectionMethod_GivesItsEnginesFlags(
         string engineName,
         string shapeName,
@@ -152,41 +249,6 @@ public sealed class ExecutionCapabilityRulesTests
         };
 
         ExecutionCapabilityRules.Of(method).Has(ExecutionCapabilities.RestoresSessionIsolation).ShouldBe(restores);
-    }
-
-    // A query method begins no transaction of its own, so it never restores the session's level.
-    [Theory]
-    [InlineData(nameof(DatabaseEngine.SqlServer))]
-    [InlineData(nameof(DatabaseEngine.PostgreSql))]
-    public void Of_QueryMethod_RestoresNoIsolation(string engineName) =>
-        ExecutionCapabilityRules
-            .Of(QueryMethodWriterTests.GetUser with { Engine = Enum.Parse<DatabaseEngine>(engineName) })
-            .Has(ExecutionCapabilities.RestoresSessionIsolation)
-            .ShouldBeFalse();
-
-    // The values the theories above give as numbers.
-    [Fact]
-    public void Flags_AsNumbers_HaveTheValuesOfTheTheory()
-    {
-        ((int)ExecutionCapabilities.RefusesCompletedTransaction).ShouldBe(1);
-        ((int)SqlServerReadsRows).ShouldBe(23);
-        ((int)(SqlServerReadsRows | ExecutionCapabilities.DrainsWhenLeftAtARow)).ShouldBe(31);
-        ((int)ExecutionCapabilities.DrainsLaterResults).ShouldBe(2);
-        ((int)(ExecutionCapabilities.DrainsLaterResults | ExecutionCapabilities.DrainsWhenLeftAtARow)).ShouldBe(10);
-        ((int)ExecutionCapabilities.FindsFailedItemByCompletion).ShouldBe(32);
-        ((int)ExecutionCapabilities.ChecksResultSetsMatchItems).ShouldBe(64);
-        ((int)ExecutionCapabilities.RestoresSessionIsolation).ShouldBe(128);
-        (
-            (int)(
-                ExecutionCapabilities.RefusesCompletedTransaction
-                | ExecutionCapabilities.ChecksRollbackAtRead
-                | ExecutionCapabilities.ChecksRollbackAfterDatabaseError
-                | ExecutionCapabilities.ChecksResultSetsMatchItems
-            )
-        ).ShouldBe(85);
-        (
-            (int)(ExecutionCapabilities.RefusesCompletedTransaction | ExecutionCapabilities.RestoresSessionIsolation)
-        ).ShouldBe(129);
     }
 
     [Theory]
