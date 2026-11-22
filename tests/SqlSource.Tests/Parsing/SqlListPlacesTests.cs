@@ -16,6 +16,7 @@ public sealed class SqlListPlacesTests
             { "SELECT SUM(CASE WHEN s IN @a THEN 1 ELSE 0 END) FROM t", ["InAggregate"] },
             { "SELECT COUNT(IIF(id NOT IN @a, 1, NULL)) FROM t", ["UnderNot, InAggregate"] },
             { "SELECT SUM(CASE WHEN s NOT IN @a THEN 1 END) OVER (PARTITION BY g) FROM t", ["UnderNot"] },
+            { "SELECT SUM(CASE WHEN s IN @a THEN (1) END) OVER () FROM t", ["None"] },
             { "SELECT SUM(x) OVER (PARTITION BY CASE WHEN s IN @a THEN 1 END) FROM t", ["None"] },
             { "SELECT SUM(x) OVER (PARTITION BY CASE WHEN s NOT IN @a THEN 1 END) FROM t", ["UnderNot"] },
             {
@@ -274,8 +275,10 @@ public sealed class SqlListPlacesTests
         places.ShouldBe([SqlListPlace.None]);
     }
 
-    // A word that can be a name, or a word of a clause where it starts none, ends no NOT.
     [Theory]
+    // With no word of a clause after it, the NOT reaches the list.
+    [InlineData("WHERE NOT a = 1 b IN @a")]
+    // A word that can be a name, or a word of a clause where it starts none, ends no NOT.
     [InlineData("WHERE NOT a = 1 OUTPUT b IN @a")]
     [InlineData("WHERE NOT a = 1 WINDOW b IN @a")]
     [InlineData("WHERE NOT a = 1 THROW b IN @a")]
@@ -409,19 +412,6 @@ public sealed class SqlListPlacesTests
         _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules, out var places);
 
         places.ShouldBe([SqlListPlace.None]);
-    }
-
-    // Without such a word, the NOT reaches the list.
-    [Fact]
-    public void Find_SqlServerNotWithNoWordAfterIt_ReachesTheList()
-    {
-        const string Sql = "WHERE NOT a = 1 b IN @a";
-        var rules = SqlDialectRules.SqlServer;
-        var lexemes = SqlLexer.Lex(Sql, rules).Lexemes;
-
-        _ = SqlListUses.Find(Sql, lexemes, 0, lexemes.Count, rules, out var places);
-
-        places.ShouldBe([SqlListPlace.UnderNot]);
     }
 
     [Theory]

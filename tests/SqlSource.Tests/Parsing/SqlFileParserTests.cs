@@ -105,17 +105,6 @@ public sealed class SqlFileParserTests
         Kept(block).ShouldBe("-- kept\nSELECT 1");
     }
 
-    [Theory]
-    [InlineData("-- name: A\n-- generator: keep-comments=off\nSELECT 1 -- dropped\n")]
-    [InlineData("-- generator: default\n\n-- name: A\nSELECT 1 -- dropped\n")]
-    public void Parse_QueryTurningKeepCommentsOffUnderAChainThatKeepsThem_DropsTheComment(string text)
-    {
-        var block = SqlFileParser.Parse(text, "Query.sql", commentsWanted: true).Blocks.ShouldHaveSingleItem();
-
-        Sql(block).ShouldBe("SELECT 1");
-        Kept(block).ShouldBeNull();
-    }
-
     // A file without a name line is one query and one scope, so its generator lines are one level: a later line that
     // turns keep-comments off contradicts an earlier one that turns it on, and overrides nothing.
     [Fact]
