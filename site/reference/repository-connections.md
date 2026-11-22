@@ -40,6 +40,10 @@ A [synchronous method](repositories.md#synchronous-repository-methods) gets its 
 - **The build finds a parameter that the type passes to its base type, or uses to initialize a field or property, only when you mark it.**  The methods would keep a second copy of it, and the compiler warns of that (CS9107, CS9124).
 - **`[SqlSourceConnection]` marks the source.**  You can mark a field, a property, a method or a primary-constructor parameter, of any of the four kinds in the table.  You can also mark a member of a [factory type](#held-factory), or a [static member](#static-connection) of any type of your project.
 - **Once one member is marked, only marked members count.**  The build then finds no member of the repository by its name or type.  A factory or a static member of the project still gives the connection of a database that no marked member is for.
+- **The build uses a member of a base type when the generated code reaches that member by its name, as in C#.**  A member of the repository, or of a base type between them, can hide it.  A member that the repository cannot reach, such as a `private` member of a base type between them, hides nothing.
+  - A method hides a base method of the same parameters.  It also hides one whose call it accepts.  So `Open(int retries)` leaves a marked `Open()` in use, and `Open(int retries = 3)` hides it.
+  - A field, property or event hides a base method only when you can invoke it, as with a delegate type.
+  - Any member but a generic nested type hides a base field or property of its name.
 - **An override of a marked member is marked as the member it overrides.**
 - **A marked member that cannot give a connection is [SQLSRC032](../diagnostics.md#sqlsrc032).**  An example is a method with other parameters.  The build then does not look for the database's source in a factory or among the static members of the project.
 - **A database can have a pair of marked members when exactly one of them is a method that returns a `Task` or `ValueTask` of a connection.**  The asynchronous methods get their connection from that one.  The synchronous methods get it from the other, which can be any of the four kinds.
@@ -155,6 +159,7 @@ In this section, a *factory* is the object that the repository holds, not a mark
 - **A primary-constructor parameter is a holder only when no field or property of the type or of a base type is one.**  So `OrderRepository(IConnectionFactory connections) { private readonly IConnectionFactory _connections = connections; }` uses `_connections`.
 - **A parameter that the type passes to its base type, or uses to initialize a field or property, is not a holder.**  So `OrderRepository(IConnectionFactory connections) : RepositoryBase(connections)` uses the holder of the base type, when the type can reach one.
 - **The marked members of the factory are its instance fields, properties and methods**, and those of its base types and of the interfaces it implements, that the repository can reach.  Each is one of the four kinds of [the connection](#repository-connection), with the same rules.
+- **A member of the factory's type hides a member of its base type as a repository's member does**, by the rules of [the connection](#repository-connection).  If the holder's type is a type parameter, a member of its class constraint hides a member of its interface constraint by the same rules.
 - **A member of the factory that implements a marked member of an interface is marked as that member is, with its `Database`.**  So a holder of a class `ConnectionFactory` that implements `IConnectionFactory` finds the mark on `IConnectionFactory.OpenAsync`.  A repository that implements such an interface gets no mark from it.
 - **A marked interface member that the factory's class or struct implements explicitly, or leaves to the interface's default, is reached through the interface.**  So with `UserRepository(ConnectionFactory connections)`, where `ConnectionFactory` implements `IConnectionFactory.OpenAsync` explicitly, each method calls `((IConnectionFactory)connections).OpenAsync(cancellationToken)`.  A public member of the same name that does not implement the marked member is not marked by it.
 - **So is one whose implementation a `new` member of the factory's class hides.**  So when `ConnectionFactory : FactoryBase` declares `public new Task<DbConnection> OpenAsync(CancellationToken cancellationToken)`, over the `OpenAsync` of `FactoryBase` that implements `IConnectionFactory`, each method calls `((IConnectionFactory)connections).OpenAsync(cancellationToken)`, which runs the member of `FactoryBase`.
@@ -192,7 +197,7 @@ A marked `static` member of a type of your project gives the connection to each 
 - **A repository uses the member only when the repository can reach it.**  The build reports nothing for one that it cannot reach, such as a `private` member of another class.
 - **A `static` member of a type marked `[SqlSourceGenerate]` is that type's own, and never the source of another repository.**  A static class nested in such a type is a type of its own, and its members are static members of the project.
 - **A type marked `[SqlSourceGenerate]` whose queries have no output `repository` needs no connection.**  So the build neither uses nor reports a `static` member or a primary-constructor parameter that such a type marks.
-- **A `static` member of a repository's base type is one of the repository's own members**, as [the connection](#repository-connection) says, and never a static member of the project for that repository.  So one that a member of the same name hides is not used: see [a marked member of a base type is not found](#limit-member-of-the-same-name).  Other repositories can use it as a static member of the project.
+- **A `static` member of a repository's base type is one of the repository's own members**, as [the connection](#repository-connection) says, and never a static member of the project for that repository.  So it is not used when a member of the repository hides it, as [the connection](#repository-connection) says.  Other repositories can use it as a static member of the project.
 - **The `Database` of the mark** works as [which database a shared mark is for](#shared-marks) says.
 - **A mark that can never give a connection is [SQLSRC032](../diagnostics.md#sqlsrc032), reported once at the mark**, whether a repository needs it or not.  It is not a source.  A `static` member of a base type of a type marked `[SqlSourceGenerate]` is the exception: it is that type's own member, and each repository that derives from the base type and needs it reports it.  These are such marks:
   - a member that cannot give a connection, as on a repository;
@@ -235,16 +240,6 @@ The marks of a factory and of the static members of the project are shared: one 
 
 ## Limits
 
-<a id="limit-member-of-the-same-name"></a>
-
-### A marked member of a base type is not found
-
-**What you see.**  A repository does not use a member of its base type that you marked `[SqlSourceConnection]`, or a factory that a field or property of its base type holds.  The build reports [SQLSRC028](../diagnostics.md#sqlsrc028), or the repository's methods use another source.
-
-**Why.**  The build skips a member of a base type when the repository, or a base type between them, has a member of the same name.  It skips it even when that member is a method with other parameters, or one that the repository cannot reach, such as a `private` member of a base type between them.  So a method `Open(int retries)` of the repository hides a marked `Open()` of its base type, and a method `Connections()` hides a field `Connections` of the base type that holds a factory.
-
-**What to do.**  Give the member of the repository, or of the base type between them, another name.
-
 <a id="limit-static-member-of-the-repositorys-name"></a>
 
 ### A static member of a base type with the repository's name
@@ -254,13 +249,3 @@ The marks of a factory and of the static members of the project are shared: one 
 **Why.**  The methods reach a `static` connection source, or a `static` member that holds your factory, through the repository's name: `Sample.Sample` for a member `Sample` of the base type of `Sample`.  Inside the repository, `Sample` names the member it inherits, not the type.
 
 **What to do.**  Give the member of the base type another name.
-
-<a id="limit-type-parameter-holder"></a>
-
-### SQLSRC029 for a factory whose holder has a type parameter as its type
-
-**What you see.**  The build reports [SQLSRC029](../diagnostics.md#sqlsrc029) for two marked members of one name, though C# would call only one of them.
-
-**Why.**  The repository holds its factory in a member whose type is a type parameter.  The type parameter is constrained to a class and to an interface that the class does not implement, and each has a marked member of that name.  C# calls the class's member, but the build counts both.
-
-**What to do.**  Mark the member on one of the two types only, or give the holder the class's type.

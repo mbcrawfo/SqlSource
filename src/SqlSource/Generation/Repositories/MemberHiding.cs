@@ -25,11 +25,13 @@ internal static class MemberHiding
     }
 
     /// <summary>
-    /// Whether a member that the type can reach, of a type that derives from the member's, hides the member: a method
-    /// or an indexer hides one of its signature, a method every member of its name that is not a method, and any other
-    /// member every member of its name.  An accessor or a backing field is hidden with the member it belongs to.  Two
-    /// interfaces that neither derives from the other hide nothing of each other, so a call that both answer is
-    /// ambiguous.  Only the members of the name are looked at.
+    /// Whether a member that the type can reach, of a type that the lookup prefers to the member's, hides the member
+    /// from the read or call that a repository's method writes.  A method hides a method of its signature or whose call
+    /// it can take, and a value of its name.  A member that is not a method hides a value of its name, and a method
+    /// only when it can be invoked.  A generic nested type hides nothing, since the code names no type arguments.  An
+    /// indexer hides an indexer of its signature, and an accessor or a backing field is hidden with the member it
+    /// belongs to.  Two interfaces that neither derives from the other hide nothing of each other, so a call that both
+    /// answer is ambiguous.  Only the members of the name are looked at.
     /// </summary>
     /// <param name="member">The member.</param>
     /// <param name="declaring">The type the walk found it in.</param>
@@ -50,7 +52,7 @@ internal static class MemberHiding
         for (var index = 0; index < lookedIn.Count; index++)
         {
             var derived = lookedIn[index];
-            if (!DerivesFrom(derived, declaring))
+            if (!DerivesFrom(derived, declaring) && !IsClassOverInterface(derived, declaring))
             {
                 continue;
             }
@@ -60,7 +62,10 @@ internal static class MemberHiding
             {
                 // The member's own access and not its getter's: C# binds to a property it can reach, then fails on a
                 // getter it cannot.
-                if (Hides(named[each], hidden) && compilation.IsSymbolAccessibleWithin(named[each], type, throughType))
+                if (
+                    Hides(named[each], hidden, compilation)
+                    && compilation.IsSymbolAccessibleWithin(named[each], type, throughType)
+                )
                 {
                     return true;
                 }
@@ -71,7 +76,7 @@ internal static class MemberHiding
     }
 
     // A member that no code can name hides only its own kind: an indexer, or a destructor or operator of its signature.
-    private static bool Hides(ISymbol hiding, ISymbol hidden) =>
+    private static bool Hides(ISymbol hiding, ISymbol hidden, Compilation compilation) =>
         (hiding, hidden) switch
         {
             (IPropertySymbol { IsIndexer: true } one, IPropertySymbol { IsIndexer: true } other) => HaveOneSignature(
@@ -79,11 +84,112 @@ internal static class MemberHiding
                 other.Parameters
             ),
             (IMethodSymbol one, IMethodSymbol other) => (
-                one.CanBeReferencedByName || one.MethodKind == other.MethodKind
-            )
+                (one.CanBeReferencedByName || one.MethodKind == other.MethodKind)
                 && one.Arity == other.Arity
-                && HaveOneSignature(one.Parameters, other.Parameters),
+                && HaveOneSignature(one.Parameters, other.Parameters)
+            ) || (one.CanBeReferencedByName && TakesTheCallOf(other, one, compilation)),
+            (_, IMethodSymbol) => hiding.CanBeReferencedByName && IsInvocable(hiding),
+            (INamedTypeSymbol { Arity: > 0 }, _) => false,
             _ => hiding.CanBeReferencedByName,
+        };
+
+    // A type parameter's class constraint is preferred to its interface constraints, but for object's members.
+    private static bool IsClassOverInterface(INamedTypeSymbol derived, INamedTypeSymbol declaring) =>
+        declaring.TypeKind == TypeKind.Interface
+        && derived.TypeKind == TypeKind.Class
+        && derived.SpecialType != SpecialType.System_Object;
+
+    private static bool IsInvocable(ISymbol member) =>
+        (
+            member switch
+            {
+                IFieldSymbol field => field.Type,
+                IPropertySymbol property => property.Type,
+                IEventSymbol @event => @event.Type,
+                _ => null,
+            }
+        )?.TypeKind
+            is TypeKind.Delegate
+                or TypeKind.Dynamic
+                or TypeKind.FunctionPointer;
+
+    // Whether C# would bind the call that the build writes for the method to the overload of a more derived type: with
+    // no argument, or with the method's token, or, for a method a synchronous query can call, with default.
+    private static bool TakesTheCallOf(IMethodSymbol called, IMethodSymbol overload, Compilation compilation)
+    {
+        if (called.MethodKind != MethodKind.Ordinary || called.IsGenericMethod)
+        {
+            return false;
+        }
+
+        if (called.Parameters.IsEmpty)
+        {
+            return !overload.IsGenericMethod && overload.Parameters.All(IsOmittable);
+        }
+
+        if (
+            !ConnectionCandidateReader.TakesToken(called)
+            || overload.Parameters.IsEmpty
+            || !TakesAValue(overload.Parameters[0])
+            || !overload.Parameters.Skip(1).All(IsOmittable)
+        )
+        {
+            return false;
+        }
+
+        return TakesTheToken(overload, called.Parameters[0].Type, compilation)
+            || (!overload.IsGenericMethod && !ConnectionCandidateReader.ReturnOf(called.ReturnType).IsAsync);
+    }
+
+    private static bool IsOmittable(IParameterSymbol parameter) =>
+        (parameter.IsOptional || parameter.IsParams) && TakesAValue(parameter);
+
+    private static bool TakesAValue(IParameterSymbol parameter) =>
+        parameter.RefKind is RefKind.None or RefKind.In or RefKind.RefReadOnlyParameter;
+
+    // The token as the first argument, in the parameter's own form or as one element of a params collection.  A
+    // collection whose element type is not known counts as taking it, so that a call never binds to another method.
+    private static bool TakesTheToken(IMethodSymbol overload, ITypeSymbol token, Compilation compilation)
+    {
+        var parameter = overload.Parameters[0];
+        return Accepts(parameter.Type)
+            || (parameter.IsParams && (ElementOf(parameter.Type) is not { } element || Accepts(element)));
+
+        bool Accepts(ITypeSymbol target) =>
+            overload.IsGenericMethod
+                ? CanInfer(overload, target, token)
+                : compilation.ClassifyCommonConversion(token, target).IsImplicit;
+    }
+
+    // Whether the method's one type parameter can be inferred from the token: the parameter is the type parameter, or
+    // a generic interface of it that the token implements.  A constraint does not matter: the call binds to the
+    // overload, and fails there.
+    private static bool CanInfer(IMethodSymbol overload, ITypeSymbol target, ITypeSymbol token) =>
+        overload.Arity == 1
+        && (
+            target is ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method }
+            || (
+                target is INamedTypeSymbol { Arity: 1 } generic
+                && generic.TypeArguments[0] is ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method }
+                && token.AllInterfaces.Any(each =>
+                    SymbolEqualityComparer.Default.Equals(each.OriginalDefinition, generic.OriginalDefinition)
+                )
+            )
+        );
+
+    // The element type of a params array or collection, or null when it does not say.
+    private static ITypeSymbol? ElementOf(ITypeSymbol collection) =>
+        collection switch
+        {
+            IArrayTypeSymbol array => array.ElementType,
+            INamedTypeSymbol { IsRefLikeType: true, Arity: 1 } span => span.TypeArguments[0],
+            INamedTypeSymbol named => named
+                .AllInterfaces.Add(named)
+                .FirstOrDefault(static each =>
+                    each.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T
+                )
+                ?.TypeArguments[0],
+            _ => null,
         };
 
     // Whether the type is a class that derives from the other, or an interface that extends it, and is not it.

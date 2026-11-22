@@ -632,6 +632,174 @@ public sealed class HeldFactoryReaderTests
         shape.HeldCandidates.ShouldBeEmpty();
     }
 
+    // The generated call binds to a factory's overload that can take it, so the base's method is out of reach.
+    [Fact]
+    public void Read_FactoryMethodBesideAnOverloadThatTakesTheCall_IsNotACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public class FactoryBase
+                {
+                    [SqlSourceConnection]
+                    public DbConnection Open() => null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public int Open(int retries = 3) => retries;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
+    // An overload that takes the call hides an implementation as a new member does, so the interface still reaches it.
+    [Fact]
+    public void Read_ImplementationThatAnOverloadTakesTheCallOf_IsReachedThroughTheInterface()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public class FactoryBase : IDatabaseFactory
+                {
+                    public DbConnection Open() => null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public int Open(int retries = 3) => retries;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldHaveSingleItem().CastTypeText.ShouldBe("global::App.IDatabaseFactory");
+    }
+
+    // A call of an interface's default method passes over a class member that cannot be invoked.
+    [Fact]
+    public void Read_DefaultMemberBesideANonInvocableClassMember_IsCalledDirectly()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open() => null!;
+                }
+
+                public class FactoryBase : IDatabaseFactory
+                {
+                    public string Open => "";
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository<TFactory>(TFactory dbf)
+                    where TFactory : FactoryBase, IDatabaseFactory;
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldHaveSingleItem().CastTypeText.ShouldBeNull();
+    }
+
+    // A type parameter's class constraint hides an interface constraint's member from the call that it takes.
+    [Theory]
+    [InlineData(
+        "[SqlSourceConnection] DbConnection Open();",
+        "[SqlSourceConnection] public DbConnection Open() => null!;"
+    )]
+    [InlineData(
+        "[SqlSourceConnection] DbConnection Open();",
+        "[SqlSourceConnection] public DbConnection Open(int retries = 3) => null!;"
+    )]
+    [InlineData(
+        "[SqlSourceConnection] DbConnection Open { get; }",
+        "[SqlSourceConnection] public DbConnection Open() => null!;"
+    )]
+    [InlineData(
+        "[SqlSourceConnection] DbConnection Open();",
+        "[SqlSourceConnection] public System.Func<DbConnection> Open => null!;"
+    )]
+    public void Read_ClassConstraintsMemberThatTakesTheCall_HidesTheInterfaces(
+        string interfaceMember,
+        string classMember
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    {{interfaceMember}}
+                }
+
+                public class FactoryBase
+                {
+                    {{classMember}}
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository<TFactory>(TFactory dbf)
+                    where TFactory : FactoryBase, IDatabaseFactory;
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldHaveSingleItem().CastTypeText.ShouldBeNull();
+    }
+
+    // A class method that cannot take the call, or a value the call cannot invoke, leaves the interface's method.
+    [Theory]
+    [InlineData("[SqlSourceConnection] public DbConnection Open(int required) => null!;")]
+    [InlineData("[SqlSourceConnection] public DbConnection Open => null!;")]
+    public void Read_ClassConstraintsMemberThatCannotTakeTheCall_LeavesTheInterfaces(string classMember)
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open();
+                }
+
+                public class FactoryBase
+                {
+                    {{classMember}}
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository<TFactory>(TFactory dbf)
+                    where TFactory : FactoryBase, IDatabaseFactory;
+            }
+            """
+        );
+
+        shape.HeldCandidates.Count.ShouldBe(2);
+    }
+
     [Fact]
     public void Read_NullableStructHolder_ReadsItsValuesType()
     {
@@ -1624,7 +1792,7 @@ public sealed class HeldFactoryReaderTests
 
     // A call through the class names the member that hides the implementation of the marked interface member, which
     // is then reached through the interface, as an explicit one is: a new method of its signature, a new member of its
-    // name that is no method, a new property over a property, a new member two classes down, a new member over an
+    // name that can be invoked, a new property over a property, a new member two classes down, a new member over an
     // override of it, and a holder of a type parameter that the class constrains, alone or with the interface.  An
     // interface's default that a class member of its name hides is reached so too, though the interface constrains
     // the type parameter.  The candidate is the interface's member, located at the implementation.
@@ -1636,7 +1804,8 @@ public sealed class HeldFactoryReaderTests
     )]
     [InlineData(
         "public class FactoryBase : IDatabaseFactory { public DbConnection Open() => null!; }\n"
-            + "public sealed class DatabaseFactory : FactoryBase { public new string Open => \"\"; }",
+            + "public sealed class DatabaseFactory : FactoryBase "
+            + "{ public new System.Func<DbConnection> Open => null!; }",
         "UserRepository(DatabaseFactory dbf)"
     )]
     [InlineData(
@@ -1739,7 +1908,7 @@ public sealed class HeldFactoryReaderTests
 
                 public class FactoryBase : IDatabaseFactory
                 {
-                    public string Open => "";
+                    public System.Func<DbConnection> Open => null!;
                 }
 
                 [SqlSourceGenerate]
@@ -1754,8 +1923,9 @@ public sealed class HeldFactoryReaderTests
         candidate.CastTypeText.ShouldBe("global::App.IDatabaseFactory");
     }
 
-    // A call through the class names an implementation that only an override of it follows, or that a member it cannot
-    // reach would hide, so it is called directly: one candidate, with no cast.
+    // A call through the class names an implementation that only an override of it follows, that a member it cannot
+    // reach would hide, or that a member it cannot invoke passes over, so it is called directly: one candidate, with no
+    // cast.
     [Theory]
     [InlineData(
         "public class FactoryBase : IDatabaseFactory { public virtual DbConnection Open() => null!; }\n"
@@ -1764,6 +1934,10 @@ public sealed class HeldFactoryReaderTests
     [InlineData(
         "public class FactoryBase : IDatabaseFactory { public DbConnection Open() => null!; }\n"
             + "public sealed class DatabaseFactory : FactoryBase { private new DbConnection Open() => null!; }"
+    )]
+    [InlineData(
+        "public class FactoryBase : IDatabaseFactory { public DbConnection Open() => null!; }\n"
+            + "public sealed class DatabaseFactory : FactoryBase { public new string Open => \"\"; }"
     )]
     public void Read_ImplementationThatNoReachableNewMemberHides_IsCalledDirectly(string classes)
     {

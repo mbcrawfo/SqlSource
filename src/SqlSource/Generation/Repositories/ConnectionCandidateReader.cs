@@ -426,10 +426,7 @@ internal static class ConnectionCandidateReader
             return null;
         }
 
-        var takesToken =
-            method.Parameters.Length == 1
-            && method.Parameters[0].RefKind == RefKind.None
-            && IsNamed(method.Parameters[0].Type, ThreadingNamespace, "CancellationToken");
+        var takesToken = TakesToken(method);
         var isCallable = !method.IsGenericMethod && (method.Parameters.IsEmpty || takesToken);
         var (kind, isAsync, declared) = ReturnOf(method.ReturnType);
         return Create(
@@ -446,8 +443,14 @@ internal static class ConnectionCandidateReader
         );
     }
 
+    // Whether the method's one parameter is a CancellationToken, passed by value.
+    internal static bool TakesToken(IMethodSymbol method) =>
+        method.Parameters.Length == 1
+        && method.Parameters[0].RefKind == RefKind.None
+        && IsNamed(method.Parameters[0].Type, ThreadingNamespace, "CancellationToken");
+
     // What a method returns: a connection string, a connection, or a task of one.
-    private static (CandidateType Kind, bool IsAsync, ITypeSymbol Declared) ReturnOf(ITypeSymbol returnType)
+    internal static (CandidateType Kind, bool IsAsync, ITypeSymbol Declared) ReturnOf(ITypeSymbol returnType)
     {
         if (returnType.SpecialType == SpecialType.System_String)
         {

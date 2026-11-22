@@ -1,5 +1,6 @@
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation.Repositories;
 using SqlSource.Testing.Generator;
@@ -495,6 +496,180 @@ public sealed class ConnectionCandidateReaderTests
         shape
             .Candidates.Select(static candidate => candidate.Type)
             .ShouldBe(Enumerable.Repeat(CandidateType.Unsupported, candidates));
+    }
+
+    // The call of a base method with no parameters is Open(), which a more derived overload can take.
+    [Theory]
+    [InlineData("Open(int retries = 3)", false)]
+    [InlineData("Open(params int[] retries)", false)]
+    [InlineData("Open(in int retries = 3)", false)]
+    [InlineData("Open(int retries)", true)]
+    [InlineData("Open<T>()", true)]
+    [InlineData("Open<T>(T value = default!)", true)]
+    [InlineData("Open(ref int retries)", true)]
+    public void Read_BaseMethodBesideAnOverload_IsACandidateUnlessItTakesTheCall(string overload, bool isCandidate)
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    protected NpgsqlConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    private int {{overload}} => 0;
+                }
+            }
+            """
+        );
+
+        shape.Candidates.Count.ShouldBe(isCandidate ? 1 : 0);
+    }
+
+    // A synchronous factory is called with the method's token, and with default from a synchronous method.
+    [Theory]
+    [InlineData("Open(object value)", false)]
+    [InlineData("Open<T>(T value)", false)]
+    [InlineData("Open<T>(System.IEquatable<T> value)", false)]
+    [InlineData("Open(in CancellationToken token)", false)]
+    [InlineData("Open(CancellationToken? token)", false)]
+    [InlineData("Open(int value)", false)]
+    [InlineData("Open(params int[] values)", false)]
+    [InlineData("Open(string value, int retries = 3)", false)]
+    [InlineData("Open(ref CancellationToken token)", true)]
+    [InlineData("Open(int value, int retries)", true)]
+    [InlineData("Open<T>(System.Collections.Generic.List<T> values)", true)]
+    [InlineData("Open<T>(T? value) where T : struct", true)]
+    [InlineData("Open<T, U>(T value)", true)]
+    public void Read_SyncTokenMethodBesideAnOverload_IsACandidateUnlessItTakesTheCall(string overload, bool isCandidate)
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    protected NpgsqlConnection Open(CancellationToken cancellationToken) => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    private int {{overload}} => 0;
+                }
+            }
+            """
+        );
+
+        shape.Candidates.Count.ShouldBe(isCandidate ? 1 : 0);
+    }
+
+    // An asynchronous factory is only ever called with the method's token, which no int parameter can take.
+    [Theory]
+    [InlineData("Open(object value)", false)]
+    [InlineData("Open<T>(T value)", false)]
+    [InlineData("Open(params CancellationToken[] tokens)", false)]
+    [InlineData("Open<T>(params T[] values)", false)]
+    [InlineData("Open(params System.Collections.Generic.IEnumerable<CancellationToken> tokens)", false)]
+    [InlineData("Open(params System.ReadOnlySpan<CancellationToken> tokens)", false)]
+    [InlineData("Open(int value)", true)]
+    [InlineData("Open(params int[] values)", true)]
+    [InlineData("Open(params System.Collections.Generic.List<int> values)", true)]
+    public void Read_AsyncTokenMethodBesideAnOverload_IsACandidateUnlessItTakesTheCall(
+        string overload,
+        bool isCandidate
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    protected Task<NpgsqlConnection> Open(CancellationToken cancellationToken) => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    private int {{overload}} => 0;
+                }
+            }
+            """,
+            languageVersion: LanguageVersion.CSharp13
+        );
+
+        shape.Candidates.Count.ShouldBe(isCandidate ? 1 : 0);
+    }
+
+    // A call passes over a member that cannot be invoked, and stops at one that can.
+    [Theory]
+    [InlineData("private new int Open = 0;", true)]
+    [InlineData("private new int Open => 0;", true)]
+    [InlineData("private new class Open { }", true)]
+    [InlineData("private new System.Func<NpgsqlConnection> Open = null!;", false)]
+    [InlineData("private new System.Func<NpgsqlConnection> Open => null!;", false)]
+    [InlineData("private new dynamic Open = null!;", false)]
+    [InlineData("private new event System.Func<NpgsqlConnection> Open = null!;", false)]
+    public void Read_BaseMethodBesideAMemberThatIsNoMethod_IsACandidateUnlessItIsInvocable(
+        string member,
+        bool isCandidate
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    protected NpgsqlConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    {{member}}
+                }
+            }
+            """
+        );
+
+        shape.Candidates.Count.ShouldBe(isCandidate ? 1 : 0);
+    }
+
+    // The read names no type arguments, so a generic nested type is not what it binds to.
+    [Theory]
+    [InlineData("private class ConnectionString<T> { }", true)]
+    [InlineData("private new class ConnectionString { }", false)]
+    public void Read_BaseValueBesideANestedType_IsACandidateUnlessTheTypeIsNotGeneric(string member, bool isCandidate)
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    protected string ConnectionString { get; } = "";
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    {{member}}
+                }
+            }
+            """
+        );
+
+        shape.Candidates.Count.ShouldBe(isCandidate ? 1 : 0);
     }
 
     [Fact]
