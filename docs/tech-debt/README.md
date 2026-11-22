@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0121`
+Next id: `TD-0123`
 
 ## Active items
 
@@ -41,6 +41,8 @@ Next id: `TD-0121`
 | [TD-0114](TD-0114-generator-code-its-own-tests-do-not-check.md) | Open | 2026-11-13 | Low | 2,504 mutants of `src/SqlSource` fail no test of their own folder or are run by none, most in `MethodPlanner.cs`, `ModelReader.cs` and `ExceptionProbe.cs`, though the driver tests and the golden corpus may reach them |
 | [TD-0115](TD-0115-tool-code-its-own-tests-do-not-check.md) | Open | 2026-11-13 | Low | 1,619 mutants of `src/SqlSource.Tool`, outside `TotalFunctions.cs`, `PlanExpression*.cs` and `ExpressionProofs.Calls.cs`, fail no test of their own folder or are run by none, most in `WatchSession.cs`, `SqlServerLive.cs` and `DiagnoseRun.cs`, though the command tests and the database projects may reach them |
 | [TD-0120](TD-0120-database-tests-do-not-run-on-windows.md) | Open | 2026-11-18 | Low | The tests against a real database do not run on Windows, where the drivers' network layer differs, since GitHub's Windows runners cannot start the pinned Linux images |
+| [TD-0121](TD-0121-repository-interface-of-a-repeated-type-parameter.md) | Open | 2026-11-22 | Low | A repository whose type parameter repeats one of an outer type implements another constructed type's interface, and its generated interface raises CS0693 |
+| [TD-0122](TD-0122-model-in-a-namespace-named-await.md) | Open | 2026-11-22 | Low | A model in a namespace with a part named `await` is written without its `@`, so an asynchronous method that names it fails with CS4003 |
 
 ## Columns
 

@@ -144,3 +144,13 @@ Some queries whose output is `repository` or `methods` cannot get a method.  Giv
 
 - Give the method the connection of the driver that the wrapper holds.  For a repository, give that connection from a marked method that returns it, or as the connection that it borrows.
 - Give the query the output `models`, and send its parameters through the wrapper yourself.
+
+<a id="limit-model-namespace-await"></a>
+
+### A model in a namespace with a part named `await`
+
+**What you see.**  The build fails in a generated asynchronous method with CS4003, "'await' cannot be used as an identifier within an async method or lambda expression".
+
+**Why.**  The method names the model by its full name, and an asynchronous method cannot use `await` as a name without its `@`.
+
+**What to do.**  Give that part of the namespace another name.

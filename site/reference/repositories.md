@@ -228,3 +228,20 @@ The [collection method](collection-methods.md#collection-methods) of the query f
 - **Under any `method-type`, a token cannot be named `cancellationToken`** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A primary-constructor parameter that gives the connection cannot have that name either, under any `method-type` ([SQLSRC036](../diagnostics.md#sqlsrc036)).
 - **On PostgreSQL, a data source with `Multiplexing=true` refuses a synchronous repository method**, with `NotSupportedException`: see [what a method reads and throws](databases/postgresql/query-methods.md#method-results).
 - **On SQL Server, Microsoft.Data.SqlClient refuses the command of a synchronous method on a borrowed connection with a pending transaction**, with `InvalidOperationException`, as it refuses that of the asynchronous method.
+
+<a id="limits"></a>
+
+## Limits
+
+<a id="limit-repeated-type-parameter"></a>
+
+### A type parameter that repeats one of an outer type
+
+**What you see.**  The build warns CS0693 in the generated file of a repository such as `Outer<T>.Repo<T>`.  `Outer<int>.Repo<string>` implements `Outer<string>.IRepo<string>`, and not `Outer<int>.IRepo<string>`.
+
+**Why.**  The generated interface uses the name `T` for both type parameters, so both take the value of the inner one.
+
+**What to do.**  Do one of these:
+
+- Give the type parameter of the nested type another name.
+- Set `GenerateInterface = false` on the repository's `[SqlSourceGenerate]`.
