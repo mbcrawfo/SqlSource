@@ -249,10 +249,10 @@ The marks of a factory and of the static members of the project are shared: one 
 
 This happens only when the repository is nested in a generic type, and a `static` member gives its connection or holds its factory.
 
-**Why.**  The methods reach that member through the repository's name, such as `Sample.ConnectionString`.  A member that `Sample` inherits has the name `Sample`, so inside the repository the name means that member, not the type.  A field or property whose type is the repository itself does not cause this.
+**Why.**  The methods reach that member through the repository's name, such as `Sample.ConnectionString`.  A member that `Sample` inherits has the name `Sample`, so inside the repository the name means that member, not the type.  A field or property whose type is the repository itself does not cause this.  A repository that is not generic and is named `cancellationToken` or `parameters` is hidden in the same way, by the argument of that name.
 
 **What to do.**  Do one of these:
 
-- Give the member of the base type another name.
+- Give the member of the base type, or the repository when an argument has its name, another name.
 - Give the connection from an instance member of the repository.
 - Move the repository out of the generic type.

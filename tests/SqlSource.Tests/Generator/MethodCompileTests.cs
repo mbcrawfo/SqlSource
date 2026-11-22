@@ -1136,6 +1136,13 @@ public sealed class MethodCompileTests
             {
                 "namespace App {",
                 "}",
+                "parameters",
+                "[SqlSourceGenerate(Source = \".\")] public partial class parameters : RepositoryBase;",
+                "global::App.parameters.parameters"
+            },
+            {
+                "namespace App {",
+                "}",
                 "Sample",
                 "public partial class await { [SqlSourceGenerate(Source = \".\")] "
                     + "public partial class Sample : RepositoryBase; }",
@@ -1256,6 +1263,8 @@ public sealed class MethodCompileTests
     [InlineData("protected static event System.Action? Repo;", "Repo", "the event App.Hiding.Repo")]
     [InlineData("protected class Repo<X> { }", "Repo<U>", "the class App.Hiding.Repo<X>")]
     [InlineData("protected static void Repo<X>() { }", "Repo<U>", "the method App.Hiding.Repo<X>()")]
+    [InlineData("", "parameters", "the method argument 'parameters'")]
+    [InlineData("", "cancellationToken", "the method argument 'cancellationToken'")]
     public void Run_SimpleNameOfTheRepositoryTakenByAMember_ReportsSqlsrc039(
         string member,
         string repository,
@@ -1317,6 +1326,12 @@ public sealed class MethodCompileTests
             + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
             + "public partial class Repo<U> : Hiding; }",
         "Repo<U>.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class parameters<U> : Hiding; }",
+        "parameters<U>.Source"
     )]
     [InlineData(
         "public class Hiding : RepositoryBase { protected static void Repo() { } } "

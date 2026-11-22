@@ -148,7 +148,7 @@ internal static partial class ConnectionResolver
                 return false;
             }
 
-            if (simpleNameTakenBy is { } takenBy && IsReachedThroughTheTypesName(candidate))
+            if (TakerOfTheSimpleName(database) is { } takenBy && IsReachedThroughTheTypesName(candidate))
             {
                 var reached = candidate.Holder?.Name ?? candidate.Name;
                 if (_hiddenNames.Add(reached))
@@ -185,6 +185,21 @@ internal static partial class ConnectionResolver
             }
 
             return true;
+        }
+
+        // What the type's simple name means in a method of the database when that is not the type: a member that takes
+        // it, or an argument of the name, which a name with type arguments never is.  Only a type nested in a generic
+        // type is reached by that name.
+        private string? TakerOfTheSimpleName(NeededDatabase database)
+        {
+            if (simpleNameTakenBy is not null || !type.IsNestedInAGenericType)
+            {
+                return simpleNameTakenBy;
+            }
+
+            return type.Types[type.Types.Count - 1].Arity == 0 && IsAnArgumentsName(type.Name, database)
+                ? "the method argument '" + type.Name + "'"
+                : null;
         }
 
         // Whether a method reaches the member through the type's name: a static member of the type or of a base type,
