@@ -91,6 +91,25 @@ public sealed class PlanNodeTests
     }
 
     [Fact]
+    public void Read_ModifyTable_HasItsOperationAndItsConflictResolution()
+    {
+        const string Upsert = /*lang=json,strict*/
+            """[{"Plan": {"Node Type": "ModifyTable", "Operation": "Insert", "Conflict Resolution": "UPDATE"}}]""";
+
+        var root = PlanNode.Read(Upsert).ShouldNotBeNull();
+
+        root.Operation.ShouldBe(PlanOperations.Insert);
+        root.ConflictResolution.ShouldBe(PlanConflicts.Update);
+    }
+
+    // A key that is no text is no plan the reader knows.
+    [Theory]
+    [InlineData("Operation")]
+    [InlineData("Conflict Resolution")]
+    public void Read_ModifyTableKeyThatIsNoText_IsNoPlan(string key) =>
+        PlanNode.Read($$$"""[{"Plan": {"Node Type": "ModifyTable", "{{{key}}}": 1}}]""").ShouldBeNull();
+
+    [Fact]
     public void Read_NodeWithoutACommand_HasNone() => PlanNode.Read(Swapped).ShouldNotBeNull().Command.ShouldBeNull();
 
     // The key is read as present or absent: what it holds is the planner's own.

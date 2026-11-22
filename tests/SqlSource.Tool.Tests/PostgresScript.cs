@@ -157,6 +157,10 @@ internal sealed class PostgresScript
     public PostgresScript Casts(PostgresCastsAnswer answer) =>
         Answer(PostgresCallNames.Casts, SetOperationTypes.CrossFamilyPairs, answer);
 
+    // "triggers" for the target of an INSERT, answering whether a BEFORE row trigger on insert stands on it.
+    public PostgresScript Triggers(PostgresRelationName relation, PostgresTriggersAnswer answer) =>
+        Answer(PostgresCallNames.Triggers, new PostgresTriggersRequest(relation), answer);
+
     // Made when the script is whole.
     public ReplayingExchange Play() => new(_capture);
 

@@ -74,7 +74,7 @@
           "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/tableRef" }]
         },
         "plan": {
-          "description": "Provenance: whether the nullability plan walk ran. 'not-needed': no column is one a plan could answer, the query holding no word of the outer-join gate, such as LEFT or ROLLUP, and no column of no origin. 'walked': the walk read the plan. 'unavailable': there was no plan, or none the walk could use, and the log says why. 'skipped': the engine has no walk, as SQL Server. The generator never reads it.",
+          "description": "Provenance: whether the nullability plan walk ran. 'not-needed': no column is one a plan could answer: the query holds no word of the outer-join gate, such as LEFT or ROLLUP, and either its columns are one relation's whole list or it has no column of no origin, no column of a view and no nullable column an INSERT may have written. 'walked': the walk read the plan. 'unavailable': there was no plan, or none the walk could use, and the log says why. 'skipped': the engine has no walk, as SQL Server. The generator never reads it.",
           "type": "string",
           "enum": ["not-needed", "walked", "unavailable", "skipped"]
         },

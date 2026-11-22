@@ -88,6 +88,10 @@ internal sealed record WalkOutcome(
 /// (<see cref="Statements.ValuesStatement" />), or null for any other statement.  It answers a column only for a plan
 /// that is a <c>Values Scan</c> under nodes that never project.
 /// </param>
+/// <param name="WrittenValuesStand">
+/// Whether a value a root <c>INSERT</c> writes is the value its <c>RETURNING</c> list returns: <c>triggers</c> found no
+/// <c>BEFORE</c> row trigger on the target or on a partition of it.
+/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
@@ -98,7 +102,8 @@ internal sealed record WalkScope(
     bool DistrustsJoinReduction = false,
     bool NoCastAcrossFamilies = false,
     int ParameterCount = 0,
-    IReadOnlyList<bool>? ValuesNeverNull = null
+    IReadOnlyList<bool>? ValuesNeverNull = null,
+    bool WrittenValuesStand = false
 );
 
 /// <summary>
@@ -190,6 +195,7 @@ internal static partial class NullabilityWalk
             fits && !instances.HasSetOperation ? new Expressions(plans, root, instances, onlyAlias) : null;
 
         var valuesNeverNull = ValuesColumnsOf(root, entries, columns.Count, scope);
+        var listsARelation = PostgresTableMatcher.ListsARelation(columns, origins);
         var walked = new List<WalkedColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
         {
@@ -204,6 +210,17 @@ internal static partial class NullabilityWalk
                         entries[index]
                     ),
                     null => ExpressionOf(columns[index], entries[index], type, expressions),
+                    { } origin
+                        when !listsARelation
+                            && (
+                                IsProvedViewColumn(root, origin, entries[index], type, expressions)
+                                || WrittenValueProves(plans, root, origin, entries[index], type)
+                            ) => Answered(
+                        columns[index],
+                        false,
+                        SidecarValues.NullableSource.Expression,
+                        entries[index]
+                    ),
                     { } origin when scope.Gated => ColumnOf(
                         columns[index],
                         origin,
@@ -223,6 +240,69 @@ internal static partial class NullabilityWalk
             instances.Nodes,
             walked
         );
+    }
+
+    // A view records no NOT NULL for its column, so the entry the plan prints for it is read as a value: a column of
+    // the tables the view expands to, or an expression.  A statement that writes through a view returns what it wrote,
+    // or what an INSTEAD OF trigger or a rule made of it, so only a plan with no ModifyTable at its root is read.
+    private static bool IsProvedViewColumn(
+        PlanNode root,
+        ColumnOrigin origin,
+        string entry,
+        long type,
+        Expressions? expressions
+    ) =>
+        origin.Table.Relkind == "v"
+        && root.NodeType != PlanNodeTypes.ModifyTable
+        && expressions?.EntryProves(entry, type) == true;
+
+    /// <summary>
+    /// The table a root <c>INSERT</c> writes, or null for any other plan, and for an <c>ON CONFLICT DO UPDATE</c>,
+    /// which may return a row it did not write.
+    /// </summary>
+    public static PostgresRelationName? InsertTargetOf(PlanNode root) =>
+        root
+            is {
+                NodeType: PlanNodeTypes.ModifyTable,
+                Operation: PlanOperations.Insert,
+                Schema: { } schema,
+                RelationName: { } name,
+            }
+        && root.ConflictResolution != PlanConflicts.Update
+            ? new PostgresRelationName(schema, name)
+            : null;
+
+    // Whether the column is one of the target of a root INSERT whose value the child proves not NULL.  The child of an
+    // INSERT prints one entry for each attribute of the target, a dropped one's as NULL, so the column's number places
+    // its value.  A generated column's value is computed after it, and a statement that may name OLD returns NULL for
+    // an old row an INSERT has none of.
+    private static bool WrittenValueProves(Plans plans, PlanNode root, ColumnOrigin origin, string entry, long type)
+    {
+        if (
+            !plans.Scope.WrittenValuesStand
+            || plans.Scope.OldAndNewMayBeNamed
+            || InsertTargetOf(root) is not { } target
+            || !string.Equals(origin.Table.Schema, target.Schema, StringComparison.Ordinal)
+            || !string.Equals(origin.Table.Name, target.Name, StringComparison.Ordinal)
+            || !ColumnNullability.KeepsNotNull(origin.Table)
+            || origin.Attribute.Generated.Length > 0
+            || ColumnNullability.Of(origin, gated: false).Nullable == false
+            || OutputReference.Parse(entry) is not { } reference
+            || !string.Equals(reference.Column, origin.Attribute.Name, StringComparison.Ordinal)
+            || (reference.Alias is { } alias && !string.Equals(alias, root.Alias, StringComparison.Ordinal))
+            || root.JoinChildren.ToArray() is not [{ Output: { } values } child]
+            || origin.Attribute.Attnum < 1
+            || origin.Attribute.Attnum > values.Count
+        )
+        {
+            return false;
+        }
+
+        return plans.InstancesOf(child) is { Reason: null, HasSetOperation: false } instances
+            && new Expressions(plans, child, instances, plans.OnlyAliasOf(child), 1).EntryProves(
+                values[origin.Attribute.Attnum - 1],
+                type
+            );
     }
 
     // A plan with grouping sets answers only a column of no origin that is never NULL in any group.  A column with an

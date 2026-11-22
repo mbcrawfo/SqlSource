@@ -315,6 +315,20 @@ internal static class PostgresEvents
         );
 
     /// <summary>
+    /// The event of <c>triggers</c>: whether a <c>BEFORE INSERT</c> row trigger may change a written value, or the
+    /// error.
+    /// </summary>
+    public static void Triggers(IRunLog log, string query, PostgresTriggersAnswer answer, long durationMs) =>
+        log.Write(
+            PostgresCallNames.Triggers,
+            new("query", query),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember("anyBeforeInsert", answer.AnyBeforeInsert == true),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
     /// The events of a walk, in this order: <c>postgres.walk.node</c> for each node that was visited,
     /// <c>postgres.walk.column</c> for each column, and <c>postgres.walk</c> with the plan's value and the reason when
     /// there is one: why the plan is <c>unavailable</c>, or <c>output-differs</c> for a <c>walked</c> one.  It is the

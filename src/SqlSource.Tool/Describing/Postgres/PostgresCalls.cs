@@ -347,6 +347,20 @@ internal sealed record PostgresCastsRequest(IReadOnlyList<long> Sources, IReadOn
 /// <param name="Error">What the server said, or null.  It is logged and never reported.</param>
 internal sealed record PostgresCastsAnswer(bool? AnyCast, PostgresServerError? Error);
 
+/// <summary>The request of <c>triggers</c>.</summary>
+/// <param name="Relation">The target of the <c>INSERT</c>, a table or a partitioned table.</param>
+internal sealed record PostgresTriggersRequest(PostgresRelationName Relation);
+
+/// <summary>
+/// Whether a <c>BEFORE</c> row trigger may change a row inserted into the table, or why it is not known.
+/// </summary>
+/// <param name="AnyBeforeInsert">
+/// Whether the table, or any partition in its tree, has a <c>BEFORE INSERT</c> row trigger, enabled or not; or null
+/// with an error.
+/// </param>
+/// <param name="Error">What the server said, or null.  It is logged and never reported.</param>
+internal sealed record PostgresTriggersAnswer(bool? AnyBeforeInsert, PostgresServerError? Error);
+
 /// <summary>The request of <c>partitions</c>.</summary>
 /// <param name="Relations">
 /// The relations the members of a plan's <c>Append</c>s scan (<see cref="PlanPartitions" />), in schema and name
