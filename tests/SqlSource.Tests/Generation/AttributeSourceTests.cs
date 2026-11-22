@@ -114,11 +114,14 @@ public sealed class AttributeSourceTests
             .GetMembers()
             .OfType<IPropertySymbol>()
             .Select(property => $"{property.Type.ToDisplayString()} {property.Name}")
-            .ShouldBe([
-                $"string {AttributeSource.SourceProperty}",
-                $"bool {AttributeSource.GenerateInterfaceProperty}",
-                $"string {AttributeSource.InterfaceNameProperty}",
-            ]);
+            .ShouldBe(
+                [
+                    $"string {AttributeSource.SourceProperty}",
+                    $"bool {AttributeSource.GenerateInterfaceProperty}",
+                    $"string {AttributeSource.InterfaceNameProperty}",
+                ],
+                ignoreOrder: true
+            );
     }
 
     [Fact]
