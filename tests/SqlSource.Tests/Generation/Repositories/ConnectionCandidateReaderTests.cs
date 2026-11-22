@@ -442,18 +442,20 @@ public sealed class ConnectionCandidateReaderTests
         shape.Candidates.ShouldBeEmpty();
     }
 
-    // A property's accessor cannot be called by its name, so it hides no method that has that name.
-    [Fact]
-    public void Read_BaseMethodNamedForADerivedAccessor_IsACandidate()
+    // A property's accessor cannot be named, so it hides no method or value that has its name.
+    [Theory]
+    [InlineData("protected NpgsqlConnection get_Source() => null!;")]
+    [InlineData("protected string get_Source = \"\";")]
+    public void Read_BaseMemberNamedForADerivedAccessor_IsACandidate(string member)
     {
         var shape = RepositoryShapes.Of(
-            """
+            $$"""
             namespace App
             {
                 public abstract class RepositoryBase
                 {
                     [SqlSourceConnection]
-                    protected NpgsqlConnection get_Source() => null!;
+                    {{member}}
                 }
 
                 [SqlSourceGenerate]
@@ -531,16 +533,18 @@ public sealed class ConnectionCandidateReaderTests
         shape.Candidates.Count.ShouldBe(isCandidate ? 1 : 0);
     }
 
-    // A synchronous factory is called with the method's token, and with default from a synchronous method.
+    // A synchronous factory is called with the method's token, or a typed default, which bind alike: to a parameter
+    // that takes a CancellationToken, and never to one that only an untyped default could reach.
     [Theory]
     [InlineData("Open(object value)", false)]
     [InlineData("Open<T>(T value)", false)]
     [InlineData("Open<T>(System.IEquatable<T> value)", false)]
     [InlineData("Open(in CancellationToken token)", false)]
+    [InlineData("Open(ref readonly CancellationToken token)", false)]
     [InlineData("Open(CancellationToken? token)", false)]
-    [InlineData("Open(int value)", false)]
-    [InlineData("Open(params int[] values)", false)]
-    [InlineData("Open(string value, int retries = 3)", false)]
+    [InlineData("Open(int value)", true)]
+    [InlineData("Open(params int[] values)", true)]
+    [InlineData("Open(string value, int retries = 3)", true)]
     [InlineData("Open(ref CancellationToken token)", true)]
     [InlineData("Open(int value, int retries)", true)]
     [InlineData("Open<T>(System.Collections.Generic.List<T> values)", true)]
@@ -581,6 +585,9 @@ public sealed class ConnectionCandidateReaderTests
     [InlineData("Open(int value)", true)]
     [InlineData("Open(params int[] values)", true)]
     [InlineData("Open(params System.Collections.Generic.List<int> values)", true)]
+    [InlineData("Open(params System.ReadOnlySpan<int> values)", true)]
+    [InlineData("Open(ExplicitFromToken value)", true)]
+    [InlineData("Open(params UntypedBag values)", false)]
     public void Read_AsyncTokenMethodBesideAnOverload_IsACandidateUnlessItTakesTheCall(
         string overload,
         bool isCandidate
@@ -590,6 +597,18 @@ public sealed class ConnectionCandidateReaderTests
             $$"""
             namespace App
             {
+                public struct ExplicitFromToken
+                {
+                    public static explicit operator ExplicitFromToken(CancellationToken token) => default;
+                }
+
+                public sealed class UntypedBag : System.Collections.IEnumerable
+                {
+                    public void Add(object value) { }
+
+                    public System.Collections.IEnumerator GetEnumerator() => null!;
+                }
+
                 public abstract class RepositoryBase
                 {
                     [SqlSourceConnection]
@@ -607,6 +626,100 @@ public sealed class ConnectionCandidateReaderTests
         );
 
         shape.Candidates.Count.ShouldBe(isCandidate ? 1 : 0);
+    }
+
+    // The build writes no call of a destructor or a generic method, so no overload takes one: each is still reported.
+    [Theory]
+    [InlineData("~RepositoryBase() { }", "private int Finalize(int retries = 3) => retries;")]
+    [InlineData("protected NpgsqlConnection Open<T>() => null!;", "private int Open(int retries = 3) => retries;")]
+    public void Read_MarkedMethodThatIsNeverCalled_IsNotHiddenByAnOverload(string marked, string overload)
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    [SqlSourceConnection]
+                    {{marked}}
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    {{overload}}
+                }
+            }
+            """
+        );
+
+        shape.Candidates.ShouldHaveSingleItem().Type.ShouldBe(CandidateType.Unsupported);
+    }
+
+    // C# leaves an override out of overload resolution and looks at the virtual it overrides, so an override hides a
+    // marked method only when that virtual is declared in a type derived from the marked method's.
+    [Theory]
+    [InlineData(
+        "public abstract class RepositoryBase { [SqlSourceConnection] protected NpgsqlConnection Open() => null!; "
+            + "protected virtual int Open(int retries = 3) => 0; }",
+        "protected override int Open(int retries = 3) => 0;",
+        1
+    )]
+    [InlineData(
+        "public abstract class Lowest { protected virtual int Open(int retries = 3) => 0; }\n"
+            + "public abstract class RepositoryBase : Lowest "
+            + "{ [SqlSourceConnection] protected NpgsqlConnection Open() => null!; }",
+        "protected override int Open(int retries = 3) => 0;",
+        1
+    )]
+    [InlineData(
+        "public abstract class RepositoryBase { [SqlSourceConnection] protected NpgsqlConnection Open() => null!; "
+            + "protected virtual int Open(params int[] retries) => 0; }",
+        "protected override int Open(params int[] retries) => 0;",
+        1
+    )]
+    [InlineData(
+        "public abstract class RepositoryBase { [SqlSourceConnection] "
+            + "protected Task<NpgsqlConnection> Open(CancellationToken cancellationToken) => null!; "
+            + "protected virtual int Open(object value) => 0; }",
+        "protected override int Open(object value) => 0;",
+        1
+    )]
+    [InlineData(
+        "public abstract class RepositoryBase { [SqlSourceConnection] "
+            + "protected NpgsqlConnection Open(CancellationToken cancellationToken) => null!; "
+            + "protected virtual int Open(string value) => 0; }",
+        "protected override int Open(string value) => 0;",
+        1
+    )]
+    [InlineData(
+        "public abstract class Lowest { [SqlSourceConnection] protected NpgsqlConnection Open() => null!; }\n"
+            + "public abstract class RepositoryBase : Lowest { protected virtual int Open(int retries = 3) => 0; }",
+        "protected override int Open(int retries = 3) => 0;",
+        0
+    )]
+    public void Read_MarkedMethodBesideAnOverride_IsHiddenOnlyByAVirtualBelowIt(
+        string baseTypes,
+        string repositoryMember,
+        int candidates
+    )
+    {
+        var shape = RepositoryShapes.Of(
+            $$"""
+            namespace App
+            {
+                {{baseTypes}}
+
+                [SqlSourceGenerate]
+                public partial class UserRepository : RepositoryBase
+                {
+                    {{repositoryMember}}
+                }
+            }
+            """
+        );
+
+        shape.Candidates.Count.ShouldBe(candidates);
     }
 
     // A call passes over a member that cannot be invoked, and stops at one that can.

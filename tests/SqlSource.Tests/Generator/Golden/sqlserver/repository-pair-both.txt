@@ -89,7 +89,7 @@ namespace App
         {
             global::System.ArgumentNullException.ThrowIfNull(parameters);
             const string sql = "SELECT id, name FROM users WHERE id = @id;";
-            var connection = this.Open(default) ?? throw new global::System.InvalidOperationException("The connection source 'Open' of 'App.Sample' is null.");
+            var connection = this.Open(default(global::System.Threading.CancellationToken)) ?? throw new global::System.InvalidOperationException("The connection source 'Open' of 'App.Sample' is null.");
             using var connectionScope = connection;
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
@@ -230,7 +230,7 @@ namespace App
         {
             global::System.ArgumentNullException.ThrowIfNull(parameters);
             const string sql = "SELECT id, name FROM users WHERE id > @id;";
-            var connection = this.Open(default) ?? throw new global::System.InvalidOperationException("The connection source 'Open' of 'App.Sample' is null.");
+            var connection = this.Open(default(global::System.Threading.CancellationToken)) ?? throw new global::System.InvalidOperationException("The connection source 'Open' of 'App.Sample' is null.");
             using var connectionScope = connection;
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
@@ -363,7 +363,7 @@ namespace App
             const string sql = "SELECT id, name FROM users WHERE id > @id;";
             var ownsTransaction = global::System.Transactions.Transaction.Current is null;
             var isolationLevel = 0;
-            var connection = this.Open(default) ?? throw new global::System.InvalidOperationException("The connection source 'Open' of 'App.Sample' is null.");
+            var connection = this.Open(default(global::System.Threading.CancellationToken)) ?? throw new global::System.InvalidOperationException("The connection source 'Open' of 'App.Sample' is null.");
             using var connectionScope = connection;
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)

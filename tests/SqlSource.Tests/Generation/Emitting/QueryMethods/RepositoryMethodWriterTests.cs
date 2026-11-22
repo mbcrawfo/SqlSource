@@ -233,7 +233,8 @@ public sealed class RepositoryMethodWriterTests
         nameof(ConnectionSourceKind.ConnectionString),
         nameof(CandidateMember.Method),
         true,
-        "var connection = new global::Npgsql.NpgsqlConnection(this._dataSource(default) ?? {0});\n"
+        "var connection = new global::Npgsql.NpgsqlConnection("
+            + "this._dataSource(default(global::System.Threading.CancellationToken)) ?? {0});\n"
             + SyncConnectionScope
     )]
     [InlineData(
@@ -252,7 +253,8 @@ public sealed class RepositoryMethodWriterTests
         nameof(ConnectionSourceKind.Factory),
         nameof(CandidateMember.Method),
         true,
-        "var connection = this._dataSource(default) ?? {0};\n" + SyncConnectionScope
+        "var connection = this._dataSource(default(global::System.Threading.CancellationToken)) ?? {0};\n"
+            + SyncConnectionScope
     )]
     [InlineData(
         nameof(ConnectionSourceKind.Borrowed),

@@ -18,6 +18,8 @@ public sealed class SynchronousRepositoryTests
 {
     private const string MethodsFile = "App.Sample-Methods.g.cs";
 
+    private const string TypedDefaultCall = "this.Open(default(global::System.Threading.CancellationToken))";
+
     private const string GetUserText = "-- name: GetUser -> one\nSELECT id FROM users WHERE id = @id;\n";
 
     private const string SyncGetUser = "        public global::App.GetUserDto GetUser(\n";
@@ -92,6 +94,49 @@ public sealed class SynchronousRepositoryTests
         + declaration
         + "\n}\n";
 
+    // A marked token method of a base type, beside an overload of the repository that takes neither its token nor a
+    // typed default, is the source of each kind of method, and the call of each binds to it.
+    [Theory]
+    [InlineData("method-type=async", true, false)]
+    [InlineData("method-type=sync", false, true)]
+    [InlineData("method-type=both", true, true)]
+    public void Run_TokenSourceBesideAnOverloadOfAnotherType_IsCalledByEachKindOfMethod(
+        string parameters,
+        bool hasAsyncCall,
+        bool hasSyncCall
+    )
+    {
+        var run = RunGetUser(
+            parameters,
+            SampleOf(
+                "public partial class Sample : RepositoryBase { private int Open(int value) => value; }\n"
+                    + "public abstract class RepositoryBase { [SqlSourceConnection] "
+                    + "protected NpgsqlConnection Open(CancellationToken token) => new(); }"
+            )
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodsFile];
+        methods.Contains("this.Open(cancellationToken)", System.StringComparison.Ordinal).ShouldBe(hasAsyncCall);
+        methods.Contains(TypedDefaultCall, System.StringComparison.Ordinal).ShouldBe(hasSyncCall);
+    }
+
+    // A typed default binds to the token method where a bare one would be ambiguous with the other overload (CS0121).
+    [Fact]
+    public void Run_MethodTypeSyncWithATokenSourceBesideAnOverloadOfAReferenceType_Compiles()
+    {
+        var run = RunGetUser(
+            "method-type=sync",
+            SampleOf(
+                "public partial class Sample { [SqlSourceConnection] private NpgsqlConnection Open(CancellationToken "
+                    + "token) => new(); private int Open(string value) => 0; }"
+            )
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain(TypedDefaultCall);
+    }
+
     // Each kind of source that returns no task gives a synchronous method its connection by its synchronous form: a
     // new connection of a string, one a data source opens, a factory's, given default for its token, and a borrowed
     // one, each opened when it is closed.
@@ -113,7 +158,7 @@ public sealed class SynchronousRepositoryTests
     [InlineData(
         "public partial class Sample { [SqlSourceConnection] private NpgsqlConnection Open(CancellationToken token) "
             + "=> new(); }",
-        "var connection = this.Open(default) ?? "
+        "var connection = " + TypedDefaultCall + " ?? "
     )]
     public void Run_MethodTypeSyncWithEachSource_WritesASynchronousMethod(string declaration, string acquire)
     {
@@ -130,7 +175,7 @@ public sealed class SynchronousRepositoryTests
         methods.ShouldNotContain("Task");
         methods.ShouldNotContain("await");
         methods.ShouldNotContain("ConfigureAwait");
-        methods.ShouldNotContain("cancellationToken");
+        methods.ShouldNotContain("cancellationToken", Case.Sensitive);
         var method = MethodsOf(run).ShouldHaveSingleItem();
         method.Synchrony.ShouldBe(MethodSynchrony.Synchronous);
         _ = method.Source.ShouldNotBeNull();
@@ -189,9 +234,9 @@ public sealed class SynchronousRepositoryTests
         run.ShouldBeClean();
         var methods = run.Sources[MethodsFile];
         CountOf(methods, "this.OpenAsync(cancellationToken)").ShouldBe(1);
-        CountOf(methods, "this.Open(default)").ShouldBe(1);
+        CountOf(methods, TypedDefaultCall).ShouldBe(1);
         methods.ShouldNotContain("this.Open(cancellationToken)");
-        methods.ShouldNotContain("this.OpenAsync(default)");
+        methods.ShouldNotContain("this.OpenAsync(default");
         var planned = MethodsOf(run);
         planned.Select(method => method.Source!.MemberName).ShouldBe(["Open", "OpenAsync"]);
     }
@@ -206,9 +251,9 @@ public sealed class SynchronousRepositoryTests
         run.ShouldBeClean();
         var methods = run.Sources[MethodsFile];
         CountOf(methods, "this.OpenAsync(cancellationToken)").ShouldBe(2);
-        CountOf(methods, "this.Open(default)").ShouldBe(2);
+        CountOf(methods, TypedDefaultCall).ShouldBe(2);
         methods.ShouldNotContain("this.Open(cancellationToken)");
-        methods.ShouldNotContain("this.OpenAsync(default)");
+        methods.ShouldNotContain("this.OpenAsync(default");
         MethodsOf(run).Select(method => method.Source!.MemberName).ShouldBe(["Open", "OpenAsync", "Open", "OpenAsync"]);
     }
 

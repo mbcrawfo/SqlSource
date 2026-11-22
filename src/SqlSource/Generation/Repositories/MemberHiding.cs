@@ -76,6 +76,7 @@ internal static class MemberHiding
     }
 
     // A member that no code can name hides only its own kind: an indexer, or a destructor or operator of its signature.
+    // An override takes no call: C# leaves it out of overload resolution for the virtual it overrides, which is walked.
     private static bool Hides(ISymbol hiding, ISymbol hidden, Compilation compilation) =>
         (hiding, hidden) switch
         {
@@ -87,7 +88,7 @@ internal static class MemberHiding
                 (one.CanBeReferencedByName || one.MethodKind == other.MethodKind)
                 && one.Arity == other.Arity
                 && HaveOneSignature(one.Parameters, other.Parameters)
-            ) || (one.CanBeReferencedByName && TakesTheCallOf(other, one, compilation)),
+            ) || (one.CanBeReferencedByName && !one.IsOverride && TakesTheCallOf(other, one, compilation)),
             (_, IMethodSymbol) => hiding.CanBeReferencedByName && IsInvocable(hiding),
             (INamedTypeSymbol { Arity: > 0 }, _) => false,
             _ => hiding.CanBeReferencedByName,
@@ -114,7 +115,7 @@ internal static class MemberHiding
                 or TypeKind.FunctionPointer;
 
     // Whether C# would bind the call that the build writes for the method to the overload of a more derived type: with
-    // no argument, or with the method's token, or, for a method a synchronous query can call, with default.
+    // no argument, or with one CancellationToken, the method's or a default of its type.
     private static bool TakesTheCallOf(IMethodSymbol called, IMethodSymbol overload, Compilation compilation)
     {
         if (called.MethodKind != MethodKind.Ordinary || called.IsGenericMethod)
@@ -137,8 +138,7 @@ internal static class MemberHiding
             return false;
         }
 
-        return TakesTheToken(overload, called.Parameters[0].Type, compilation)
-            || (!overload.IsGenericMethod && !ConnectionCandidateReader.ReturnOf(called.ReturnType).IsAsync);
+        return TakesTheToken(overload, called.Parameters[0].Type, compilation);
     }
 
     private static bool IsOmittable(IParameterSymbol parameter) =>

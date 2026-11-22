@@ -22,7 +22,8 @@ internal sealed class SyncCallSpelling : CallSpelling
     public override StringBuilder AppendToken(StringBuilder builder, string token, bool afterArgument) => builder;
 
     /// <inheritdoc />
-    public override StringBuilder AppendSourceToken(StringBuilder builder, string token) => builder.Append("default");
+    public override StringBuilder AppendSourceToken(StringBuilder builder, string token) =>
+        builder.Append("default(global::System.Threading.CancellationToken)");
 
     /// <inheritdoc />
     public override StringBuilder AppendCallEnd(StringBuilder builder) => builder.Append(')');

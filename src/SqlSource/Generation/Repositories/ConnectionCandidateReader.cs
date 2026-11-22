@@ -450,7 +450,7 @@ internal static class ConnectionCandidateReader
         && IsNamed(method.Parameters[0].Type, ThreadingNamespace, "CancellationToken");
 
     // What a method returns: a connection string, a connection, or a task of one.
-    internal static (CandidateType Kind, bool IsAsync, ITypeSymbol Declared) ReturnOf(ITypeSymbol returnType)
+    private static (CandidateType Kind, bool IsAsync, ITypeSymbol Declared) ReturnOf(ITypeSymbol returnType)
     {
         if (returnType.SpecialType == SpecialType.System_String)
         {

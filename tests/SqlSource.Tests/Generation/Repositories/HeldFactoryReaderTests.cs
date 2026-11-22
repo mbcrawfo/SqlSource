@@ -660,6 +660,62 @@ public sealed class HeldFactoryReaderTests
         shape.HeldCandidates.ShouldBeEmpty();
     }
 
+    // C# leaves an override out of overload resolution, so the call still binds to the marked method.
+    [Fact]
+    public void Read_FactoryMethodBesideAnOverrideThatTakesTheCall_IsACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public class FactoryBase
+                {
+                    [SqlSourceConnection]
+                    public DbConnection Open() => null!;
+
+                    public virtual int Open(int retries = 3) => retries;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public override int Open(int retries = 3) => retries;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldHaveSingleItem().Name.ShouldBe("Open");
+    }
+
+    // object is no class constraint, so its ToString leaves an interface's member of that name to the call.
+    [Fact]
+    public void Read_InterfaceMemberNamedForAnObjectMember_StaysACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    string ToString();
+                }
+
+                public class FactoryBase;
+
+                [SqlSourceGenerate]
+                public partial class UserRepository<TFactory>(TFactory dbf)
+                    where TFactory : FactoryBase, IDatabaseFactory;
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldHaveSingleItem().Name.ShouldBe("ToString");
+    }
+
     // An overload that takes the call hides an implementation as a new member does, so the interface still reaches it.
     [Fact]
     public void Read_ImplementationThatAnOverloadTakesTheCallOf_IsReachedThroughTheInterface()
