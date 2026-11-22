@@ -226,7 +226,7 @@ public sealed class WatchSetTests
         ShouldBeForEveryKind(set, envFile, WatchEffect.Describe);
         set.Classify(Created(P("App/obj/Other.cs"))).ShouldBe(WatchEffect.None);
         set.Classify(Created(P("App/bin/Other.csproj"))).ShouldBe(WatchEffect.None);
-        set.Classify(Changed(P(".git/index"))).ShouldBe(WatchEffect.None);
+        set.Classify(Created(P("App/.git/x/New.cs"))).ShouldBe(WatchEffect.None);
         if (!path.EndsWith(".sql.json", StringComparison.Ordinal))
         {
             set.Classify(Created(beside)).ShouldBe(WatchEffect.None);
@@ -301,6 +301,7 @@ public sealed class WatchSetTests
     [InlineData("App/obj/Debug/net8.0/Generated.cs")]
     [InlineData("App/obj/App.csproj.nuget.g.props")]
     [InlineData(".git/index")]
+    [InlineData("App/.git/x/New.cs")]
     [InlineData("App/Queries/bin/New.sql")]
     public void Classify_UnderBinObjOrGit_IsNone(string path)
     {
