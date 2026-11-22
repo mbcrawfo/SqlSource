@@ -80,6 +80,7 @@ internal static class PostgresFieldRules
         PostgresCallNames.Partitions,
         PostgresCallNames.Relations,
         PostgresCallNames.Overloads,
+        PostgresCallNames.Casts,
         PostgresCallNames.Deallocate,
     ];
 

@@ -79,22 +79,22 @@ public sealed class SetOperationTests(PostgresDatabases postgres)
         (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation, NotNullSetOperation]);
 
     // The planner casts the int4 branch to the result's int8 and the plan does not print the cast; under UNION and
-    // UNION ALL the cast branch is a scan the walk does not follow, on either major.
+    // UNION ALL the cast branch is a scan whose one column is the branch's, on either major.
     [Theory]
     [InlineData("SELECT u.id FROM users u UNION ALL SELECT o.id FROM orders o")]
     [InlineData("SELECT o.id FROM orders o UNION ALL SELECT u.id FROM users u")]
     [InlineData("SELECT u.id FROM users u UNION SELECT o.id FROM orders o")]
-    public async Task DescribeAsync_UnionOfInt4AndInt8_StaysUnknown(string sql) =>
-        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin]);
+    public async Task DescribeAsync_UnionOfInt4AndInt8_IsAnswered(string sql) =>
+        (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation]);
 
     // Under INTERSECT and EXCEPT 14's flagged member is the planner's own leaf scan, followed by place; 18 prints the
-    // cast branch's scan as an input like any other, and it stays unknown.  The INTERSECT's other input, an int8
-    // that can be NULL, proves nothing.
+    // cast branch's scan as an input like any other, whose one column is the branch's.  The INTERSECT's other input, an
+    // int8 that can be NULL, proves nothing, and one input is enough.
     [Theory]
     [InlineData("SELECT u.id FROM users u INTERSECT SELECT s.big FROM samples s")]
     [InlineData("SELECT u.id FROM users u EXCEPT SELECT o.id FROM orders o")]
-    public async Task DescribeAsync_IntersectAndExceptOfACastBranch_AreAnsweredOn14AndUnknownOn18(string sql) =>
-        (await WalkedAsync(sql)).ShouldBe([postgres.Major == 14 ? NotNullSetOperation : UnknownNoOrigin]);
+    public async Task DescribeAsync_IntersectAndExceptOfACastBranch_AreAnswered(string sql) =>
+        (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation]);
 
     // An INTERSECT is proven by either input: the int8 side needs no cast.
     [Fact]

@@ -90,8 +90,10 @@ flowchart TD
     explain -->|"a plan"| partitions["partitions, when needed"]
     partitions --> relations["relations, when needed"]
     relations --> overloads["overloads, when needed"]
-    overloads --> walk["The walk"]
-    walk --> match
+    overloads --> walk["The walk, without and with the type rule"]
+    walk -->|"the two answers differ"| casts["casts"]
+    walk -->|"they agree"| match
+    casts --> match
     explain -->|"an error: logged, the heuristic stands"| match
     explain -->|"26000"| gone["SQLSRC236"]
     match --> deallocate
@@ -111,14 +113,14 @@ The steps of `DescribePreparedAsync`, in the order it runs them:
 8. **The parameters typed**, as [parameters](#parameters) says.
 9. **The columns built.**  `OuterJoinGate.IsGated` decides whether a statement with rows is gated, and each column is built with the catalog's answer or the heuristic's, as [the nullability page](postgres-nullability.md#nullability) says.  A column of a pseudo-type ends the describe.
 10. **`check`.**  Npgsql describes the SQL as generated code will send it, as [the check against Npgsql](#the-check-against-npgsql) says.
-11. **The plan.**  For a statement with rows that is gated or has a column of no origin, `explain` asks for the plan, `partitions`, `relations` and `overloads` answer what the walk needs of it, and `NullabilityWalk` walks it, as [the plan](postgres-nullability.md#the-plan) and [the plan walk](postgres-nullability.md#the-plan-walk) say.  A query that is neither asks nothing more, and pays nothing.
+11. **The plan.**  For a statement with rows that is gated or has a column of no origin, `explain` asks for the plan, `partitions`, `relations` and `overloads` answer what the walk needs of it, and `NullabilityWalk` walks it, and for a column of no origin on a session that finds `pg_catalog` first walks it again with the [type rule of a scan](postgres-nullability.md#output-entries), whose answer counts only when `casts` then finds no cast across its families, as [the plan](postgres-nullability.md#the-plan) and [the plan walk](postgres-nullability.md#the-plan-walk) say.  A query that is neither asks nothing more, and pays nothing.
 12. **The table match**, which asks nothing, as [matching a table](#matching-a-table) says.
 
 A statement without rows is `SidecarResultKind.None`, with its parameters and no columns, no table and no provenance.  What one with rows records as `plan` is in [the plan](postgres-nullability.md#the-plan).  The events each step writes, and their order, are in the remarks of [`PostgresEvents`](../../src/SqlSource.Tool/Describing/Postgres/PostgresEvents.cs).
 
 ### Calls that are not made
 
-A call is not made when it has nothing to ask: `tables` when no column names a table, `types` when there is no OID, `spellings` when there is no pair, `partitions` when the plan holds no `Append` that may scan partitions, `relations` when every column has an origin or `tables` answered every relation the plan scans, and `overloads` when every column has an origin, when the session does not find `pg_catalog` first, or when the plan prints no name of `CatalogOverloads`: a function's name followed by its parenthesis, `count` only when the parenthesis holds more than `*`, or an operator of the table between two operands.  Each of these six requests is sorted and holds each item once, so that it is the same however a query orders what it names, and a capture of the same query is the same.
+A call is not made when it has nothing to ask: `tables` when no column names a table, `types` when there is no OID, `spellings` when there is no pair, `partitions` when the plan holds no `Append` that may scan partitions, `relations` when every column has an origin or `tables` answered every relation the plan scans, and `overloads` when every column has an origin, when the session does not find `pg_catalog` first, or when the plan prints no name of `CatalogOverloads`: a function's name followed by its parenthesis, `count` only when the parenthesis holds more than `*`, or an operator of the table between two operands.  `casts` is asked only when the walk's answer differs with and without the rule that [rules an entry of a scanned plan out by its type](postgres-nullability.md#output-entries), and its one request is fixed.  Each of the other six requests is sorted and holds each item once, so that it is the same however a query orders what it names, and a capture of the same query is the same.
 
 ### Why `PREPARE`
 
@@ -163,6 +165,7 @@ The catalog calls run on the describe's connection, under the user's `search_pat
 | `partitions` | The ancestors of each relation an `Append` may scan as a partition |
 | `relations` | The relations a plan scans that `tables` did not answer, by schema and name, answered as `tables` answers |
 | `overloads` | Which of the function and operator names a plan prints a schema other than `pg_catalog` holds, or `pg_catalog` holds as an object that is not built in (an OID of `16384` or more) |
+| `casts` | Whether `pg_cast` holds a row for any of the ordered pairs of types asked, which are those of two families of `SetOperationTypes` that the walk rules out of each other |
 | `deallocate` | `DEALLOCATE` of the statement |
 
 An OID is a `long`.  A row of `types` names its members as the catalog does, `typtypmod` for the modifier a domain fixes, and its `formatType` is `format_type(oid, -1)`.  A row of `spellings` is a type, a modifier and `format_type(oid, modifier)`.  A row of `tables` names its members as the catalog does where the catalog has one word, `attnum`, `relkind`, `relhassubclass`, and `hasForeignPartition` and `hasInsteadRule`, which are no catalog columns, are named for what they say.  A column of `columns` holds Npgsql's three numbers as it gave them, undecoded, and beside them its `typeModifier`.  A row of `partitions` is a relation's schema and name and its `ancestors`, the OIDs of `pg_partition_ancestors` without itself, nearest first; a relation that is gone has no row.  The request of `overloads` is two lists of names, `functions` from `pg_proc.proname` and `operators` from `pg_operator.oprname`, and its answer is the names of each that a schema other than `pg_catalog` holds, whatever the arguments and whether or not the session's path names the schema, or that `pg_catalog` holds as an object that is not built in, of an OID of 16384 or more; an empty list means that `pg_catalog` alone holds every name asked, all of it built in, and an error leaves both lists null.  `check`'s record of a parameter holds the `bindName` as its `dataTypeName`.  The tool's own rewrite of the SQL that `check` compares with is built by `NpgsqlCheck.Read` from the query's SQL and parameters, which are its arguments, and is not a member of the request, so the requests of older captures still match.

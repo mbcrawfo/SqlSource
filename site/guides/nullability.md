@@ -142,7 +142,7 @@ On PostgreSQL, a column most often gets a nullable property when:
 - It comes from a view, whose nullability PostgreSQL does not record.
 - It is a call of a function that the full rules do not list, such as `initcap(name)`.
 - It is `sum`, `max`, `min` or `avg` with no `GROUP BY`, which is null over no rows.
-- A `WITH` query or a subquery in `FROM` computes it, such as a `count(*)`.
+- A `WITH` query or a subquery in `FROM` computes it, such as a `count(*)`, beside a column that keeps it from counting, such as a number that can be null or that the query does not read.
 
 To fix one, [say that the column is never null](#not-null).  See [Which columns can be null](../reference/databases/postgresql/nullability.md#nullability) and [the limit](../reference/databases/postgresql/nullability.md#limit-columns-treated-as-nullable).
 

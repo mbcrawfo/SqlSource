@@ -133,6 +133,44 @@ internal static partial class PlanExpression
             return CatalogForm(from, to);
         }
 
+        /// <summary>
+        /// The type of the span whether or not it is <c>NULL</c>, as
+        /// <see cref="TypeRegardlessOfNull" /> says.
+        /// </summary>
+        public long? TypeRegardless(int from, int to)
+        {
+            if (!_context.CatalogFunctions)
+            {
+                return null;
+            }
+
+            while (to - from > 2 && IsGroup(from, to) && OperatorAt(from + 1, to - 1) is null)
+            {
+                from++;
+                to--;
+            }
+
+            if (to - from >= 3 && IsWord(from, "NULL") && Is(from + 1, Kind.Cast) && IsTypeName(from + 2, to))
+            {
+                return BuiltInType(from + 2, to);
+            }
+
+            if (
+                Is(from, Kind.Open)
+                && _closes[from] is var close and >= 0
+                && close + 2 < to
+                && Is(close + 1, Kind.Cast)
+                && IsTypeName(close + 2, to)
+            )
+            {
+                return BuiltInType(close + 2, to);
+            }
+
+            return OutputReference.Parse(Text(from, to)) is { } reference
+                ? _context.ProvedTypeOf(reference)
+                : Proved(from, to);
+        }
+
         // The type of COALESCE(...), GREATEST(...) or LEAST(...), [from, to) its arguments, when it cannot be NULL:
         // the parser casts every argument to their common type, and the plan prints the casts.  The references to the
         // sides of a full join that prove it are of that type too.

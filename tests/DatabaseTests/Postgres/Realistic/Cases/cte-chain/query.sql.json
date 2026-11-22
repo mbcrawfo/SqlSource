@@ -64,8 +64,8 @@
             "schema": "pg_catalog",
             "internalName": "int8"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": null,
           "computed": null
@@ -79,8 +79,8 @@
             "schema": "pg_catalog",
             "internalName": "numeric"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": null,
           "computed": null
@@ -94,8 +94,8 @@
             "schema": "pg_catalog",
             "internalName": "timestamptz"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": null,
           "computed": null

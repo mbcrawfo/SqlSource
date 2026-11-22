@@ -230,6 +230,53 @@ internal static class ScratchSchema
     public const string DropShadowingOperators = "DROP SCHEMA IF EXISTS shadowing_operators CASCADE";
 
     /// <summary>
+    /// The schema <c>scan_columns</c>: a table <c>t</c> whose first row holds <c>NULL</c> in every column that may, a
+    /// domain, and two SQL functions the planner inlines, whose result reaches its declared <c>text</c> by an
+    /// assignment cast the plan does not print.  The text makes the schema again.
+    /// </summary>
+    public const string ScanColumns = """
+        DROP SCHEMA IF EXISTS scan_columns CASCADE;
+        CREATE SCHEMA scan_columns;
+        CREATE DOMAIN scan_columns.mail AS text;
+        CREATE TABLE scan_columns.t (
+            id integer NOT NULL,
+            n integer,
+            label text NOT NULL,
+            note text,
+            day date,
+            at timestamptz NOT NULL,
+            amount numeric NOT NULL,
+            mail scan_columns.mail,
+            big bigint NOT NULL
+        );
+        INSERT INTO scan_columns.t VALUES
+            (1, NULL, 'a', NULL, NULL, '2026-01-01', 1, NULL, 10),
+            (2, 1, 'b', 'x', '2026-01-02', '2026-01-02', 2, 'm', 20);
+        CREATE FUNCTION scan_columns.as_text() RETURNS TABLE (t text, c bigint) LANGUAGE sql STABLE AS
+            'SELECT s.n, count(*) FROM scan_columns.t s GROUP BY s.n OFFSET 0';
+        CREATE FUNCTION scan_columns.union_as_text() RETURNS TABLE (t text, i bigint) LANGUAGE sql STABLE AS
+            'SELECT s.n, s.id::bigint FROM scan_columns.t s
+            UNION ALL (SELECT s2.n, s2.id::bigint FROM scan_columns.t s2 LIMIT 5)';
+        """;
+
+    /// <summary>
+    /// On <see cref="ScanColumns" />, a user's assignment cast from <c>date</c> to <c>bigint</c>, which joins two
+    /// families of <c>SetOperationTypes</c>, and a function the planner inlines whose <c>d</c> is a nullable
+    /// <c>date</c> through it.  The cast's function is in PL/pgSQL, which the planner does not inline, so that the plan
+    /// prints the <c>date</c> alone.  Dropping the schema drops the cast with its function.
+    /// </summary>
+    public const string ScanColumnsCast = """
+        CREATE FUNCTION scan_columns.day_number(date) RETURNS bigint LANGUAGE plpgsql IMMUTABLE AS
+            'BEGIN RETURN ($1 - DATE ''2000-01-01'')::bigint; END';
+        CREATE CAST (date AS bigint) WITH FUNCTION scan_columns.day_number(date) AS ASSIGNMENT;
+        CREATE FUNCTION scan_columns.as_bigint() RETURNS TABLE (d bigint, c bigint) LANGUAGE sql STABLE AS
+            'SELECT s.day, count(*) FROM scan_columns.t s GROUP BY s.day OFFSET 0';
+        """;
+
+    /// <summary>Drops <see cref="ScanColumns" />.</summary>
+    public const string DropScanColumns = "DROP SCHEMA IF EXISTS scan_columns CASCADE";
+
+    /// <summary>
     /// The schema <c>shadowing_equals</c>, of one operator <c>=</c> on two of <paramref name="type" /> that always
     /// returns false.  On <see cref="ShadowingEqualsPath" />, Npgsql, which reads the database's types when it opens
     /// a connection by SQL that compares them with <c>=</c>, cannot read them.  CREATE OPERATOR has no OR REPLACE, so
