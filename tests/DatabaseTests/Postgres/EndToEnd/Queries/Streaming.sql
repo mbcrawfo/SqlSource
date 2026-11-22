@@ -71,7 +71,6 @@ ORDER BY n;
 -- summary: The accounts, and then a division by zero after them, which the loop throws at its end or at a break.
 -- ListThenRaise of Methods.sql, streamed: the UNION ALL sends the rows of its first branch, and then fails on the first
 -- row of the second, so the error comes after the three accounts.
--- column: id not null
 -- output-model: CollectedAccount
 (SELECT
     id,

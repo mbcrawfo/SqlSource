@@ -5,7 +5,7 @@
   "toolVersion": "fixture",
   "queries": {
     "GetUsersWithOrderStats": {
-      "hash": "babf3dabf2a5726bcca1207363ec03b1f6ee1a6dd901260588dde0a744d77a96",
+      "hash": "d48af234481bb45bb503f4460102307bbe5d1bff9a93049beba364a3f608e9b9",
       "toolVersion": "fixture",
       "database": "postgres",
       "engine": "postgres",
@@ -51,27 +51,27 @@
         },
         {
           "ordinal": 1,
-          "name": "biggest_order",
-          "type": {
-            "name": "numeric",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "numeric"
-          },
-          "nullable": null,
-          "nullableSource": "no-origin",
-          "origin": null,
-          "identity": null,
-          "computed": null
-        },
-        {
-          "ordinal": 2,
           "name": "booking_count",
           "type": {
             "name": "bigint",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "int8"
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        },
+        {
+          "ordinal": 2,
+          "name": "biggest_order",
+          "type": {
+            "name": "numeric",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "numeric"
           },
           "nullable": null,
           "nullableSource": "no-origin",

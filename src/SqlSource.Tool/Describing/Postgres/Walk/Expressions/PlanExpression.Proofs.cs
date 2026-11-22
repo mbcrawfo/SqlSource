@@ -91,7 +91,8 @@ internal static partial class PlanExpression
                     from,
                     to,
                     () =>
-                        OperatorAt(from + 1, to - 1) is null && !IsWord(from + 1, "ANY")
+                        IsComputedValue(from + 1, to - 1)
+                        || (OperatorAt(from + 1, to - 1) is null && !IsWord(from + 1, "ANY"))
                             ? Proved(from + 1, to - 1)
                             : CatalogForm(from, to)
                 );
@@ -123,6 +124,11 @@ internal static partial class PlanExpression
             if (IsCase(from, to))
             {
                 return _context.CatalogFunctions ? CaseType(from, to) : null;
+            }
+
+            if (IsComputedValue(from, to))
+            {
+                return _context.InitPlanTypeOf?.Invoke(Text(from, to));
             }
 
             if (OutputReference.Parse(Text(from, to)) is { } reference)

@@ -29,7 +29,7 @@
       "method": "prepare",
       "request": {
         "statement": "sqlsource_1",
-        "sql": "SELECT\n    u.id,\n    (SELECT max(o.total) FROM orders o WHERE o.user_id = u.id) AS biggest_order,\n    (SELECT count(*) FROM bookings) AS booking_count\nFROM users u\nWHERE u.id > $1",
+        "sql": "SELECT\n    u.id,\n    (SELECT count(*) FROM bookings) AS booking_count,\n    (SELECT max(o.total) FROM orders o WHERE o.user_id = u.id) AS biggest_order\nFROM users u\nWHERE u.id > $1",
         "types": [
           "unknown"
         ]
@@ -62,8 +62,8 @@
           },
           {
             "ordinal": 1,
-            "name": "biggest_order",
-            "typeOid": 1700,
+            "name": "booking_count",
+            "typeOid": 20,
             "tableOid": 0,
             "attributeNumber": 0,
             "length": null,
@@ -73,8 +73,8 @@
           },
           {
             "ordinal": 2,
-            "name": "booking_count",
-            "typeOid": 20,
+            "name": "biggest_order",
+            "typeOid": 1700,
             "tableOid": 0,
             "attributeNumber": 0,
             "length": null,
@@ -251,7 +251,7 @@
     {
       "method": "check",
       "request": {
-        "sql": "SELECT\n    u.id,\n    (SELECT max(o.total) FROM orders o WHERE o.user_id = u.id) AS biggest_order,\n    (SELECT count(*) FROM bookings) AS booking_count\nFROM users u\nWHERE u.id > @min_id",
+        "sql": "SELECT\n    u.id,\n    (SELECT count(*) FROM bookings) AS booking_count,\n    (SELECT max(o.total) FROM orders o WHERE o.user_id = u.id) AS biggest_order\nFROM users u\nWHERE u.id > @min_id",
         "parameters": [
           {
             "name": "min_id",
@@ -267,20 +267,20 @@
             "dataTypeName": "integer"
           },
           {
-            "name": "biggest_order",
-            "typeOid": 1700,
-            "dataTypeName": "numeric"
-          },
-          {
             "name": "booking_count",
             "typeOid": 20,
             "dataTypeName": "bigint"
+          },
+          {
+            "name": "biggest_order",
+            "typeOid": 1700,
+            "dataTypeName": "numeric"
           }
         ],
         "error": null,
         "driverError": null,
         "sent": {
-          "text": "SELECT\n    u.id,\n    (SELECT max(o.total) FROM orders o WHERE o.user_id = u.id) AS biggest_order,\n    (SELECT count(*) FROM bookings) AS booking_count\nFROM users u\nWHERE u.id > $1",
+          "text": "SELECT\n    u.id,\n    (SELECT count(*) FROM bookings) AS booking_count,\n    (SELECT max(o.total) FROM orders o WHERE o.user_id = u.id) AS biggest_order\nFROM users u\nWHERE u.id > $1",
           "parameters": [
             "min_id"
           ]
@@ -296,7 +296,7 @@
         "settings": []
       },
       "answer": {
-        "plan": "[\n  {\n    \"Plan\": {\n      \"Node Type\": \"Seq Scan\",\n      \"Parallel Aware\": false,\n      \"Async Capable\": false,\n      \"Relation Name\": \"users\",\n      \"Schema\": \"public\",\n      \"Alias\": \"u\",\n      \"Startup Cost\": 17.51,\n      \"Total Cost\": 1440.29,\n      \"Plan Rows\": 70,\n      \"Plan Width\": 44,\n      \"Disabled\": false,\n      \"Output\": [\"u.id\", \"(SubPlan 1)\", \"(InitPlan 2).col1\"],\n      \"Filter\": \"(u.id > $1)\",\n      \"Plans\": [\n        {\n          \"Node Type\": \"Aggregate\",\n          \"Strategy\": \"Plain\",\n          \"Partial Mode\": \"Simple\",\n          \"Parent Relationship\": \"InitPlan\",\n          \"Subplan Name\": \"InitPlan 2\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Startup Cost\": 17.50,\n          \"Total Cost\": 17.51,\n          \"Plan Rows\": 1,\n          \"Plan Width\": 8,\n          \"Disabled\": false,\n          \"Output\": [\"count(*)\"],\n          \"Plans\": [\n            {\n              \"Node Type\": \"Seq Scan\",\n              \"Parent Relationship\": \"Outer\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Relation Name\": \"bookings\",\n              \"Schema\": \"public\",\n              \"Alias\": \"bookings\",\n              \"Startup Cost\": 0.00,\n              \"Total Cost\": 16.00,\n              \"Plan Rows\": 600,\n              \"Plan Width\": 0,\n              \"Disabled\": false,\n              \"Output\": [\"bookings.id\", \"bookings.user_id\", \"bookings.during\", \"bookings.slots\", \"bookings.tags\"]\n            }\n          ]\n        },\n        {\n          \"Node Type\": \"Aggregate\",\n          \"Strategy\": \"Plain\",\n          \"Partial Mode\": \"Simple\",\n          \"Parent Relationship\": \"SubPlan\",\n          \"Subplan Name\": \"SubPlan 1\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Startup Cost\": 20.14,\n          \"Total Cost\": 20.15,\n          \"Plan Rows\": 1,\n          \"Plan Width\": 32,\n          \"Disabled\": false,\n          \"Output\": [\"max(o.total)\"],\n          \"Plans\": [\n            {\n              \"Node Type\": \"Seq Scan\",\n              \"Parent Relationship\": \"Outer\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Relation Name\": \"orders\",\n              \"Schema\": \"public\",\n              \"Alias\": \"o\",\n              \"Startup Cost\": 0.00,\n              \"Total Cost\": 20.12,\n              \"Plan Rows\": 4,\n              \"Plan Width\": 20,\n              \"Disabled\": false,\n              \"Output\": [\"o.id\", \"o.user_id\", \"o.total\", \"o.placed_at\", \"o.note\"],\n              \"Filter\": \"(o.user_id = u.id)\"\n            }\n          ]\n        }\n      ]\n    }\n  }\n]",
+        "plan": "[\n  {\n    \"Plan\": {\n      \"Node Type\": \"Seq Scan\",\n      \"Parallel Aware\": false,\n      \"Async Capable\": false,\n      \"Relation Name\": \"users\",\n      \"Schema\": \"public\",\n      \"Alias\": \"u\",\n      \"Startup Cost\": 17.51,\n      \"Total Cost\": 1440.29,\n      \"Plan Rows\": 70,\n      \"Plan Width\": 44,\n      \"Disabled\": false,\n      \"Output\": [\"u.id\", \"(InitPlan 1).col1\", \"(SubPlan 2)\"],\n      \"Filter\": \"(u.id > $1)\",\n      \"Plans\": [\n        {\n          \"Node Type\": \"Aggregate\",\n          \"Strategy\": \"Plain\",\n          \"Partial Mode\": \"Simple\",\n          \"Parent Relationship\": \"InitPlan\",\n          \"Subplan Name\": \"InitPlan 1\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Startup Cost\": 17.50,\n          \"Total Cost\": 17.51,\n          \"Plan Rows\": 1,\n          \"Plan Width\": 8,\n          \"Disabled\": false,\n          \"Output\": [\"count(*)\"],\n          \"Plans\": [\n            {\n              \"Node Type\": \"Seq Scan\",\n              \"Parent Relationship\": \"Outer\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Relation Name\": \"bookings\",\n              \"Schema\": \"public\",\n              \"Alias\": \"bookings\",\n              \"Startup Cost\": 0.00,\n              \"Total Cost\": 16.00,\n              \"Plan Rows\": 600,\n              \"Plan Width\": 0,\n              \"Disabled\": false,\n              \"Output\": [\"bookings.id\", \"bookings.user_id\", \"bookings.during\", \"bookings.slots\", \"bookings.tags\"]\n            }\n          ]\n        },\n        {\n          \"Node Type\": \"Aggregate\",\n          \"Strategy\": \"Plain\",\n          \"Partial Mode\": \"Simple\",\n          \"Parent Relationship\": \"SubPlan\",\n          \"Subplan Name\": \"SubPlan 2\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Startup Cost\": 20.14,\n          \"Total Cost\": 20.15,\n          \"Plan Rows\": 1,\n          \"Plan Width\": 32,\n          \"Disabled\": false,\n          \"Output\": [\"max(o.total)\"],\n          \"Plans\": [\n            {\n              \"Node Type\": \"Seq Scan\",\n              \"Parent Relationship\": \"Outer\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Relation Name\": \"orders\",\n              \"Schema\": \"public\",\n              \"Alias\": \"o\",\n              \"Startup Cost\": 0.00,\n              \"Total Cost\": 20.12,\n              \"Plan Rows\": 4,\n              \"Plan Width\": 20,\n              \"Disabled\": false,\n              \"Output\": [\"o.id\", \"o.user_id\", \"o.total\", \"o.placed_at\", \"o.note\"],\n              \"Filter\": \"(o.user_id = u.id)\"\n            }\n          ]\n        }\n      ]\n    }\n  }\n]",
         "error": null
       }
     },
