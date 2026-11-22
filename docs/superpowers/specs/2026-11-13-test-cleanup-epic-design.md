@@ -149,7 +149,7 @@ Counts are of findings.  The guard is **mutation** (the scope's run before and a
 | 57 | [tool-describing-sqlserver-strengthen](2026-11-13-test-cleanup-phase-57-tool-describing-sqlserver-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Describing/SqlServer` |  |  | 3 |  |  | mutation: `tool-describing-sqlserver` | done |
 | 58 | [tool-describing-sqlserver-mixed](2026-11-13-test-cleanup-phase-58-tool-describing-sqlserver-mixed-design.md) | `tests/SqlSource.Tool.Tests/Describing/SqlServer` | 3 |  | 2 |  |  | mutation: `tool-describing-sqlserver`; covers and run time for 1 | done |
 | 59 | [tool-dotenv-strengthen](2026-11-13-test-cleanup-phase-59-tool-dotenv-strengthen-design.md) | `tests/SqlSource.Tool.Tests/DotEnv` |  |  | 1 |  |  | mutation: `tool-dotenv` | done |
-| 60 | [tool-processes-strengthen](2026-11-13-test-cleanup-phase-60-tool-processes-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Processes` |  |  | 2 |  |  | mutation: `tool-processes` | not started |
+| 60 | [tool-processes-strengthen](2026-11-13-test-cleanup-phase-60-tool-processes-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Processes` |  |  | 2 |  |  | mutation: `tool-processes` | done |
 | 61 | [tool-projects-strengthen](2026-11-13-test-cleanup-phase-61-tool-projects-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Projects` |  |  | 3 |  |  | mutation: `tool-projects` | done |
 | 62 | [tool-reporting-strengthen](2026-11-13-test-cleanup-phase-62-tool-reporting-strengthen-design.md) | `tests/SqlSource.Tool.Tests/Reporting` |  |  | 3 |  |  | mutation: `tool-reporting` | done |
 | 63 | [tool-reporting-mixed](2026-11-13-test-cleanup-phase-63-tool-reporting-mixed-design.md) | `tests/SqlSource.Tool.Tests/Reporting` | 1 |  | 1 |  |  | mutation: `tool-reporting` | done |
