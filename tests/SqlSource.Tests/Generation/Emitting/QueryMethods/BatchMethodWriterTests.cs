@@ -412,6 +412,7 @@ public sealed class BatchMethodWriterTests
     // restore the session's level.
     [Theory]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), false)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.Serializable), false)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.Serializable), true)]
     public void Append_OffOrPostgreSql_LeavesTheSessionsLevelAlone(
         string engineName,

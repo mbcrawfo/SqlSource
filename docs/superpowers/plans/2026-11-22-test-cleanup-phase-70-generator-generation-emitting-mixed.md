@@ -22,6 +22,7 @@ Both halves of the guard ran on `cd00d105`.  `main` then moved to `4ab5c120`, wh
 Where the change goes beyond the spec's words:
 
 - **F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-08.**  Two private constants, `SqlServerBatchReadsNoRows` and `SqlServerBatchReadsRows`, name the flags of the collection method's rows, as `SqlServerReadsRows` names the query method's.
+- **F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-02.**  The finding's proposal keeps two rows and drops "the rest", but its list of rows names five of the six others and leaves out `(PostgreSql, Serializable, false)`, which no row of the rule's theory covers.  The epic's fold drops the named rows, so this row stays and the theory has three.  The guard's "after" half ran with the row gone: putting it back can only add kills, so its `compare` stands, and the test project has one test more than the 9,220 below.
 - **F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-03.**  The new assertions replace the three old ones, each of which is part of a new one's text.
 - **F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-12.**  The test now writes the plain `SqlServerStream`, since the vector column only served the text it no longer asserts.  The sentence of its comment on the row being built before the flag is set moves to `Append_SqlServerStreams_ChecksTheTransactionWhenARowFails`, whose text holds that order.
 
@@ -66,8 +67,8 @@ Where the change goes beyond the spec's words:
 - [x] **Step 1 (F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-07):** Delete `Of_QueryMethod_RestoresNoIsolation`.
 - [x] **Step 2 (F-SqlSource.Tests.Generation.Emitting-1-11):** Move `"SELECT id FROM users"` into `Escape_CharacterThatXmlCanHold_IsKept` and delete the fact.
 - [x] **Step 3 (F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-01):** Keep the rows `(On, false)` and `(Serializable, true)` of `Append_SqlServerOwnTransaction_RestoresTheSessionsLevel`.
-- [x] **Step 4 (F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-02):** Keep the rows `(SqlServer, Off, false)` and `(PostgreSql, Serializable, true)` of `Append_OffOrPostgreSql_LeavesTheSessionsLevelAlone`.
-- [x] **Step 5 (F-SqlSource.Tests.Generation.Emitting-1-04):** Add the row `"ab"`.
+- [x] **Step 4 (F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-02):** Drop the five named rows of `Append_OffOrPostgreSql_LeavesTheSessionsLevelAlone`, keeping `(SqlServer, Off, false)`, `(PostgreSql, Serializable, false)` and `(PostgreSql, Serializable, true)`.
+- [x] **Step 5 (F-SqlSource.Tests.Generation.Emitting-1-04):** Add the row `"a\uE000b"`.
 - [x] **Step 6 (F-SqlSource.Tests.Generation.Emitting-1-05):** Make `AppendMember_TextEndingInALineTerminator_EndsWithAnEmptyCommentLine` a theory over `\n`, `\r` and `\r\n`.
 - [x] **Step 7 (F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-03):** Assert the synchronous refusal, the result-set check with its `FieldCount`, and the rollback catch's `reader.Dispose();` with its throw.
 - [x] **Step 8 (F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-10):** Assert the buffer's whole declaration.
@@ -82,7 +83,7 @@ Where the change goes beyond the spec's words:
 - [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-70/generator-generation-emitting/after` (Windows): 2,206 mutants tested, 1,998 killed, 199 survived, 9 timeouts, 0 errors; 39 min 21 s.  `compare`: 2,002 detected before, 2,002 still detected, 0 lost, 0 not comparable.
 - [x] **Step 2:** Every survivor a strengthen names is `Killed`: `XmlDocWriter.cs:182:74`, `XmlDocWriter.cs:198:47`, `RowsWriter.cs:373:72` and `RowsWriter.cs:377:94`.
 - [x] **Step 3:** Hand check of F-SqlSource.Tests.Generation.Emitting.QueryMethods-1-03, which names no survivor: with `AppendCompletedTransactionCheck`, `AppendResultSetCheck` or `AppendRollbackCheck` made to write nothing, the test fails each time.
-- [x] **Step 4:** `kills` on the "after" report:
+- [x] **Step 4:** `kills` on the "after" report, in which `Append_OffOrPostgreSql_LeavesTheSessionsLevelAlone` had two rows, before its third was put back:
 
 | Test | Rows | Kills | Alone | Survivors under it |
 |----|----|----|----|----|
