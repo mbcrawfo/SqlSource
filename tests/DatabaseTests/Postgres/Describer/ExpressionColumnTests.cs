@@ -186,6 +186,64 @@ public sealed class ExpressionColumnTests(PostgresDatabases postgres)
         }
     }
 
+    // A plus calls an operator that a schema first on the path may hold, which returns NULL here.  The parser folds a
+    // minus into the constant, so it calls none.
+    [Theory]
+    [InlineData("VALUES (+1), (2)", "?")]
+    [InlineData("VALUES (-1), (2)", "n")]
+    public async Task DescribeAsync_ValuesWithASignUnderAShadowingPath_ReadsOnlyTheMinus(string sql, string expected)
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ShadowPrefixOperators);
+
+            await ProvedColumns.ShouldAnswerAsync(
+                postgres,
+                sql,
+                expected,
+                $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public"
+            );
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+        }
+    }
+
+    // With standard_conforming_strings off a backslash escapes a quote, so the server reads a NULL in the second column
+    // where the tool's lexer reads one string.  No column of a VALUES is read on such a connection.
+    [Fact]
+    public async Task DescribeAsync_ValuesWithoutStandardConformingStrings_IsNotRead() =>
+        await ProvedColumns.ShouldAnswerAsync(
+            postgres,
+            @"VALUES ('\'', NULL, ', 2, 3), (4, 5, 6) ORDER BY \'x'), ('a', 1, 'b')",
+            "???",
+            $"{postgres.ConnectionString};Options=-c standard_conforming_strings=off"
+        );
+
+    // A count(*) of a schema first on the path returns NULL, under grouping sets as anywhere.
+    [Fact]
+    public async Task DescribeAsync_CountUnderGroupingSetsShadowedOnThePath_IsNotProved()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ScanColumns);
+            await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
+
+            await ProvedColumns.ShouldAnswerAsync(
+                postgres,
+                $"SELECT count(*) AS c FROM {T} t GROUP BY ROLLUP (t.id)",
+                "?",
+                $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public"
+            );
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+            await postgres.ExecuteAsync(ScratchSchema.DropScanColumns);
+        }
+    }
+
     // Before 17 the second InitPlan's value and the statement's parameter both print $1.  The parameter holds NULL, so
     // no $k up to the statement's parameters is read as an InitPlan's, and from 17 the InitPlan prints its own name.
     [Fact]

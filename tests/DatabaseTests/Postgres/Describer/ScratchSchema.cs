@@ -84,6 +84,21 @@ internal static class ScratchSchema
         """;
 
     /// <summary>
+    /// Prefix operators <c>shadow.+</c> and <c>shadow.-</c> of an <c>integer</c> that always return <c>NULL</c>.  On a
+    /// path that names <c>shadow</c> first, <c>+1</c> calls the first, while the parser folds <c>-1</c> into a constant
+    /// and calls neither.
+    /// </summary>
+    public const string ShadowPrefixOperators = """
+        CREATE SCHEMA IF NOT EXISTS shadow;
+        CREATE OR REPLACE FUNCTION shadow.null_integer(integer) RETURNS integer
+            LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END';
+        DROP OPERATOR IF EXISTS shadow.+ (none, integer);
+        CREATE OPERATOR shadow.+ (rightarg = integer, function = shadow.null_integer);
+        DROP OPERATOR IF EXISTS shadow.- (none, integer);
+        CREATE OPERATOR shadow.- (rightarg = integer, function = shadow.null_integer);
+        """;
+
+    /// <summary>
     /// Drops the schema <c>shadow</c> with what <see cref="ShadowCount" /> and <see cref="ShadowOperators" /> made in
     /// it.  Every test that runs either runs this in a finally: while <c>shadow</c> holds a <c>count</c> or a
     /// <c>*</c>, the describer reads no <c>count(x)</c> and no range intersection of any other test.

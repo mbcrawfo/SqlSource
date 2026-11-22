@@ -11,11 +11,13 @@ namespace SqlSource.Tool.Describing.Postgres.Statements;
 /// <c>Values Scan</c> prints <c>column1</c> and nothing of what its rows hold, so they are read from the SQL.
 /// </summary>
 /// <remarks>
-/// A cell counts only as one number, with a sign or without, one string in single quotes, <c>TRUE</c> or <c>FALSE</c>.
-/// <c>NULL</c>, a parameter, a cast, an expression, a call and a string with a prefix do not, since each may be
-/// <c>NULL</c> or is not read.  What may follow the rows is <c>ORDER BY</c>, <c>LIMIT</c>, <c>OFFSET</c> or
-/// <c>FETCH</c>, which add no row, or the end of the statement.  The walk uses the answer only for a plan that is a
-/// <c>Values Scan</c> under nodes that never project.
+/// A cell counts only as one number, with a minus or without, one string in single quotes, <c>TRUE</c> or <c>FALSE</c>.
+/// The parser folds a minus into the constant, while a plus calls an operator that a schema on the search path may
+/// hold.  <c>NULL</c>, a parameter, a cast, an expression, a call and a string with a prefix do not count, since each
+/// may be <c>NULL</c> or is not read.  The text is read as a server with <c>standard_conforming_strings</c> on reads
+/// it, so the session asks only on such a connection.  What may follow the rows is <c>ORDER BY</c>, <c>LIMIT</c>,
+/// <c>OFFSET</c> or <c>FETCH</c>, which add no row, or the end of the statement.  The walk uses the answer only for a
+/// plan that is a <c>Values Scan</c> under nodes that never project.
 /// </remarks>
 internal static class ValuesStatement
 {
@@ -29,7 +31,7 @@ internal static class ValuesStatement
         Close,
         Comma,
         Semicolon,
-        Sign,
+        Minus,
         Other,
     }
 
@@ -115,7 +117,7 @@ internal static class ValuesStatement
                 case TokenKind.String:
                 case TokenKind.Comma:
                 case TokenKind.Semicolon:
-                case TokenKind.Sign:
+                case TokenKind.Minus:
                 case TokenKind.Other:
                     break;
                 default:
@@ -135,7 +137,7 @@ internal static class ValuesStatement
             [{ Kind: TokenKind.Word } word] => IsNumber(word.Text)
                 || IsKeyword(word, "TRUE")
                 || IsKeyword(word, "FALSE"),
-            [{ Kind: TokenKind.Sign }, { Kind: TokenKind.Word } number] => IsNumber(number.Text),
+            [{ Kind: TokenKind.Minus }, { Kind: TokenKind.Word } number] => IsNumber(number.Text),
             _ => false,
         };
 
@@ -254,7 +256,7 @@ internal static class ValuesStatement
                             ')' => TokenKind.Close,
                             ',' => TokenKind.Comma,
                             ';' => TokenKind.Semicolon,
-                            '+' or '-' => TokenKind.Sign,
+                            '-' => TokenKind.Minus,
                             _ => TokenKind.Other,
                         },
                         character.ToString()

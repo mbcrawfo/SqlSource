@@ -12,7 +12,7 @@ public sealed class ValuesStatementTests
     [InlineData("VALUES (1)", new[] { true })]
     [InlineData("values (1, 'a'), (2, 'b')", new[] { true, true })]
     [InlineData(
-        "VALUES (1.5, -2, +3, .5, 1., 1e5, TRUE, false)",
+        "VALUES (1.5, -2, 3, .5, 1., 1e5, TRUE, false)",
         new[] { true, true, true, true, true, true, true, true }
     )]
     [InlineData("-- name: X\nVALUES /* c */ (1), -- d\n(2);", new[] { true })]
@@ -38,6 +38,7 @@ public sealed class ValuesStatementTests
     [InlineData("VALUES ('a' 'b', 1)", new[] { false, true })]
     [InlineData("VALUES ($$a$$, 1)", new[] { false, true })]
     [InlineData("VALUES (\"a\", 1)", new[] { false, true })]
+    [InlineData("VALUES (+1, 1)", new[] { false, true })]
     [InlineData("VALUES (- - 1, 1)", new[] { false, true })]
     [InlineData("VALUES (-'1', 1)", new[] { false, true })]
     [InlineData("VALUES (1.2.3, 1)", new[] { false, true })]

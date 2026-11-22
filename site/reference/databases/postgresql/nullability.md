@@ -61,8 +61,8 @@ SqlSource can tell that a column is never null when the column is one of these:
   - The window has no frame clause, or each bound of its frame is `UNBOUNDED PRECEDING`, `CURRENT ROW` or `UNBOUNDED FOLLOWING`.
   - The frame has no `EXCLUDE`.
   - Its argument is a table column or an expression of this list, and not a column of a subquery or a `WITH` query.
-- **`count(...)` or `grouping(...)` as the whole column of a query with `ROLLUP`, `CUBE` or `GROUPING SETS`.**  Each is a number in every group, the grand total included.
-- **A column of a statement that is a `VALUES` alone**, when every row holds a literal in that column: a number, a string in single quotes, `TRUE` or `FALSE`.  An `ORDER BY`, a `LIMIT`, an `OFFSET` or a `FETCH` after the rows changes nothing.
+- **`count(...)` without `OVER`, or `grouping(...)`, as the whole column of a query with `ROLLUP`, `CUBE` or `GROUPING SETS`.**  Each is a number in every group, the grand total included.
+- **A column of a statement that is a `VALUES` alone**, when every row holds a literal in that column: a number with or without a `-`, a string in single quotes, `TRUE` or `FALSE`.  An `ORDER BY`, a `LIMIT`, an `OFFSET` or a `FETCH` after the rows changes nothing.  This holds only on a connection with `standard_conforming_strings` on, which is the default.
 - **A subquery that is the whole column and returns one row**, such as `(SELECT count(*) FROM orders o WHERE o.account_id = a.id)`.  It counts only when all of these are true:
   - It has an aggregate, and no `GROUP BY`, `HAVING`, `LIMIT` or `OFFSET`.
   - Its value is `count(*)`, or arithmetic, a function or a cast of the list above over values that are never null.
@@ -152,7 +152,7 @@ SqlSource treats a column as one that can be null when one of these is true:
   - over a `UNION`, an `INTERSECT` or an `EXCEPT`, such as `count(*)` of a subquery that holds one.
 
   SqlSource can treat such a column as one that can be null even when the list above says it is never null.
-- **The query has `ROLLUP`, `CUBE` or `GROUPING SETS`.**  SqlSource treats every column of such a query as one that can be null, except a `count(...)` or a `grouping(...)` that is the whole column.
+- **The query has `ROLLUP`, `CUBE` or `GROUPING SETS`.**  SqlSource treats every column of such a query as one that can be null, except a `count(...)` without `OVER` or a `grouping(...)` that is the whole column.
 - **The query names `OLD` or `NEW`, and the column is a subquery, an `IN (SELECT ...)`, an `= ANY (SELECT ...)`, or an expression that a subquery in `FROM` or a `WITH` query computes.**  This holds even for one that the list above says is never null.
 - **The search path of the connection puts another schema before `pg_catalog`, and the column is one of these.**  This holds even for one that the list above says is never null:
   - `count(*)`, `count(x)`, a ranking, `array_agg`, a JSON builder, or a range constructor or intersection;

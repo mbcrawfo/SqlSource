@@ -28,7 +28,12 @@ public sealed class NullabilityWalkGroupingSetsTests
             HasGroupingSets = true,
         };
 
-    private static WalkOutcome RunOf(PlanNode root, CatalogNames? alone, int columnCount)
+    private static WalkOutcome RunOf(
+        PlanNode root,
+        CatalogNames? alone,
+        int columnCount,
+        bool catalogFunctionsFirst = true
+    )
     {
         var (columns, origins) = Built(true, [.. Enumerable.Repeat(Expression, columnCount)]);
         return NullabilityWalk.Run(
@@ -38,7 +43,7 @@ public sealed class NullabilityWalkGroupingSetsTests
             new WalkScope(
                 true,
                 false,
-                true,
+                catalogFunctionsFirst,
                 PostgresTables.Of(TableA, OrdersO),
                 [.. Enumerable.Repeat(BuiltInTypes.Int8, columnCount)],
                 CatalogAlone: alone
@@ -77,6 +82,16 @@ public sealed class NullabilityWalkGroupingSetsTests
         outcome.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
         AnswersOf(outcome).ShouldBe([UnknownNoOrigin]);
     }
+
+    // Where another schema comes before pg_catalog, count(*) may be that schema's.  GROUPING(...) is syntax, which no
+    // search path changes.
+    [Theory]
+    [InlineData("count(*)", false)]
+    [InlineData("count(o.quantity)", false)]
+    [InlineData("GROUPING(o.user_id)", true)]
+    public void Run_WhenPgCatalogIsNotFirst_ReadsOnlyGrouping(string entry, bool answered) =>
+        AnswersOf(RunOf(Grouped(entry), CountAlone, 1, catalogFunctionsFirst: false))
+            .ShouldBe([answered ? NotNullExpression : UnknownNoOrigin]);
 
     // A grouping column is NULL on a subtotal row, and any other value may be NULL in the empty group.
     [Theory]

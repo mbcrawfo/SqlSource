@@ -279,7 +279,9 @@ internal sealed partial class PostgresSession : DescriberSession
                     DistrustsJoinReduction: gated
                         && request.Parameters.Any(static parameter => parameter.HasNegatedUse),
                     ParameterCount: parameterOids.Count,
-                    ValuesNeverNull: ValuesStatement.NeverNullColumns(request.Sql)
+                    ValuesNeverNull: SettingOf("standard_conforming_strings") == "on"
+                        ? ValuesStatement.NeverNullColumns(request.Sql)
+                        : null
                 ),
                 cancellationToken
             );
