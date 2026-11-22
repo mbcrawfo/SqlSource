@@ -120,6 +120,19 @@ public sealed class ShadowingOperatorsCallTests(PostgresDatabases postgres)
         actual.ShouldBeEquivalentTo(expected);
     }
 
+    // The pair of integer and bigint has a row of pg_cast, which a shadowed = would not find.
+    [Fact]
+    public async Task CastsAsync_OperatorsBeforeTheCatalog_AnswersAsOnTheDefaultPath()
+    {
+        var (expected, actual) = await AnswersAsync(live =>
+            live.CastsAsync(new PostgresCastsRequest([23], [20]), TestContext.Current.CancellationToken)
+        );
+
+        expected.Error.ShouldBeNull(expected.Error?.Message);
+        expected.AnyCast.ShouldBe(true);
+        actual.ShouldBeEquivalentTo(expected);
+    }
+
     private async Task MakeTablesAsync()
     {
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);

@@ -134,6 +134,21 @@ internal static partial class PlanExpression
             : null;
 
     /// <summary>
+    /// The type of an entry whether or not it is <c>NULL</c>, or null: the type a <c>NULL::type</c> or a cast
+    /// <c>(E)::T</c> prints, when it is a built-in one, or what <see cref="ProvedTypeOf" /> reads under a context whose
+    /// <see cref="ExpressionContext.ProvedTypeOf" /> gives a reference's declared type whether or not it is proved.
+    /// Parentheses that wrap the entry whole are read through, but those of an operator.  Only where the session finds
+    /// <c>pg_catalog</c> first.
+    /// </summary>
+    /// <param name="entry">The entry as the plan prints it.</param>
+    /// <param name="context">What the walk says of the plan the entry is read in.</param>
+    /// <returns>The OID of the type, or null.</returns>
+    public static long? TypeRegardlessOfNull(string entry, ExpressionContext context) =>
+        PlanTokens.Read(entry) is { Count: > 0 } tokens
+            ? new Reader(entry, tokens, context).TypeRegardless(0, tokens.Count)
+            : null;
+
+    /// <summary>
     /// The type of an entry that is a whole constant or a form of this class whose type is fixed, or null.  The forms
     /// are those of <see cref="NullableOf(string, ExpressionContext)" /> with a type that does not depend on its
     /// arguments: a quoted literal with a cast to a built-in type, a number, <c>true</c> or <c>false</c>, a null test,

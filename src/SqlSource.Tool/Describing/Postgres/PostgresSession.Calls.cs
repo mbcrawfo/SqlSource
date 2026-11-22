@@ -124,6 +124,19 @@ internal sealed partial class PostgresSession
             cancellationToken
         );
 
+    private Task<PostgresCastsAnswer> CastsAsync(
+        string query,
+        PostgresCastsRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        AskAsync(
+            PostgresCallNames.Casts,
+            request,
+            _live.CastsAsync,
+            (asked, answer, durationMs) => PostgresEvents.Casts(_log, query, asked, answer, durationMs),
+            cancellationToken
+        );
+
     // The error of the call is logged and never reported.
     private Task<PostgresDeallocateAnswer> DeallocateAsync(
         string query,

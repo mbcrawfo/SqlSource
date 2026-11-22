@@ -149,14 +149,20 @@ public sealed class NullabilityWalkSetOperationTests
         { "unanswered-relation", Text(Scan("w", "w.name")) },
         {
             "user-subquery-scan",
-            Text(Over("Subquery Scan", Scan("u", "u.name"), "Subquery") with { Alias = "s", Output = ["s.name"] })
+            Text(
+                Over("Subquery Scan", Scan("u", "u.name", "u.email"), "Subquery") with
+                {
+                    Alias = "s",
+                    Output = ["s.name"],
+                }
+            )
         },
     };
 
     public static TheoryData<string> BranchesThatMayBeNull => [.. BranchesThatMayBeNullRows.Keys];
 
     // A NULL, a nullable column, the side a LEFT JOIN extends, a relation that "tables" and "relations" did not
-    // answer, and a user subquery's scan, which is mapped by no position.
+    // answer, and a user subquery's scan, which is mapped by no position, so that its nullable column may be the one.
     [Theory]
     [MemberData(nameof(BranchesThatMayBeNull))]
     public void Run_UnionAllWithABranchThatMayBeNull_KeepsNoOrigin(string name) =>
@@ -191,7 +197,7 @@ public sealed class NullabilityWalkSetOperationTests
                 RunSet(
                     AppendOf(
                         Scan("u", "'a'::text", "u.name"),
-                        Select(2, Scan("o", "o.label"), "'b'::text", "\"*SELECT* 2\".label")
+                        Select(2, Scan("o", "o.label", "o.note"), "'b'::text", "\"*SELECT* 2\".label")
                     ),
                     TextOid,
                     TextOid

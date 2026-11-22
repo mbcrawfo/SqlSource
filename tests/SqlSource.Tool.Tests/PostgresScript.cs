@@ -153,6 +153,10 @@ internal sealed class PostgresScript
     public PostgresScript Overloads(IReadOnlyList<string> functions, IReadOnlyList<string> operators) =>
         Overloads(new PostgresOverloadsRequest(functions, operators), new PostgresOverloadsAnswer([], [], null));
 
+    // "casts" for the pairs the walk asks about, answering whether a row joins any of them.
+    public PostgresScript Casts(PostgresCastsAnswer answer) =>
+        Answer(PostgresCallNames.Casts, SetOperationTypes.CrossFamilyPairs, answer);
+
     // Made when the script is whole.
     public ReplayingExchange Play() => new(_capture);
 

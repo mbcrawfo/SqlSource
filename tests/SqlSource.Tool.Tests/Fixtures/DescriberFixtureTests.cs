@@ -135,6 +135,7 @@ public sealed class DescriberFixtureTests : IDisposable
                     "postgres/walk-right-merge",
                     "postgres/walk-right-nestloop",
                     "postgres/walk-rollup",
+                    "postgres/walk-scan-column",
                     "postgres/walk-self-join",
                     "postgres/walk-semi-anti",
                     "postgres/walk-subquery-flattened",
