@@ -145,6 +145,51 @@ public sealed class NullabilityWalkWrittenValueTests
     public void Run_ColumnPastTheChildsValues_IsNotProved() =>
         AnswersOf(RunOf(Insert("t", ["opt", "1"], "1")))[0].ShouldBe(NullableCatalog);
 
+    // A number below 1 places no value of the child: the walk leaves the column as it was built and does not throw.
+    [Fact]
+    public void Run_ColumnBeforeTheChildsValues_IsNotProved()
+    {
+        var (columns, origins) = Built(false, Optional, Expression);
+        origins[0] = new ColumnOrigin(Table, PostgresTables.Attribute(-1, "opt", PostgresRows.Int4.Oid));
+
+        var outcome = NullabilityWalk.Run(
+            new PlanInstancesCache(Written, null),
+            columns,
+            origins,
+            new WalkScope(
+                false,
+                false,
+                true,
+                PostgresTables.Of(Table),
+                [BuiltInTypes.Int4, BuiltInTypes.Int4],
+                WrittenValuesStand: true
+            )
+        );
+
+        AnswersOf(outcome)[0].ShouldBe(NullableCatalog);
+    }
+
+    // Over a join a RETURNING list prints bare names that map to no instance, so only the name tells the column.
+    [Theory]
+    [InlineData("opt", true)]
+    [InlineData("id", false)]
+    public void Run_BareEntryOverAJoin_IsProvedOnlyForTheColumnsOwnName(string entry, bool proved)
+    {
+        var join = Join("Left", Scan("a", "a.id"), Scan("b", "b.id")) with { Output = ["1", "'x'::integer"] };
+        var root = Written with { Plans = [join with { ParentRelationship = Outer }], Output = [entry, "1"] };
+
+        AnswersOf(RunOf(root))[0].ShouldBe(proved ? NotNullExpression : NullableCatalog);
+    }
+
+    // The catalog already answers a NOT NULL column, and keeps its source.
+    [Fact]
+    public void Run_NotNullColumn_KeepsTheCatalog() =>
+        AnswersOf(RunOf(Written with { Output = ["id", "1"] }, attnum: 1))[0].ShouldBe(NotNullCatalog);
+
+    [Fact]
+    public void Run_EntryThatIsNoReference_IsNotProved() =>
+        AnswersOf(RunOf(Written with { Output = ["(opt + 1)", "1"] }))[0].ShouldBe(NullableCatalog);
+
     [Fact]
     public void InsertTargetOf_RootInsert_IsItsTable() =>
         NullabilityWalk.InsertTargetOf(Written).ShouldBe(new PostgresRelationName("public", "t"));

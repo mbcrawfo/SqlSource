@@ -43,6 +43,11 @@ public sealed class NullabilityWalkViewTests
     public void Run_EntryOfANullableColumn_KeepsTheView() =>
         AnswersOf(RunOf(Scan("t", "t.opt", "1"), Partial)).ShouldBe([UnknownView, NotNullExpression]);
 
+    // A table's NOT NULL column is the catalog's to answer, though its entry would prove it too.
+    [Fact]
+    public void Run_NotNullColumnOfATable_KeepsTheCatalog() =>
+        AnswersOf(RunOf(Scan("t", "t.id", "1"), NotNull, Expression)).ShouldBe([NotNullCatalog, NotNullExpression]);
+
     // What a statement writes through a view is not what the view's query reads.
     [Fact]
     public void Run_ViewColumnUnderARootModifyTable_KeepsTheView()
