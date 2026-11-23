@@ -9,7 +9,7 @@ namespace SqlSource.Tests;
 // of its own is in every measure.
 internal static class PooledAllocations
 {
-    private const int Iterations = 20;
+    public const int Iterations = 20;
 
     private const int Measures = 5;
 
