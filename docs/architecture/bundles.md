@@ -269,7 +269,7 @@ The vocabulary is [`postgres-vocabulary.txt`](../../src/SqlSource.Tool/Bundles/R
 | Kind | Keys | What it keeps |
 |----|----|----|
 | Structure | `Plan`, `Plans` | The nodes, each renamed |
-| Fixed | `Node Type`, `Join Type`, `Parent Relationship`, `Strategy`, `Command` | The planner's closed word |
+| Fixed | `Node Type`, `Join Type`, `Parent Relationship`, `Strategy`, `Command`, `Operation`, `Conflict Resolution` | The planner's closed word |
 | Count | `Subplans Removed` | The number; a string is refused |
 | Presence | `Grouping Sets` | One empty object for each element, since the walk reads only that it is there |
 | Name | `Alias`, `Relation Name`, `Schema`, `CTE Name` | One raw name, renamed as a catalog holds it, quoted, so that the same spelling quoted in `Output` has the same replacement: an `Alias` or a `CTE Name` an `Alias` name, a `Relation Name` a `Table` and a `Schema` a `Schema` |

@@ -102,7 +102,7 @@ internal static partial class NullabilityWalk
         }
 
         // Whether the entry is proved not NULL of a type that carries to the column's, through a scan inside it too.
-        private bool EntryProves(string entry, long columnType) =>
+        public bool EntryProves(string entry, long columnType) =>
             OutputReference.Parse(entry) is { } reference
             && InstanceOf(reference) is { Instance.Kind: InstanceKind.Plan }
                 ? ProvedThroughScan(reference, columnType)

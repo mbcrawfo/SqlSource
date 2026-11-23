@@ -133,6 +133,31 @@ public sealed class ShadowingOperatorsCallTests(PostgresDatabases postgres)
         actual.ShouldBeEquivalentTo(expected);
     }
 
+    // A trigger of a partition, which every comparison of the call's text must find.
+    [Fact]
+    public async Task TriggersAsync_OperatorsBeforeTheCatalog_AnswersAsOnTheDefaultPath()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Written);
+
+            var (expected, actual) = await AnswersAsync(live =>
+                live.TriggersAsync(
+                    new PostgresTriggersRequest(new PostgresRelationName("written", "p")),
+                    TestContext.Current.CancellationToken
+                )
+            );
+
+            expected.Error.ShouldBeNull(expected.Error?.Message);
+            expected.AnyBeforeInsert.ShouldBe(true);
+            actual.ShouldBeEquivalentTo(expected);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropWritten);
+        }
+    }
+
     private async Task MakeTablesAsync()
     {
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);

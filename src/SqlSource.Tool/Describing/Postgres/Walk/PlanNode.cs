@@ -45,6 +45,10 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// <param name="Window">
 /// <c>Window</c>, the definition of a <c>WindowAgg</c>'s window, which PostgreSQL 18 prints and 14 to 17 do not.
 /// </param>
+/// <param name="Operation"><c>Operation</c> of a <c>ModifyTable</c>: <c>Insert</c>, <c>Update</c> and the rest.</param>
+/// <param name="ConflictResolution">
+/// <c>Conflict Resolution</c> of a <c>ModifyTable</c> with <c>ON CONFLICT</c>: <c>NOTHING</c> or <c>UPDATE</c>.
+/// </param>
 internal sealed record PlanNode(
     string NodeType,
     string? JoinType,
@@ -62,7 +66,9 @@ internal sealed record PlanNode(
     bool HasFilter,
     int SubplansRemoved,
     IReadOnlyList<PlanNode> Plans,
-    string? Window = null
+    string? Window = null,
+    string? Operation = null,
+    string? ConflictResolution = null
 )
 {
     /// <summary>
@@ -195,6 +201,8 @@ internal sealed record PlanNode(
             || !TryText(element, PlanKeys.Command, out var command)
             || !TryText(element, PlanKeys.Strategy, out var strategy)
             || !TryText(element, PlanKeys.Window, out var window)
+            || !TryText(element, PlanKeys.Operation, out var operation)
+            || !TryText(element, PlanKeys.ConflictResolution, out var conflict)
             || !TryCount(element, PlanKeys.SubplansRemoved, out var removed)
             || !TryNodes(element, out var plans)
         )
@@ -221,7 +229,9 @@ internal sealed record PlanNode(
             element.TryGetProperty(PlanKeys.Filter, out _),
             removed,
             plans,
-            window
+            window,
+            operation,
+            conflict
         );
     }
 

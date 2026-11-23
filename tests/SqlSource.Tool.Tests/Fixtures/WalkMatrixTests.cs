@@ -28,9 +28,6 @@ public sealed class WalkMatrixTests
     // A column of a table whose entry of the plan cannot be mapped, or whose plan cannot be used.
     private const string Heuristic = "true heuristic";
 
-    // A column of a view that nothing extends.
-    private const string OfView = "null view";
-
     // An expression the plan does not answer.
     private const string NoOrigin = "null no-origin";
 
@@ -65,7 +62,7 @@ public sealed class WalkMatrixTests
         ["walk-cte-inlined"] = (Walked, [Kept, Joined]),
         ["walk-cte-materialized"] = (Walked, [Kept, Joined]),
         ["walk-lateral"] = (Walked, [Kept, Joined]),
-        ["walk-view"] = (Walked, [OfView, OfView, Joined, Joined, Joined]),
+        ["walk-view"] = (Walked, [Expression, Expression, Joined, Joined, Joined]),
         ["walk-view-nullable-side"] = (Walked, [Kept, Joined]),
         ["walk-using"] = (Walked, [Expression, Joined, Joined]),
         ["walk-natural"] = (Walked, [Expression, Expression, Joined, Joined]),

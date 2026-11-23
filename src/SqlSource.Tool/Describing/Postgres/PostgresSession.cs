@@ -24,10 +24,11 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// A query is described through one prepared statement: <c>PREPARE</c> takes a declared type as written, resolves
 /// it, checks it against every use of its parameter, and infers the rest.  The statement is then described through
 /// an <c>EXECUTE</c> that is never run, which gives its columns.  For a query that the outer-join gate lets in, or
-/// one with a column of no origin, an <c>EXPLAIN</c> of that <c>EXECUTE</c> under <c>force_generic_plan</c> gives
-/// the plan that <see cref="NullabilityWalk" /> walks.  Every call from <c>prepare</c> to <c>deallocate</c> runs
-/// in one transaction that <c>prepare</c> begins and <c>deallocate</c> rolls back, so that a pooler in transaction
-/// mode keeps the describe on one backend (<see cref="PostgresConnection.BeginDescribeAsync" />).  A prepared
+/// one with a column the plan may answer, of no origin, of a view or written by an <c>INSERT</c>, an <c>EXPLAIN</c> of
+/// that <c>EXECUTE</c> under <c>force_generic_plan</c> gives the plan that <see cref="NullabilityWalk" /> walks.
+/// Every call from <c>prepare</c> to <c>deallocate</c> runs in one transaction that <c>prepare</c> begins and
+/// <c>deallocate</c> rolls back, so that a pooler in transaction mode keeps the describe on one backend
+/// (<see cref="PostgresConnection.BeginDescribeAsync" />).  A prepared
 /// statement is session state and survives a rollback, so it is freed in a <c>finally</c>, inside the transaction;
 /// one left behind would be a leak until the session ends.  Its name is a counter, since the name is part of a
 /// request and a capture must be the same each time it is recorded.
@@ -38,6 +39,9 @@ internal sealed partial class PostgresSession : DescriberSession
 
     /// <summary>The oldest major version of PostgreSQL the describer supports.</summary>
     public const int MinimumMajorVersion = 14;
+
+    // The first major that refuses a partition a generated column over its parent's plain one.
+    private const int MajorOfPartitionsThatKeepWrittenValues = 16;
 
     private readonly string _database;
     private readonly IRunLog _log;
@@ -163,11 +167,12 @@ internal sealed partial class PostgresSession : DescriberSession
     // What is asked of a statement that was prepared, in this order: its columns, the tables they name, and every
     // type that the parameters, the columns and their origins have, once; the server's spelling of each type with
     // each modifier the built types need, once; Npgsql's own reading of the SQL; and, for a query with rows that is
-    // gated or has a column of no origin, its generic plan, then the ancestors of the relations an Append of the plan
-    // may scan as partitions, and, for a column of no origin, the relations the plan scans that "tables" did not
-    // answer and which of the names of CatalogOverloads the plan prints another schema holds, or pg_catalog holds as
-    // an object that is not built in, and, when it changes an answer, whether any cast joins two families of
-    // SetOperationTypes.
+    // gated or has a column the plan may answer, of no origin, of a view or written by an INSERT, its generic plan,
+    // then the ancestors of the relations an Append of the plan may scan as partitions, and, for such a column, the
+    // relations the plan scans that "tables" did not answer and which of the names of CatalogOverloads the plan prints
+    // another schema holds, or pg_catalog holds as an object that is not built in, and, when it changes an answer,
+    // whether any cast joins two families of SetOperationTypes and whether a BEFORE row trigger can change a value an
+    // INSERT writes.
     // The table match is made last and asks nothing: it reads the nullability the walk set.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
@@ -262,10 +267,10 @@ internal sealed partial class PostgresSession : DescriberSession
             return Failed(differs);
         }
 
-        // After the check, for a gated query and for one with a column of no origin, which the plan may answer: one
-        // whose every column is a table's or a view's and that is not gated pays nothing.
+        // After the check, for a gated query and for one with a column the plan may answer (NeedsThePlan): any other
+        // query, a relation's whole column list among them, pays nothing.
         WalkOutcome? walked = null;
-        if (gated || (columns.Count > 0 && origins.Any(static origin => origin is null)))
+        if (gated || NeedsThePlan(request.Sql, built.Value, origins))
         {
             var walk = await WalkAsync(
                 request,
@@ -276,12 +281,13 @@ internal sealed partial class PostgresSession : DescriberSession
                     PostgresSearchPath.PutsCatalogFirst(SettingOf("search_path")),
                     tables.Value,
                     ColumnTypes: [.. columns.Select(static column => column.TypeOid)],
-                    DistrustsJoinReduction: gated
-                        && request.Parameters.Any(static parameter => parameter.HasNegatedUse),
+                    DistrustsJoinReduction: request.Parameters.Any(static parameter => parameter.HasNegatedUse),
                     ParameterCount: parameterOids.Count,
                     ValuesNeverNull: SettingOf("standard_conforming_strings") == "on"
                         ? ValuesStatement.NeverNullColumns(request.Sql)
-                        : null
+                        : null,
+                    PartitionsKeepWrittenValues: Versions.LeadingMajor(Server.Version)
+                        >= MajorOfPartitionsThatKeepWrittenValues
                 ),
                 cancellationToken
             );
@@ -299,6 +305,22 @@ internal sealed partial class PostgresSession : DescriberSession
         var match = MatchOf(request, recorded, origins);
         return Described(parameters.Value, recorded, walked?.Plan ?? SidecarValues.Plan.NotNeeded, match);
     }
+
+    // Whether a query that is not gated has a column the plan may answer: one of no origin, one of a view, or a
+    // nullable column of a table that an INSERT may have written a value into.  A relation's whole column list keeps
+    // the relation's answers, so that it keeps the model named after the relation.
+    private static bool NeedsThePlan(string sql, IReadOnlyList<SidecarColumn> columns, ColumnOrigin?[] origins) =>
+        !PostgresTableMatcher.ListsARelation(columns, origins)
+        && (
+            origins.Any(ReadsAnEntry)
+            || (
+                OuterJoinGate.NamesInsert(sql)
+                && origins.Where((origin, index) => origin is not null && columns[index].Nullable != false).Any()
+            )
+        );
+
+    // Whether the column is answered from its entry of the plan's root: one of no origin, or of a view.
+    private static bool ReadsAnEntry(ColumnOrigin? origin) => origin is null or { Table.Relkind: "v" };
 
     // A setting as "open" read it, or null.
     private string? SettingOf(string name) =>
@@ -343,11 +365,13 @@ internal sealed partial class PostgresSession : DescriberSession
         {
             var partitions = await PartitionsOfAsync(request, root, cancellationToken);
             var cache = new PlanInstancesCache(root, partitions, scope.DistrustsJoinReduction);
-            var relations = await RelationsOfAsync(request, root, origins, scope.Tables, cancellationToken);
-            var alone = await OverloadsOfAsync(request, root, origins, scope, cancellationToken);
+            var target = NullabilityWalk.InsertTargetOf(root);
+            var readsValues = target is not null || origins.Any(ReadsAnEntry);
+            var relations = await RelationsOfAsync(request, root, readsValues, scope.Tables, cancellationToken);
+            var alone = await OverloadsOfAsync(request, root, readsValues, scope, cancellationToken);
             var read = scope with { Tables = relations, CatalogAlone = alone };
             outcome = NullabilityWalk.Run(cache, columns, origins, read);
-            if (scope.CatalogFunctionsFirst && origins.Any(static origin => origin is null))
+            if (scope.CatalogFunctionsFirst && readsValues)
             {
                 var typed = NullabilityWalk.Run(cache, columns, origins, read with { NoCastAcrossFamilies = true });
                 if (
@@ -357,6 +381,22 @@ internal sealed partial class PostgresSession : DescriberSession
                 )
                 {
                     outcome = typed;
+                    read = read with { NoCastAcrossFamilies = true };
+                }
+            }
+
+            // A value the INSERT writes stands only where no BEFORE row trigger can change it, which is asked only
+            // when it would change an answer.
+            if (target is not null)
+            {
+                var written = NullabilityWalk.Run(cache, columns, origins, read with { WrittenValuesStand = true });
+                if (
+                    !NullabilityWalk.SameAnswers(outcome, written)
+                    && await TriggersAsync(request.Name, new PostgresTriggersRequest(target), cancellationToken)
+                        is { Error: null, AnyBeforeInsert: false }
+                )
+                {
+                    outcome = written;
                 }
             }
         }
@@ -393,17 +433,18 @@ internal sealed partial class PostgresSession : DescriberSession
 
     // The tables of "tables" with a row of "relations" for each relation the plan scans that "tables" did not
     // answer, for the walk to prove a reference inside an expression and to read a set operation's branches.  It is
-    // asked whenever a column has no origin and a relation is left to ask for.  An error is logged and never reported:
+    // asked whenever the walk reads a value, of a column of no origin or a view's or one an INSERT writes, and a
+    // relation is left to ask for.  An error is logged and never reported:
     // the walk goes on with the rows of "tables" alone.
     private async Task<IReadOnlyDictionary<long, PostgresTableRow>> RelationsOfAsync(
         DescribeRequest request,
         PlanNode root,
-        ColumnOrigin?[] origins,
+        bool readsValues,
         IReadOnlyDictionary<long, PostgresTableRow> tables,
         CancellationToken cancellationToken
     )
     {
-        if (!origins.Any(static origin => origin is null))
+        if (!readsValues)
         {
             return tables;
         }
@@ -426,22 +467,18 @@ internal sealed partial class PostgresSession : DescriberSession
     }
 
     // The names of CatalogOverloads that the plan prints and that "overloads" answered no schema but pg_catalog holds,
-    // and pg_catalog holds only as built-in objects, for the walk to read them by their name.  It is asked only when a
-    // column has no origin, the session finds pg_catalog first, and the plan prints such a name, and nothing is held
+    // and pg_catalog holds only as built-in objects, for the walk to read them by their name.  It is asked only when
+    // the walk reads a value, the session finds pg_catalog first, and the plan prints such a name, and nothing is held
     // alone otherwise.  An error is logged and never reported: every name asked is then held elsewhere.
     private async Task<CatalogNames> OverloadsOfAsync(
         DescribeRequest request,
         PlanNode root,
-        ColumnOrigin?[] origins,
+        bool readsValues,
         WalkScope scope,
         CancellationToken cancellationToken
     )
     {
-        if (
-            !origins.Any(static origin => origin is null)
-            || !scope.CatalogFunctionsFirst
-            || CatalogOverloads.RequestOf(root) is not { } asked
-        )
+        if (!readsValues || !scope.CatalogFunctionsFirst || CatalogOverloads.RequestOf(root) is not { } asked)
         {
             return CatalogNames.None;
         }

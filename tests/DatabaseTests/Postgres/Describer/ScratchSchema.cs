@@ -299,6 +299,79 @@ internal static class ScratchSchema
     public const string DropScanColumns = "DROP SCHEMA IF EXISTS scan_columns CASCADE";
 
     /// <summary>
+    /// The schema <c>written</c>: tables an <c>INSERT</c> writes, each with what may change the row it returns, and
+    /// views over <c>src</c>, a table whose first row holds <c>NULL</c> in <c>note</c>.  The text makes the schema
+    /// again.
+    /// </summary>
+    public const string Written = """
+        DROP SCHEMA IF EXISTS written CASCADE;
+        CREATE SCHEMA written;
+        CREATE TABLE written.src (id integer NOT NULL, label text NOT NULL, note text);
+        INSERT INTO written.src VALUES (1, 'a', NULL), (2, 'b', 'x');
+        CREATE TABLE written.t (
+            id integer PRIMARY KEY,
+            a text,
+            b text DEFAULT 'x',
+            c text DEFAULT NULL,
+            g text GENERATED ALWAYS AS (NULLIF(a, 'v')) STORED
+        );
+        INSERT INTO written.t (id, a) VALUES (1, 'old');
+        CREATE TABLE written.gone (a integer, dropped integer, b text);
+        ALTER TABLE written.gone DROP COLUMN dropped;
+        CREATE FUNCTION written.to_null() RETURNS trigger LANGUAGE plpgsql AS
+            'BEGIN NEW.a := NULL; RETURN NEW; END';
+        CREATE FUNCTION written.nothing() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END';
+        CREATE TABLE written.fired (id integer, a text);
+        CREATE TRIGGER nulls BEFORE INSERT ON written.fired FOR EACH ROW EXECUTE FUNCTION written.to_null();
+        CREATE TABLE written.disabled (id integer, a text);
+        CREATE TRIGGER nulls BEFORE INSERT ON written.disabled FOR EACH ROW EXECUTE FUNCTION written.to_null();
+        ALTER TABLE written.disabled DISABLE TRIGGER nulls;
+        CREATE TABLE written.after_insert (id integer, a text);
+        CREATE TRIGGER nulls AFTER INSERT ON written.after_insert FOR EACH ROW EXECUTE FUNCTION written.to_null();
+        CREATE TABLE written.per_statement (id integer, a text);
+        CREATE TRIGGER none BEFORE INSERT ON written.per_statement FOR EACH STATEMENT
+            EXECUTE FUNCTION written.nothing();
+        CREATE TABLE written.before_update (id integer, a text);
+        CREATE TRIGGER nulls BEFORE UPDATE ON written.before_update FOR EACH ROW EXECUTE FUNCTION written.to_null();
+        CREATE TABLE written.p (id integer NOT NULL, a text) PARTITION BY RANGE (id);
+        CREATE TABLE written.p_low PARTITION OF written.p FOR VALUES FROM (0) TO (100);
+        CREATE TABLE written.p_high PARTITION OF written.p FOR VALUES FROM (100) TO (200) PARTITION BY RANGE (id);
+        CREATE TABLE written.p_deep PARTITION OF written.p_high FOR VALUES FROM (100) TO (200);
+        CREATE TRIGGER nulls BEFORE INSERT ON written.p_deep FOR EACH ROW EXECUTE FUNCTION written.to_null();
+        CREATE TABLE written.q (id integer NOT NULL, a text) PARTITION BY RANGE (id);
+        CREATE TABLE written.q_low PARTITION OF written.q FOR VALUES FROM (0) TO (100);
+        CREATE TABLE written.sink (id integer, a text);
+        CREATE TABLE written.ruled (id integer, a text);
+        CREATE RULE r AS ON INSERT TO written.ruled DO INSTEAD
+            INSERT INTO written.sink VALUES (NEW.id, NULL) RETURNING sink.id, sink.a;
+        CREATE TABLE written.also (id integer, a text);
+        CREATE RULE r AS ON INSERT TO written.also DO ALSO INSERT INTO written.sink VALUES (NEW.id, NULL);
+        CREATE VIEW written.v_plain AS
+            SELECT s.id, s.label, s.note, s.id + 1 AS next FROM written.src s;
+        CREATE VIEW written.v_left AS
+            SELECT u.id, o.label AS other FROM written.src u LEFT JOIN written.src o ON o.id = u.id + 1;
+        CREATE VIEW written.v_view AS SELECT v.id, v.other FROM written.v_left v;
+        CREATE VIEW written.v_group AS
+            SELECT s.label, count(*) AS c, max(s.note) AS m FROM written.src s GROUP BY s.label;
+        CREATE VIEW written.v_union AS SELECT s.id FROM written.src s UNION ALL SELECT NULL::integer;
+        CREATE VIEW written.v_null AS SELECT s.id, NULLIF(s.label, 'a') AS x FROM written.src s;
+        CREATE MATERIALIZED VIEW written.mv AS SELECT s.id FROM written.src s;
+        """;
+
+    /// <summary>
+    /// On <see cref="Written" />, a partitioned table whose plain column <c>a</c> is a partition's generated column of
+    /// <c>NULL</c>.  PostgreSQL 14 and 15 attach such a partition, and 16 and later refuse it.
+    /// </summary>
+    public const string WrittenGeneratedPartition = """
+        CREATE TABLE written.pg (id integer NOT NULL, a text, b text) PARTITION BY RANGE (id);
+        CREATE TABLE written.pg_1 (id integer NOT NULL, a text GENERATED ALWAYS AS (NULL::text) STORED, b text);
+        ALTER TABLE written.pg ATTACH PARTITION written.pg_1 FOR VALUES FROM (0) TO (100);
+        """;
+
+    /// <summary>Drops <see cref="Written" />.</summary>
+    public const string DropWritten = "DROP SCHEMA IF EXISTS written CASCADE";
+
+    /// <summary>
     /// The schema <c>shadowing_equals</c>, of one operator <c>=</c> on two of <paramref name="type" /> that always
     /// returns false.  On <see cref="ShadowingEqualsPath" />, Npgsql, which reads the database's types when it opens
     /// a connection by SQL that compares them with <c>=</c>, cannot read them.  CREATE OPERATOR has no OR REPLACE, so
