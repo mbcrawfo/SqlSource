@@ -56,6 +56,17 @@ internal static class PostgresPlans
             [outer with { ParentRelationship = Outer }, inner with { ParentRelationship = Inner }]
         );
 
+    // A root Insert on the table of public of the name, over a child that prints one value for each of its attributes.
+    public static PlanNode Insert(string table, string[] returning, params string[] values) =>
+        Over(PlanNodeTypes.ModifyTable, Over("Result", Scan("x")) with { Plans = [], Output = values }) with
+        {
+            Operation = PlanOperations.Insert,
+            RelationName = table,
+            Alias = table,
+            Schema = "public",
+            Output = returning,
+        };
+
     // A node that is no join over one child: a Sort, a Hash, a ModifyTable, a Subquery Scan.
     public static PlanNode Over(string nodeType, PlanNode child, string relationship = Outer) =>
         new(
@@ -120,6 +131,8 @@ internal static class PostgresPlans
         Add(map, "CTE Name", node.CteName);
         Add(map, "Command", node.Command);
         Add(map, "Strategy", node.Strategy);
+        Add(map, "Operation", node.Operation);
+        Add(map, "Conflict Resolution", node.ConflictResolution);
         Add(map, "Output", node.Output);
         if (node.HasGroupingSets)
         {

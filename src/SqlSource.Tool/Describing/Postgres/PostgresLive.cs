@@ -212,6 +212,27 @@ internal sealed class PostgresLive(PostgresConnection connection)
         )
         """;
 
+    // Whether the table of $1 and $2, or a partition in its tree, has a BEFORE INSERT row trigger: the bits 1, 2 and 4
+    // of tgtype, which a disabled one has too.  The functions stand for & and = of two integers, which a schema on the
+    // search path could otherwise hold.
+    private const string TriggersSql = """
+        SELECT EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_class AS c
+            JOIN pg_catalog.pg_namespace AS n ON n.oid OPERATOR(pg_catalog.=) c.relnamespace
+            JOIN pg_catalog.pg_trigger AS t
+                ON t.tgrelid OPERATOR(pg_catalog.=) c.oid
+                OR EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_partition_tree(c.oid::pg_catalog.regclass) AS tree
+                    WHERE t.tgrelid OPERATOR(pg_catalog.=) tree.relid
+                )
+            WHERE n.nspname OPERATOR(pg_catalog.=) $1::pg_catalog.text
+                AND c.relname OPERATOR(pg_catalog.=) $2::pg_catalog.text
+                AND pg_catalog.int4eq(pg_catalog.int4and(t.tgtype::pg_catalog.int4, 7), 7)
+        )
+        """;
+
     // The server's spelling of each pair of a type and a modifier, in one query.
     private const string SpellingsSql = """
         SELECT p.oid, p.typmod, pg_catalog.format_type(p.oid, p.typmod)
@@ -608,6 +629,26 @@ internal sealed class PostgresLive(PostgresConnection connection)
                 return new PostgresCastsAnswer(reader.GetBoolean(0), null);
             },
             static error => new PostgresCastsAnswer(null, error),
+            token
+        );
+
+    /// <summary>
+    /// Asks <c>triggers</c>: whether the table, or a partition in its tree, has a <c>BEFORE INSERT</c> row trigger.
+    /// </summary>
+    public Task<PostgresTriggersAnswer> TriggersAsync(PostgresTriggersRequest asked, CancellationToken token) =>
+        InDescribeAsync(
+            async () =>
+            {
+                await using var command = await connection.CommandAsync(TriggersSql, token);
+                _ = command.Parameters.Add(
+                    new NpgsqlParameter { Value = asked.Relation.Schema, DataTypeName = "text" }
+                );
+                _ = command.Parameters.Add(new NpgsqlParameter { Value = asked.Relation.Name, DataTypeName = "text" });
+                await using var reader = await command.ExecuteReaderAsync(token);
+                _ = await reader.ReadAsync(token);
+                return new PostgresTriggersAnswer(reader.GetBoolean(0), null);
+            },
+            static error => new PostgresTriggersAnswer(null, error),
             token
         );
 

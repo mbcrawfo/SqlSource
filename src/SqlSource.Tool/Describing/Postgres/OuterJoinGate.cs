@@ -46,6 +46,8 @@ internal static class OuterJoinGate
 
     private static readonly string[] OldAndNew = ["OLD", "NEW"];
 
+    private static readonly string[] Insert = ["INSERT"];
+
     /// <summary>
     /// Whether the SQL holds one of the words, as a whole word and in any case.  <c>OLD</c> and <c>NEW</c> count as a
     /// quoted identifier too, since PostgreSQL 18 resolves <c>"old"</c> and <c>"new"</c>, and so does any
@@ -66,6 +68,15 @@ internal static class OuterJoinGate
     /// The SQL does not lex: a bug of the plan, whose parser read the same text.
     /// </exception>
     public static bool NamesOldOrNew(string sql) => HoldsAnyOf(sql, OldAndNew);
+
+    /// <summary>
+    /// Whether the SQL holds the word <c>INSERT</c>: whether the statement may write the values a <c>RETURNING</c> list
+    /// returns.  A word and no structure, which costs a walk that finds nothing and never a wrong answer.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The SQL does not lex: a bug of the plan, whose parser read the same text.
+    /// </exception>
+    public static bool NamesInsert(string sql) => HoldsAnyOf(sql, Insert);
 
     // Whether a lexeme of text, which is no string, comment or quoted identifier, holds one of the words, or a quoted
     // identifier may name the old or the new row.  Both lists hold OLD and NEW, the one pair of words with a quoted

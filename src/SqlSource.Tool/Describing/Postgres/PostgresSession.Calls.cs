@@ -137,6 +137,20 @@ internal sealed partial class PostgresSession
             cancellationToken
         );
 
+    // The error of the call is logged and never reported: a written value then stays unproved.
+    private Task<PostgresTriggersAnswer> TriggersAsync(
+        string query,
+        PostgresTriggersRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        AskAsync(
+            PostgresCallNames.Triggers,
+            request,
+            _live.TriggersAsync,
+            (asked, answer, durationMs) => PostgresEvents.Triggers(_log, query, answer, durationMs),
+            cancellationToken
+        );
+
     // The error of the call is logged and never reported.
     private Task<PostgresDeallocateAnswer> DeallocateAsync(
         string query,

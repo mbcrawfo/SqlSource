@@ -562,7 +562,8 @@ public sealed class ColumnTests(PostgresDatabases postgres)
             "INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id, left('a', 1) AS l"
         );
 
-        plain.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        // An INSERT's nullable column is planned for the value it writes, which the rule's action does not write here.
+        plain.Plan.ShouldBe(SidecarValues.Plan.Walked);
         Of(plain.Columns.ShouldNotBeNull()).ShouldBe([NullableCatalog]);
         gated.Plan.ShouldBe(SidecarValues.Plan.Walked);
         Of(gated.Columns.ShouldNotBeNull()).ShouldBe([NullableCatalog, NotNullExpression]);
@@ -676,8 +677,8 @@ public sealed class ColumnTests(PostgresDatabases postgres)
         Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog]);
     }
 
-    // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  In a gated query a view's
-    // column says "view" where no join extends it.
+    // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  A view's whole column list says
+    // "view", and a plain view's column in any other list is read from the entry the plan prints for it.
     [Fact]
     public async Task DescribeAsync_ColumnsOfAViewAndOfAMaterializedView_SayView()
     {
@@ -691,7 +692,7 @@ public sealed class ColumnTests(PostgresDatabases postgres)
 
         Of(view).ShouldBe([UnknownView, UnknownView, UnknownView, UnknownView]);
         Of(materialized).ShouldBe([UnknownView]);
-        Of(gated).ShouldBe([UnknownView, NullableOuterJoin]);
+        Of(gated).ShouldBe([NotNullExpression, NullableOuterJoin]);
     }
 
     // A table's row selected whole is a column of the table's composite type, which is no pseudo-type.
