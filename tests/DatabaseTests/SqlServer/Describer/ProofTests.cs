@@ -234,8 +234,10 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             { 0, "SELECT CASE WHEN g IS NULL THEN b ELSE g END AS c FROM dbo.proof_rows GROUP BY ROLLUP (g, b)" },
         };
 
-    // A CASE that reads a value twice proves nothing unless the value is a stored column: each of these can differ
-    // between its two reads, though no plan measured on 2017 or 2025 evaluates them twice, so no NULL row can be shown.
+    // A CASE that reads a value twice proves nothing unless the value is a stored column: each of the first five can
+    // differ between its two reads, though no plan measured on 2017 or 2025 evaluates them twice.  COALESCE reads an
+    // argument twice too, and over a window ordered by NEWID() it does give a NULL, in about a quarter of many rows, so
+    // that the five rows here may show none and the describe alone is held.
     public static TheoryData<string> ValuesReadTwice =>
         [
             "SELECT CASE WHEN flip IS NULL THEN 0 ELSE flip END AS c FROM dbo.proof_volatile",
@@ -246,6 +248,14 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
                 + "SELECT CASE WHEN flip IS NULL THEN 0 ELSE flip END AS c FROM q",
             "SELECT CASE WHEN q.flip IS NULL THEN 0 ELSE q.flip END AS c FROM dbo.proof_rows "
                 + "CROSS APPLY (SELECT CASE WHEN ABS(CHECKSUM(NEWID())) % 2 = 0 THEN 1 END AS flip) AS q",
+            "SELECT COALESCE(LAG(b) OVER (ORDER BY NEWID()), 0) AS c FROM dbo.proof_rows",
+            "SELECT COALESCE(LEAD(b) OVER (ORDER BY NEWID()), 0) AS c FROM dbo.proof_rows",
+            "SELECT COALESCE(LAG(b) OVER (ORDER BY NEWID()) + 1, 0) AS c FROM dbo.proof_rows",
+            "SELECT COALESCE(LAG(b, 1, 5) OVER (ORDER BY NEWID()), 0) AS c FROM dbo.proof_rows",
+            "SELECT COALESCE(YEAR(LAG(maybe) OVER (ORDER BY NEWID())), 0) AS c FROM dbo.proof_dates",
+            "SELECT COALESCE(DATEADD(DAY, 1, LAG(maybe) OVER (ORDER BY NEWID())), at_utc) AS c FROM dbo.proof_dates",
+            "SELECT COALESCE(LAG(maybe) OVER (ORDER BY NEWID()) AT TIME ZONE 'UTC', SYSDATETIMEOFFSET()) AS c "
+                + "FROM dbo.proof_dates",
         ];
 
     [Theory]
@@ -318,7 +328,7 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
 
     [Theory]
     [MemberData(nameof(ValuesReadTwice))]
-    public Task DescribeAsync_CaseOfAValueReadTwice_StaysNullable(string sql) =>
+    public Task DescribeAsync_ValueReadTwice_StaysNullable(string sql) =>
         WithRowsAsync(() => ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server));
 
     // EOMONTH ignores an offset that is NULL, so no NULL row can be shown, and the form still does not rely on that.
@@ -348,9 +358,10 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     // Design fact 1, the assumption of decision 5: with ANSI_WARNINGS and ARITHABORT off, a conversion overflow, a
     // SUM of two ints over one group and an int's arithmetic that overflow are NULL, and so are COALESCE, GREATEST
     // and LEAST whose one argument that is not NULL overflows the conversion to their type, a date function whose
-    // operand overflows the conversion to a date, and LAG whose default overflows its value's type; with ANSI_WARNINGS
-    // on, whatever ARITHABORT says, and as SqlClient connects, each is an error.  The settings are made on a connection
-    // of the test's own, outside the pool, so that no other test reads them.
+    // operand overflows the conversion to a date, LAG whose default overflows its value's type, and a CASE that
+    // replaces a NULL with a value that overflows the column's type; with ANSI_WARNINGS on, whatever ARITHABORT says,
+    // and as SqlClient connects, each is an error.  The settings are made on a connection of the test's own, outside
+    // the pool, so that no other test reads them.
     [Theory]
     [InlineData(0, "SELECT CAST(300 AS tinyint)", 220)]
     [InlineData(0, "SELECT SUM(x) FROM (VALUES (1, 2147483647), (1, 2147483647)) AS v (g, x) GROUP BY g", 8115)]
@@ -364,6 +375,11 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     [InlineData(0, "SELECT DATENAME(YEAR, 1e10)", 8115)]
     [InlineData(0, "SELECT YEAR(1e10)", 8115)]
     [InlineData(0, "SELECT LAG(x, 1, 300) OVER (ORDER BY x) FROM (VALUES (CAST(1 AS tinyint))) AS v (x)", 220)]
+    [InlineData(
+        0,
+        "SELECT CASE WHEN x IS NULL THEN 1e10 ELSE x END FROM (VALUES (CAST(NULL AS datetime))) AS v (x)",
+        8115
+    )]
     public async Task Set_AnsiWarningsOff_OverflowIsNull(int major, string sql, int error)
     {
         sqlServer.SkipBelow(major, NewFunctionsReason);

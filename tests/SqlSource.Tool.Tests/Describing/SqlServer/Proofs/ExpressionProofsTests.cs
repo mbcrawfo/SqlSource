@@ -164,7 +164,7 @@ public sealed class ExpressionProofsTests
     [InlineData("COALESCE(t.a * 2, 0)", "", true, true, "t.a")]
     [InlineData("COALESCE(dbo.f(t.a), 0)", "", false, false, "")]
     [InlineData("COALESCE(MAX(dbo.f(t.a)), 0)", "GROUP BY t.b", false, false, "")]
-    [InlineData("COALESCE(LAG(t.a) OVER (ORDER BY t.id), 0)", "", true, true, "t.a")]
+    [InlineData("COALESCE(LAG(t.a) OVER (ORDER BY t.id), 0)", "", false, false, "")]
     [InlineData("COALESCE(CAST(t.a AS geometry), 0)", "", false, false, "")]
     [InlineData("COALESCE(CONVERT(geometry, t.a), 0)", "", false, false, "")]
     // CAST and CONVERT: the operand proved, and CONVERT's style an integer literal.
@@ -249,7 +249,20 @@ public sealed class ExpressionProofsTests
     [InlineData("LAG(t.a, 1, 0) OVER (ORDER BY t.id)", "", true, false, "t.a")]
     [InlineData("lag(t.a, 0, 'x') OVER (ORDER BY t.id)", "", true, false, "t.a")]
     [InlineData("LEAD(t.a, 2, t.b) OVER (PARTITION BY t.c ORDER BY t.id)", "", true, false, "t.a|t.b")]
-    [InlineData("COALESCE(LAG(t.a, 1, 0) OVER (ORDER BY t.id), NULL)", "", true, false, "t.a")]
+    // A LAG or LEAD has no type proof, and a date function or AT TIME ZONE none over what is never asked: COALESCE
+    // reads an argument twice, and a window ordered by NEWID() gives two values.
+    [InlineData("COALESCE(LAG(t.a, 1, 0) OVER (ORDER BY t.id), NULL)", "", false, false, "")]
+    [InlineData("COALESCE(LEAD(t.a, 1, 0) OVER (ORDER BY t.id), 0)", "", false, false, "")]
+    [InlineData("COALESCE(LAG(t.a) OVER (ORDER BY t.id) + 1, 0)", "", false, false, "")]
+    [InlineData("CAST(LAG(t.a, 1, 0) OVER (ORDER BY t.id) AS bigint)", "", false, false, "")]
+    [InlineData("COALESCE(DATEADD(DAY, 1, LAG(t.d) OVER (ORDER BY t.id)), 0)", "", false, false, "")]
+    [InlineData("COALESCE(YEAR(LAG(t.d) OVER (ORDER BY t.id)), 0)", "", false, false, "")]
+    [InlineData("COALESCE(EOMONTH(dbo.f(t.d)), 0)", "", false, false, "")]
+    [InlineData("COALESCE(YEAR(MAX(t.d)), 0)", "GROUP BY t.b", false, false, "")]
+    [InlineData("COALESCE(LAG(t.d) OVER (ORDER BY t.id) AT TIME ZONE 'UTC', 0)", "", false, false, "")]
+    [InlineData("COALESCE(dbo.f(t.d) AT TIME ZONE 'UTC', 0)", "", false, false, "")]
+    [InlineData("COALESCE(DATEADD(DAY, 1, t.d), 0)", "", true, true, "")]
+    [InlineData("COALESCE(t.d AT TIME ZONE 'UTC', 0)", "", true, true, "")]
     [InlineData("LAG(SUM(t.a), 1, 0) OVER (ORDER BY t.b)", "GROUP BY t.b", true, false, "t.a")]
     [InlineData("LAG(t.a) OVER (ORDER BY t.id)", "", false, false, "")]
     [InlineData("LAG(t.a, 1) OVER (ORDER BY t.id)", "", false, false, "")]
@@ -436,8 +449,6 @@ public sealed class ExpressionProofsTests
     [InlineData("MONTH(t.a)", "", true)]
     [InlineData("DAY(t.a)", "", true)]
     [InlineData("EOMONTH(t.a)", "", true)]
-    [InlineData("LAG(t.a, 1, 0) OVER (ORDER BY t.id)", "", false)]
-    [InlineData("LEAD(t.a, 1, 0) OVER (ORDER BY t.id)", "", false)]
     public void Of_EveryForm_ProvedByBothReadings(string form, string tail, bool typeFixed)
     {
         foreach (var item in (string[])[form, $"COALESCE({form}, 0)"])
@@ -481,7 +492,6 @@ public sealed class ExpressionProofsTests
     // LAG, LEAD and the CASE that replaces a NULL convert their default to the type of the value.
     [InlineData("LAG(t.s, 1, 'NULL') OVER (ORDER BY t.id)", "")]
     [InlineData("LEAD(t.a, 1, t.s) OVER (ORDER BY t.id)", "")]
-    [InlineData("CAST(LAG(t.s, 1, 'NULL') OVER (ORDER BY t.id) AS varbinary(max))", "")]
     [InlineData("CASE WHEN t.s IS NULL THEN 'NULL' ELSE t.s END", "")]
     [InlineData("CASE WHEN t.a IS NULL THEN t.s ELSE t.a END", "")]
     // A CLR type's conversion to a string is its ToString, which a user's type may answer null.
@@ -496,6 +506,24 @@ public sealed class ExpressionProofsTests
         count.ShouldBeGreaterThan(0, Texts(sql, tokens, proofs.Operands));
         proof.Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: true), count)]).ShouldBeTrue();
         proof.Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: false), count)]).ShouldBeFalse();
+    }
+
+    // The default of LAG and LEAD and the fallback of the CASE are held of no CLR type themselves, whatever the value's
+    // type is.
+    [Theory]
+    [InlineData("LEAD(t.a, 1, t.s) OVER (ORDER BY t.id)")]
+    [InlineData("CASE WHEN t.a IS NULL THEN t.s ELSE t.a END")]
+    public void Of_DefaultOfAClrType_IsNotProved(string item)
+    {
+        var (sql, tokens, proofs, body) = Read($"SELECT {item} AS c FROM t AS t");
+        var proof = proofs.Of(body.Items.ShouldHaveSingleItem().Expression);
+
+        var texts = Texts(sql, tokens, proofs.Operands).Split('|');
+        texts.ShouldBe(["t.a", "t.s"], ignoreOrder: true);
+        proof
+            .Holds([.. texts.Select(static text => new OperandFacts(true, NotClr: text != "t.s", Stored: true))])
+            .ShouldBeFalse();
+        proof.Holds([.. texts.Select(static _ => new OperandFacts(true, NotClr: true, Stored: true))]).ShouldBeTrue();
     }
 
     // The CASE reads its column twice, and a value evaluated twice can differ: the column must be stored, or be

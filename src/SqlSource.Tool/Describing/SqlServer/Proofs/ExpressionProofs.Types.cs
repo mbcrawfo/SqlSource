@@ -33,14 +33,15 @@ internal sealed partial class ExpressionProofs
     // The type proof of a piece that is a primary, or null when it is none.  A literal, NULL, a count subquery and the
     // forms whose type is fixed are of no CLR type; MAX and MIN are of their operand's type, COALESCE, GREATEST and
     // LEAST of one of their arguments', and CAST and CONVERT of their target, which proves only when it is built in.
-    // AT TIME ZONE is a datetimeoffset, and the date forms take no CLR type.  LAG and LEAD are of their value's type,
-    // their default converted to it.  A call of a schema's name may return a CLR type and cannot be asked.  Anything
-    // else is asked.
+    // AT TIME ZONE is a datetimeoffset, and the date forms take no CLR type, each proved only when it holds nothing
+    // that is never asked.  LAG and LEAD have no type proof, since COALESCE reads an argument twice (TD-0123) and a
+    // window ordered by NEWID() gives two values.  A call of a schema's name may return a CLR type and cannot be asked.
+    // Anything else is asked.
     private Proof? PrimaryType(TokenRange piece)
     {
         if (AtTimeZoneOf(piece) is not null)
         {
-            return Proof.Yes;
+            return HoldsWhatIsNeverAsked(piece) ? Proof.No : Proof.Yes;
         }
 
         var first = tokens[piece.Start];
@@ -111,10 +112,9 @@ internal sealed partial class ExpressionProofs
             FormKind.CoalesceGreatestLeast => AllOf(Arguments(arguments).Select(TypeOf)),
             FormKind.Cast => CastOperand(arguments) is null ? Proof.No : Proof.Yes,
             FormKind.Convert => CastTargets.IsBuiltIn(tokens, Arguments(arguments)[0]) ? Proof.Yes : Proof.No,
-            FormKind.DateAddOrDiff or FormKind.DatePartOrName or FormKind.DateValue or FormKind.EndOfMonth => Proof.Yes,
-            FormKind.LagOrLead => Arguments(arguments) is { Count: >= 1 and <= 3 } parts
-                ? AllOf(parts.Where((_, index) => index != 1).Select(TypeOf))
-                : Proof.No,
+            FormKind.DateAddOrDiff or FormKind.DatePartOrName or FormKind.DateValue or FormKind.EndOfMonth =>
+                HoldsWhatIsNeverAsked(arguments) ? Proof.No : Proof.Yes,
+            FormKind.LagOrLead => Proof.No,
             _ => throw UnexpectedEnumValueException.Of(kind),
         };
 
