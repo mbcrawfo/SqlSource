@@ -76,7 +76,7 @@ internal static class TypeDiagnostics
                 typeName,
                 (column == NpgsqlColumn.None ? "Reference Npgsql, then map" : "Map")
                     + " it with the type override, as "
-                    + key
+                    + AsAKey(key, engine)
                     + "=NpgsqlTypes.NpgsqlRange<T> with the data source's EnableUnmappedTypes()"
             ),
             TypeMappingKind.NeedsDriver => engine switch
