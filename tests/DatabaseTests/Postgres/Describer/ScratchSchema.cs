@@ -84,6 +84,21 @@ internal static class ScratchSchema
         """;
 
     /// <summary>
+    /// Prefix operators <c>shadow.+</c> and <c>shadow.-</c> of an <c>integer</c> that always return <c>NULL</c>.  On a
+    /// path that names <c>shadow</c> first, <c>+1</c> calls the first, while the parser folds <c>-1</c> into a constant
+    /// and calls neither.
+    /// </summary>
+    public const string ShadowPrefixOperators = """
+        CREATE SCHEMA IF NOT EXISTS shadow;
+        CREATE OR REPLACE FUNCTION shadow.null_integer(integer) RETURNS integer
+            LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END';
+        DROP OPERATOR IF EXISTS shadow.+ (none, integer);
+        CREATE OPERATOR shadow.+ (rightarg = integer, function = shadow.null_integer);
+        DROP OPERATOR IF EXISTS shadow.- (none, integer);
+        CREATE OPERATOR shadow.- (rightarg = integer, function = shadow.null_integer);
+        """;
+
+    /// <summary>
     /// Drops the schema <c>shadow</c> with what <see cref="ShadowCount" /> and <see cref="ShadowOperators" /> made in
     /// it.  Every test that runs either runs this in a finally: while <c>shadow</c> holds a <c>count</c> or a
     /// <c>*</c>, the describer reads no <c>count(x)</c> and no range intersection of any other test.
@@ -231,9 +246,9 @@ internal static class ScratchSchema
 
     /// <summary>
     /// The schema <c>scan_columns</c>: a table <c>t</c> whose first row holds <c>NULL</c> in every column that may, a
-    /// partitioned table <c>p</c> of the same kind, a domain, and two SQL functions the planner inlines, whose result
-    /// reaches its declared <c>text</c> by an assignment cast the plan does not print.  The text makes the schema
-    /// again.
+    /// partitioned table <c>p</c> of the same kind, a domain, a function <c>"grouping"</c> that returns <c>NULL</c>,
+    /// and two SQL functions the planner inlines, whose result reaches its declared <c>text</c> by an assignment cast
+    /// the plan does not print.  The text makes the schema again.
     /// </summary>
     public const string ScanColumns = """
         DROP SCHEMA IF EXISTS scan_columns CASCADE;
@@ -257,6 +272,8 @@ internal static class ScratchSchema
         CREATE TABLE scan_columns.p_low PARTITION OF scan_columns.p FOR VALUES FROM (0) TO (100);
         CREATE TABLE scan_columns.p_high PARTITION OF scan_columns.p FOR VALUES FROM (100) TO (200);
         INSERT INTO scan_columns.p VALUES (1, NULL), (150, 1);
+        CREATE FUNCTION scan_columns."grouping"(integer) RETURNS integer LANGUAGE plpgsql IMMUTABLE AS
+            'BEGIN RETURN NULL; END';
         CREATE FUNCTION scan_columns.as_text() RETURNS TABLE (t text, c bigint) LANGUAGE sql STABLE AS
             'SELECT s.n, count(*) FROM scan_columns.t s GROUP BY s.n OFFSET 0';
         CREATE FUNCTION scan_columns.union_as_text() RETURNS TABLE (t text, i bigint) LANGUAGE sql STABLE AS

@@ -36,6 +36,37 @@ public sealed class TotalFunctionsTests
             .FunctionResult("date_trunc", [BuiltInTypes.Text, BuiltInTypes.Timestamptz])
             .ShouldBe(BuiltInTypes.Timestamptz);
 
+    [Theory]
+    [InlineData("abs", BuiltInTypes.Int2, BuiltInTypes.Int2)]
+    [InlineData("abs", BuiltInTypes.Int4, BuiltInTypes.Int4)]
+    [InlineData("abs", BuiltInTypes.Int8, BuiltInTypes.Int8)]
+    [InlineData("abs", BuiltInTypes.Float4, BuiltInTypes.Float4)]
+    [InlineData("abs", BuiltInTypes.Float8, BuiltInTypes.Float8)]
+    [InlineData("abs", BuiltInTypes.Numeric, BuiltInTypes.Numeric)]
+    [InlineData("ceil", BuiltInTypes.Float8, BuiltInTypes.Float8)]
+    [InlineData("ceil", BuiltInTypes.Numeric, BuiltInTypes.Numeric)]
+    [InlineData("floor", BuiltInTypes.Float8, BuiltInTypes.Float8)]
+    [InlineData("floor", BuiltInTypes.Numeric, BuiltInTypes.Numeric)]
+    [InlineData("round", BuiltInTypes.Float8, BuiltInTypes.Float8)]
+    [InlineData("trunc", BuiltInTypes.Float8, BuiltInTypes.Float8)]
+    public void FunctionResult_NumberFunctionOfOneArgument_IsItsType(string name, long argument, long expected) =>
+        TotalFunctions.FunctionResult(name, [argument]).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("round")]
+    [InlineData("trunc")]
+    public void FunctionResult_NumericWithAScale_IsNumeric(string name) =>
+        TotalFunctions.FunctionResult(name, [BuiltInTypes.Numeric, BuiltInTypes.Int4]).ShouldBe(BuiltInTypes.Numeric);
+
+    // round(numeric) and trunc(numeric) print inlined with a scale of 0, and ceiling is no name the table reads.
+    [Theory]
+    [InlineData("round", BuiltInTypes.Numeric)]
+    [InlineData("trunc", BuiltInTypes.Numeric)]
+    [InlineData("ceil", BuiltInTypes.Int4)]
+    [InlineData("ceiling", BuiltInTypes.Numeric)]
+    public void FunctionResult_SignatureNotInTheTable_IsNull(string name, long argument) =>
+        TotalFunctions.FunctionResult(name, [argument]).ShouldBeNull();
+
     [Fact]
     public void FunctionResult_ArgumentOfNoKnownType_IsNull() =>
         TotalFunctions.FunctionResult("upper", [TotalFunctions.UnknownType]).ShouldBeNull();

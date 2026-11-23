@@ -121,6 +121,29 @@ internal static partial class PlanExpression
             : null;
 
     /// <summary>
+    /// Whether the entry, as a node prints it, is what that node computes, and no value it takes from a child.  A node
+    /// prints a value of a child in one pair of parentheses of its own, <c>(sum(x))</c>, so a text with none is its
+    /// own, and so is an operator or a test, which prints in parentheses of its own and in a second pair when it is
+    /// taken from a child.  A child that prints the same text computed it apart, perhaps under its own grouping or a
+    /// window of the same name.  A parameter or an <c>InitPlan</c>'s value in parentheses, <c>($0)</c>, is a child's.
+    /// </summary>
+    /// <param name="entry">The entry as the plan prints it.</param>
+    public static bool IsOwnValue(string entry) =>
+        PlanTokens.Read(entry) is { Count: > 0 } tokens
+        && new Reader(entry, tokens, NoContext).WrapsNoChildValue(tokens.Count);
+
+    /// <summary>
+    /// Whether the entry is, as a whole, a value that is never <c>NULL</c> in any group of grouping sets, the empty
+    /// group included: a <c>count</c> as <see cref="NullableOf(string, ExpressionContext)" /> reads one, or
+    /// <c>GROUPING(...)</c>, which is syntax, since a function of that name prints in quotes.
+    /// </summary>
+    /// <param name="entry">The entry as the plan prints it.</param>
+    /// <param name="context">What the walk says of the plan the entry is read in.</param>
+    public static bool IsNeverNullInAnyGroup(string entry, ExpressionContext context) =>
+        PlanTokens.Read(entry) is { Count: > 0 } tokens
+        && new Reader(entry, tokens, context).IsCountOrGrouping(tokens.Count);
+
+    /// <summary>
     /// The type of an entry that is, as a whole, a value proved not <c>NULL</c> of a known type, or null: a constant,
     /// a null test, <c>count(*)</c> or a ranking as <see cref="TypeOf" /> types them, or an operator, a function or a
     /// cast of the forms the remarks give, a <c>COALESCE</c>, a <c>GREATEST</c>, a <c>LEAST</c> and a <c>CASE</c> among
@@ -277,12 +300,17 @@ internal static partial class PlanExpression
         // The index of the token that closes each opening parenthesis or bracket, and -1 for any other.
         private readonly int[] _closes;
 
-        // The type Proved gave each span read so far, by the span and the state of _groupsHaveRows it was read in.
-        private readonly Dictionary<(int From, int To, bool GroupsHaveRows), long?> _proved = [];
+        // The type Proved gave each span read so far, by the span and the state of _groupsHaveRows and _readsWindow it
+        // was read in.
+        private readonly Dictionary<(int From, int To, bool GroupsHaveRows, bool ReadsWindow), long?> _proved = [];
 
         // Whether an aggregate of the span being read is one of the node's own, over a group that has a row: false
         // inside a group a child printed.
         private bool _groupsHaveRows;
+
+        // Whether a window aggregate of the span being read is one of the node's own, under the node's window: false
+        // inside a group a child printed, which the child computed under a window that may have the same name.
+        private bool _readsWindow;
 
         public Reader(string entry, List<Token> tokens, ExpressionContext context)
         {
@@ -290,6 +318,7 @@ internal static partial class PlanExpression
             _tokens = tokens;
             _context = context;
             _groupsHaveRows = context.GroupsHaveRows;
+            _readsWindow = context.WindowHoldsCurrentRow is not null;
             _closes = new int[tokens.Count];
             var open = new Stack<int>();
             for (var index = 0; index < tokens.Count; index++)
@@ -313,10 +342,11 @@ internal static partial class PlanExpression
         // Reads the group with its aggregates unread when a child of the node printed it, then restores the state.
         private T InGroup<T>(int from, int to, Func<T> read)
         {
-            var outside = _groupsHaveRows;
-            if (outside && _context.GroupFromChild?.Invoke(Inside(from, to)) == true)
+            var outside = (_groupsHaveRows, _readsWindow);
+            if ((_groupsHaveRows || _readsWindow) && _context.GroupFromChild?.Invoke(Inside(from, to)) == true)
             {
                 _groupsHaveRows = false;
+                _readsWindow = false;
             }
 
             try
@@ -325,7 +355,7 @@ internal static partial class PlanExpression
             }
             finally
             {
-                _groupsHaveRows = outside;
+                (_groupsHaveRows, _readsWindow) = outside;
             }
         }
 
@@ -508,6 +538,41 @@ internal static partial class PlanExpression
         // function of the name: then it is count("any"), which is never NULL.
         private bool IsCatalogsCount(int from, int to) =>
             IsWord(from, "count") && HeldAlone("count") && IsCountOrRanking(from, to, anyArgument: true);
+
+        // Whether the tokens are not wrapped whole in parentheses, or what they wrap is an operator or a test.
+        public bool WrapsNoChildValue(int count)
+        {
+            if (!IsGroup(0, count))
+            {
+                return true;
+            }
+
+            if (IsComputedValue(1, count - 1))
+            {
+                return false;
+            }
+
+            for (var at = 1; at < count - 1; at = Next(at))
+            {
+                if (
+                    Is(at, Kind.Other)
+                    || IsWord(at, "IS")
+                    || IsWord(at, "AND")
+                    || IsWord(at, "OR")
+                    || IsWord(at, "NOT")
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Whether the first to tokens are a count the catalog answers for, or GROUPING(...).
+        public bool IsCountOrGrouping(int to) =>
+            (IsWord(0, "count") && ((_context.CatalogFunctions && IsCountOrRanking(0, to)) || IsCatalogsCount(0, to)))
+            || (IsWord(0, "GROUPING") && ClosesAtTheEnd(0, to));
 
         // The names of CatalogOverloads the tokens call, as CatalogNamesIn gives them.
         public (IReadOnlyList<string> Functions, IReadOnlyList<string> Operators) CatalogNames()

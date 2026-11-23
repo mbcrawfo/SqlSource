@@ -330,7 +330,7 @@ public sealed class ExpressionTests(PostgresDatabases postgres)
 
         (
             await AnswersAsync(
-                "SELECT u.id::text AS label, u.name::integer AS parsed, u.id % 2 AS odd, abs(u.balance) AS size, "
+                "SELECT u.id::text AS label, u.name::integer AS parsed, u.id % 2 AS odd, sign(u.balance) AS size, "
                     + "u.status = 'active' AS active, u.tags || 'x'::text AS more, d.amount * 2 AS twice "
                     + "FROM users u JOIN expression_amounts d ON d.id = u.id"
             )

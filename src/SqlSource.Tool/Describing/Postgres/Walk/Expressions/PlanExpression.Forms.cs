@@ -41,7 +41,9 @@ internal static partial class PlanExpression
                 return OperatorAt(from + 1, to - 1) is { } at ? Operator(from + 1, at, to - 1) : null;
             }
 
-            return Is(from, Kind.Open) ? Cast(from, to) : Function(from, to) ?? Aggregate(from, to);
+            return Is(from, Kind.Open)
+                ? Cast(from, to)
+                : Function(from, to) ?? Aggregate(from, to) ?? WindowAggregate(from, to);
         }
 
         // The group of ANY's one comparison, (L op (SubPlan n).colk) or with hashed, which is NULL only when a
@@ -262,6 +264,29 @@ internal static partial class PlanExpression
                 end > start
                 && TotalFunctions.HasAggregate(Text(from), ArgumentCount(start, end))
                 && Arguments(start, end) is { } arguments
+                ? TotalFunctions.AggregateResult(Text(from), arguments)
+                : null;
+        }
+
+        // name(a, ...) OVER w, an aggregate of the table over proved arguments, where the node that computes it is the
+        // WindowAgg of the window w and its frame holds the current row: the frame then has a row, whose value is not
+        // NULL.  A FILTER may leave the frame no row, so it makes this no such form.
+        private long? WindowAggregate(int from, int to)
+        {
+            if (!_readsWindow || !IsLowerWord(from) || from + 1 >= to || !Is(from + 1, Kind.Open))
+            {
+                return null;
+            }
+
+            var close = _closes[from + 1];
+            return
+                close >= 0
+                && close + 3 == to
+                && IsWord(close + 1, "OVER")
+                && IsName(close + 2)
+                && _context.WindowHoldsCurrentRow?.Invoke(Text(close + 2)) == true
+                && TotalFunctions.HasAggregate(Text(from), ArgumentCount(from + 2, close))
+                && Arguments(from + 2, close) is { } arguments
                 ? TotalFunctions.AggregateResult(Text(from), arguments)
                 : null;
         }

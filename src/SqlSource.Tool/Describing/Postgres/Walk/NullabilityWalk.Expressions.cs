@@ -173,6 +173,41 @@ internal static partial class NullabilityWalk
                 InitPlanTypeOf: value => IsWhole(entry, value) ? OneRowValueTypeOf(InitPlanOf(value), columnType) : null
             );
 
+        /// <summary>
+        /// Whether the entry of the root is a <c>count</c> or a <c>GROUPING(...)</c> that the <c>Aggregate</c> of the
+        /// grouping sets computes, passed up unchanged through nodes of one child that no join extends: never
+        /// <c>NULL</c> in any group, the empty one included, though the grouping columns are <c>NULL</c> there.
+        /// </summary>
+        public bool ProvedInEveryGroup(string entry)
+        {
+            var node = root;
+            var text = entry;
+            for (var depth = 0; depth <= MaxDepth; depth++)
+            {
+                if (instances.IsExtended(node))
+                {
+                    return false;
+                }
+
+                if (node is { NodeType: PlanNodeTypes.Aggregate, HasGroupingSets: true })
+                {
+                    return node.Output?.Contains(text, StringComparer.Ordinal) == true
+                        && PlanExpression.IsNeverNullInAnyGroup(text, ContextOf(entry, TotalFunctions.UnknownType));
+                }
+
+                PlanNode[] children = [.. node.JoinChildren];
+                if (children is not [_] || PrintedBelow(node, children, text) is not [var found])
+                {
+                    return false;
+                }
+
+                node = found.Child;
+                text = found.Printed;
+            }
+
+            return false;
+        }
+
         // Whether the entry is the subplan's value and nothing else, once the parentheses that wrap it whole are off.
         private static bool IsWhole(string entry, string name)
         {
@@ -342,7 +377,7 @@ internal static partial class NullabilityWalk
                 return null;
             }
 
-            var printing = Printing(children, entry).ToArray();
+            var printing = PrintedBelow(node, children, entry);
             if (printing.Length == 0)
             {
                 return instances.IsExtended(node)
@@ -359,6 +394,7 @@ internal static partial class NullabilityWalk
                                 GroupFromChild = group => Printing(children, group).Any(),
                                 GroupsHaveRows = GroupsHaveRows(node),
                                 ProvedOnFullJoinSides = ProvedOnFullJoinSidesOf(node),
+                                WindowHoldsCurrentRow = WindowHoldsCurrentRowOf(node),
                             }
                         ),
                     ];
@@ -377,6 +413,10 @@ internal static partial class NullabilityWalk
 
             return readings;
         }
+
+        // What the reader is told of the window of the node that computes an entry: only a WindowAgg has one.
+        private static Func<string, bool>? WindowHoldsCurrentRowOf(PlanNode node) =>
+            node.NodeType == PlanNodeTypes.WindowAgg ? name => PlanWindows.HoldsCurrentRow(node.Window, name) : null;
 
         // Whether each group of the node has a row: an Aggregate with a Group Key makes its groups of the rows that
         // share a key.  So does a Sorted one with no key left, as PostgreSQL 16 and later plan a GROUP BY whose every
@@ -398,7 +438,7 @@ internal static partial class NullabilityWalk
                 return false;
             }
 
-            var printing = Printing(children, entry).ToArray();
+            var printing = PrintedBelow(node, children, entry);
             if (printing.Length > 0)
             {
                 return printing.All(found => Preserved(found.Child, found.Printed, depth + 1));
@@ -428,6 +468,21 @@ internal static partial class NullabilityWalk
         // A child that prints no Output, and is extended or has a join under it that extends.
         private bool OpaqueAndNotPreserved(PlanNode child) =>
             child.Output is null && (instances.IsExtended(child) || instances.ExtendsUnder(child));
+
+        // Each child the node takes the entry from.  An Aggregate or a WindowAgg computes an entry that is its own
+        // value (PlanExpression.IsOwnValue), though a child prints the same text: an upper sum(x) over a subquery's
+        // sum(x), or a window w1 over a subquery's own w1, since a window's name is unique within its query level
+        // alone.
+        private static (PlanNode Child, string Printed)[] PrintedBelow(
+            PlanNode node,
+            PlanNode[] children,
+            string entry
+        ) =>
+            node.NodeType is PlanNodeTypes.Aggregate or PlanNodeTypes.WindowAgg
+            && OutputReference.Parse(entry) is null
+            && PlanExpression.IsOwnValue(entry)
+                ? []
+                : [.. Printing(children, entry)];
 
         // Each child that prints the value, and how: as it is, wrapped whole in parentheses, or without the
         // parentheses that wrap it whole.
