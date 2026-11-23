@@ -77,7 +77,7 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 **What stays the same in a row.**  SQL Server can compute an argument of `COALESCE` twice: once to test it and once for the result.  So each argument before the one that is never null must be one of these:
 
 - a constant, `NULL` or a query parameter;
-- a column stored in a table of the query's own database, read directly or through a subquery in the `FROM` or a `WITH` query;
+- a column stored in a table of the query's own database, read directly, or through a subquery in the `FROM` or a `WITH` query that returns the column itself and has no `UNION`;
 - arithmetic of these, or `CAST`, `CONVERT` to a built-in type, `COALESCE`, `ISNULL` or `NULLIF` of these;
 - `SUM`, `MAX` or `MIN` of these, without `OVER (...)`;
 - `AVG` of these, without `OVER (...)`, inside `CAST` or `CONVERT` to a built-in type.
@@ -93,6 +93,7 @@ These answers assume that the connection that runs the query leaves `ANSI_WARNIN
 - **`COALESCE` over a column of each side of a `FULL JOIN`**, as in `COALESCE(i.id, p.invoice_id)`.
 - **`COALESCE` with an argument that can change before the one that is never null.**  This includes a `CASE`, a subquery, a window function, a date function, a computed column, a view's column and a column read `FOR SYSTEM_TIME`.  SQL Server can compute such a value again for the result, and the second value can be null.  Write `ISNULL(x, 0)`, which computes `x` once.
 - **`COALESCE` with a column of another database or of a linked server before the one that is never null.**  This holds when the query reads the table by its name, a synonym, a subquery in the `FROM` or a `WITH` query.  Write `ISNULL(x, 0)`.
+- **`COALESCE` with a column that a subquery or a `WITH` query combines or computes, before the one that is never null.**  This includes a column of a `UNION` or `UNION ALL`, a column of an `UNPIVOT`, and a column such as `SUM(x) AS total`.  Write `ISNULL(x, 0)`.
 - **`COALESCE(AVG(x), 0)`**, unless the `AVG` is inside `CAST` or `CONVERT` to a built-in type.  Write `ISNULL(AVG(x), 0)`.
 - **`CASE WHEN x IS NULL THEN 0 ELSE x END` of a computed column, a view's column or a subquery's expression that can be null.**  The `CASE` reads `x` twice, and SQL Server can compute such a value again for the second read.  Write `ISNULL(x, 0)`, which is never null.
 - **A column that a filter keeps from being null.**  An example is a column that can hold null, under `WHERE x IS NOT NULL`.  Another is the optional side of a `LEFT JOIN` that the `WHERE` makes inner.
@@ -134,6 +135,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - `COALESCE` over both sides of a `FULL JOIN`;
 - `COALESCE` over a value that can change, such as a `CASE` or a subquery;
 - `COALESCE` over a column of another database or of a linked server;
+- `COALESCE` over a column of a `UNION` or an `UNPIVOT`, or one that a subquery computes;
 - `COALESCE(AVG(x), 0)`;
 - a computed column that is not persisted;
 - a column that a filter keeps from being null;

@@ -264,6 +264,18 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             $"SELECT COALESCE(q.flip, 0) AS c FROM (SELECT {Flip} AS flip FROM dbo.proof_rows) AS q",
             $"WITH q AS (SELECT {Flip} AS flip FROM dbo.proof_rows) SELECT COALESCE(flip, 0) AS c FROM q",
             $"SELECT COALESCE(MAX({Flip}), 0) AS c FROM dbo.proof_rows GROUP BY id",
+            // The server names no source column for a column that a set operator or an UNPIVOT combines, or that a
+            // derived table computes, so none is shown to be stored.
+            "SELECT COALESCE(q.x, 0) AS c FROM (SELECT b AS x FROM dbo.proof_rows UNION ALL "
+                + "SELECT g FROM dbo.proof_rows) AS q",
+            "SELECT COALESCE(q.x, 0) AS c FROM (SELECT b AS x FROM dbo.proof_rows UNION "
+                + "SELECT g FROM dbo.proof_rows) AS q",
+            "WITH q AS (SELECT b AS x FROM dbo.proof_rows UNION ALL SELECT g FROM dbo.proof_rows) "
+                + "SELECT COALESCE(q.x, 0) AS c FROM q",
+            "SELECT COALESCE(u.x, 0) AS c FROM (SELECT id, b, g FROM dbo.proof_rows) AS p "
+                + "UNPIVOT (x FOR w IN (b, g)) AS u",
+            "SELECT COALESCE(q.total, 0) AS c FROM (SELECT SUM(b) AS total FROM dbo.proof_rows GROUP BY g) AS q",
+            "SELECT COALESCE(q.x, 0) AS c FROM (SELECT b * 2 AS x FROM dbo.proof_rows) AS q",
             "SELECT CASE WHEN flip IS NULL THEN 0 ELSE flip END AS c FROM dbo.proof_volatile",
             "SELECT CASE WHEN flip IS NULL THEN 0 ELSE flip END AS c FROM dbo.proof_volatile_view",
             "SELECT CASE WHEN q.flip IS NULL THEN 0 ELSE q.flip END AS c "
@@ -332,6 +344,26 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             await ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server);
             (await NullRowsAsync(sql)).ShouldBeGreaterThan(0, sql);
         });
+
+    // An aggregate over a named window is no aggregate of its group, and a CAST or CONVERT around it hides it from the
+    // type proof, so only the walk of what gives one value keeps these nullable.  WINDOW came with SQL Server 2022.
+    [Theory]
+    [InlineData("COALESCE(CAST(MAX(b) OVER w AS int), 0)")]
+    [InlineData("COALESCE(CONVERT(int, SUM(b) OVER w), 0)")]
+    [InlineData("COALESCE(CAST(MIN(b) OVER w AS bigint) + 1, 0)")]
+    [InlineData("COALESCE(CAST(AVG(b) OVER w AS int), 0)")]
+    public async Task DescribeAsync_NamedWindowThatChanges_NullableAndNullRow(string item)
+    {
+        sqlServer.SkipBelow(NewFunctions, NewFunctionsReason);
+        var sql =
+            $"SELECT {item} AS c FROM dbo.proof_many "
+            + "WINDOW w AS (ORDER BY NEWID() ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING)";
+        await WithManyRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server);
+            (await NullRowsAsync(sql)).ShouldBeGreaterThan(0, sql);
+        });
+    }
 
     // GREATEST and LEAST evaluate an argument once, so one proved argument holds beside a value that changes.
     [Theory]

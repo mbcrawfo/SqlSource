@@ -603,6 +603,8 @@ public sealed class ExpressionProofsTests
     [InlineData("COALESCE(LAG(t.a) OVER (ORDER BY t.id), 0)", "", false)]
     [InlineData("COALESCE(CAST(LAG(t.a) OVER (ORDER BY NEWID()) AS int), 0)", "", false)]
     [InlineData("COALESCE(CONVERT(int, LEAD(t.a) OVER (ORDER BY NEWID())), 0)", "", false)]
+    [InlineData("COALESCE(CAST(MAX(t.a) OVER w AS int), 0)", "WINDOW w AS (ORDER BY NEWID())", false)]
+    [InlineData("COALESCE(CONVERT(int, SUM(t.a) OVER w), 0)", "WINDOW w AS (ORDER BY NEWID())", false)]
     [InlineData("COALESCE(dbo.f(t.a), 0)", "", false)]
     [InlineData("COALESCE([SUM](t.a), 0)", "", false)]
     [InlineData("COALESCE([ISNULL](t.a, 0), 0)", "", false)]
