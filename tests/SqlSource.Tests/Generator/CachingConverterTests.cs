@@ -290,7 +290,7 @@ public sealed class CachingConverterTests
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.LibraryConverters).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.Converters).ShouldBe([IncrementalStepRunReason.Modified]);
-        NodaTimeEdgesOf(result).Count().ShouldBe(14);
+        NodaTimeEdgesOf(result).Count().ShouldBe(NodaTimeConversions.Edges.Count);
         AllReasons(result, TrackingNames.ProjectConverters)
             .ShouldBe([IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBe(IncrementalStepRunReason.Modified);
@@ -314,7 +314,7 @@ public sealed class CachingConverterTests
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.LibraryConverters).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.Converters).ShouldBe([IncrementalStepRunReason.Cached]);
-        NodaTimeEdgesOf(result).Count().ShouldBe(14);
+        NodaTimeEdgesOf(result).Count().ShouldBe(NodaTimeConversions.Edges.Count);
     }
 
     // The edges of NodaTime that the set holds, without System.Text.Json's, which the runtime's references bring.

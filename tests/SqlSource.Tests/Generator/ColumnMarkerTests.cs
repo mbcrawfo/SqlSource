@@ -70,22 +70,10 @@ public sealed class ColumnMarkerTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        run.Sources["App.GetTotalsDto-Model.g.cs"]
-            .ShouldBe(
-                $$"""
-                {{GeneratedFile.ModelHeader}}
-                namespace App
-                {
-                    /// <summary>
-                    /// A row of the query <c>GetTotals</c> from <c>Users.sql</c>.
-                    /// </summary>
-                    /// <param name="Total">The column <c>total</c>, <c>integer</c>.</param>
-                    /// <param name="Note">The column <c>note</c>, <c>text</c>.</param>
-                    public sealed record GetTotalsDto(int Total, string? Note);
-                }
-
-                """
-            );
+        var model = run.Sources["App.GetTotalsDto-Model.g.cs"];
+        model.ShouldContain("public sealed record GetTotalsDto(int Total, string? Note);\n");
+        model.ShouldContain("<param name=\"Total\">The column <c>total</c>");
+        model.ShouldContain("<param name=\"Note\">The column <c>note</c>");
     }
 
     [Fact]

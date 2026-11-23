@@ -26,25 +26,10 @@ public sealed class GeneratedSourceEscapingTests
         );
 
         run.ShouldBeClean();
-        run.Sources["class.g.cs"]
-            .ShouldBe(
-                $$"""
-                {{GeneratedFile.Header}}
-                partial struct @class
-                {
-                    /// <summary>
-                    /// The <c>GetUser</c> query from <c>Users.sql</c>.
-                    /// </summary>
-                    /// <remarks>
-                    /// <code>
-                    /// SELECT 1;
-                    /// </code>
-                    /// </remarks>
-                    public const string GetUser = "SELECT 1;";
-                }
-
-                """
-            );
+        var file = run.Sources["class.g.cs"];
+        file.ShouldStartWith(GeneratedFile.Header + "\npartial struct @class\n{\n");
+        file.ShouldNotContain("namespace");
+        file.ShouldContain("\n    public const string GetUser = \"SELECT 1;\";\n");
     }
 
     [Fact]

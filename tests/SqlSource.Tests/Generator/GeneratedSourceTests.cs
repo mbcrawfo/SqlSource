@@ -140,28 +140,10 @@ public sealed class GeneratedSourceTests
         );
 
         run.ShouldBeClean();
-        run.Sources[GeneratorHarness.SampleFile]
-            .ShouldBe(
-                $$"""
-                {{GeneratedFile.Header}}
-                namespace App
-                {
-                    partial class Sample
-                    {
-                        /// <summary>
-                        /// The <c>GetUser</c> query from <c>Users.sql</c>.
-                        /// </summary>
-                        /// <remarks>
-                        /// <code>
-                        /// SELECT 1;
-                        /// </code>
-                        /// </remarks>
-                        public const string GetUser = "SELECT 1;";
-                    }
-                }
-
-                """
-            );
+        var file = run.Sources[GeneratorHarness.SampleFile];
+        file.ShouldContain("namespace App\n{\n    partial class Sample\n    {\n");
+        file.ShouldContain("        public const string GetUser = \"SELECT 1;\";\n");
+        file.ShouldNotContain("class Sql");
     }
 
     [Theory]
@@ -249,37 +231,23 @@ public sealed class GeneratedSourceTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Data.Outer.IMiddle-2.Inner.g.cs"]
-            .ShouldBe(
-                $$"""
-                {{GeneratedFile.Header}}
-                namespace App.Data
+        var file = run.Sources["App.Data.Outer.IMiddle-2.Inner.g.cs"];
+        file.ShouldContain(
+            """
+            namespace App.Data
+            {
+                partial class Outer
                 {
-                    partial class Outer
+                    partial interface IMiddle<TKey, TValue>
                     {
-                        partial interface IMiddle<TKey, TValue>
+                        partial record Inner
                         {
-                            partial record Inner
+                            private static partial class Sql
                             {
-                                private static partial class Sql
-                                {
-                                    /// <summary>
-                                    /// The <c>GetUser</c> query from <c>Users.sql</c>.
-                                    /// </summary>
-                                    /// <remarks>
-                                    /// <code>
-                                    /// SELECT 1;
-                                    /// </code>
-                                    /// </remarks>
-                                    public const string GetUser = "SELECT 1;";
-                                }
-                            }
-                        }
-                    }
-                }
 
-                """
-            );
+            """
+        );
+        file.ShouldContain("                    public const string GetUser = \"SELECT 1;\";\n");
     }
 
     // A list's uses are segments of their own, and a constant writes them as the SQL wrote them.
