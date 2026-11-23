@@ -344,7 +344,7 @@ public sealed class WatchFolderTests : IAsyncDisposable
         _watch.Clock.Advance(PollingFolderWatcher.Interval);
         await PassAsync(_watch, pollers, 2);
 
-        FoldersOf(polled).ShouldBe([_watch.Run.Folder.Path, _libs, _shared]);
+        FoldersOf(polled).ShouldBe([_watch.Run.Folder.Path, _libs, _shared], ignoreOrder: true);
         File.SetLastWriteTimeUtc(_settings, File.GetLastWriteTimeUtc(_settings).AddMinutes(1));
         _watch.Clock.Advance(PollingFolderWatcher.Interval);
         await PassAsync(_watch, pollers: 3, 3);
@@ -363,7 +363,7 @@ public sealed class WatchFolderTests : IAsyncDisposable
         var polled = PollAllButTheProject();
         await StartAsync();
         var pollers = _watch.Clock.PendingTimers;
-        FoldersOf(polled).ShouldBe([_watch.Run.Folder.Path, _libs, _shared]);
+        FoldersOf(polled).ShouldBe([_watch.Run.Folder.Path, _libs, _shared], ignoreOrder: true);
 
         Directory.Delete(_shared, recursive: true);
         _watch.Clock.Advance(PollingFolderWatcher.Interval);

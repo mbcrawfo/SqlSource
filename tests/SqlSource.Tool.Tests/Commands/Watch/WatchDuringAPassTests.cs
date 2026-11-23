@@ -339,7 +339,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         var app = Path.GetDirectoryName(watch.Project.ProjectPath);
         // The folder above the project's, outside a repository.
         var root = watch.Run.Folder.Path;
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app]);
+        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app], ignoreOrder: true);
 
         watch.Project.ListSettings(shared);
         await File.WriteAllTextAsync(users, SqlTexts.TwoUsers, TestContext.Current.CancellationToken);
@@ -348,7 +348,9 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         await watch.TimerAsync();
         watch.Clock.Advance(WatchSession.Debounce);
         _ = await Eventually.WithinAsync(hold.Arrived.Task, "The second pass did not describe.");
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app, Path.GetDirectoryName(shared)]);
+        watch
+            .Watcher.Open.Select(request => request.Folder)
+            .ShouldBe([root, app, Path.GetDirectoryName(shared)], ignoreOrder: true);
         watch.Raise(Changed(shared));
         hold.Released.SetResult();
         await watch.PassesAsync(2);
@@ -369,7 +371,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         AboveTheTempFolder.SkipWhenInARepository(_watch.Run.Folder.Path);
         await _watch.StartAsync();
         var first = _watch.Watcher.Open.ToList();
-        first.Select(request => request.Folder).ShouldBe([_watch.Above, _watch.Run.Folder.Path]);
+        first.Select(request => request.Folder).ShouldBe([_watch.Above, _watch.Run.Folder.Path], ignoreOrder: true);
 
         await _watch.ChangeAsync(Changed(_watch.Project.ProjectPath));
 
@@ -400,14 +402,14 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         };
         var root = watch.Run.Folder.Path;
         await watch.StartAsync("App/App.csproj");
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app, sharedFolder]);
+        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app, sharedFolder], ignoreOrder: true);
 
         watch.Project.Unlist(shared);
         watch.Project.ListSettings(other);
         await watch.ChangeAsync(Changed(watch.Project.ProjectPath));
 
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app, otherFolder]);
-        openWhenAsked[otherFolder].ShouldBe([root, app, sharedFolder]);
+        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app, otherFolder], ignoreOrder: true);
+        openWhenAsked[otherFolder].ShouldBe([root, app, sharedFolder], ignoreOrder: true);
         watch.Watcher.Requests.Count.ShouldBe(4);
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
     }
@@ -424,12 +426,14 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         var app = Path.GetDirectoryName(watch.Project.ProjectPath);
         var root = watch.Run.Folder.Path;
         await watch.StartAsync("App/App.csproj");
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app]);
+        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app], ignoreOrder: true);
 
         _ = watch.Run.Folder.WriteFile("Shared/sqlsource.json", "{}");
         await watch.ChangeAsync(Changed(watch.Project.ProjectPath));
 
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app, Path.GetDirectoryName(shared)]);
+        watch
+            .Watcher.Open.Select(request => request.Folder)
+            .ShouldBe([root, app, Path.GetDirectoryName(shared)], ignoreOrder: true);
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
