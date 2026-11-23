@@ -1170,11 +1170,11 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-The repository is nested in a generic type, and a `static` member gives its connection or holds its factory.  The methods reach that member through the name of the repository.  A member that the repository inherits has the same name, so inside the repository the name means that member.  The method could read the wrong value, so the repository queries of that database get no method.
+The repository is nested in a generic type, and a `static` member gives its connection or holds its factory.  The methods reach that member through the name of the repository.  A member that the repository inherits, or a parameter of its primary constructor, has the same name, so inside the repository the name means that member or parameter.  The method could read the wrong value, so the repository queries of that database get no method.
 
 A repository that is not generic and is named `cancellationToken` or `parameters` gets this error too, since the argument of that name hides it.  The name `parameters` counts only when a repository query of that database has parameters, and `cancellationToken` counts whatever the `method-type`.
 
-The error is at the repository's `[SqlSourceGenerate]`.  The build does not report it when the inherited member is a field or property whose type is the repository itself, since C# then still reaches the repository's `static` members.
+The error is at the repository's `[SqlSourceGenerate]`.  The build does not report it when the member or parameter has the repository itself as its type, since C# then still reaches the repository's `static` members.  It does report it when a nested type of the same name, in a base type further up, is another type.
 
 ```csharp
 public abstract class RepositoryBase
@@ -1198,7 +1198,7 @@ public partial class Outer<T>
 
 **Fix:** do one of these.
 
-- Rename the inherited member, or the repository when an argument has its name.
+- Rename the inherited member or the parameter, or the repository when an argument has its name.
 - Give the connection from an instance member of the repository.
 - Move the repository out of the generic type.
 

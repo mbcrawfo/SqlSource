@@ -66,7 +66,9 @@ internal static class RepositoryShapeReader
                     interfaceOn,
                     interfaceName,
                     symbol is not null && interfaceOn ? FindTaken(symbol, interfaceName, compilation, token) : null,
-                    symbol is not null && type.IsNestedInAGenericType ? FindSimpleNameTaker(symbol, compilation) : null
+                    symbol is not null && type.IsNestedInAGenericType
+                        ? FindSimpleNameTaker(symbol, compilation, token)
+                        : null
                 )
             );
         }
@@ -76,23 +78,73 @@ internal static class RepositoryShapeReader
         );
     }
 
-    // What the type's simple name means inside it, when that is not the type: the nearest members of the name and the
-    // type's arity that the type can reach, its own or inherited, as C# looks up a simple name.  A field or property
-    // whose type is the type itself is C#'s Color Color rule, through which the name still reaches its static members.
-    private static string? FindSimpleNameTaker(INamedTypeSymbol type, Compilation compilation)
+    // What the type's simple name means inside it, when that is not the type: the nearest member of the name and the
+    // type's arity that the type can reach, its own or inherited, as C# looks up a simple name, else a
+    // primary-constructor parameter.  A nested type that is the type itself is the type.  A field or property of the
+    // type's own type is C#'s Color Color rule, which holds while the name, read as a type, still means this type.
+    private static string? FindSimpleNameTaker(INamedTypeSymbol type, Compilation compilation, CancellationToken token)
     {
         for (var each = type; each is not null; each = each.BaseType)
         {
-            var members = each.GetMembers(type.Name)
-                .Where(member => HasTheArity(member, type.Arity) && compilation.IsSymbolAccessibleWithin(member, type))
-                .ToList();
-            if (members.Count > 0)
+            var found = each.GetMembers(type.Name)
+                .FirstOrDefault(member => IsFoundByTheName(member, type, compilation));
+            if (found is INamedTypeSymbol nested)
             {
-                return IsOfTheType(members[0], type) ? null : DescribeMember(members[0]);
+                return SymbolEqualityComparer.Default.Equals(nested, type) ? null : DescribeMember(nested);
+            }
+
+            if (found is not null)
+            {
+                return IsOfTheType(found, type)
+                    ? FindNestedTypeTaker(each.BaseType, type, compilation)
+                    : DescribeMember(found);
+            }
+        }
+
+        return FindParameterTaker(type, token);
+    }
+
+    private static bool IsFoundByTheName(ISymbol member, INamedTypeSymbol type, Compilation compilation) =>
+        member.CanBeReferencedByName
+        && HasTheArity(member, type.Arity)
+        && compilation.IsSymbolAccessibleWithin(member, type);
+
+    // The nearest nested type of the type's name and arity from the base type, when it is another type: the name, read
+    // as a type, then means that one, and a field or property of the type's own type is an instance reference.
+    private static string? FindNestedTypeTaker(
+        INamedTypeSymbol? baseType,
+        INamedTypeSymbol type,
+        Compilation compilation
+    )
+    {
+        for (var each = baseType; each is not null; each = each.BaseType)
+        {
+            var nested = each.GetTypeMembers(type.Name, type.Arity)
+                .FirstOrDefault(member => compilation.IsSymbolAccessibleWithin(member, type));
+            if (nested is not null)
+            {
+                return SymbolEqualityComparer.Default.Equals(nested, type) ? null : DescribeMember(nested);
             }
         }
 
         return null;
+    }
+
+    // A primary-constructor parameter of the name, which a name with type arguments never means, unless it is of the
+    // type's own type, as a field of it is.
+    private static string? FindParameterTaker(INamedTypeSymbol type, CancellationToken token)
+    {
+        if (type.Arity != 0)
+        {
+            return null;
+        }
+
+        var parameter = ConnectionCandidateReader
+            .PrimaryConstructorOf(type, token)
+            ?.Parameters.FirstOrDefault(each => each.Name == type.Name);
+        return parameter is null || SymbolEqualityComparer.Default.Equals(parameter.Type, type)
+            ? null
+            : "the primary-constructor parameter '" + parameter.Name + "'";
     }
 
     // Whether a simple name of the arity finds the member: a generic method answers a name with no type arguments too.

@@ -1265,6 +1265,8 @@ public sealed class MethodCompileTests
     [InlineData("protected static void Repo<X>() { }", "Repo<U>", "the method App.Hiding.Repo<X>()")]
     [InlineData("", "parameters", "the method argument 'parameters'")]
     [InlineData("", "cancellationToken", "the method argument 'cancellationToken'")]
+    [InlineData("", "Repo(string Repo)", "the primary-constructor parameter 'Repo'")]
+    [InlineData("protected static string? Repo { get; set; }", "Repo(int Repo)", "the property App.Hiding.Repo")]
     public void Run_SimpleNameOfTheRepositoryTakenByAMember_ReportsSqlsrc039(
         string member,
         string repository,
@@ -1300,8 +1302,40 @@ public sealed class MethodCompileTests
             .ShouldBe(1);
     }
 
+    // A nearest member can leave the name to another type: an inherited nested type of the repository's name that is
+    // another constructed type, and a type beyond a field of the repository's own type, which ends Color Color.
+    [Theory]
+    [InlineData(
+        "public partial class Outer<T> : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Outer<int>; }",
+        "the class App.Outer<int>.Repo"
+    )]
+    [InlineData(
+        "public class B0 : RepositoryBase { public class Repo { } } "
+            + "public class B1<X> : B0 { protected static Outer<X>.Repo? Repo; } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : B1<T>; }",
+        "the class App.B0.Repo"
+    )]
+    public void Run_SimpleNameTakenByAnotherType_ReportsSqlsrc039(string declarations, string takenBy)
+    {
+        foreach (var source in StaticSourceAndHolderOf("Source", declarations))
+        {
+            var problems = RunRepositories(source).Problems();
+
+            problems.ShouldNotBeEmpty();
+            foreach (var problem in problems)
+            {
+                problem.ShouldStartWith("SQLSRC039 ");
+                problem.ShouldContain("inside the type that name means " + takenBy + ".");
+            }
+        }
+    }
+
     // The simple name still reaches the repository: a field or property of the repository's own type, which is C#'s
-    // Color Color rule; a member of another arity; and a member the repository cannot reach.
+    // Color Color rule, and a parameter of that type; an inherited nested type that is the repository; a member of
+    // another arity; a member the repository cannot reach; and an accessor or operator, which no name finds.
     [Theory]
     [InlineData(
         "public class Hiding<X> : RepositoryBase { protected static Outer<X>.Repo? Repo { get; set; } } "
@@ -1338,6 +1372,59 @@ public sealed class MethodCompileTests
             + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
             + "public partial class Repo<U> : Hiding; }",
         "Repo<U>.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo(Repo? Repo) : RepositoryBase; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<U>(string Repo) : RepositoryBase; }",
+        "Repo<U>.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Outer<T>; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<U> : Outer<T>; }",
+        "Repo<U>.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> { public partial class Mid : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Mid; } }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Between<X> : Outer<X> { protected static Outer<X>.Repo? Repo; } "
+            + "public partial class Outer<T> : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Between<T>; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Between<X> : Outer<X> { } public partial class Outer<T> : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Between<T>; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { public int X => 0; } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class get_X : Hiding; }",
+        "get_X.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { public static Hiding operator +(Hiding a, Hiding b) => a; } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class op_Addition : Hiding; }",
+        "op_Addition.Source"
     )]
     [InlineData(
         "public class Hiding : RepositoryBase { private static string? Repo { get; set; } } "

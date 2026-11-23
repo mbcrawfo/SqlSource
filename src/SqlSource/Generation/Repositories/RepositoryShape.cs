@@ -36,9 +36,9 @@ namespace SqlSource.Generation.Repositories;
 /// containing type.  Null when nothing does, or the type gets no interface.
 /// </param>
 /// <param name="SimpleNameTakenBy">
-/// What the type's simple name means inside it when that is not the type, such as
-/// <c>the property App.Base.Sample</c>, for a type nested in a generic type, whose methods reach a static member
-/// through that name.  Null when the name reaches the type, or the type is not nested in a generic type.
+/// What the type's simple name means inside it when that is not the type, an inherited member or a primary-constructor
+/// parameter, such as <c>the property App.Base.Sample</c>, for a type nested in a generic type, whose methods reach a
+/// static member through that name.  Null when the name reaches the type, or the type is not nested in a generic type.
 /// </param>
 internal sealed record RepositoryShape(
     string TypeKey,
