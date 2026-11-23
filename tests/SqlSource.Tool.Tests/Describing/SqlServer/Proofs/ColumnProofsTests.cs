@@ -31,7 +31,9 @@ public sealed class ColumnProofsTests
 
         proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users");
         proofs.OperandCount.ShouldBe(2);
-        Nullability(proofs.Apply(Answers(false, true))).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply([new OperandFacts(false, true, Stored: true), new OperandFacts(true, true)]))
+            .ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply(Answers(false, true))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
         Nullability(proofs.Apply(Answers(false, false))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
         Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
@@ -47,7 +49,7 @@ public sealed class ColumnProofsTests
         );
 
         proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users");
-        Nullability(proofs.Apply(Answers(false, true)))
+        Nullability(proofs.Apply([new OperandFacts(false, true, Stored: true), new OperandFacts(true, true)]))
             .ShouldBe([(false, SidecarValues.NullableSource.Expression), (true, SidecarValues.NullableSource.Server)]);
         Nullability(proofs.Apply(Answers(true, false)))
             .ShouldBe([
@@ -180,9 +182,10 @@ public sealed class ColumnProofsTests
         var proofs = Read("SELECT COALESCE(nickname, N'NULL') AS shown FROM dbo.users", ExpressionRow(1, "shown"));
 
         proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1]\nFROM dbo.users");
-        Nullability(proofs.Apply([new OperandFacts(NotNull: true, NotClr: false)]))
+        Nullability(proofs.Apply([new OperandFacts(NotNull: true, NotClr: false, Stored: true)]))
             .ShouldBe([(true, SidecarValues.NullableSource.Server)]);
-        Nullability(proofs.Apply(Answers(false))).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply([new OperandFacts(false, NotClr: true, Stored: true)]))
+            .ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
         Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
 

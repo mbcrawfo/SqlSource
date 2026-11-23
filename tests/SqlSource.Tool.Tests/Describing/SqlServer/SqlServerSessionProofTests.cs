@@ -31,12 +31,20 @@ public sealed class SqlServerSessionProofTests
         SourceColumn = "nickname",
     };
 
+    // The first operand of COALESCE(nickname, name), which is read twice, as a stored column of the table.
+    private static readonly SqlServerColumnRow StoredNickname = OperandRow(1, true) with
+    {
+        SourceType = "U",
+        SourceColumn = "nickname",
+        IsComputedColumn = false,
+    };
+
     [Fact]
     public async Task DescribeAsync_FormNeedsOperands_AsksOperandsAndCorrectsTheColumn()
     {
         var operands = new SqlServerColumnsRequest(ShownOperands, null);
         var script = Script(Shown, [IdColumn, ExpressionRow(2, "shown"), Rowstat with { ColumnOrdinal = 3 }])
-            .Operands(operands, new SqlServerColumnsAnswer([OperandRow(1, true), OperandRow(2, false)], null, null));
+            .Operands(operands, new SqlServerColumnsAnswer([StoredNickname, OperandRow(2, false)], null, null));
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Shown));
 
@@ -113,7 +121,7 @@ public sealed class SqlServerSessionProofTests
                 new SqlServerColumnsRequest(Sql, "@x int"),
                 new SqlServerColumnsAnswer([ExpressionRow(1, "shown")], null, null)
             )
-            .Operands(operands, new SqlServerColumnsAnswer([OperandRow(1, true), OperandRow(2, false)], null, null));
+            .Operands(operands, new SqlServerColumnsAnswer([StoredNickname, OperandRow(2, false)], null, null));
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
