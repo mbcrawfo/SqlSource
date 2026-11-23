@@ -81,7 +81,7 @@ A repository method has the name of the query.  Under the [generator parameter](
   - the member of a base type, or the primary-constructor parameter, that gives the method its connection or holds the factory it comes from;
   - for a public method, the name of the interface of the type.
 - **A [synchronous method](generator-parameters.md#setting-generator-parameters) that takes no argument cannot be named `Finalize`** ([SQLSRC274](../diagnostics.md#sqlsrc274)).  The compiler would take it for the finalizer of the type.
-- **A token cannot be named `parameters` or `cancellationToken`, or as any other argument that a query method can have** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A token also cannot have the name of the primary-constructor parameter that gives the connection, or that holds the factory it comes from.  Nor can it have the name of the repository, when the repository is not generic and a `static` member of it, or of a base type, gives the connection or holds the factory.
+- **A token cannot be named `parameters` or `cancellationToken`, or as any other argument that a query method can have** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A token also cannot have the name of the primary-constructor parameter that gives the connection, or that holds the factory it comes from.  Nor can it have the name of the repository, when the repository is not generic, the repository is nested in a generic type, and a `static` member gives the connection or holds the factory.
 - **The repository methods of a type are in the file of its methods**, `App.UserRepository-Methods.g.cs`, with its other query methods and its interface.
 
 [Where a repository gets its connection](repository-connections.md) is a page of its own.
@@ -228,3 +228,22 @@ The [collection method](collection-methods.md#collection-methods) of the query f
 - **Under any `method-type`, a token cannot be named `cancellationToken`** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  A primary-constructor parameter that gives the connection cannot have that name either, under any `method-type` ([SQLSRC036](../diagnostics.md#sqlsrc036)).
 - **On PostgreSQL, a data source with `Multiplexing=true` refuses a synchronous repository method**, with `NotSupportedException`: see [what a method reads and throws](databases/postgresql/query-methods.md#method-results).
 - **On SQL Server, Microsoft.Data.SqlClient refuses the command of a synchronous method on a borrowed connection with a pending transaction**, with `InvalidOperationException`, as it refuses that of the asynchronous method.
+
+<a id="limits"></a>
+
+## Limits
+
+<a id="limit-repeated-type-parameter"></a>
+
+### A type parameter of an outer type that is hidden
+
+**What you see.**  The build warns CS0693 in the generated file of a repository such as `Outer<T>.Repo<T>`.  `Outer<int>.Repo<string>` implements `Outer<string>.IRepo<string>`, and not `Outer<int>.IRepo<string>`.
+
+A nested type with the name of the outer type parameter has the same effect, with no warning.  In `Outer<T>.Mid` with a nested class `T`, the repository `Mid.Repo` implements the interface of another constructed type.
+
+**Why.**  The generated interface names the outer type with `T`, and inside the repository `T` means the inner type parameter or the nested type.
+
+**What to do.**  Do one of these:
+
+- Give the inner type parameter, or the nested type, another name.
+- Set `GenerateInterface = false` on the repository's `[SqlSourceGenerate]`.

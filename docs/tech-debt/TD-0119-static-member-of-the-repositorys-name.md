@@ -1,21 +1,21 @@
-# TD-0119: A static source or holder of a base type that has the repository's name is reached through the member
+# TD-0119: A repository nested in a generic type cannot use a static connection when a member takes its name
 
 ## Problem
 
-[`ConnectionResolver`](../../src/SqlSource/Generation/Repositories/ConnectionResolver.Resolving.cs) writes the access of a static source, and of a static holder of a held factory, as the repository's name, then a dot, then the member's name: `Sample.Sample` for a static member `Sample` of a base type of `Sample`.  Inside the repository the simple name `Sample` binds to the inherited member before the type, so `Sample.Sample` reads a member of the member's value.  The generated method fails to compile with `CS1061`.  A member cannot have its own type's name (`CS0542`), so only a member that the repository inherits can.
+[`ConnectionResolver`](../../src/SqlSource/Generation/Repositories/ConnectionResolver.Resolving.cs) writes a static access through the repository's type in full from `global::`, except for a repository nested in a generic type.  There, a nearer type parameter or nested type, a generated one too, can hide an outer type parameter, and the path would name another constructed type or fail to compile, so the access starts at the repository's simple name.  An inherited member or a primary-constructor parameter of that name then takes the name from the type, and `Sample.ConnectionString` would read through it.  [`RepositoryShapeReader`](../../src/SqlSource/Generation/Repositories/RepositoryShapeReader.cs) finds it, and `SQLSRC039` refuses the repository's static source or holder, unless it is a field, property or parameter of the repository's own type, which C#'s Color Color rule lets through while no farther nested type takes the name, or a nested type that is the repository.  A repository that is not generic and is named as a method's argument, `cancellationToken` or `parameters`, is refused too.
 
 ## Why it exists
 
-The access of a static member has been written from the type's name since the connection sources were first built, and the case was found only while the review of held factories checked `SQLSRC275`'s message for a static holder.  Fixing it changes how every static source is reached, which is beyond the change that found it.
+The full path fixed every repository that is not nested in a generic type.  For the rest, the owner chose today's access over a check of every name a path could meet, since generated nested classes do not exist when the check runs, and chose to refuse the shape over a method that could silently read another member.
 
 ## Impact
 
-Low.  A base type must declare a static source or factory holder with the name of a type derived from it.  The build fails in the generated code, at the method, with an error that does not name the cause.  Renaming the member is the workaround.
+Low.  The repository must be nested in a generic type, use a static source or holder, and inherit a member, or take a parameter, with its name.  The build reports the cause at the repository.  Renaming the member or parameter, using an instance source or moving the repository are the workarounds.
 
 ## Proposed fix
 
-Write a static access through the type in full, `global::App.Sample.Sample`, as a global's is, when the member has the type's name, or always, with the type's name in full from the `TargetType`.  A global's access has no leading name, so a token of the type's name would then hide nothing and `SQLSRC275` for it would go too.  Add a compile test to `MethodCompileTests` of a static source and of a static holder of a base type that has the repository's name.  Remove the limit "A static member of a base type with the repository's name" from `site/reference/repository-connections.md` and its row of `site/guides/troubleshooting.md`.
+Give such a repository a way to reach its static member that no name can hide, such as a generated private accessor, and remove `SQLSRC039`'s refusal.  Add a compile test of each shape to `MethodCompileTests`, and remove the limit "A static member of a base type with the repository's name" from `site/reference/repository-connections.md` with its row of `site/guides/troubleshooting.md`.
 
 ## Trigger
 
-A user report of `CS1061` in a repository's generated methods, or the next change to how a static source is reached.
+A user report of `SQLSRC039`, or the next change to how a static source is reached.

@@ -62,7 +62,9 @@ Find the message of the exception in this list.  Each entry gives the cause, wha
 - **An empty list after `IN` matches the rows whose value is null, on SQL Server.**  A connection with `ANSI_NULLS` off takes `= NULL` as true for a null.  See [`ANSI_NULLS` off](../reference/databases/sqlserver/query-methods.md#limit-ansi-nulls-off).
 - **Dapper sends no value for a parameter such as `@account_id`.**  Dapper sends a property of the input model only to a parameter written as `@` and the property's name.  See [parameter names for Dapper](dapper.md#limit-parameter-names).
 - **A `rowcount` method returns `-1`, on SQL Server.**  `SET NOCOUNT ON` in a query or command that has no parameters stays on for the connection's session.  See [`rowcount` after `SET NOCOUNT ON`](../reference/databases/sqlserver/query-methods.md#limit-rowcount-after-nocount).
-- **CS1061 in a repository's generated methods, naming the repository.**  A `static` connection source of a base type, or a `static` member that holds your factory, has the repository's name.  See [a static member of a base type with the repository's name](../reference/repository-connections.md#limit-static-member-of-the-repositorys-name).
+- **SQLSRC039 on a repository nested in a generic type.**  A member that the repository inherits, or a parameter of its primary constructor, has the repository's name, and a `static` member gives its connection or holds its factory.  See [a static member of a base type with the repository's name](../reference/repository-connections.md#limit-static-member-of-the-repositorys-name).
+- **CS0693 in a repository's generated file, or a repository that does not implement its interface.**  An inner type parameter or a nested type has the name of an outer type parameter.  See [a type parameter of an outer type that is hidden](../reference/repositories.md#limit-repeated-type-parameter).
+- **CS4003 in a generated asynchronous method.**  A model is in a namespace with a part named `await`.  See [a model in a namespace with a part named `await`](../reference/query-methods.md#limit-model-namespace-await).
 
 <a id="not-described"></a>
 

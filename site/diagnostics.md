@@ -1162,6 +1162,48 @@ CSC : error SQLSRC038: The CollectionItemException that this project sees in Dat
 
 See: [Projects that share internals](reference/exceptions.md#projects-that-share-internals)
 
+## SQLSRC039
+
+**Repository name is hidden from its static connection**
+
+Reported by: the build.
+
+A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
+
+The repository is nested in a generic type, and a `static` member gives its connection or holds its factory.  The methods reach that member through the name of the repository.  A member that the repository inherits, or a parameter of its primary constructor, has the same name, so inside the repository the name means that member or parameter.  The method could read the wrong value, so the repository queries of that database get no method.
+
+A repository that is not generic and is named `cancellationToken` or `parameters` gets this error too, since the argument of that name hides it.  The name `parameters` counts only when a repository query of that database has parameters, and `cancellationToken` counts whatever the `method-type`.
+
+The error is at the repository's `[SqlSourceGenerate]`.  The build does not report it when the member or parameter has the repository itself as its type, since C# then still reaches the repository's `static` members.  It does report it when a nested type of the same name, in a base type further up, is another type.
+
+```csharp
+public abstract class RepositoryBase
+{
+    protected static string? UserRepository { get; set; }
+}
+
+public partial class Outer<T>
+{
+    [SqlSourceGenerate]
+    public partial class UserRepository : RepositoryBase
+    {
+        private static readonly string ConnectionString = "Host=localhost";
+    }
+}
+```
+
+```console
+/work/App/Outer.cs(8,6): error SQLSRC039: The repository methods of 'App.Outer<T>.UserRepository' reach the static member 'ConnectionString' through the type's name, but inside the type that name means the property App.RepositoryBase.UserRepository.  Rename that member, or give the connection from an instance member.
+```
+
+**Fix:** do one of these.
+
+- Rename the inherited member or the parameter, or the repository when an argument has its name.
+- Give the connection from an instance member of the repository.
+- Move the repository out of the generic type.
+
+See: [a static member of a base type with the repository's name](reference/repository-connections.md#limit-static-member-of-the-repositorys-name)
+
 ## SQLSRC101
 
 **Quote is not closed**
@@ -4814,7 +4856,7 @@ A token of a query whose output is `repository` or `methods` has the name of an 
 
 A token is an argument of the method too, so it cannot take one of these names.  That holds even in a query without parameters, whose method has no `parameters`.  So the method is not generated.
 
-A token of a `repository` query also cannot take the name of what its method gets its connection through.  The argument of the token would hide it.  That is the primary-constructor parameter that gives the connection or holds the factory it comes from, or the type, when the connection comes from a `static` member of the type or a factory in one.
+A token of a `repository` query also cannot take the name of what its method gets its connection through.  The argument of the token would hide it.  That is the primary-constructor parameter that gives the connection or holds the factory it comes from.  It is also the repository's name, when the repository is not generic, the repository is nested in a generic type, and a `static` member gives the connection or holds the factory.
 
 The first sample is a token with the name of an argument.  The second is a token with the name of the primary-constructor parameter:
 
