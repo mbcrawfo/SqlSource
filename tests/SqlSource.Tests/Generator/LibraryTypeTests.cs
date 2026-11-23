@@ -789,6 +789,69 @@ public sealed class LibraryTypeTests
         QueryOf(run).Columns.ShouldNotBeNull().ShouldHaveSingleItem().Text.ShouldBe(Geometry);
     }
 
+    // Each query of the type that has one reports its own failure.
+    [Fact]
+    public void Run_ModelsClaimOfTwoLibraryOnlyQueries_Reports246ForEach()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            ListShapes + "\n-- name: ListMore\nSELECT shape FROM more;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [ShapesEntry(file), Entry(file, "ListMore", [], [Column("shape", PostgisGeometry)])],
+            references: WithNetTopologySuite,
+            settings: AtModels
+        );
+
+        run.Diagnostics.ShouldBe([
+            ShapeHasNoCSharpType,
+            ShapeHasNoCSharpType.Replace("(1,10)-(1,20)", "(4,10)-(4,18)", StringComparison.Ordinal),
+        ]);
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
+    // The type's own problem takes the place of its models, and so of the failure that stands for them.
+    [Fact]
+    public void Run_ModelsClaimOfATypeWithADiagnostic_ReportsThatDiagnosticAlone()
+    {
+        const string NotPartial = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public class Rows;
+            }
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+
+        var run = MethodRuns.Run(file, [ShapesEntry(file)], NotPartial, WithNetTopologySuite, settings: AtModels);
+
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC001 ");
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
+    // The type's first file has no query at Models, so the query that fails is the first read of its file, the second.
+    [Fact]
+    public void Run_ModelsClaimOfALibraryOnlyColumnInTheSecondFile_Reports246()
+    {
+        var first = new SqlFile("/app/Repo/A.sql", "-- output: sql\n\n-- name: Other\nSELECT 1;\n");
+        var second = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+
+        var run = MethodRuns.Run(
+            second,
+            [ShapesEntry(second)],
+            references: WithNetTopologySuite,
+            settings: AtModels,
+            otherFiles: [first]
+        );
+
+        run.Diagnostics.ShouldBe([ShapeHasNoCSharpType]);
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
     // Two types that claim one query at Models each defer the same failure, which is reported once, as typing reported
     // it once.
     [Fact]

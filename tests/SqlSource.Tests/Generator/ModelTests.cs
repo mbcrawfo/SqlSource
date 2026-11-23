@@ -902,6 +902,38 @@ public sealed class ModelTests
         }
     }
 
+    // Only the array parameters change at Models, and the properties on both sides of one keep their places.
+    [Fact]
+    public void Run_ArrayParameterBetweenOthers_KeepsEachPropertyInPlace()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT id FROM users WHERE a = @a AND b = ANY (@ids) AND c = @c;\n"
+        );
+
+        var run = Run(
+            file,
+            Entry(file, "GetUser", [Parameter("a"), Parameter("ids", IntArray), Parameter("c")], [Column("id")])
+        );
+
+        run.ShouldBeClean();
+        run.Sources["App.GetUserParams-Model.g.cs"]
+            .ShouldContain("public sealed record GetUserParams(int A, int[] Ids, int C);");
+    }
+
+    // A person edited the sidecar, which the hash of the query does not guard, and its entry names a parameter that the
+    // query lacks: the model has the entry's parameter, which no marker of the query declares.
+    [Fact]
+    public void Run_EntryWithAParameterTheQueryLacks_GivesItsProperty()
+    {
+        var entry = Entry(Users, "GetUser", [Parameter("other")], [Column("id")]);
+
+        var run = Run(Source, [Users, Sidecars.HandEdited(Users, entry)]);
+
+        run.ShouldBeClean();
+        run.Sources["App.GetUserParams-Model.g.cs"].ShouldContain("public sealed record GetUserParams(int Other);");
+    }
+
     // One of the two queries has the array in the database and the other a text that a type override reads as string[],
     // and the shared model has the constructor for the one.
     [Fact]

@@ -595,6 +595,90 @@ public sealed class SharedModelTests
         ModelFiles(run).ShouldBeEmpty();
     }
 
+    // The first and the last letter of the alphabet are lower-case letters too.
+    [Theory]
+    [InlineData("a")]
+    [InlineData("z")]
+    [InlineData("az")]
+    public void Run_ModelNamedWithTheEdgeLettersAlone_IsSqlsrc258(string name)
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, $"-- name: GetUser\n-- output-model: {name}\nSELECT 1;\n");
+
+        var run = Run(Source, [file, Sidecar(file, "GetUser", [Column("id")])]);
+
+        AssertUnusable(
+            run,
+            $"SQLSRC258 {GetUserName}: The model 'App.{name}' of the query 'GetUser' cannot be generated: the "
+                + $"compiler warns on a type name of lower-case ASCII letters alone.{Help258}"
+        );
+    }
+
+    // The namespace of the second model has four parts, and the model is the second of them: neither the first part,
+    // which is its own, nor the whole namespace is the other model.
+    [Fact]
+    public void Run_ModelNamedAsAMiddlePartOfAnotherModelsNamespace_IsSqlsrc258ForBoth()
+    {
+        var run = RunModelAndItsNamespacePart(Source, "Data.Rows", "Data.Rows.More.Row");
+
+        run.Problems()
+            .ShouldBe([
+                $"SQLSRC258 {GeneratorHarness.UsersPath}(1,10)-(1,14): The model 'Data.Rows' of the query 'GetA' "
+                    + $"cannot be generated: it is the namespace of another model.{Help258}",
+                $"SQLSRC258 {GeneratorHarness.UsersPath}(5,10)-(5,14): The model 'Data.Rows.More.Row' of the query "
+                    + $"'GetB' cannot be generated: 'Data.Rows' is another model, and a part of its "
+                    + $"namespace.{Help258}",
+            ]);
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
+    // A model of the global namespace is the first part of the other model's namespace, with its second part after.
+    [Fact]
+    public void Run_ModelOfTheGlobalNamespaceNamedAsTheStartOfAnotherModelsNamespace_IsSqlsrc258ForBoth()
+    {
+        const string GlobalSource = """
+            using SqlSource;
+
+            [SqlSourceGenerate(Source = ".")]
+            public partial class Sample;
+            """;
+
+        var run = RunModelAndItsNamespacePart(GlobalSource, "Data", "Data.Rows.Row");
+
+        run.Problems()
+            .ShouldBe([
+                $"SQLSRC258 {GeneratorHarness.UsersPath}(1,10)-(1,14): The model 'Data' of the query 'GetA' cannot be "
+                    + $"generated: it is the namespace of another model.{Help258}",
+                $"SQLSRC258 {GeneratorHarness.UsersPath}(5,10)-(5,14): The model 'Data.Rows.Row' of the query 'GetB' "
+                    + $"cannot be generated: 'Data' is another model, and a part of its namespace.{Help258}",
+            ]);
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
+    // The type's name has no period before it when its namespace is the global one, whether it is declared at the top
+    // or nested in another type.
+    [Theory]
+    [InlineData("[SqlSourceGenerate(Source = \".\")] public partial class Sample;", "Sample")]
+    [InlineData(
+        "public partial class Outer { [SqlSourceGenerate(Source = \".\")] public partial class Sample; }",
+        "Outer.Sample"
+    )]
+    public void Run_EqualSuffixesOfATypeInTheGlobalNamespace_NameTheTypeWithoutAPeriodBeforeIt(
+        string declaration,
+        string name
+    )
+    {
+        var source = "using SqlSource;\n\n" + declaration + "\n";
+
+        var run = RunWithEqualSuffixes(source);
+
+        run.Problems()
+            .ShouldBe([
+                $"SQLSRC257 {GetUserName}: The output model 'GetUserModel' of the query 'GetUser' is not the same as "
+                    + $"the input model of that name of the query 'GetUser' in Users.sql, for the type {name}: one is "
+                    + $"an input model and the other an output model.{Help257}",
+            ]);
+    }
+
     // CS0542.
     [Fact]
     public void Run_ColumnNamedAsItsModel_IsSqlsrc256()
@@ -991,6 +1075,20 @@ public sealed class SharedModelTests
         ModelFiles(run).ShouldBe(["App.UserRow-Model.g.cs"]);
         run.Sources["App.UserRow-Model.g.cs"]
             .ShouldContain("    /// A row of the query <c>GetA</c> from <c>A.sql</c>.\n");
+    }
+
+    // GetA of the first model and GetB of the second, each a query of Users.sql with its marker, under the source.
+    private static GeneratorRun RunModelAndItsNamespacePart(string source, string first, string second)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            $"-- name: GetA\n-- output-model: {first}\nSELECT 1;\n\n"
+                + $"-- name: GetB\n-- output-model: {second}\nSELECT 2;\n"
+        );
+        return Run(
+            source,
+            [file, Sidecars.Of(file, Entry(file, "GetA", [], [Column("id")]), Entry(file, "GetB", [], [Column("id")]))]
+        );
     }
 
     // The one error, and no model, so that nothing reaches the compiler.
