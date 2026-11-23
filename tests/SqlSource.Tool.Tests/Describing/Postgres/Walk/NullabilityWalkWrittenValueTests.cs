@@ -21,7 +21,8 @@ public sealed class NullabilityWalkWrittenValueTests
         bool stand = true,
         bool oldAndNew = false,
         PostgresTableRow? table = null,
-        int attnum = 2
+        int attnum = 2,
+        bool partitionsKeep = true
     )
     {
         var (columns, origins) = Built(false, new Asked(Table, attnum), Expression);
@@ -40,7 +41,8 @@ public sealed class NullabilityWalkWrittenValueTests
                 true,
                 tables,
                 [BuiltInTypes.Int4, BuiltInTypes.Int4],
-                WrittenValuesStand: stand
+                WrittenValuesStand: stand,
+                PartitionsKeepWrittenValues: partitionsKeep
             )
         );
     }
@@ -110,6 +112,15 @@ public sealed class NullabilityWalkWrittenValueTests
 
         AnswersOf(RunOf(Written, table: generated))[0].ShouldBe(NullableCatalog);
     }
+
+    // Before 16 a partition's generated column may replace the value, and a plain table has no partition to.
+    [Theory]
+    [InlineData("p", true, true)]
+    [InlineData("p", false, false)]
+    [InlineData("r", false, true)]
+    public void Run_ValueWrittenByTableKind_IsProvedWherePartitionsKeepIt(string relkind, bool keep, bool proved) =>
+        AnswersOf(RunOf(Written, table: Table with { Relkind = relkind }, partitionsKeep: keep))[0]
+            .ShouldBe(proved ? NotNullExpression : NullableCatalog);
 
     // A foreign partition's server, an inheritance child and an INSTEAD rule each decide the row returned.
     [Theory]

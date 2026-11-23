@@ -29,12 +29,24 @@ public sealed class PostgresSessionTriggersTests
         2
     );
 
-    private static async Task<SidecarColumn> DescribeAsync(string written, PostgresTriggersAnswer? answer)
+    private static async Task<SidecarColumn> DescribeAsync(
+        string written,
+        PostgresTriggersAnswer? answer,
+        string version = "18.4",
+        string relkind = "r"
+    )
     {
-        var script = new PostgresScript().Open();
+        var script = new PostgresScript().Answer(
+            PostgresCallNames.Open,
+            PostgresOpenRequest.Instance,
+            PostgresScript.Opened with
+            {
+                ServerVersion = version,
+            }
+        );
         _ = script.Prepares(1, Sql, [], new([], null));
         _ = script.Columns(1, 0, Note);
-        _ = script.Tables([Target.Oid], Target);
+        _ = script.Tables([Target.Oid], Target with { Relkind = relkind });
         _ = script.Resolves([PostgresRows.Text.Oid], PostgresRows.Text);
         _ = script.Checks(Sql, [], Note);
         _ = script.Explains(1, 0, PostgresScript.PlanOf(Insert("t", ["note"], "1", written)));
@@ -79,6 +91,41 @@ public sealed class PostgresSessionTriggersTests
 
         column.Nullable.ShouldBe(true);
         column.NullableSource.ShouldBe(SidecarValues.NullableSource.Catalog);
+    }
+
+    // From 16 the server refuses a partition's generated column over a plain one, and a pre-release counts as its
+    // major.
+    [Theory]
+    [InlineData("16.0")]
+    [InlineData("16beta1")]
+    [InlineData("18.6")]
+    public async Task DescribeAsync_PartitionedTargetFrom16_IsProved(string version)
+    {
+        var column = await DescribeAsync("'x'::text", new PostgresTriggersAnswer(false, null), version, "p");
+
+        column.Nullable.ShouldBe(false);
+    }
+
+    // Below 16, or on a version that names no major, the value is not read and so "triggers" is not asked.
+    [Theory]
+    [InlineData("14.24")]
+    [InlineData("15.19")]
+    [InlineData("devel")]
+    public async Task DescribeAsync_PartitionedTargetBelow16_KeepsTheCatalog(string version)
+    {
+        var column = await DescribeAsync("'x'::text", null, version, "p");
+
+        column.Nullable.ShouldBe(true);
+        column.NullableSource.ShouldBe(SidecarValues.NullableSource.Catalog);
+    }
+
+    // A plain table has no partition, on any version.
+    [Fact]
+    public async Task DescribeAsync_PlainTargetBelow16_IsProved()
+    {
+        var column = await DescribeAsync("'x'::text", new PostgresTriggersAnswer(false, null), "14.24");
+
+        column.Nullable.ShouldBe(false);
     }
 
     // No answer of "triggers" can change a value that is not proved, so it is not asked.

@@ -4,7 +4,7 @@ How the PostgreSQL describer decides whether a column can be null: the catalog's
 
 ## Nullability
 
-A column's answer is built in three layers.  The catalog says what a column of a relation can hold.  The gate says whether the query holds a word that can make a `NOT NULL` column come back `NULL`.  The walk reads the plan of a gated query, and of one with a column of no [origin](README.md#origin), and answers what it can prove.  Whatever a layer cannot answer keeps the answer of the layer before it, and is never a wrong `false`.
+A column's answer is built in three layers.  The catalog says what a column of a relation can hold.  The gate says whether the query holds a word that can make a `NOT NULL` column come back `NULL`.  The walk reads the plan of a gated query, and of one with a column of no [origin](README.md#origin), of a view or written by an `INSERT`, and answers what it can prove.  Whatever a layer cannot answer keeps the answer of the layer before it, and is never a wrong `false`.
 
 ### The catalog
 
@@ -112,6 +112,7 @@ A nullable column of the target of a root `INSERT` is `false` with `expression` 
 - The plan's `Operation` is `Insert`, and its `Conflict Resolution` is not `UPDATE`, since `ON CONFLICT DO UPDATE` may return a row the statement did not write (`NullabilityWalk.InsertTargetOf`).
 - The column's origin is the target, of a table that keeps its rows (`ColumnNullability.KeepsNotNull`): an `INSTEAD` rule, a foreign partition and an inheritance child each decide what is returned.  A `DO ALSO` rule makes a second plan, which the walk does not read.
 - The column is not generated, and the statement names neither `OLD` nor `NEW`.
+- The target is not partitioned, or the server is 16 or later (`WalkScope.PartitionsKeepWrittenValues`).  14 and 15 attach a partition whose column is generated where its parent's is plain, and the generated value replaces the one the plan prints.  16 and later refuse such a partition.
 - The entry of the `RETURNING` list is the column itself, under the target's alias or bare.
 - `triggers` finds no `BEFORE INSERT` row trigger on the target or on any partition in its tree, enabled or disabled, since `ALTER TABLE` can enable one without a new describe.  The session walks without written values, then with them (`WalkScope.WrittenValuesStand`), and asks `triggers` only when the two differ.  An error of the call leaves the first answer.
 

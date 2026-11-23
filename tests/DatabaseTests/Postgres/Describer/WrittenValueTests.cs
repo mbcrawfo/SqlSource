@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
@@ -42,6 +43,8 @@ public sealed class WrittenValueTests(PostgresDatabases postgres)
             { "INSERT INTO written.t (id, a) SELECT x.id + 10, x.a FROM written.t x RETURNING a", "?" },
             { "INSERT INTO written.t AS x (id, a) SELECT x.id + 10, x.note FROM written.src x RETURNING x.a", "?" },
             { "INSERT INTO written.t AS x (id, a) SELECT x.id + 10, x.label FROM written.src x RETURNING x.a", "n" },
+            // A set operation prints its first branch's value alone.
+            { "INSERT INTO written.t (id, a) SELECT 300, 'x' UNION ALL SELECT 301, NULL RETURNING a", "?" },
             // ON CONFLICT: DO NOTHING returns only what it wrote, and DO UPDATE returns a row it did not.
             { "INSERT INTO written.t (id, a) VALUES (5, 'x') ON CONFLICT (id) DO NOTHING RETURNING a", "n" },
             {
@@ -58,7 +61,6 @@ public sealed class WrittenValueTests(PostgresDatabases postgres)
             // A BEFORE row trigger on a partition, two levels down, which the row reaches.
             { "INSERT INTO written.p (id, a) VALUES (150, 'x') RETURNING a", "?" },
             { "INSERT INTO written.p (id, a) VALUES (1, 'x') RETURNING a", "?" },
-            { "INSERT INTO written.q (id, a) VALUES (1, 'x') RETURNING a", "n" },
             // An expression over a partitioned target.
             { "INSERT INTO written.q (id, a) VALUES (1, 'x') RETURNING id + 1 AS i, a || 'y' AS s", "n?" },
             { "INSERT INTO written.p (id, a) VALUES (150, 'x') RETURNING id + 1 AS i, a || 'y' AS s", "n?" },
@@ -80,6 +82,57 @@ public sealed class WrittenValueTests(PostgresDatabases postgres)
             await postgres.ExecuteAsync(ScratchSchema.Written);
 
             await ProvedColumns.ShouldAnswerAsync(postgres, sql, expected);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropWritten);
+        }
+    }
+
+    // Before 16 a partition's generated column can replace the value, so no value written to a partitioned target is
+    // read, on a partitioned table with no such partition too.
+    [Fact]
+    public async Task DescribeAsync_ValueWrittenToAPartitionedTarget_IsProvedFrom16()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Written);
+
+            await ProvedColumns.ShouldAnswerAsync(
+                postgres,
+                "INSERT INTO written.q (id, a) VALUES (1, 'x') RETURNING a",
+                postgres.Major >= 16 ? "n" : "?"
+            );
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropWritten);
+        }
+    }
+
+    // What the proof from 16 rests on: the server refuses the partition.  Before 16 it holds NULL in the written
+    // column.
+    [Fact]
+    public async Task DescribeAsync_PartitionsGeneratedColumnOverAWrittenValue_IsNotProved()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Written);
+            if (postgres.Major >= 16)
+            {
+                _ = await Should.ThrowAsync<DbException>(() =>
+                    postgres.ExecuteAsync(ScratchSchema.WrittenGeneratedPartition)
+                );
+                return;
+            }
+
+            await postgres.ExecuteAsync(ScratchSchema.WrittenGeneratedPartition);
+
+            await ProvedColumns.ShouldAnswerAsync(
+                postgres,
+                "INSERT INTO written.pg (id, a, b) VALUES (1, 'x', 'y') RETURNING a",
+                "?"
+            );
         }
         finally
         {

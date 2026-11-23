@@ -24,10 +24,11 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// A query is described through one prepared statement: <c>PREPARE</c> takes a declared type as written, resolves
 /// it, checks it against every use of its parameter, and infers the rest.  The statement is then described through
 /// an <c>EXECUTE</c> that is never run, which gives its columns.  For a query that the outer-join gate lets in, or
-/// one with a column of no origin, an <c>EXPLAIN</c> of that <c>EXECUTE</c> under <c>force_generic_plan</c> gives
-/// the plan that <see cref="NullabilityWalk" /> walks.  Every call from <c>prepare</c> to <c>deallocate</c> runs
-/// in one transaction that <c>prepare</c> begins and <c>deallocate</c> rolls back, so that a pooler in transaction
-/// mode keeps the describe on one backend (<see cref="PostgresConnection.BeginDescribeAsync" />).  A prepared
+/// one with a column the plan may answer, of no origin, of a view or written by an <c>INSERT</c>, an <c>EXPLAIN</c> of
+/// that <c>EXECUTE</c> under <c>force_generic_plan</c> gives the plan that <see cref="NullabilityWalk" /> walks.
+/// Every call from <c>prepare</c> to <c>deallocate</c> runs in one transaction that <c>prepare</c> begins and
+/// <c>deallocate</c> rolls back, so that a pooler in transaction mode keeps the describe on one backend
+/// (<see cref="PostgresConnection.BeginDescribeAsync" />).  A prepared
 /// statement is session state and survives a rollback, so it is freed in a <c>finally</c>, inside the transaction;
 /// one left behind would be a leak until the session ends.  Its name is a counter, since the name is part of a
 /// request and a capture must be the same each time it is recorded.
@@ -38,6 +39,9 @@ internal sealed partial class PostgresSession : DescriberSession
 
     /// <summary>The oldest major version of PostgreSQL the describer supports.</summary>
     public const int MinimumMajorVersion = 14;
+
+    // The first major that refuses a partition a generated column over its parent's plain one.
+    private const int MajorOfPartitionsThatKeepWrittenValues = 16;
 
     private readonly string _database;
     private readonly IRunLog _log;
@@ -163,11 +167,12 @@ internal sealed partial class PostgresSession : DescriberSession
     // What is asked of a statement that was prepared, in this order: its columns, the tables they name, and every
     // type that the parameters, the columns and their origins have, once; the server's spelling of each type with
     // each modifier the built types need, once; Npgsql's own reading of the SQL; and, for a query with rows that is
-    // gated or has a column of no origin, its generic plan, then the ancestors of the relations an Append of the plan
-    // may scan as partitions, and, for a column of no origin, the relations the plan scans that "tables" did not
-    // answer and which of the names of CatalogOverloads the plan prints another schema holds, or pg_catalog holds as
-    // an object that is not built in, and, when it changes an answer, whether any cast joins two families of
-    // SetOperationTypes.
+    // gated or has a column the plan may answer, of no origin, of a view or written by an INSERT, its generic plan,
+    // then the ancestors of the relations an Append of the plan may scan as partitions, and, for such a column, the
+    // relations the plan scans that "tables" did not answer and which of the names of CatalogOverloads the plan prints
+    // another schema holds, or pg_catalog holds as an object that is not built in, and, when it changes an answer,
+    // whether any cast joins two families of SetOperationTypes and whether a BEFORE row trigger can change a value an
+    // INSERT writes.
     // The table match is made last and asks nothing: it reads the nullability the walk set.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
@@ -262,8 +267,8 @@ internal sealed partial class PostgresSession : DescriberSession
             return Failed(differs);
         }
 
-        // After the check, for a gated query and for one with a column of no origin, which the plan may answer: one
-        // whose every column is a table's or a view's and that is not gated pays nothing.
+        // After the check, for a gated query and for one with a column the plan may answer (NeedsThePlan): any other
+        // query, a relation's whole column list among them, pays nothing.
         WalkOutcome? walked = null;
         if (gated || NeedsThePlan(request.Sql, built.Value, origins))
         {
@@ -280,7 +285,9 @@ internal sealed partial class PostgresSession : DescriberSession
                     ParameterCount: parameterOids.Count,
                     ValuesNeverNull: SettingOf("standard_conforming_strings") == "on"
                         ? ValuesStatement.NeverNullColumns(request.Sql)
-                        : null
+                        : null,
+                    PartitionsKeepWrittenValues: Versions.LeadingMajor(Server.Version)
+                        >= MajorOfPartitionsThatKeepWrittenValues
                 ),
                 cancellationToken
             );

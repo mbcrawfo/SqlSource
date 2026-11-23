@@ -26,6 +26,9 @@ SqlSource can tell that a column is never null when the column is one of these:
   - The statement has `ON CONFLICT DO UPDATE`.
   - The table, or any of its partitions, has a `BEFORE INSERT` row trigger, even a disabled one.
   - The value is a query parameter.
+  - The table has a `DO ALSO` rule on `INSERT`.
+  - The table is partitioned, on PostgreSQL 15 or earlier.
+  - The query holds the word `OLD` or `NEW`, or the quoted name `"old"` or `"new"`, in any case.
 - **A constant** other than `NULL`, such as `1` or `'active'`.
 - **A test**: `IS NULL` or `IS NOT NULL`.
 - **Arithmetic or a comparison of values that are never null**, in one of these forms:

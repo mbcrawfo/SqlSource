@@ -358,6 +358,16 @@ internal static class ScratchSchema
         CREATE MATERIALIZED VIEW written.mv AS SELECT s.id FROM written.src s;
         """;
 
+    /// <summary>
+    /// On <see cref="Written" />, a partitioned table whose plain column <c>a</c> is a partition's generated column of
+    /// <c>NULL</c>.  PostgreSQL 14 and 15 attach such a partition, and 16 and later refuse it.
+    /// </summary>
+    public const string WrittenGeneratedPartition = """
+        CREATE TABLE written.pg (id integer NOT NULL, a text, b text) PARTITION BY RANGE (id);
+        CREATE TABLE written.pg_1 (id integer NOT NULL, a text GENERATED ALWAYS AS (NULL::text) STORED, b text);
+        ALTER TABLE written.pg ATTACH PARTITION written.pg_1 FOR VALUES FROM (0) TO (100);
+        """;
+
     /// <summary>Drops <see cref="Written" />.</summary>
     public const string DropWritten = "DROP SCHEMA IF EXISTS written CASCADE";
 

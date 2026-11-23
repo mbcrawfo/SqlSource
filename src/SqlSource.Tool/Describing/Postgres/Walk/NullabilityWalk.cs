@@ -42,8 +42,9 @@ internal sealed record WalkOutcome(
 
 /// <summary>What a walk is asked to answer, beside the plan and the columns.</summary>
 /// <param name="Gated">
-/// Whether <see cref="OuterJoinGate" /> found a word in the query.  Only then does the plan answer a column with an
-/// origin: a query without one is planned for its columns of no origin, and no outer join can have touched the rest.
+/// Whether <see cref="OuterJoinGate" /> found a word in the query.  Only then does the plan answer a table's column
+/// for its joins: a query without one is planned for its columns of no origin, of a view or written by an
+/// <c>INSERT</c>, and no outer join its text writes can have touched the rest.
 /// </param>
 /// <param name="OldAndNewMayBeNamed">
 /// Whether the query's SQL names <c>OLD</c> or <c>NEW</c>, so that a reference at a root <c>ModifyTable</c> may be
@@ -68,7 +69,7 @@ internal sealed record WalkOutcome(
 /// name of a call that failed, is held elsewhere.
 /// </param>
 /// <param name="DistrustsJoinReduction">
-/// Whether no join of the plan is trusted to keep a side that the query's text may null-extend: a gated query that
+/// Whether no join of the plan is trusted to keep a side that the query's text or a view may null-extend: a query that
 /// negates a list, <c>o.id NOT IN @ids</c>.  The list is described as one value, which the planner reads as the strict
 /// <c>o.id &lt;&gt; $1</c> and so makes a <c>LEFT JOIN</c> inner, while an empty list, as the query runs, keeps the
 /// rows whose <c>o.id</c> is <c>NULL</c>.  Every join but a semi join is then read as extending both of its sides.
@@ -92,6 +93,11 @@ internal sealed record WalkOutcome(
 /// Whether a value a root <c>INSERT</c> writes is the value its <c>RETURNING</c> list returns: <c>triggers</c> found no
 /// <c>BEFORE</c> row trigger on the target or on a partition of it.
 /// </param>
+/// <param name="PartitionsKeepWrittenValues">
+/// Whether the server refuses a partition a generated column where its partitioned table's column is plain, as 16 and
+/// later do.  Before 16 such a partition replaces the value the plan prints, so no value written to a partitioned
+/// target is read.
+/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
@@ -103,7 +109,8 @@ internal sealed record WalkScope(
     bool NoCastAcrossFamilies = false,
     int ParameterCount = 0,
     IReadOnlyList<bool>? ValuesNeverNull = null,
-    bool WrittenValuesStand = false
+    bool WrittenValuesStand = false,
+    bool PartitionsKeepWrittenValues = false
 );
 
 /// <summary>
@@ -285,6 +292,7 @@ internal static partial class NullabilityWalk
             || !string.Equals(origin.Table.Schema, target.Schema, StringComparison.Ordinal)
             || !string.Equals(origin.Table.Name, target.Name, StringComparison.Ordinal)
             || !ColumnNullability.KeepsNotNull(origin.Table)
+            || (origin.Table.Relkind == "p" && !plans.Scope.PartitionsKeepWrittenValues)
             || origin.Attribute.Generated.Length > 0
             || ColumnNullability.Of(origin, gated: false).Nullable == false
             || OutputReference.Parse(entry) is not { } reference
