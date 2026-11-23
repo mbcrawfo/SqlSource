@@ -110,6 +110,21 @@ public sealed class LibraryProbeTests
         probe.NodaTimeVersion.ShouldBe(new Version(3, 4, 0, 0));
     }
 
+    // Of two packages named NodaTime of different versions, which a project references through two routes, the newer
+    // gives the version, whichever is listed first.  The packages are strong-named, so the compilation keeps both.
+    [Theory]
+    [InlineData("3.1.9", "3.3.7")]
+    [InlineData("3.3.7", "3.1.9")]
+    public void Read_TwoNodaTimePackages_RecordsTheNewerVersionInEitherOrder(string first, string second)
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.NodaTime(first), LibraryReferences.NodaTime(second))
+        );
+
+        probe.NodaTime.ShouldBeTrue();
+        probe.NodaTimeVersion.ShouldBe(new Version(3, 3, 7, 0));
+    }
+
     // An assembly of another name that defines the types, as a library merged into one does, is found, and gives no
     // version.
     [Fact]
@@ -385,6 +400,8 @@ public sealed class LibraryProbeTests
     [InlineData("2.1", false)]
     [InlineData("2.1.0", false)]
     [InlineData("2.1.0-beta1", false)]
+    [InlineData("2.0.0-beta1", true)]
+    [InlineData("2.0.9", true)]
     [InlineData("2.2.0", false)]
     [InlineData("unknown", false)]
     [InlineData(null, false)]
@@ -401,6 +418,33 @@ public sealed class LibraryProbeTests
         );
 
         probe.IsBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer).ShouldBe(expected);
+    }
+
+    // The packages below the floor are those of the library asked about: a project whose NetTopologySuite packages are
+    // too old gets none of them named for NodaTime or JSON.
+    [Fact]
+    public void PackagesBelowTheFloor_OfALibraryWhoseNeighboursAreBelow_NamesItsOwnAlone()
+    {
+        var probe = new LibraryProbe(
+            NodaTime: true,
+            NpgsqlNodaTime: true,
+            NodaTimeVersion: new Version(3, 1, 8, 0),
+            NetTopologySuite: true,
+            NetTopologySuiteAtFloor: false,
+            NetTopologySuiteVersion: "2.4.0",
+            SqlServerBytes: true,
+            SqlServerBytesVersion: "2.0.0",
+            Json: true
+        );
+
+        probe
+            .PackagesBelowTheFloor(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql)
+            .ShouldBe([("NodaTime", "3.1.8", "3.1.9")]);
+        probe
+            .PackagesBelowTheFloor(SqlLibrary.NodaTime, DatabaseEngine.SqlServer)
+            .ShouldBe([("NodaTime", "3.1.8", "3.1.9")]);
+        probe.PackagesBelowTheFloor(SqlLibrary.Json, DatabaseEngine.PostgreSql).ShouldBeEmpty();
+        probe.PackagesBelowTheFloor(SqlLibrary.Json, DatabaseEngine.SqlServer).ShouldBeEmpty();
     }
 
     // Both below on SQL Server: each package once, NetTopologySuite first.
