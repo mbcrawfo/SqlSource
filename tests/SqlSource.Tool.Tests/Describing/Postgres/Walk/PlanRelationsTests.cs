@@ -40,6 +40,18 @@ public sealed class PlanRelationsTests
     public void Of_ScanInASubPlan_IsFound() =>
         PlanRelations.Of(Over("Result", Scan("orders"), "SubPlan")).ShouldBe([Name("public", "orders")]);
 
+    // An INSERT scans no target, and a RETURNING list reads its columns.
+    [Fact]
+    public void Of_TargetOfARootModifyTable_IsFound() =>
+        PlanRelations
+            .Of(Insert("t", ["a"], "'x'::text") with { Plans = [Scan("users")] })
+            .ShouldBe([Name("public", "t"), Name("public", "users")]);
+
+    // A data-modifying CTE's target is what its own scan reads, and no column of the statement.
+    [Fact]
+    public void Of_TargetOfAModifyTableBelowTheRoot_IsNotFound() =>
+        PlanRelations.Of(Over("CTE Scan", Insert("t", ["a"], "'x'::text"), "InitPlan")).ShouldBeEmpty();
+
     // A relation scanned twice, by two aliases or by two branches, is asked once.
     [Fact]
     public void Of_RelationScannedTwice_IsOnce() =>

@@ -28,9 +28,6 @@ public sealed class WalkMatrixTests
     // A column of a table whose entry of the plan cannot be mapped, or whose plan cannot be used.
     private const string Heuristic = "true heuristic";
 
-    // A column of a view that nothing extends.
-    private const string OfView = "null view";
-
     // An expression the plan does not answer.
     private const string NoOrigin = "null no-origin";
 
@@ -38,7 +35,6 @@ public sealed class WalkMatrixTests
     private const string Expression = "false expression";
 
     private const string Walked = "walked";
-    private const string Unavailable = "unavailable";
 
     private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.Of(SidecarValues.Engine.Postgres);
 
@@ -66,7 +62,7 @@ public sealed class WalkMatrixTests
         ["walk-cte-inlined"] = (Walked, [Kept, Joined]),
         ["walk-cte-materialized"] = (Walked, [Kept, Joined]),
         ["walk-lateral"] = (Walked, [Kept, Joined]),
-        ["walk-view"] = (Walked, [OfView, OfView, Joined, Joined, Joined]),
+        ["walk-view"] = (Walked, [Expression, Expression, Joined, Joined, Joined]),
         ["walk-view-nullable-side"] = (Walked, [Kept, Joined]),
         ["walk-using"] = (Walked, [Expression, Joined, Joined]),
         ["walk-natural"] = (Walked, [Expression, Expression, Joined, Joined]),
@@ -79,9 +75,9 @@ public sealed class WalkMatrixTests
         ["walk-quoted-alias"] = (Walked, [Kept, Joined]),
         ["walk-semi-anti"] = (Walked, [Kept, NoOrigin]),
         ["walk-anti"] = (Walked, [Kept, Joined, Joined]),
-        ["walk-rollup"] = (Unavailable, [Heuristic, NoOrigin]),
-        ["walk-cube"] = (Unavailable, [Heuristic, Heuristic, NoOrigin]),
-        ["walk-grouping-sets"] = (Unavailable, [Heuristic, NoOrigin]),
+        ["walk-rollup"] = (Walked, [Heuristic, Expression]),
+        ["walk-cube"] = (Walked, [Heuristic, Heuristic, Expression]),
+        ["walk-grouping-sets"] = (Walked, [Heuristic, Expression]),
         ["walk-order-by-unselected"] = (Walked, [Kept, Joined]),
     };
 

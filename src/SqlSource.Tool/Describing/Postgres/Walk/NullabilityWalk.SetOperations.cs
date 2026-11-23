@@ -412,8 +412,10 @@ internal static partial class NullabilityWalk
             }
 
             return expressions.NullableOf(entry, TotalFunctions.UnknownType) == false
-                && PlanExpression.TypeOf(entry, plans.Scope.CatalogFunctionsFirst) is { } constant
-                && SetOperationTypes.Carries(constant, type);
+                && (PlanExpression.TypeOf(entry, plans.Scope.CatalogFunctionsFirst) ?? expressions.ValueTypeOf(entry))
+                    is { } value
+                && value != TotalFunctions.UnknownType
+                && SetOperationTypes.Carries(value, type);
         }
     }
 }

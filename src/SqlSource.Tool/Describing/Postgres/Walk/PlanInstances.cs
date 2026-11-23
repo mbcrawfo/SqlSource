@@ -188,6 +188,16 @@ internal sealed class PlanInstances
     /// </summary>
     public string? Reason { get; private set; }
 
+    /// <summary>
+    /// Whether a grouping set is all that stands against the plan, so that a value never <c>NULL</c> in any group can
+    /// still be read from it.
+    /// </summary>
+    public bool OnlyGroupingSetsAgainst
+    {
+        get => Reason == WalkReasons.GroupingSets && !field;
+        private set;
+    }
+
     /// <summary>Every node that was visited, in the order of the visit.</summary>
     public IReadOnlyList<VisitedNode> Nodes => _nodes;
 
@@ -242,6 +252,26 @@ internal sealed class PlanInstances
     /// </summary>
     public bool IsUnder(string alias, PlanNode node) =>
         _nodesOfInstances.TryGetValue(alias, out var named) && Reaches(node, named);
+
+    /// <summary>
+    /// Whether a join from the node down to the node that names the instance of the alias null-extends the side the
+    /// instance is on; true when the alias names no instance under the node.
+    /// </summary>
+    public bool ExtendsBetween(PlanNode node, string alias) =>
+        !_nodesOfInstances.TryGetValue(alias, out var named) || !Reaches(node, named) || ExtendsOnPath(node, named);
+
+    private bool ExtendsOnPath(PlanNode node, PlanNode sought)
+    {
+        if (ReferenceEquals(node, sought))
+        {
+            return false;
+        }
+
+        var child = node.JoinChildren.First(candidate => Reaches(candidate, sought));
+        var side = child.ParentRelationship == PlanRelationships.Inner ? NullExtension.Inner : NullExtension.Outer;
+        var extends = ExtendsOf(node);
+        return extends is null || extends == NullExtension.Both || extends == side || ExtendsOnPath(child, sought);
+    }
 
     // Whether the node is the one sought, by reference, or one of its Outer and Inner children reaches it.
     private static bool Reaches(PlanNode node, PlanNode sought) =>
@@ -306,6 +336,7 @@ internal sealed class PlanInstances
         if (extends is null)
         {
             Reason ??= WalkReasons.UnknownJoinType;
+            OnlyGroupingSetsAgainst = true;
         }
 
         // EXPLAIN (FORMAT JSON) writes every aggregate as "Aggregate", with its strategy apart, and one that mixes
@@ -382,6 +413,7 @@ internal sealed class PlanInstances
         if (!_instances.TryAdd(alias, instance))
         {
             Reason ??= WalkReasons.DoubledAlias;
+            OnlyGroupingSetsAgainst = true;
             return;
         }
 

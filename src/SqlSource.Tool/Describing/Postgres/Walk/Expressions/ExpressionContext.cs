@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
@@ -24,8 +25,8 @@ namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 /// computed it under its own grouping.
 /// </param>
 /// <param name="GroupsHaveRows">
-/// Whether the node that computes the entry is an <c>Aggregate</c> each of whose groups has a row: one with a
-/// <c>Group Key</c> and no <c>Grouping Sets</c>.
+/// Whether the node that computes the entry is an <c>Aggregate</c> each of whose groups has a row: one with no
+/// <c>Grouping Sets</c> that has a <c>Group Key</c> or the <c>Sorted</c> strategy.
 /// </param>
 /// <param name="ScalarSubPlanTypeOf">
 /// The type of the value of the <c>SubPlan</c> of a name, <c>SubPlan 1</c>, when its plan always returns one row whose
@@ -42,11 +43,22 @@ namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 /// its name, and only when <paramref name="CatalogFunctions" /> holds too; a name it leaves out is read as no form of
 /// that table.
 /// </param>
-/// <param name="ProvedOnFullJoinSide">
-/// Where the node that computes the entry is a <c>Full</c> join that no join above null-extends: for a reference to an
-/// instance under one of its sides, under which no join null-extends, whether that side is the join's <c>Outer</c>
-/// child, and the declared type of the column, when the walk would prove the column but for that join's extension;
-/// or null.  It is null at any other node.
+/// <param name="ProvedOnFullJoinSides">
+/// One reader for each <c>Full</c> join at or under the node that computes the entry that no join above null-extends:
+/// for a reference to an instance under one of its sides, which no join under that side null-extends and which every
+/// node from the one that computes the entry down to the join prints as it is, whether that side is the join's
+/// <c>Outer</c> child, and the declared type of the column, when the walk would prove the column but for that join's
+/// extension; or null.  It is null where no node computes the entry.
+/// </param>
+/// <param name="InitPlanTypeOf">
+/// The type of the value of an <c>InitPlan</c>, given as the plan prints it, <c>$1</c> or <c>(InitPlan 1).col1</c>,
+/// when its plan always returns one row whose value the walk proves not <c>NULL</c>; or null.  The walk answers it only
+/// for a value that is the whole entry, of the column's type.
+/// </param>
+/// <param name="WindowHoldsCurrentRow">
+/// Where the node that computes the entry is a <c>WindowAgg</c>: whether the window of the name printed after
+/// <c>OVER</c> is the node's, with a frame that holds the current row (<see cref="PlanWindows" />).  It is null at any
+/// other node.
 /// </param>
 internal sealed record ExpressionContext(
     bool CatalogFunctions,
@@ -57,5 +69,7 @@ internal sealed record ExpressionContext(
     Func<string, long?>? ScalarSubPlanTypeOf = null,
     Func<string, int, long?>? SubPlanColumnTypeOf = null,
     CatalogNames? CatalogAlone = null,
-    Func<OutputReference, (bool OuterSide, long Type)?>? ProvedOnFullJoinSide = null
+    IReadOnlyList<Func<OutputReference, (bool OuterSide, long Type)?>>? ProvedOnFullJoinSides = null,
+    Func<string, long?>? InitPlanTypeOf = null,
+    Func<string, bool>? WindowHoldsCurrentRow = null
 );

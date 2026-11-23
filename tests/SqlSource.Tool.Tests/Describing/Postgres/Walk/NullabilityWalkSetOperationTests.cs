@@ -5,6 +5,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
 using static SqlSource.Tool.Tests.PostgresPlans;
@@ -106,6 +107,43 @@ public sealed class NullabilityWalkSetOperationTests
         outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
         outcome.Reason.ShouldBeNull();
         AnswersOf(outcome).ShouldBe([NotNullSetOperation, NotNullSetOperation]);
+    }
+
+    // A branch that is an expression counts by the type the walk proves it of, which carries to the column's.
+    [Fact]
+    public void Run_UnionAllOfExpressionsOfTheFamily_IsFalseFromTheBranches() =>
+        AnswersOf(RunSet(AppendOf(Scan("u", "(u.id + 1)"), Scan("o", "(o.user_id + 1)")), Int8Oid))
+            .ShouldBe([NotNullSetOperation]);
+
+    // A branch's expression over a nullable column proves nothing, nor does one whose type cannot carry to the
+    // column's.
+    [Theory]
+    [InlineData("(o.ref + 1)", Int4Oid)]
+    [InlineData("(o.user_id + 1)", TextOid)]
+    public void Run_UnionAllOfAnExpressionThatProvesNothing_KeepsNoOrigin(string branch, long type) =>
+        AnswersOf(RunSet(AppendOf(Scan("u", "(u.id + 1)"), Scan("o", branch)), type)).ShouldBe([UnknownNoOrigin]);
+
+    // array_agg of a group is never NULL and of no known type, so that no branch of it carries to the column's type.
+    [Fact]
+    public void Run_UnionAllOfValuesOfNoKnownType_KeepsNoOrigin()
+    {
+        const long IntegerArrayOid = 1007;
+        var alone = new CatalogNames(new HashSet<string>(["array_agg"], StringComparer.Ordinal), new HashSet<string>());
+        var root = AppendOf(
+            Aggregate("Sorted", true, Scan("u", "u.id"), "array_agg(u.id)"),
+            Aggregate("Sorted", true, Scan("o", "o.user_id"), "array_agg(o.user_id)")
+        );
+        var (columns, origins) = Built(false, Expression);
+
+        AnswersOf(
+                NullabilityWalk.Run(
+                    new PlanInstancesCache(root, null),
+                    columns,
+                    origins,
+                    new WalkScope(false, false, true, SetTables, [IntegerArrayOid], CatalogAlone: alone)
+                )
+            )
+            .ShouldBe([UnknownNoOrigin]);
     }
 
     // An Append that partition pruning removed a member of shows not every partition, and another execution may read

@@ -473,22 +473,23 @@ public sealed class SynchronousRepositoryTests
             .ShouldBe(1);
     }
 
-    // A pair's synchronous factory, an instance member, hides no type, and its asynchronous one, a static member, is
-    // reached through the type, which a token of the type's name would hide: the second form is checked too.
+    // A pair held through two parameters: a token of the asynchronous factory's holder hides only the second form's
+    // source, so that form is checked too.
     [Fact]
-    public void Run_MethodTypeBothTokenNamedAsTheTypeOfTheAsynchronousFactory_ReportsSqlsrc275()
+    public void Run_MethodTypeBothTokenNamedAsTheAsynchronousHolder_ReportsSqlsrc275()
     {
         var source = SampleOf(
-            "public partial class Sample\n    {\n"
+            "public partial class Sample(SyncFactory a, AsyncFactory b);\n\n"
+                + "    public sealed class SyncFactory\n    {\n"
                 + "        [SqlSourceConnection]\n"
-                + "        private static Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken) =>\n"
-                + "            Task.FromResult(new NpgsqlConnection());\n\n"
+                + "        public NpgsqlConnection Open() => new NpgsqlConnection();\n    }\n\n"
+                + "    public sealed class AsyncFactory\n    {\n"
                 + "        [SqlSourceConnection]\n"
-                + "        private NpgsqlConnection Open() => new NpgsqlConnection();\n    }"
+                + "        public Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken) =>\n"
+                + "            Task.FromResult(new NpgsqlConnection());\n    }"
         );
         var file = UsersFile(
-            "-- generator: method-type=both\n-- name: GetFrom\n-- token: {{Sample:users}}\n"
-                + "SELECT id FROM {{Sample}};\n"
+            "-- generator: method-type=both\n-- name: GetFrom\n-- token: {{b:users}}\nSELECT id FROM {{b}};\n"
         );
 
         var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], source);
@@ -496,7 +497,8 @@ public sealed class SynchronousRepositoryTests
         var problems = run.Problems();
         problems.Count.ShouldBe(1);
         problems[0].ShouldStartWith("SQLSRC275 ");
-        problems[0].ShouldContain("'Sample'");
+        problems[0].ShouldContain("the primary-constructor parameter 'b', through which");
+        problems[0].ShouldContain("'b.OpenAsync'");
     }
 
     // A method of no argument named Finalize has the signature of object.Finalize, which the compiler warns about

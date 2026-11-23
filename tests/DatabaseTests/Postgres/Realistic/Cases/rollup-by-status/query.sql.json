@@ -12,7 +12,7 @@
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
-      "plan": "unavailable",
+      "plan": "walked",
       "tableMatch": "no-origin",
       "parameters": [],
       "columns": [
@@ -64,8 +64,8 @@
             "schema": "pg_catalog",
             "internalName": "int8"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": null,
           "computed": null
@@ -94,8 +94,8 @@
             "schema": "pg_catalog",
             "internalName": "int4"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": null,
           "computed": null

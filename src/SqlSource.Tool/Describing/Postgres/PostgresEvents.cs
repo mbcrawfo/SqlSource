@@ -18,9 +18,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, <c>spellings</c>, one <c>column</c> for each
 /// column, <c>check</c>, <c>table-match</c> and <c>deallocate</c>, in that order, each only when its call was made,
 /// and <c>table-match</c> only for a statement with rows whose check agreed.  A query with rows that is gated or has
-/// a column of no origin writes, between <c>check</c> and <c>table-match</c>, <c>explain</c>, <c>partitions</c>,
-/// <c>relations</c>, <c>overloads</c> and <c>casts</c> when each is asked, one <c>walk.node</c> for each node the walk
-/// visited, one <c>walk.column</c> for each column, and <c>walk</c>.
+/// a column the plan may answer writes, between <c>check</c> and <c>table-match</c>, <c>explain</c>,
+/// <c>partitions</c>, <c>relations</c>, <c>overloads</c>, <c>casts</c> and <c>triggers</c> when each is asked, one
+/// <c>walk.node</c> for each node the walk visited, one <c>walk.column</c> for each column, and <c>walk</c>.
 /// </remarks>
 internal static class PostgresEvents
 {
@@ -311,6 +311,20 @@ internal static class PostgresEvents
             answer.Error is { } error
                 ? new LogMember(Error, ErrorOf(error))
                 : new LogMember("anyCast", answer.AnyCast == true),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
+    /// The event of <c>triggers</c>: whether a <c>BEFORE INSERT</c> row trigger may change a written value, or the
+    /// error.
+    /// </summary>
+    public static void Triggers(IRunLog log, string query, PostgresTriggersAnswer answer, long durationMs) =>
+        log.Write(
+            PostgresCallNames.Triggers,
+            new("query", query),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember("anyBeforeInsert", answer.AnyBeforeInsert == true),
             new(Duration, durationMs)
         );
 

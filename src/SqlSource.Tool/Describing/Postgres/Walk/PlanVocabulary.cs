@@ -14,6 +14,8 @@ internal static class PlanNodeTypes
     public const string CteScan = "CTE Scan";
     public const string ModifyTable = "ModifyTable";
     public const string Aggregate = "Aggregate";
+    public const string WindowAgg = "WindowAgg";
+    public const string ValuesScan = "Values Scan";
 
     public const string SeqScan = "Seq Scan";
     public const string IndexScan = "Index Scan";
@@ -55,6 +57,19 @@ internal static class PlanRelationships
 internal static class AggregateStrategies
 {
     public const string Plain = "Plain";
+    public const string Sorted = "Sorted";
+}
+
+/// <summary>The value of <c>Operation</c> of a <c>ModifyTable</c> that the walk compares.</summary>
+internal static class PlanOperations
+{
+    public const string Insert = "Insert";
+}
+
+/// <summary>The value of <c>Conflict Resolution</c> of a <c>ModifyTable</c> that the walk compares.</summary>
+internal static class PlanConflicts
+{
+    public const string Update = "UPDATE";
 }
 
 /// <summary>The values of <c>Join Type</c>.</summary>

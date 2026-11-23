@@ -42,6 +42,13 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// members from the plan: their number, and 0 when the key is absent.  Such a node does not show every partition.
 /// </param>
 /// <param name="Plans"><c>Plans</c>: the children, empty when the node has none.</param>
+/// <param name="Window">
+/// <c>Window</c>, the definition of a <c>WindowAgg</c>'s window, which PostgreSQL 18 prints and 14 to 17 do not.
+/// </param>
+/// <param name="Operation"><c>Operation</c> of a <c>ModifyTable</c>: <c>Insert</c>, <c>Update</c> and the rest.</param>
+/// <param name="ConflictResolution">
+/// <c>Conflict Resolution</c> of a <c>ModifyTable</c> with <c>ON CONFLICT</c>: <c>NOTHING</c> or <c>UPDATE</c>.
+/// </param>
 internal sealed record PlanNode(
     string NodeType,
     string? JoinType,
@@ -58,7 +65,10 @@ internal sealed record PlanNode(
     bool HasGroupKey,
     bool HasFilter,
     int SubplansRemoved,
-    IReadOnlyList<PlanNode> Plans
+    IReadOnlyList<PlanNode> Plans,
+    string? Window = null,
+    string? Operation = null,
+    string? ConflictResolution = null
 )
 {
     /// <summary>
@@ -134,6 +144,23 @@ internal sealed record PlanNode(
             : null;
 
     /// <summary>
+    /// The root of the one <c>InitPlan</c> of the tree that returns the parameter, as PostgreSQL before 17 names one,
+    /// <c>InitPlan 2 (returns $1)</c>, or null.  One that returns several is named for them all, and is none.
+    /// </summary>
+    /// <param name="parameter">The parameter as the plan prints it, <c>$1</c>.</param>
+    public PlanNode? OnlyInitPlanReturning(string parameter) =>
+        SelfAndDescendants()
+            .Where(node =>
+                node.ParentRelationship == PlanRelationships.InitPlan
+                && node.SubplanName?.EndsWith($" (returns {parameter})", StringComparison.Ordinal) == true
+            )
+            .Take(2)
+            .ToArray()
+            is [var only]
+            ? only
+            : null;
+
+    /// <summary>
     /// The root of a plan's text, or null: the text is an array of one object whose <c>Plan</c> is the root, and
     /// anything else is a plan that cannot be used.  A key the walk does not read is ignored.
     /// </summary>
@@ -173,6 +200,9 @@ internal sealed record PlanNode(
             || !TryText(element, PlanKeys.CteName, out var cte)
             || !TryText(element, PlanKeys.Command, out var command)
             || !TryText(element, PlanKeys.Strategy, out var strategy)
+            || !TryText(element, PlanKeys.Window, out var window)
+            || !TryText(element, PlanKeys.Operation, out var operation)
+            || !TryText(element, PlanKeys.ConflictResolution, out var conflict)
             || !TryCount(element, PlanKeys.SubplansRemoved, out var removed)
             || !TryNodes(element, out var plans)
         )
@@ -198,7 +228,10 @@ internal sealed record PlanNode(
                 && key.GetArrayLength() > 0,
             element.TryGetProperty(PlanKeys.Filter, out _),
             removed,
-            plans
+            plans,
+            window,
+            operation,
+            conflict
         );
     }
 

@@ -73,6 +73,38 @@ public sealed class PostgresTableMatcherTests
             [.. cells.Select(static cell => cell.Origin)]
         );
 
+    private static bool ListsARelation(params Cell[] cells) =>
+        PostgresTableMatcher.ListsARelation(
+            [.. cells.Select(static cell => cell.Column)],
+            [.. cells.Select(static cell => cell.Origin)]
+        );
+
+    // A column the walk proved keeps the list a relation's, though the match would read it as another nullability.
+    [Fact]
+    public void ListsARelation_WholeListWithAnotherNullability_IsTrue()
+    {
+        var cells = Whole(Items);
+        cells[2] = cells[2] with { Column = cells[2].Column with { Nullable = false } };
+
+        ListsARelation(cells).ShouldBeTrue();
+        Match(cells).Result.ShouldBe(SidecarValues.TableMatch.NullabilityDiffers);
+    }
+
+    [Fact]
+    public void ListsARelation_NoColumn_IsFalse() => ListsARelation().ShouldBeFalse();
+
+    [Fact]
+    public void ListsARelation_ColumnLeftOut_IsFalse() =>
+        ListsARelation(From(Items, 1), From(Items, 2)).ShouldBeFalse();
+
+    [Fact]
+    public void ListsARelation_AnotherOrder_IsFalse() =>
+        ListsARelation(From(Items, 2), From(Items, 1), From(Items, 4)).ShouldBeFalse();
+
+    [Fact]
+    public void ListsARelation_ColumnWithoutAnOrigin_IsFalse() =>
+        ListsARelation([.. Whole(Items), Expression]).ShouldBeFalse();
+
     [Fact]
     public void Match_EveryColumnOfATableInItsOrder_IsTheTable() =>
         Match(Whole(Items)).ShouldBe((new SidecarTable("public", "items"), SidecarValues.TableMatch.Matched));

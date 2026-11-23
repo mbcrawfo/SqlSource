@@ -15,7 +15,7 @@ public sealed class RealisticNullabilityNoiseTests(PostgresDatabases postgres)
 {
     // The budget of each recorded major, by the major.  One is lowered in the change that lowers the noise, as the
     // test below demands, and raised only in a change that adds cases, by how much and why in that commit.
-    private static readonly Dictionary<int, int> Budgets = new() { [14] = 19, [18] = 17 };
+    private static readonly Dictionary<int, int> Budgets = new() { [14] = 12, [18] = 10 };
 
     private readonly RealisticNoiseChecks _checks = new(
         RealisticCases.Corpus,

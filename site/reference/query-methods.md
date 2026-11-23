@@ -51,11 +51,11 @@ A type that claims the file of a query gives the query its methods when all of t
   - Nothing else takes the name of any of its methods ([SQLSRC274](../diagnostics.md#sqlsrc274)).
   - The query does not stream its rows under `method-type=sync` ([SQLSRC298](../diagnostics.md#sqlsrc298)).
   - No token has the name of an argument that a query method can have ([SQLSRC275](../diagnostics.md#sqlsrc275)).
-  - For a repository query, no token has the name of the primary-constructor parameter that gives the connection, or that holds the factory it comes from ([SQLSRC275](../diagnostics.md#sqlsrc275)).  Nor does a token have the name of the repository, when the repository is not generic and a `static` member of it, or of a base type, gives the connection or holds the factory.
+  - For a repository query, no token has the name of the primary-constructor parameter that gives the connection, or that holds the factory it comes from ([SQLSRC275](../diagnostics.md#sqlsrc275)).  Nor does a token have the name of the repository, when the repository is not generic, the repository is nested in a generic type, and a `static` member gives the connection or holds the factory.
   - If the method goes in the extension class, that class can be written ([SQLSRC276](../diagnostics.md#sqlsrc276)).
 - **For a repository query, the type has the connection of the query.**  All of these are true:
   - The type is not static ([SQLSRC034](../diagnostics.md#sqlsrc034)).
-  - One member, or a pair of members, gives the connection of the database of the query: a member of the type, of a factory that it holds, or a static member of the project, as [where the build looks](repository-connections.md#connection-order) says ([SQLSRC028](../diagnostics.md#sqlsrc028) to [SQLSRC033](../diagnostics.md#sqlsrc033), [SQLSRC036](../diagnostics.md#sqlsrc036)).
+  - One member, or a pair of members, gives the connection of the database of the query: a member of the type, of a factory that it holds, or a static member of the project, as [where the build looks](repository-connections.md#connection-order) says ([SQLSRC028](../diagnostics.md#sqlsrc028) to [SQLSRC033](../diagnostics.md#sqlsrc033), [SQLSRC036](../diagnostics.md#sqlsrc036), [SQLSRC039](../diagnostics.md#sqlsrc039)).
   - For a synchronous method, one member that gives the connection returns no task ([SQLSRC299](../diagnostics.md#sqlsrc299)).
 - **The [converters](converters.md#converters) of the query serve it.**  This is for a column or parameter whose type has converters, and whose type a type override, a column type or a `-- param:` marker chose.  It has a converter that it can use, and all of these are true:
   - The converter is of the direction that the column or parameter needs ([SQLSRC280](../diagnostics.md#sqlsrc280)).
@@ -144,3 +144,13 @@ Some queries whose output is `repository` or `methods` cannot get a method.  Giv
 
 - Give the method the connection of the driver that the wrapper holds.  For a repository, give that connection from a marked method that returns it, or as the connection that it borrows.
 - Give the query the output `models`, and send its parameters through the wrapper yourself.
+
+<a id="limit-model-namespace-await"></a>
+
+### A model in a namespace with a part named `await`
+
+**What you see.**  The build fails in a generated asynchronous method with CS4003, "'await' cannot be used as an identifier within an async method or lambda expression".
+
+**Why.**  The method names the model by its full name, and an asynchronous method cannot use `await` as a name without its `@`.
+
+**What to do.**  Give that part of the namespace another name.

@@ -221,13 +221,27 @@ public sealed class NullabilityWalkExpressionTests
         AnswersOf(RunOverAAndR(plan)).ShouldBe([UnknownNoOrigin]);
     }
 
-    // A join that null-extends under a side may make that side's column NULL, whichever side it extends.
-    [Fact]
-    public void Run_CoalesceAtAFullJoinOverAnExtendedSide_KeepsNoOrigin()
+    // A join under a side that extends the relation the form names may make its column NULL.
+    [Theory]
+    [InlineData("Right")]
+    [InlineData("Full")]
+    public void Run_CoalesceAtAFullJoinOverAnExtendedInstance_KeepsNoOrigin(string joinType)
     {
-        var left = Join("Left", Scan("a", "a.id"), Scan("b", "b.id")) with { Output = ["a.id"] };
+        var under = Join(joinType, Scan("a", "a.id"), Scan("b", "b.id")) with { Output = ["a.id"] };
 
-        AnswersOf(RunOverAAndR(FullJoinOfAAndR(left))).ShouldBe([UnknownNoOrigin]);
+        AnswersOf(RunOverAAndR(FullJoinOfAAndR(under))).ShouldBe([UnknownNoOrigin]);
+    }
+
+    // A join under a side that extends only another relation leaves the column the form names as it was.
+    [Theory]
+    [InlineData("Left")]
+    [InlineData("Inner")]
+    [InlineData("Anti")]
+    public void Run_CoalesceAtAFullJoinOverAJoinThatKeepsTheInstance_IsAnswered(string joinType)
+    {
+        var under = Join(joinType, Scan("a", "a.id"), Scan("b", "b.id")) with { Output = ["a.id"] };
+
+        AnswersOf(RunOverAAndR(FullJoinOfAAndR(under))).ShouldBe([NotNullExpression]);
     }
 
     // A row of the full join has a row of one side at least, but that side's column may itself be NULL.
@@ -240,13 +254,37 @@ public sealed class NullabilityWalkExpressionTests
             .ShouldBe([UnknownNoOrigin]);
     }
 
-    // A node above the join that computes the COALESCE reads each column as the join extends it.
+    // A node above the join that computes the COALESCE over the references the join passes up reads a row of the join.
     [Fact]
-    public void Run_CoalesceAboveAFullJoin_KeepsNoOrigin()
+    public void Run_CoalesceAboveAFullJoin_IsAnswered()
     {
         var join = FullJoinOfAAndR(Scan("a", "a.id")) with { Output = ["a.id", "r.account_id"] };
+        var sort = Over("Sort", join) with { Output = ["a.id", "r.account_id"] };
 
-        AnswersOf(RunOverAAndR(Over("Result", join) with { Output = [CoalesceOfBothSides] }))
+        AnswersOf(RunOverAAndR(Over("Result", sort) with { Output = [CoalesceOfBothSides] }))
+            .ShouldBe([NotNullExpression]);
+    }
+
+    // A node between that does not print a reference may have computed another value under its name.
+    [Fact]
+    public void Run_CoalesceAboveAFullJoinThroughANodeThatDropsAReference_KeepsNoOrigin()
+    {
+        var join = FullJoinOfAAndR(Scan("a", "a.id")) with { Output = ["a.id", "r.account_id"] };
+        var between = Over("Sort", join) with { Output = ["a.id"] };
+
+        AnswersOf(RunOverAAndR(Over("Result", between) with { Output = [CoalesceOfBothSides] }))
+            .ShouldBe([UnknownNoOrigin]);
+    }
+
+    // A full join under the side a join above extends is NULL in a row that join did not match, wherever the form is
+    // computed.
+    [Fact]
+    public void Run_CoalesceAboveAFullJoinThatALeftJoinExtends_KeepsNoOrigin()
+    {
+        var full = FullJoinOfAAndR(Scan("a", "a.id")) with { Output = ["a.id", "r.account_id"] };
+        var left = Join("Left", Scan("b", "b.id"), full) with { Output = ["a.id", "r.account_id"] };
+
+        AnswersOf(RunOverAAndR(Over("Result", left) with { Output = [CoalesceOfBothSides] }))
             .ShouldBe([UnknownNoOrigin]);
     }
 

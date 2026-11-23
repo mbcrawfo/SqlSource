@@ -707,6 +707,228 @@ public sealed class PlanOutputTests(PostgresDatabases postgres)
             .. node.Plans.Where(static child => child.ParentRelationship is "Outer" or "Inner").SelectMany(Followed),
         ];
 
+    // An uncorrelated subquery is an InitPlan, whose value prints as $k before 17, under a name that says what it
+    // returns, and as (InitPlan n).col1 from 17.  An EXISTS and an ARRAY print the same on every major, so that only
+    // the column's type tells them from a scalar subquery.
+    [Theory]
+    [InlineData("(SELECT count(*) FROM orders)")]
+    [InlineData("EXISTS (SELECT 1 FROM orders)")]
+    [InlineData("ARRAY(SELECT o.id FROM orders o)")]
+    public async Task Explain_UncorrelatedSubquery_PrintsAnInitPlansValue(string expression)
+    {
+        var root = await ExplainAsync($"SELECT {expression} AS v");
+
+        root.Output.ShouldBe([postgres.Major >= 17 ? "(InitPlan 1).col1" : "$0"]);
+        All(root)
+            .Single(static node => node.ParentRelationship == "InitPlan")
+            .SubplanName.ShouldBe(postgres.Major >= 17 ? "InitPlan 1" : "InitPlan 1 (returns $0)");
+    }
+
+    // A GROUP BY whose every column the WHERE sets to one value keeps its key before 16, and from 16 is a Sorted
+    // Aggregate with no key.  Either returns no row for an input of none.
+    [Fact]
+    public async Task Explain_GroupByTheWhereFixes_IsSortedWithNoKeyFromSixteen()
+    {
+        const string Sql = "SELECT max(o.total) FROM orders o WHERE o.user_id = -5 GROUP BY o.user_id";
+
+        var root = await ExplainAsync(Sql);
+
+        root.NodeType.ShouldBe(PlanNodeTypes.Aggregate);
+        root.HasGroupKey.ShouldBe(postgres.Major < 16);
+        if (!root.HasGroupKey)
+        {
+            root.Strategy.ShouldBe(AggregateStrategies.Sorted);
+        }
+
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var command = source.CreateCommand($"SELECT count(*) FROM ({Sql}) s");
+        (await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)).ShouldBe(0L);
+    }
+
+    // With no GROUP BY, or an empty one, the Aggregate is Plain, which returns a row for an input of none.
+    [Theory]
+    [InlineData("SELECT max(o.total) FROM orders o WHERE o.user_id = -5")]
+    [InlineData("SELECT max(o.total) FROM orders o WHERE o.user_id = -5 GROUP BY ()")]
+    [InlineData("SELECT max(o.total) FROM orders o WHERE o.user_id = -5 HAVING count(*) >= 0")]
+    public async Task Explain_NoGroupBy_IsAPlainAggregate(string sql)
+    {
+        var root = await ExplainAsync(sql);
+
+        root.NodeType.ShouldBe(PlanNodeTypes.Aggregate);
+        root.Strategy.ShouldBe(AggregateStrategies.Plain);
+        root.HasGroupKey.ShouldBeFalse();
+    }
+
+    // A cast of one side's column prints inside the COALESCE at the join.  A COALESCE over two grouped columns is
+    // computed by the Aggregate above the join, which takes each reference from the join as it is.
+    [Fact]
+    public async Task Explain_FullJoinForms_PrintWhatTheWalkFollows()
+    {
+        const string From = "FROM users u FULL JOIN orders o ON o.user_id = u.id";
+
+        var cast = await ExplainAsync($"SELECT coalesce(o.id, u.id) {From}");
+        var above = await ExplainAsync($"SELECT coalesce(o.user_id, u.id) {From} GROUP BY o.user_id, u.id");
+
+        cast.JoinType.ShouldBe(PlanJoinTypes.Full);
+        cast.Output.ShouldBe(["COALESCE(o.id, (u.id)::bigint)"]);
+        above.NodeType.ShouldBe(PlanNodeTypes.Aggregate);
+        above.Output.ShouldNotBeNull().ShouldContain("COALESCE(o.user_id, u.id)");
+        var join = All(above).Single(static node => node.JoinType == PlanJoinTypes.Full);
+        join.Output.ShouldNotBeNull().ShouldContain("o.user_id");
+        join.Output.ShouldContain("u.id");
+    }
+
+    // PostgreSQL 18 prints a window's definition with its frame, and 14 to 17 print none.
+    [Theory]
+    [InlineData("PARTITION BY u.status ORDER BY u.id", "w1 AS (PARTITION BY u.status ORDER BY u.id)")]
+    [InlineData("ORDER BY u.id ROWS UNBOUNDED PRECEDING", "w1 AS (ORDER BY u.id ROWS UNBOUNDED PRECEDING)")]
+    [InlineData(
+        "ORDER BY u.id ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING",
+        "w1 AS (ORDER BY u.id ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)"
+    )]
+    [InlineData(
+        "ORDER BY u.id ROWS BETWEEN 1 PRECEDING AND CURRENT ROW",
+        "w1 AS (ORDER BY u.id ROWS BETWEEN '1'::bigint PRECEDING AND CURRENT ROW)"
+    )]
+    [InlineData(
+        "ORDER BY u.id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW",
+        "w1 AS (ORDER BY u.id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW)"
+    )]
+    public async Task Explain_WindowAggregate_PrintsItsFrameFromEighteen(string definition, string printed)
+    {
+        var root = await ExplainAsync($"SELECT max(u.id) OVER ({definition}) FROM users u");
+
+        var window = All(root).First(static node => node.NodeType == PlanNodeTypes.WindowAgg);
+        window.Output.ShouldNotBeNull()[0].ShouldBe(postgres.Major >= 18 ? "max(id) OVER w1" : "max(id) OVER (?)");
+        window.Window.ShouldBe(postgres.Major >= 18 ? printed : null);
+    }
+
+    // Under grouping sets a count and GROUPING(...) print at the Aggregate, and in parentheses at a Sort above it,
+    // which 14 does not need for this query.
+    [Fact]
+    public async Task Explain_GroupingSets_PrintsCountAndGroupingAtTheAggregate()
+    {
+        var root = await ExplainAsync(
+            "SELECT u.status, count(*), count(DISTINCT u.id), grouping(u.status) FROM users u "
+                + "GROUP BY ROLLUP (u.status) ORDER BY u.status"
+        );
+
+        var grouped = All(root).Single(static node => node.HasGroupingSets);
+        grouped.NodeType.ShouldBe(PlanNodeTypes.Aggregate);
+        grouped.Output.ShouldBe(["status", "count(*)", "count(DISTINCT id)", "GROUPING(status)"]);
+        if (!ReferenceEquals(root, grouped))
+        {
+            root.Output.ShouldBe(["status", "(count(*))", "(count(DISTINCT id))", "(GROUPING(status))"]);
+        }
+    }
+
+    // A VALUES statement of several rows is a Values Scan, which prints its columns by their place, and of one row a
+    // Result of its constants.
+    [Fact]
+    public async Task Explain_Values_PrintsItsColumnsByTheirPlace()
+    {
+        var sorted = await ExplainAsync("VALUES ('a', 1), ('b', 2) ORDER BY 2");
+        var single = await ExplainAsync("VALUES ('a', 1)");
+
+        sorted.NodeType.ShouldBe(PlanNodeTypes.Sort);
+        sorted.Output.ShouldBe(["column1", "column2"]);
+        var scan = sorted.Plans.ShouldHaveSingleItem();
+        scan.NodeType.ShouldBe(PlanNodeTypes.ValuesScan);
+        scan.Output.ShouldBe(["column1", "column2"]);
+        single.NodeType.ShouldBe("Result");
+    }
+
+    // round(numeric) and trunc(numeric) are SQL functions the planner inlines into their two-argument forms.
+    [Theory]
+    [InlineData("round(o.total)", "round(total, 0)")]
+    [InlineData("trunc(o.total)", "trunc(total, 0)")]
+    [InlineData("round(o.total, 2)", "round(total, 2)")]
+    [InlineData("ceil(o.total)", "ceil(total)")]
+    [InlineData("abs(o.total)", "abs(total)")]
+    public async Task Explain_FunctionOfTheTable_PrintsItsSignature(string expression, string printed)
+    {
+        var root = await ExplainAsync($"SELECT {expression} FROM orders o");
+
+        root.Output.ShouldBe([printed]);
+    }
+
+    // The child of an INSERT prints one entry for each attribute of the target in its order: a dropped one's as a NULL
+    // of its type, and a generated one's as a NULL it is computed over later.
+    [Theory]
+    [InlineData(
+        "INSERT INTO written.gone (a, b) VALUES (1, 'x') RETURNING b",
+        new[] { "1", "NULL::integer", "'x'::text" }
+    )]
+    [InlineData(
+        "INSERT INTO written.t (id, a) VALUES (1, 'x') ON CONFLICT DO NOTHING RETURNING a",
+        new[] { "1", "'x'::text", "'x'::text", "NULL::text", "NULL::text" }
+    )]
+    public async Task Explain_Insert_PrintsAValueForEachAttributeInItsOrder(string sql, string[] values)
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Written);
+
+            var root = await ExplainAsync(sql);
+
+            root.NodeType.ShouldBe(PlanNodeTypes.ModifyTable);
+            root.Operation.ShouldBe(PlanOperations.Insert);
+            root.Plans.ShouldHaveSingleItem().Output.ShouldBe(values);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropWritten);
+        }
+    }
+
+    // What InsertTargetOf reads: an upsert names its resolution, and an UPDATE is another operation.
+    [Theory]
+    [InlineData("INSERT INTO written.t (id) VALUES (1) ON CONFLICT (id) DO UPDATE SET a = 'x'", "Insert", "UPDATE")]
+    [InlineData("INSERT INTO written.t (id) VALUES (1) ON CONFLICT (id) DO NOTHING", "Insert", "NOTHING")]
+    [InlineData("INSERT INTO written.t (id) VALUES (1)", "Insert", null)]
+    [InlineData("UPDATE written.t SET a = 'x'", "Update", null)]
+    public async Task Explain_ModifyTable_PrintsItsOperationAndItsResolution(
+        string sql,
+        string operation,
+        string? resolution
+    )
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Written);
+
+            var root = await ExplainAsync(sql);
+
+            root.Operation.ShouldBe(operation);
+            root.ConflictResolution.ShouldBe(resolution);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropWritten);
+        }
+    }
+
+    // An INSERT prints the target's alias, and an UPDATE of a partitioned target a partition's, which names no
+    // instance.
+    [Theory]
+    [InlineData("INSERT INTO written.q (id) VALUES (1) RETURNING id + 1", "(q.id + 1)")]
+    [InlineData("UPDATE written.q SET a = 'x' RETURNING id + 1", "(q_1.id + 1)")]
+    public async Task Explain_PartitionedTarget_PrintsItsReturningList(string sql, string printed)
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Written);
+
+            var root = await ExplainAsync(sql);
+
+            root.Output.ShouldBe([printed]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropWritten);
+        }
+    }
+
     // The node and every node under it, whatever the relationship.
     private static PlanNode[] All(PlanNode node) => [node, .. node.Plans.SelectMany(All)];
 }

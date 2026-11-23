@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres.Columns;
@@ -41,8 +42,9 @@ internal sealed record WalkOutcome(
 
 /// <summary>What a walk is asked to answer, beside the plan and the columns.</summary>
 /// <param name="Gated">
-/// Whether <see cref="OuterJoinGate" /> found a word in the query.  Only then does the plan answer a column with an
-/// origin: a query without one is planned for its columns of no origin, and no outer join can have touched the rest.
+/// Whether <see cref="OuterJoinGate" /> found a word in the query.  Only then does the plan answer a table's column
+/// for its joins: a query without one is planned for its columns of no origin, of a view or written by an
+/// <c>INSERT</c>, and no outer join its text writes can have touched the rest.
 /// </param>
 /// <param name="OldAndNewMayBeNamed">
 /// Whether the query's SQL names <c>OLD</c> or <c>NEW</c>, so that a reference at a root <c>ModifyTable</c> may be
@@ -67,7 +69,7 @@ internal sealed record WalkOutcome(
 /// name of a call that failed, is held elsewhere.
 /// </param>
 /// <param name="DistrustsJoinReduction">
-/// Whether no join of the plan is trusted to keep a side that the query's text may null-extend: a gated query that
+/// Whether no join of the plan is trusted to keep a side that the query's text or a view may null-extend: a query that
 /// negates a list, <c>o.id NOT IN @ids</c>.  The list is described as one value, which the planner reads as the strict
 /// <c>o.id &lt;&gt; $1</c> and so makes a <c>LEFT JOIN</c> inner, while an empty list, as the query runs, keeps the
 /// rows whose <c>o.id</c> is <c>NULL</c>.  Every join but a semi join is then read as extending both of its sides.
@@ -77,6 +79,25 @@ internal sealed record WalkOutcome(
 /// <see cref="SetOperationTypes.CrossFamilyPairs" />, so that an entry of a scanned plan whose type
 /// <see cref="SetOperationTypes.CannotReach" /> the column's is not that column.
 /// </param>
+/// <param name="ParameterCount">
+/// How many parameters the statement has, numbered from 1.  PostgreSQL before 17 prints an <c>InitPlan</c>'s value as
+/// <c>$k</c>, numbered from 0, as it prints the statement's parameter <c>$k</c>, so a <c>$k</c> from 1 to this count is
+/// never read as an <c>InitPlan</c>'s.
+/// </param>
+/// <param name="ValuesNeverNull">
+/// For a statement that is a <c>VALUES</c> alone, whether every row holds a literal in each column
+/// (<see cref="Statements.ValuesStatement" />), or null for any other statement.  It answers a column only for a plan
+/// that is a <c>Values Scan</c> under nodes that never project.
+/// </param>
+/// <param name="WrittenValuesStand">
+/// Whether a value a root <c>INSERT</c> writes is the value its <c>RETURNING</c> list returns: <c>triggers</c> found no
+/// <c>BEFORE</c> row trigger on the target or on a partition of it.
+/// </param>
+/// <param name="PartitionsKeepWrittenValues">
+/// Whether the server refuses a partition a generated column where its partitioned table's column is plain, as 16 and
+/// later do.  Before 16 such a partition replaces the value the plan prints, so no value written to a partitioned
+/// target is read.
+/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
@@ -85,7 +106,11 @@ internal sealed record WalkScope(
     IReadOnlyList<long> ColumnTypes,
     CatalogNames? CatalogAlone = null,
     bool DistrustsJoinReduction = false,
-    bool NoCastAcrossFamilies = false
+    bool NoCastAcrossFamilies = false,
+    int ParameterCount = 0,
+    IReadOnlyList<bool>? ValuesNeverNull = null,
+    bool WrittenValuesStand = false,
+    bool PartitionsKeepWrittenValues = false
 );
 
 /// <summary>
@@ -155,7 +180,12 @@ internal static partial class NullabilityWalk
 
         if (instances.Reason is { } reason)
         {
-            return Unusable(reason, root, instances, columns);
+            return
+                instances.OnlyGroupingSetsAgainst
+                && !instances.HasSetOperation
+                && OutputFits(entries, origins, instances)
+                ? RunGroupingSets(plans, root, instances, columns, origins, entries)
+                : Unusable(reason, root, instances, columns);
         }
 
         // A plan whose root's Output does not agree with the row description (OutputFits) is read for no expression.  A
@@ -171,6 +201,8 @@ internal static partial class NullabilityWalk
         var expressions =
             fits && !instances.HasSetOperation ? new Expressions(plans, root, instances, onlyAlias) : null;
 
+        var valuesNeverNull = ValuesColumnsOf(root, entries, columns.Count, scope);
+        var listsARelation = PostgresTableMatcher.ListsARelation(columns, origins);
         var walked = new List<WalkedColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
         {
@@ -178,7 +210,24 @@ internal static partial class NullabilityWalk
             walked.Add(
                 origins[index] switch
                 {
+                    null when valuesNeverNull?[index] == true => Answered(
+                        columns[index],
+                        false,
+                        SidecarValues.NullableSource.Expression,
+                        entries[index]
+                    ),
                     null => ExpressionOf(columns[index], entries[index], type, expressions),
+                    { } origin
+                        when !listsARelation
+                            && (
+                                IsProvedViewColumn(root, origin, entries[index], type, expressions)
+                                || WrittenValueProves(plans, root, origin, entries[index], type)
+                            ) => Answered(
+                        columns[index],
+                        false,
+                        SidecarValues.NullableSource.Expression,
+                        entries[index]
+                    ),
                     { } origin when scope.Gated => ColumnOf(
                         columns[index],
                         origin,
@@ -198,6 +247,150 @@ internal static partial class NullabilityWalk
             instances.Nodes,
             walked
         );
+    }
+
+    // A view records no NOT NULL for its column, so the entry the plan prints for it is read as a value: a column of
+    // the tables the view expands to, or an expression.  A statement that writes through a view returns what it wrote,
+    // or what an INSTEAD OF trigger or a rule made of it, so only a plan with no ModifyTable at its root is read.
+    private static bool IsProvedViewColumn(
+        PlanNode root,
+        ColumnOrigin origin,
+        string entry,
+        long type,
+        Expressions? expressions
+    ) =>
+        origin.Table.Relkind == "v"
+        && root.NodeType != PlanNodeTypes.ModifyTable
+        && expressions?.EntryProves(entry, type) == true;
+
+    /// <summary>
+    /// The table a root <c>INSERT</c> writes, or null for any other plan, and for an <c>ON CONFLICT DO UPDATE</c>,
+    /// which may return a row it did not write.
+    /// </summary>
+    public static PostgresRelationName? InsertTargetOf(PlanNode root) =>
+        root
+            is {
+                NodeType: PlanNodeTypes.ModifyTable,
+                Operation: PlanOperations.Insert,
+                Schema: { } schema,
+                RelationName: { } name,
+            }
+        && root.ConflictResolution != PlanConflicts.Update
+            ? new PostgresRelationName(schema, name)
+            : null;
+
+    // Whether the column is one of the target of a root INSERT whose value the child proves not NULL.  The child of an
+    // INSERT prints one entry for each attribute of the target, a dropped one's as NULL, so the column's number places
+    // its value.  A generated column's value is computed after it, and a statement that may name OLD returns NULL for
+    // an old row an INSERT has none of.
+    private static bool WrittenValueProves(Plans plans, PlanNode root, ColumnOrigin origin, string entry, long type)
+    {
+        if (
+            !plans.Scope.WrittenValuesStand
+            || plans.Scope.OldAndNewMayBeNamed
+            || InsertTargetOf(root) is not { } target
+            || !string.Equals(origin.Table.Schema, target.Schema, StringComparison.Ordinal)
+            || !string.Equals(origin.Table.Name, target.Name, StringComparison.Ordinal)
+            || !ColumnNullability.KeepsNotNull(origin.Table)
+            || (origin.Table.Relkind == "p" && !plans.Scope.PartitionsKeepWrittenValues)
+            || origin.Attribute.Generated.Length > 0
+            || ColumnNullability.Of(origin, gated: false).Nullable == false
+            || OutputReference.Parse(entry) is not { } reference
+            || !string.Equals(reference.Column, origin.Attribute.Name, StringComparison.Ordinal)
+            || (reference.Alias is { } alias && !string.Equals(alias, root.Alias, StringComparison.Ordinal))
+            || root.JoinChildren.ToArray() is not [{ Output: { } values } child]
+            || origin.Attribute.Attnum < 1
+            || origin.Attribute.Attnum > values.Count
+        )
+        {
+            return false;
+        }
+
+        return plans.InstancesOf(child) is { Reason: null, HasSetOperation: false } instances
+            && new Expressions(plans, child, instances, plans.OnlyAliasOf(child), 1).EntryProves(
+                values[origin.Attribute.Attnum - 1],
+                type
+            );
+    }
+
+    // A plan with grouping sets answers only a column of no origin that is never NULL in any group.  A column with an
+    // origin keeps the heuristic, since a grouping column is NULL on a subtotal row.  The plan counts as walked when it
+    // answered one, and the reason stays, as it does for a plan whose expressions were not read.
+    private static WalkOutcome RunGroupingSets(
+        Plans plans,
+        PlanNode root,
+        PlanInstances instances,
+        IReadOnlyList<SidecarColumn> columns,
+        IReadOnlyList<ColumnOrigin?> origins,
+        IReadOnlyList<string> entries
+    )
+    {
+        var expressions = new Expressions(plans, root, instances, plans.OnlyAliasOf(root));
+        var walked = new List<WalkedColumn>(columns.Count);
+        var answered = false;
+        for (var index = 0; index < columns.Count; index++)
+        {
+            if (origins[index] is null && expressions.ProvedInEveryGroup(entries[index]))
+            {
+                answered = true;
+                walked.Add(Answered(columns[index], false, SidecarValues.NullableSource.Expression, entries[index]));
+            }
+            else
+            {
+                walked.Add(Kept(columns[index], entries[index]));
+            }
+        }
+
+        return new WalkOutcome(
+            answered ? SidecarValues.Plan.Walked : SidecarValues.Plan.Unavailable,
+            WalkReasons.GroupingSets,
+            instances.Nodes,
+            walked
+        );
+    }
+
+    // What the statement's VALUES rows say of each column, when the plan is a Values Scan under nodes that never
+    // project and the root prints its columns in order: the SQL's rows are then the plan's.  Null otherwise.
+    private static IReadOnlyList<bool>? ValuesColumnsOf(
+        PlanNode root,
+        IReadOnlyList<string> entries,
+        int count,
+        WalkScope scope
+    )
+    {
+        if (scope.ValuesNeverNull is not { } neverNull || neverNull.Count != count)
+        {
+            return null;
+        }
+
+        var node = root;
+        while (NeverProjectedChildOf(node) is { } child)
+        {
+            node = child;
+        }
+
+        if (node.NodeType != PlanNodeTypes.ValuesScan)
+        {
+            return null;
+        }
+
+        for (var index = 0; index < count; index++)
+        {
+            if (
+                OutputReference.Parse(entries[index]) is not { } reference
+                || reference.Alias is not (null or "*VALUES*")
+                || !string.Equals(
+                    reference.Column,
+                    "column" + (index + 1).ToString(CultureInfo.InvariantCulture),
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return null;
+            }
+        }
+
+        return neverNull;
     }
 
     /// <summary>Whether two walks of one plan give every column the same answer.</summary>

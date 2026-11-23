@@ -48,6 +48,8 @@ internal static partial class PostgresPlanRenamer
         [PlanKeys.ParentRelationship] = KeyKind.Fixed,
         [PlanKeys.Strategy] = KeyKind.Fixed,
         [PlanKeys.Command] = KeyKind.Fixed,
+        [PlanKeys.Operation] = KeyKind.Fixed,
+        [PlanKeys.ConflictResolution] = KeyKind.Fixed,
         [PlanKeys.SubplansRemoved] = KeyKind.Count,
         [PlanKeys.GroupingSets] = KeyKind.Presence,
         [PlanKeys.Alias] = KeyKind.Name,
@@ -58,6 +60,7 @@ internal static partial class PostgresPlanRenamer
         [PlanKeys.Output] = KeyKind.Expression,
         [PlanKeys.Filter] = KeyKind.Expression,
         [PlanKeys.GroupKey] = KeyKind.Expression,
+        [PlanKeys.Window] = KeyKind.Expression,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     // The class of a new name of each name key.

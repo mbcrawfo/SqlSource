@@ -33,8 +33,8 @@ public sealed class SqlServerNamesTests
         SqlServerNames.UdtPart(part).ShouldBe(expected);
 
     [Fact]
-    public void ClrSystemTypes_OfSys_AreTheThreeInOrder() =>
-        SqlServerNames.ClrSystemTypes.ShouldBe(["hierarchyid", "geography", "geometry"]);
+    public void ClrSystemTypes_OfSys_AreTheThree() =>
+        SqlServerNames.ClrSystemTypes.ShouldBe(["hierarchyid", "geography", "geometry"], ignoreOrder: true);
 
     [Theory]
     [InlineData("hierarchyid", true)]

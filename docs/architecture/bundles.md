@@ -269,12 +269,12 @@ The vocabulary is [`postgres-vocabulary.txt`](../../src/SqlSource.Tool/Bundles/R
 | Kind | Keys | What it keeps |
 |----|----|----|
 | Structure | `Plan`, `Plans` | The nodes, each renamed |
-| Fixed | `Node Type`, `Join Type`, `Parent Relationship`, `Strategy`, `Command` | The planner's closed word |
+| Fixed | `Node Type`, `Join Type`, `Parent Relationship`, `Strategy`, `Command`, `Operation`, `Conflict Resolution` | The planner's closed word |
 | Count | `Subplans Removed` | The number; a string is refused |
 | Presence | `Grouping Sets` | One empty object for each element, since the walk reads only that it is there |
 | Name | `Alias`, `Relation Name`, `Schema`, `CTE Name` | One raw name, renamed as a catalog holds it, quoted, so that the same spelling quoted in `Output` has the same replacement: an `Alias` or a `CTE Name` an `Alias` name, a `Relation Name` a `Table` and a `Schema` a `Schema` |
 | Subplan | `Subplan Name` | `CTE <name>`, its name renamed as an `Alias`; any other as an expression |
-| Expression | `Output`, `Filter`, `Group Key` | Each string read by the walk's `PlanTokens`: a word or a quoted name renamed as a name, a function's where `(` follows, a string as the mapping's literal, a number and punctuation kept, and any other token kept only when it holds no letter, digit or `_` |
+| Expression | `Output`, `Filter`, `Group Key`, `Window` | Each string read by the walk's `PlanTokens`: a word or a quoted name renamed as a name, a function's where `(` follows, a string as the mapping's literal, a number and punctuation kept, and any other token kept only when it holds no letter, digit or `_` |
 
 A plan that is no JSON array of objects with a `Plan`, a node that is no object, an object or an array where a key holds a text, a string of an expression key that `PlanTokens` cannot read and a token of no kind it renames are refused, `RefusalStep.PlanString`, at the plan's place.  `Register` registers each name key in its class before the query is renamed, so that a name a plan is the first to hold takes its key's class.
 

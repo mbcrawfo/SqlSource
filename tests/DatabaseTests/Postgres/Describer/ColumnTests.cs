@@ -562,7 +562,8 @@ public sealed class ColumnTests(PostgresDatabases postgres)
             "INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id, left('a', 1) AS l"
         );
 
-        plain.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        // An INSERT's nullable column is planned for the value it writes, which the rule's action does not write here.
+        plain.Plan.ShouldBe(SidecarValues.Plan.Walked);
         Of(plain.Columns.ShouldNotBeNull()).ShouldBe([NullableCatalog]);
         gated.Plan.ShouldBe(SidecarValues.Plan.Walked);
         Of(gated.Columns.ShouldNotBeNull()).ShouldBe([NullableCatalog, NotNullExpression]);
@@ -603,7 +604,7 @@ public sealed class ColumnTests(PostgresDatabases postgres)
     }
 
     // A subtotal row holds NULL in a NOT NULL grouping column, with no outer join in sight, and the column keeps
-    // its origin.  The walk refuses a plan with a grouping set, so the heuristic stands.
+    // its origin.  A plan with a grouping set answers only its count, so the heuristic stands for the column.
     [Theory]
     [InlineData("SELECT status, count(*) FROM users GROUP BY ROLLUP (status)")]
     [InlineData("SELECT status, count(*) FROM users GROUP BY CUBE (status)")]
@@ -612,10 +613,12 @@ public sealed class ColumnTests(PostgresDatabases postgres)
     {
         var description = await ShouldDescribeAsync(sql);
 
-        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
-        var status = description.Columns.ShouldNotBeNull()[0];
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        var columns = description.Columns.ShouldNotBeNull();
+        var status = columns[0];
         status.Origin.ShouldBe(Origin("users", "status"));
         (status.Nullable, status.NullableSource).ShouldBe(NullableHeuristic);
+        columns[1].Nullable.ShouldBe(false);
     }
 
     // PostgreSQL 18's old row of a RETURNING list is NULL for a row an INSERT adds.  Each column keeps its table as
@@ -674,8 +677,8 @@ public sealed class ColumnTests(PostgresDatabases postgres)
         Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog]);
     }
 
-    // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  In a gated query a view's
-    // column says "view" where no join extends it.
+    // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  A view's whole column list says
+    // "view", and a plain view's column in any other list is read from the entry the plan prints for it.
     [Fact]
     public async Task DescribeAsync_ColumnsOfAViewAndOfAMaterializedView_SayView()
     {
@@ -689,7 +692,7 @@ public sealed class ColumnTests(PostgresDatabases postgres)
 
         Of(view).ShouldBe([UnknownView, UnknownView, UnknownView, UnknownView]);
         Of(materialized).ShouldBe([UnknownView]);
-        Of(gated).ShouldBe([UnknownView, NullableOuterJoin]);
+        Of(gated).ShouldBe([NotNullExpression, NullableOuterJoin]);
     }
 
     // A table's row selected whole is a column of the table's composite type, which is no pseudo-type.

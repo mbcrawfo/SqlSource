@@ -31,6 +31,33 @@ internal static class PostgresTableMatcher
     public static (SidecarTable? Table, string Result) Match(
         IReadOnlyList<SidecarColumn> columns,
         IReadOnlyList<ColumnOrigin?> origins
+    ) =>
+        MatchBy(
+            columns,
+            origins,
+            // What the relation's column has is what a query that is not gated records for it: the rule of a NOT
+            // NULL, of one that is not validated and of a view is ColumnNullability's, and is not written twice.
+            found =>
+                columns
+                    .Select(static column => column.Nullable)
+                    .SequenceEqual(found.Select(static origin => ColumnNullability.Of(origin, gated: false).Nullable))
+        );
+
+    /// <summary>
+    /// Whether the columns are one relation's whole column list, each under its name and in its order: every check of
+    /// <see cref="Match" /> but nullability.  Such a query gets the model named after the relation, which every query
+    /// of the list shares, so the walk proves none of its view's or written columns not null and it keeps the
+    /// relation's answers.
+    /// </summary>
+    /// <param name="columns">The columns of a statement, in order.</param>
+    /// <param name="origins">Where each column comes from, or null, in the same order.</param>
+    public static bool ListsARelation(IReadOnlyList<SidecarColumn> columns, IReadOnlyList<ColumnOrigin?> origins) =>
+        columns.Count > 0 && MatchBy(columns, origins, static _ => true).Result == SidecarValues.TableMatch.Matched;
+
+    private static (SidecarTable? Table, string Result) MatchBy(
+        IReadOnlyList<SidecarColumn> columns,
+        IReadOnlyList<ColumnOrigin?> origins,
+        Func<ColumnOrigin[], bool> sameNullability
     )
     {
         if (columns.Count == 0 || columns.Count != origins.Count)
@@ -61,12 +88,7 @@ internal static class PostgresTableMatcher
             // As lists and not as sets: a column that is left out and a column that is there twice both differ.
             () => numbers.Order().SequenceEqual(table.Columns.Select(static attribute => attribute.Attnum).Order()),
             () => numbers.SequenceEqual(numbers.Order()),
-            // What the relation's column has is what a query that is not gated records for it: the rule of a NOT
-            // NULL, of one that is not validated and of a view is ColumnNullability's, and is not written twice.
-            () =>
-                columns
-                    .Select(static column => column.Nullable)
-                    .SequenceEqual(found.Select(static origin => ColumnNullability.Of(origin, gated: false).Nullable))
+            () => sameNullability(found)
         );
         return result == SidecarValues.TableMatch.Matched
             ? (new SidecarTable(table.Schema, table.Name), result)

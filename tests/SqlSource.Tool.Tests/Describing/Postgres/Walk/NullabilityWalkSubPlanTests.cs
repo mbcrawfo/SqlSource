@@ -135,6 +135,131 @@ public sealed class NullabilityWalkSubPlanTests
             }
         );
 
+    // A Plain count of "o" as an InitPlan of the name.
+    private static PlanNode InitPlan(string name) =>
+        CountOfO() with
+        {
+            ParentRelationship = "InitPlan",
+            SubplanName = name,
+        };
+
+    // A scan of "a" whose second entry is the value, over a statement of the given number of parameters.
+    private static WalkOutcome RunInitPlan(string value, long type, int parameters, params PlanNode[] initPlans)
+    {
+        var (columns, origins) = Built(false, Expression, Expression);
+        return NullabilityWalk.Run(
+            new PlanInstancesCache(ScanOfA(value, initPlans), null),
+            columns,
+            origins,
+            new WalkScope(
+                false,
+                false,
+                true,
+                PostgresTables.Of(TableA, OrdersO),
+                [BuiltInTypes.Int4, type],
+                ParameterCount: parameters
+            )
+        );
+    }
+
+    // An uncorrelated subquery prints $k before 17, under an InitPlan named for what it returns, and its own name from
+    // 17.  Either may be wrapped by a node above.
+    [Theory]
+    [InlineData("(InitPlan 1).col1", "InitPlan 1", 0)]
+    [InlineData("(InitPlan 1).col1", "InitPlan 1", 3)]
+    [InlineData("((InitPlan 1).col1)", "InitPlan 1", 0)]
+    [InlineData("$0", "InitPlan 1 (returns $0)", 0)]
+    [InlineData("$0", "InitPlan 1 (returns $0)", 2)]
+    [InlineData("($0)", "InitPlan 1 (returns $0)", 0)]
+    [InlineData("$3", "InitPlan 2 (returns $3)", 2)]
+    public void Run_InitPlanOfAPlainCount_IsAnswered(string value, string name, int parameters) =>
+        AnswersOf(RunInitPlan(value, BuiltInTypes.Int8, parameters, InitPlan(name)))
+            .ShouldBe([UnknownNoOrigin, NotNullExpression]);
+
+    // $k up to the statement's parameters may be the parameter, which prints the same.  Another column than the first,
+    // a plan of another name or of several values, and an expression over the value say nothing.
+    [Theory]
+    [InlineData("$1", "InitPlan 2 (returns $1)", 1)]
+    [InlineData("$2", "InitPlan 2 (returns $2)", 3)]
+    [InlineData("$1", "InitPlan 2 (returns $0,$1)", 0)]
+    [InlineData("$1", "InitPlan 2 (returns $11)", 0)]
+    [InlineData("(InitPlan 1).col2", "InitPlan 1", 0)]
+    [InlineData("(InitPlan 2).col1", "InitPlan 1", 0)]
+    [InlineData("(InitPlan 1).col1", "InitPlan 1 (returns $0)", 0)]
+    [InlineData("((InitPlan 1).col1 + 1)", "InitPlan 1", 0)]
+    [InlineData("($0 + 1)", "InitPlan 1 (returns $0)", 0)]
+    public void Run_ValueNoInitPlanProves_KeepsNoOrigin(string value, string name, int parameters) =>
+        AnswersOf(RunInitPlan(value, BuiltInTypes.Int8, parameters, InitPlan(name)))
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+
+    // An InitPlan prints an EXISTS and an ARRAY as a scalar subquery: a boolean or an array is in no family.
+    [Theory]
+    [InlineData(BuiltInTypes.Bool)]
+    [InlineData(BuiltInTypes.Jsonb)]
+    public void Run_InitPlanOfATypeInNoFamily_KeepsNoOrigin(long type) =>
+        AnswersOf(RunInitPlan("(InitPlan 1).col1", type, 0, InitPlan("InitPlan 1")))
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+
+    // Two InitPlans that return one parameter say nothing of which it is.
+    [Fact]
+    public void Run_InitPlanReturningAParameterTwoPlansReturn_KeepsNoOrigin() =>
+        AnswersOf(
+                RunInitPlan(
+                    "$0",
+                    BuiltInTypes.Int8,
+                    0,
+                    InitPlan("InitPlan 1 (returns $0)"),
+                    InitPlan("InitPlan 2 (returns $0)")
+                )
+            )
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+
+    // A plan that may return no row, or one whose value may be NULL.
+    [Fact]
+    public void Run_InitPlanThatMayReturnNoRow_KeepsNoOrigin()
+    {
+        var filtered = InitPlan("InitPlan 1") with { HasFilter = true };
+        var keyed = InitPlan("InitPlan 1") with { HasGroupKey = true };
+        var max = InitPlan("InitPlan 1") with { Output = ["max(o.quantity)"] };
+
+        foreach (var plan in new[] { filtered, keyed, max })
+        {
+            AnswersOf(RunInitPlan("(InitPlan 1).col1", BuiltInTypes.Int8, 0, plan))
+                .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+        }
+    }
+
+    // An InitPlan's value on the side a join null-extends is NULL for a row the join did not match.
+    [Theory]
+    [InlineData("(InitPlan 1).col1", "InitPlan 1")]
+    [InlineData("$0", "InitPlan 1 (returns $0)")]
+    public void Run_InitPlanOnTheSideAJoinExtends_KeepsNoOrigin(string value, string name)
+    {
+        var evaluates = Scan("b", "b.id", value);
+        var join = Join("Left", Scan("a", "a.id"), evaluates) with
+        {
+            Output = ["a.id", "(" + value + ")"],
+            Plans = [Scan("a", "a.id"), evaluates with { ParentRelationship = "Inner" }, InitPlan(name)],
+        };
+        var (columns, origins) = Built(false, Expression, Expression);
+
+        AnswersOf(
+                NullabilityWalk.Run(
+                    new PlanInstancesCache(join, null),
+                    columns,
+                    origins,
+                    new WalkScope(
+                        false,
+                        false,
+                        true,
+                        PostgresTables.Of(TableA, OrdersO),
+                        [BuiltInTypes.Int4, BuiltInTypes.Int8]
+                    )
+                )
+            )
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+    }
+
     // A subquery evaluated on the side a join null-extends is NULL for a row the join did not match, and one evaluated
     // on the side it keeps is answered.
     [Theory]
