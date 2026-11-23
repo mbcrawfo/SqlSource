@@ -164,7 +164,7 @@ public sealed class ExpressionProofsTests
     [InlineData("COALESCE(t.a * 2, 0)", "", true, true, "t.a")]
     [InlineData("COALESCE(dbo.f(t.a), 0)", "", false, false, "")]
     [InlineData("COALESCE(MAX(dbo.f(t.a)), 0)", "GROUP BY t.b", false, false, "")]
-    [InlineData("COALESCE(LAG(t.a) OVER (ORDER BY t.id), 0)", "", false, false, "")]
+    [InlineData("COALESCE(LAG(t.a) OVER (ORDER BY t.id), 0)", "", true, true, "t.a")]
     [InlineData("COALESCE(CAST(t.a AS geometry), 0)", "", false, false, "")]
     [InlineData("COALESCE(CONVERT(geometry, t.a), 0)", "", false, false, "")]
     // CAST and CONVERT: the operand proved, and CONVERT's style an integer literal.
@@ -193,6 +193,112 @@ public sealed class ExpressionProofsTests
     // JSON_OBJECT and JSON_ARRAY.
     [InlineData("JSON_OBJECT('a': t.a)", "", true, true, "")]
     [InlineData("JSON_ARRAY(t.a)", "", true, true, "")]
+    // The date functions: NULL only when an operand is.  The date part is a word and is never asked.
+    [InlineData("DATEADD(DAY, 1, t.d)", "", true, false, "t.d")]
+    [InlineData("dateadd(day, 1, t.d)", "", true, false, "t.d")]
+    [InlineData("DATEADD(DAY, t.n, t.d)", "", true, false, "t.n|t.d")]
+    [InlineData("DATEADD(DAY, @n, t.d)", "", false, false, "")]
+    [InlineData("DATEADD(DAY, NULL, t.d)", "", false, false, "")]
+    [InlineData("DATEADD(DAY, 1, NULL)", "", false, false, "")]
+    [InlineData("DATEADD(DAY, 1, MAX(t.d))", "GROUP BY ROLLUP (t.b)", true, false, "t.d")]
+    [InlineData("DATEDIFF(DAY, t.a, t.b)", "", true, false, "t.a|t.b")]
+    [InlineData("DATEDIFF_BIG(DAY, t.a, '2020-01-01')", "", true, false, "t.a")]
+    [InlineData("DATEDIFF(DAY, t.a, @p)", "", false, false, "")]
+    [InlineData("DATEPART(YEAR, t.d)", "", true, false, "t.d")]
+    [InlineData("DATENAME(WEEKDAY, t.d)", "", true, false, "t.d")]
+    [InlineData("YEAR(t.d)", "", true, false, "t.d")]
+    [InlineData("MONTH(t.d)", "", true, false, "t.d")]
+    [InlineData("DAY(t.d)", "", true, false, "t.d")]
+    [InlineData("YEAR(t.d)", "GROUP BY ROLLUP (t.d)", false, false, "")]
+    [InlineData("EOMONTH(t.d)", "", true, false, "t.d")]
+    [InlineData("EOMONTH(t.d, 1)", "", true, false, "t.d")]
+    [InlineData("EOMONTH(t.d, t.n)", "", true, false, "t.d|t.n")]
+    [InlineData("EOMONTH(t.d, @n)", "", false, false, "")]
+    [InlineData("EOMONTH(COALESCE(t.a, t.b))", "", true, false, "t.a|t.b")]
+    // A date function of the wrong shape, or that is not the built-in one, proves nothing.
+    [InlineData("DATEADD(DAY, 1)", "", false, false, "")]
+    [InlineData("DATEADD('DAY', 1, t.d)", "", false, false, "")]
+    [InlineData("DATEADD((DAY), 1, t.d)", "", false, false, "")]
+    [InlineData("DATEPART(DAY)", "", false, false, "")]
+    [InlineData("DATEPART(DAY, t.a, t.b)", "", false, false, "")]
+    [InlineData("YEAR(t.a, t.b)", "", false, false, "")]
+    [InlineData("EOMONTH(t.d, 1, 2)", "", false, false, "")]
+    [InlineData("YEAR(t.d) OVER ()", "", false, false, "")]
+    [InlineData("[YEAR](t.d)", "", false, false, "")]
+    [InlineData("dbo.YEAR(t.d)", "", false, false, "")]
+    // AT TIME ZONE: NULL only when its value or its zone is, each a primary, along a chain.
+    [InlineData("t.a AT TIME ZONE 'UTC'", "", true, false, "t.a")]
+    [InlineData("t.a at time zone 'UTC'", "", true, false, "t.a")]
+    [InlineData("t.a AT TIME ZONE t.z", "", true, false, "t.a|t.z")]
+    [InlineData("t.a AT TIME ZONE 'UTC' AT TIME ZONE t.z", "", true, false, "t.a|t.z")]
+    [InlineData("t.a AT TIME ZONE COALESCE(t.z, 'UTC')", "", true, false, "t.a|t.z")]
+    [InlineData("(t.a) AT TIME ZONE 'UTC'", "", true, false, "t.a")]
+    [InlineData("CAST(t.a AS datetime2) AT TIME ZONE 'UTC'", "", true, false, "t.a")]
+    [InlineData("COALESCE(t.a AT TIME ZONE 'UTC', NULL)", "", true, false, "t.a")]
+    [InlineData("t.a AT TIME ZONE @z", "", false, false, "")]
+    [InlineData("t.a AT TIME ZONE NULL", "", false, false, "")]
+    [InlineData("NULL AT TIME ZONE 'UTC'", "", false, false, "")]
+    [InlineData("t.a AT TIME ZONE 'UTC' AT TIME ZONE @z", "", false, false, "")]
+    [InlineData("t.a AT TIME ZONE 'UTC'", "GROUP BY ROLLUP (t.a)", false, false, "")]
+    // AT is no reserved word: only the three words are the operator, and a side that is no primary is a leaf.
+    [InlineData("COALESCE(t.at, 0)", "", true, true, "t.at")]
+    [InlineData("t.a AT TIME 'UTC'", "", false, false, "")]
+    [InlineData("t.a COLLATE c AT TIME ZONE 'UTC'", "", false, false, "")]
+    [InlineData("t.a AT TIME ZONE 'UTC' COLLATE c", "", false, false, "")]
+    // LAG and LEAD: the value and the default proved, and the offset an integer literal.
+    [InlineData("LAG(t.a, 1, 0) OVER (ORDER BY t.id)", "", true, false, "t.a")]
+    [InlineData("lag(t.a, 0, 'x') OVER (ORDER BY t.id)", "", true, false, "t.a")]
+    [InlineData("LEAD(t.a, 2, t.b) OVER (PARTITION BY t.c ORDER BY t.id)", "", true, false, "t.a|t.b")]
+    [InlineData("COALESCE(LAG(t.a, 1, 0) OVER (ORDER BY t.id), NULL)", "", true, false, "t.a")]
+    [InlineData("LAG(SUM(t.a), 1, 0) OVER (ORDER BY t.b)", "GROUP BY t.b", true, false, "t.a")]
+    [InlineData("LAG(t.a) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, 1) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, 1, NULL) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, 1, @d) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, @n, 0) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, NULL, 0) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, (1), 0) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, 1 + 1, 0) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, 1.5, 0) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, -1, 0) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, 1, 0, 9) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, 1, 0)", "", false, false, "")]
+    [InlineData("LAG(t.a, 1, 0) OVER w", "WINDOW w AS (ORDER BY t.id)", false, false, "")]
+    [InlineData("LAG(t.a, 1, 0) IGNORE NULLS OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("LAG(t.a, 1, 0) OVER (ORDER BY t.a)", "GROUP BY ROLLUP (t.a)", false, false, "")]
+    [InlineData("[LAG](t.a, 1, 0) OVER (ORDER BY t.id)", "", false, false, "")]
+    // A CASE that replaces a column's NULL.  The column is asked, and the fallback proved.
+    [InlineData("CASE WHEN t.a IS NULL THEN 0 ELSE t.a END", "", true, false, "t.a")]
+    [InlineData("case when t.a is null then 'x' else t.a end", "", true, false, "t.a")]
+    [InlineData("CASE WHEN a IS NULL THEN 0 ELSE a END", "", true, false, "a")]
+    [InlineData("CASE WHEN [t].[a] IS NULL THEN 0 ELSE [t].[a] END", "", true, false, "[t].[a]")]
+    [InlineData("CASE WHEN t.a IS NULL THEN t.b ELSE t.a END", "", true, false, "t.b|t.a")]
+    [InlineData("CASE WHEN t.a IS NULL THEN COALESCE(t.b, 0) ELSE t.a END", "", true, false, "t.b|t.a")]
+    [InlineData(
+        "CASE WHEN t.a IS NULL THEN CASE WHEN t.b > 0 THEN 1 ELSE 0 END ELSE t.a END",
+        "",
+        true,
+        false,
+        "CASE WHEN t.b > 0 THEN 1 ELSE 0 END|t.a"
+    )]
+    [InlineData("CASE WHEN t.a IS NULL THEN NULL ELSE t.a END", "", false, false, "")]
+    [InlineData("CASE WHEN t.a IS NULL THEN @p ELSE t.a END", "", false, false, "")]
+    // Under a grouping set the column is asked its source and its type, but not whether it is null.
+    [InlineData("CASE WHEN t.a IS NULL THEN 0 ELSE t.a END", "GROUP BY ROLLUP (t.a)", false, false, "t.a")]
+    // One token from the form: each is a CASE alone, a leaf that asks nothing.
+    [InlineData("CASE WHEN t.a IS NOT NULL THEN 0 ELSE t.a END", "", false, false, "")]
+    [InlineData("CASE WHEN t.a IS NULL THEN 0 ELSE t.b END", "", false, false, "")]
+    [InlineData("CASE WHEN t.a IS NULL THEN 0 ELSE [t].[a] END", "", false, false, "")]
+    [InlineData("CASE WHEN t.a IS NULL THEN 0 ELSE T.A END", "", false, false, "")]
+    [InlineData("CASE WHEN t.a IS NULL THEN 0 ELSE t.a + 1 END", "", false, false, "")]
+    [InlineData("CASE WHEN t.a IS NULL THEN 0 END", "", false, false, "")]
+    [InlineData("CASE WHEN t.a IS NULL THEN 0 WHEN t.b = 1 THEN 1 ELSE t.a END", "", false, false, "")]
+    [InlineData("CASE t.a WHEN NULL THEN 0 ELSE t.a END", "", false, false, "")]
+    [InlineData("CASE WHEN (t.a) IS NULL THEN 0 ELSE (t.a) END", "", false, false, "")]
+    [InlineData("CASE WHEN t.a + 1 IS NULL THEN 0 ELSE t.a + 1 END", "", false, false, "")]
+    [InlineData("CASE WHEN ABS(t.a) IS NULL THEN 0 ELSE ABS(t.a) END", "", false, false, "")]
+    [InlineData("CASE WHEN NULL IS NULL THEN 0 ELSE NULL END", "", false, false, "")]
+    [InlineData("CASE WHEN @p IS NULL THEN 0 ELSE @p END", "", false, false, "")]
     // Arithmetic: every operand proved.
     [InlineData("t.a * t.b", "", true, false, "t.a|t.b")]
     [InlineData("(t.a + t.b) % 2", "", true, false, "t.a|t.b")]
@@ -231,7 +337,6 @@ public sealed class ExpressionProofsTests
     // Anything else inside a form is asked whole.
     [InlineData("COALESCE(t.a & t.b, NULL)", "", true, false, "t.a & t.b")]
     [InlineData("COALESCE(t.a COLLATE Latin1_General_BIN, NULL)", "", true, false, "t.a COLLATE Latin1_General_BIN")]
-    [InlineData("COALESCE(t.a AT TIME ZONE 'UTC', NULL)", "", true, false, "t.a AT TIME ZONE 'UTC'")]
     [InlineData("COALESCE(ISNULL(t.a, 0), NULL)", "", true, false, "ISNULL(t.a, 0)")]
     [InlineData("COALESCE(NULLIF(t.a, 0), NULL)", "", true, false, "NULLIF(t.a, 0)")]
     [InlineData("COALESCE(IIF(t.a > 0, 1, 0), NULL)", "", true, false, "IIF(t.a > 0, 1, 0)")]
@@ -252,7 +357,6 @@ public sealed class ExpressionProofsTests
     [InlineData("(SELECT TOP (1) o.x FROM o)", "", false, false, "")]
     [InlineData("CASE WHEN t.a > 0 THEN 1 ELSE 0 END", "", false, false, "")]
     [InlineData("TRY_CAST(t.a AS int)", "", false, false, "")]
-    [InlineData("t.a AT TIME ZONE 'UTC'", "", false, false, "")]
     [InlineData("ISNULL(t.a, 0)", "", false, false, "")]
     [InlineData("t.a + 1", "", true, false, "t.a")]
     // A user's function, or anything that holds one, is never asked.  Each item that is no form stands inside
@@ -274,7 +378,7 @@ public sealed class ExpressionProofsTests
     [InlineData("JSON_OBJECTAGG(t.k : t.v)", "GROUP BY t.b", false, false, "")]
     [InlineData("COALESCE(ISNULL(MAX(t.a), 0), NULL)", "GROUP BY t.b", false, false, "")]
     [InlineData("COALESCE(CASE WHEN SUM(t.a) > 0 THEN 1 ELSE 0 END, NULL)", "GROUP BY t.b", false, false, "")]
-    [InlineData("COALESCE(LAG(t.a, 1, 0) OVER (ORDER BY t.id), NULL)", "", false, false, "")]
+    [InlineData("COALESCE(LAG(t.a, @n, 0) OVER (ORDER BY t.id), NULL)", "", false, false, "")]
     // Columns, in the select's context.
     [InlineData("t.a", "GROUP BY ROLLUP (t.a)", false, false, "")]
     [InlineData("COALESCE(t.a, NULL)", "GROUP BY t.a", true, false, "t.a")]
@@ -323,6 +427,17 @@ public sealed class ExpressionProofsTests
     [InlineData("CONVERT(int, t.a)", "", true)]
     [InlineData("JSON_OBJECT('a': t.a)", "", true)]
     [InlineData("JSON_ARRAY(t.a)", "", true)]
+    [InlineData("DATEADD(DAY, t.n, t.a)", "", true)]
+    [InlineData("DATEDIFF(DAY, t.a, t.b)", "", true)]
+    [InlineData("DATEDIFF_BIG(DAY, t.a, t.b)", "", true)]
+    [InlineData("DATEPART(DAY, t.a)", "", true)]
+    [InlineData("DATENAME(DAY, t.a)", "", true)]
+    [InlineData("YEAR(t.a)", "", true)]
+    [InlineData("MONTH(t.a)", "", true)]
+    [InlineData("DAY(t.a)", "", true)]
+    [InlineData("EOMONTH(t.a)", "", true)]
+    [InlineData("LAG(t.a, 1, 0) OVER (ORDER BY t.id)", "", false)]
+    [InlineData("LEAD(t.a, 1, 0) OVER (ORDER BY t.id)", "", false)]
     public void Of_EveryForm_ProvedByBothReadings(string form, string tail, bool typeFixed)
     {
         foreach (var item in (string[])[form, $"COALESCE({form}, 0)"])
@@ -363,6 +478,12 @@ public sealed class ExpressionProofsTests
     [InlineData("COALESCE((SELECT TOP (1) o.s FROM o), 'NULL')", "")]
     [InlineData("CAST(COALESCE(t.s, 'NULL') AS varbinary(max))", "")]
     [InlineData("COALESCE(COALESCE(t.s, 'NULL'), 'x')", "")]
+    // LAG, LEAD and the CASE that replaces a NULL convert their default to the type of the value.
+    [InlineData("LAG(t.s, 1, 'NULL') OVER (ORDER BY t.id)", "")]
+    [InlineData("LEAD(t.a, 1, t.s) OVER (ORDER BY t.id)", "")]
+    [InlineData("CAST(LAG(t.s, 1, 'NULL') OVER (ORDER BY t.id) AS varbinary(max))", "")]
+    [InlineData("CASE WHEN t.s IS NULL THEN 'NULL' ELSE t.s END", "")]
+    [InlineData("CASE WHEN t.a IS NULL THEN t.s ELSE t.a END", "")]
     // A CLR type's conversion to a string is its ToString, which a user's type may answer null.
     [InlineData("CAST(t.s AS nvarchar(100))", "")]
     [InlineData("CONVERT(varbinary(max), t.s)", "")]
@@ -375,6 +496,28 @@ public sealed class ExpressionProofsTests
         count.ShouldBeGreaterThan(0, Texts(sql, tokens, proofs.Operands));
         proof.Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: true), count)]).ShouldBeTrue();
         proof.Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: false), count)]).ShouldBeFalse();
+    }
+
+    // The CASE reads its column twice, and a value evaluated twice can differ: the column must be stored, or be
+    // answered not null.  That answer cannot be used under a grouping set, whose totals hold the column NULL.
+    [Theory]
+    [InlineData(false, true, true, "", true)]
+    [InlineData(true, true, false, "", true)]
+    [InlineData(true, true, true, "", true)]
+    [InlineData(false, true, false, "", false)]
+    [InlineData(true, false, true, "", false)]
+    [InlineData(false, false, true, "", false)]
+    [InlineData(false, true, true, "GROUP BY ROLLUP (t.a)", true)]
+    [InlineData(true, true, false, "GROUP BY ROLLUP (t.a)", false)]
+    [InlineData(false, true, false, "GROUP BY ROLLUP (t.a)", false)]
+    public void Of_CaseOfAColumn_NeedsItStoredOrNotNull(bool notNull, bool notClr, bool stored, string tail, bool holds)
+    {
+        var (_, _, proofs, body) = Read($"SELECT CASE WHEN t.a IS NULL THEN 0 ELSE t.a END AS c FROM t AS t {tail}");
+
+        var proof = proofs.Of(body.Items.ShouldHaveSingleItem().Expression);
+
+        proofs.Operands.Count.ShouldBe(1);
+        proof.Holds([new OperandFacts(notNull, notClr, stored)]).ShouldBe(holds);
     }
 
     // CAST and CONVERT prove only to a built-in type that is no CLR type, written as one word, with or without its

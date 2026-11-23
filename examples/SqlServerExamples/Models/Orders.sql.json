@@ -252,7 +252,7 @@
       ]
     },
     "ListOrderMonths": {
-      "hash": "2225403b8387a7c92267e1f2ef7e6eb130dd3c7526e5a55dccd94e2f7bd32a41",
+      "hash": "b2d4bf5193a6ff24d7f5d013707eba83d635d52f948386ff3fb2a5b370eba7a0",
       "toolVersion": "0.2.1",
       "database": "mssql",
       "engine": "mssql",
@@ -284,7 +284,7 @@
         },
         {
           "ordinal": 1,
-          "name": "month_end",
+          "name": "month_start",
           "type": {
             "name": "date",
             "maxLength": 3,

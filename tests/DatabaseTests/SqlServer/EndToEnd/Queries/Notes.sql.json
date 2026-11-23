@@ -322,7 +322,7 @@
       ]
     },
     "ListAccountMonths": {
-      "hash": "0ed98343ec7ce3b6dafae3f21b218fff965ceb3d8cb274ec6a7bfb2f3a7480e0",
+      "hash": "65b66e92a1e3f1dbcfb77557266be51dbf9b82d01fc7331ab03d8be3e1f2a76a",
       "toolVersion": "0.2.1",
       "database": "app",
       "engine": "mssql",
@@ -354,7 +354,7 @@
         },
         {
           "ordinal": 1,
-          "name": "month_end",
+          "name": "month_start",
           "type": {
             "name": "date",
             "maxLength": 3,

@@ -101,6 +101,33 @@ public sealed class OperandsQueryTests
             .ShouldBe([new OperandFacts(NotNull: !nullable, notClr)]);
     }
 
+    // Only a column of a table that is not computed is read twice as one value: a view's or a function's column may be
+    // an expression, and a row with no source column is one.
+    [Theory]
+    [InlineData("U", false, "x", true)]
+    [InlineData("U", true, "x", false)]
+    [InlineData("U", null, "x", false)]
+    [InlineData("U", false, null, false)]
+    [InlineData("V", false, "x", false)]
+    [InlineData("IF", false, "x", false)]
+    [InlineData("TF", false, "x", false)]
+    [InlineData(null, false, "x", false)]
+    public void AnswersOf_Source_StoredAsTheRowSays(string? sourceType, bool? computed, string? column, bool stored)
+    {
+        var row = OperandRow(1, nullable: true) with
+        {
+            SourceType = sourceType,
+            IsComputedColumn = computed,
+            SourceColumn = column,
+        };
+
+        OperandsQuery
+            .AnswersOf(new SqlServerColumnsAnswer([row], null, null), 1)
+            .ShouldNotBeNull()
+            .ShouldHaveSingleItem()
+            .Stored.ShouldBe(stored);
+    }
+
     public static TheoryData<string?, string?, string?, string?, bool, bool> ClrTypeRows()
     {
         (string? SystemType, string? UserSchema, string? UserName, string? Assembly, bool NotClr)[] rows =

@@ -12,10 +12,10 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// <para>
 /// An expression is split at its own level on <c>+</c>, <c>-</c>, <c>*</c>, <c>/</c> and <c>%</c>, a sign before a
 /// piece being unary, and is proved when every piece is.  A piece is a primary: a literal, <c>NULL</c>, a parameter, a
-/// column, <c>( ... )</c>, a subquery, a <c>CASE</c> or a call.  A call of a bare name may be a form that proves it;
-/// one of a schema's name is a user's function, which proves nothing.  An expression with anything else at its own
-/// level is a leaf, and so are a column, a <c>CASE</c>, a subquery that is not a <c>COUNT</c>'s, and a call that is no
-/// form.
+/// column, <c>( ... )</c>, a subquery, a <c>CASE</c>, a call or <c>a AT TIME ZONE z</c> of two primaries.  A call of a
+/// bare name may be a form that proves it; one of a schema's name is a user's function, which proves nothing.  An
+/// expression with anything else at its own level is a leaf, and so are a column, a <c>CASE</c> that is no form, a
+/// subquery that is not a <c>COUNT</c>'s, and a call that is no form.
 /// </para>
 /// <para>
 /// A leaf is asked when its context allows: the rows' context, an aggregate's operand without <c>OVER</c>, always;
@@ -155,6 +155,7 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
         {
             Proof.Operand leaf => new Proof.Operand(OperandIndex(_leaves[leaf.Index])),
             Proof.NotClr leaf => new Proof.NotClr(OperandIndex(_leaves[leaf.Index])),
+            Proof.Stored leaf => new Proof.Stored(OperandIndex(_leaves[leaf.Index])),
             Proof.AnyOf any => new Proof.AnyOf([.. any.Parts.Select(Numbered)]),
             Proof.AllOf all => new Proof.AllOf([.. all.Parts.Select(Numbered)]),
             _ => proof,
@@ -243,6 +244,11 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
     // The proof of a piece that is a primary, or null when it is none.
     private Proof? Primary(TokenRange piece, bool rows)
     {
+        if (AtTimeZoneOf(piece) is { } conversion)
+        {
+            return AtTimeZone(conversion, rows);
+        }
+
         var first = tokens[piece.Start];
         if (piece.Count == 1 && first.Kind is TsqlTokenKind.String or TsqlTokenKind.Number)
         {
@@ -320,7 +326,7 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
     {
         if (tokens[piece.Start].Is("CASE"))
         {
-            return Leaf(piece, rows);
+            return GuardOf(piece) is { } guard ? Guarded(guard, rows) : Leaf(piece, rows);
         }
 
         var inner = new TokenRange(piece.Start + 1, piece.End - 1);

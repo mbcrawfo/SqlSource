@@ -60,13 +60,13 @@ WHERE a.id = @id
 GROUP BY a.id;
 
 -- name: ListAccountMonths
--- summary: The last day of the month each account opened in.
--- SQL Server treats EOMONTH as possibly null, and the tool cannot show otherwise, so the column would be nullable
--- without its marker.
--- column: month_end not null
+-- summary: The first day of the month each account opened in.
+-- SQL Server treats DATEFROMPARTS as possibly null, and the tool cannot show otherwise, so the column would be
+-- nullable without its marker.
+-- column: month_start not null
 SELECT
     a.id,
-    EOMONTH(a.opened_on) AS month_end
+    DATEFROMPARTS(YEAR(a.opened_on), MONTH(a.opened_on), 1) AS month_start
 FROM dbo.accounts AS a
 ORDER BY a.id;
 

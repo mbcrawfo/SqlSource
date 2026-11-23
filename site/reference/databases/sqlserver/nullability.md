@@ -46,10 +46,14 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - **A rank**: `ROW_NUMBER()`, `RANK()` and `DENSE_RANK()`, and `NTILE` of a whole number, `NTILE(4)`, with `OVER (...)`.
 - **`SUM`, `MAX` and `MIN` of a value that is never null, in a query with a `GROUP BY` whose every group has a row.**  A `GROUP BY` with `ROLLUP`, `CUBE` or `GROUPING SETS` counts too.
 - **`SUM`, `MAX` and `MIN` of a value that is never null, with `OVER (...)` whose frame holds the current row.**  A window that gives no frame has such a frame.
-- **`COALESCE`, `GREATEST` and `LEAST` with an argument that is never null**, and no argument of a spatial type, of `hierarchyid` or of another .NET type.
+- **`COALESCE`, `GREATEST` and `LEAST` with an argument that is never null**, and no argument of a spatial type, of `hierarchyid` or of another .NET type.  See [a `COALESCE` over a value that changes](#limit-coalesce-computed-twice).
 - **`CAST` and `CONVERT` of a value that is never null to a built-in type**, such as `int`, `decimal(10, 2)`, `nvarchar(max)` or `datetime2`.  This holds when the type is written as SQL Server names it, and when the style of `CONVERT`, if it has one, is a whole number written in the query.  `TRY_CAST` and `TRY_CONVERT` can be null.
 - **Arithmetic of values that are never null**: `+`, `-`, `*`, `/` and `%`, as in `SUM(quantity * unit_price)`.
 - **`JSON_OBJECT` and `JSON_ARRAY`**, on SQL Server 2022 and later.
+- **A date function of values that are never null**: `DATEADD`, `DATEDIFF`, `DATEDIFF_BIG`, `DATEPART`, `DATENAME`, `YEAR`, `MONTH`, `DAY` and `EOMONTH`.
+- **`AT TIME ZONE` of a value and a time zone that are never null**, as in `placed_at AT TIME ZONE 'UTC'`.
+- **`LAG` and `LEAD` with a default**, as in `LAG(status, 1, 'none') OVER (...)`, when the value and the default are never null, the offset is a whole number written in the query, and neither is of a spatial type, of `hierarchyid` or of another .NET type.
+- **`CASE WHEN x IS NULL THEN e ELSE x END`**, when `e` is never null, `x` is written the same both times, and `x` is a column stored in a table or is never null itself.  Neither may be of a spatial type, of `hierarchyid` or of another .NET type.
 - **A computed column declared `PERSISTED NOT NULL`, read from its table alone**, when all of these are true:
   - the `FROM` of the query names that one table and nothing else;
   - the column is an item of its own, or the query is `SELECT *` from that table;
@@ -73,13 +77,12 @@ These answers assume that the connection that runs the query leaves `ANSI_WARNIN
 
 **SqlSource treats these as columns that can be null, though some of them never are:**
 
-- **`LAG(...)` and `LEAD(...)` with a default.**
-- **Other functions of values that are never null**, such as `EOMONTH`, `DATEADD`, `AT TIME ZONE` and `NEWID()`.
+- **Other functions of values that are never null**, such as `DATEFROMPARTS`, `SWITCHOFFSET` and `NEWID()`.
 - **A computed column that is not persisted**, unless SQL Server can show from its expression that it is never null, as for `ISNULL(quantity, 0)`.
 - **A computed column declared `PERSISTED NOT NULL` and read through a join, a view, a subquery or a `WITH` query**, with the same exception.
 - **A column of a recursive `WITH` query.**
 - **`COALESCE` over a column of each side of a `FULL JOIN`**, as in `COALESCE(i.id, p.invoice_id)`.
-- **A `CASE` whose `ELSE` is the column that it tests for null**, `CASE WHEN x IS NULL THEN 0 ELSE x END`.  Write `ISNULL(x, 0)`, which is never null.
+- **`CASE WHEN x IS NULL THEN 0 ELSE x END` of a computed column, a view's column or a subquery's expression that can be null.**  The `CASE` reads `x` twice, and SQL Server can compute such a value again for the second read.  Write `ISNULL(x, 0)`, which is never null.
 - **A column that a filter keeps from being null.**  An example is a column that can hold null, under `WHERE x IS NOT NULL`.  Another is the optional side of a `LEFT JOIN` that the `WHERE` makes inner.
 - **A column of a query that is not one `SELECT`.**  Such a query keeps the answer of SQL Server, so a count or a sum in it can be null.  This holds for the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, for a `UNION`, `INTERSECT` or `EXCEPT`, for `FOR XML` or `FOR JSON`, and for several statements in one query.
 - **A conversion to `geometry`, `geography`, `hierarchyid` or another .NET type**, since SQL Server can convert the text `'NULL'` to such a type as null: `CAST(N'NULL' AS geometry)` is null.
@@ -90,15 +93,15 @@ A column that can be null gets a nullable property in the query's [output model]
 
 ```sql mssql
 -- name: ListOrderMonths
--- column: month_end not null
-SELECT id, EOMONTH(placed_at) AS month_end
+-- column: month_start not null
+SELECT id, DATEFROMPARTS(YEAR(placed_at), MONTH(placed_at), 1) AS month_start
 FROM dbo.orders;
 ```
 
-If `placed_at` is `NOT NULL`, the last day of its month is never null, though SQL Server treats `EOMONTH` as a value that can be null.  So the marker gives the property `MonthEnd` the type `System.DateTime`, and not `System.DateTime?`.
+If `placed_at` is `NOT NULL`, the first day of its month is never null, though SQL Server treats `DATEFROMPARTS` as a value that can be null.  So the marker gives the property `MonthStart` the type `System.DateTime`, and not `System.DateTime?`.
 
 - **The build does not check the marker.**  A [query method](../../query-methods.md#reading-rows) throws if such a column is null after all.
-- **An alias `AS [month_end!]` does the same without the marker.**  The mark is left out of the name of the property.  It stays in the name of the column, which Dapper matches to the name of the property, so with Dapper write the marker.
+- **An alias `AS [month_start!]` does the same without the marker.**  The mark is left out of the name of the property.  It stays in the name of the column, which Dapper matches to the name of the property, so with Dapper write the marker.
 
 See [which properties can be null](../../model-properties.md#model-nullability) and [the `-- column:` marker](../../model-properties.md#column-marker).
 
@@ -114,8 +117,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 
 **Why.**  SQL Server treats a column as one that can be null when it cannot show that the column never is.  SqlSource keeps its answer where it cannot show otherwise from the query.  Among the columns that get such a property are:
 
-- `EOMONTH`, `AT TIME ZONE` and other functions of values that are never null;
-- `LAG` and `LEAD` with a default;
+- `DATEFROMPARTS`, `SWITCHOFFSET` and other functions of values that are never null;
 - the columns of a recursive `WITH` query;
 - `COALESCE` over both sides of a `FULL JOIN`;
 - a computed column that is not persisted;
@@ -128,11 +130,21 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - End the alias of the column with `!`.
 - In the place of a `CASE` that tests `x` for null, write `ISNULL(x, 0)`.
 
+<a id="limit-coalesce-computed-twice"></a>
+
+### Null from a `COALESCE` over a value that changes
+
+**What you see.**  A column written with `COALESCE` gets a property that cannot be null, and some rows hold a null.
+
+**Why.**  SQL Server can compute an argument of `COALESCE` once to test it and again for the result.  When the argument gives a different value each time, such as an expression or a subquery that calls `NEWID()`, the test can see a value and the result can be null.  SqlSource still treats that `COALESCE` as never null.
+
+**What to do.**  Write `ISNULL(x, 0)`, which computes `x` once.
+
 <a id="limit-ansi-warnings-off"></a>
 
 ### Null from a column whose property cannot be null, with `ANSI_WARNINGS` off
 
-**What you see.**  A column whose property cannot be null holds a null when the query runs.  It can be a count, a sum, a cast or a conversion, `COALESCE`, `GREATEST`, `LEAST` or arithmetic that SqlSource treats as never null.
+**What you see.**  A column whose property cannot be null holds a null when the query runs.  It can be a count, a sum, a cast or a conversion, `COALESCE`, `GREATEST`, `LEAST`, `LAG`, `LEAD`, a date function or arithmetic that SqlSource treats as never null.
 
 **Why.**  The connection turns `ANSI_WARNINGS` off.  With `ANSI_WARNINGS` and `ARITHABORT` both off, SQL Server returns null in place of some errors: an arithmetic overflow, a value too large for its type, or a division by zero.
 
