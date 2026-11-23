@@ -10,6 +10,8 @@ Measured through the describer on 2025 (CU9-GDR1), over 500 rows:
 |----|----|----|
 | `SELECT COALESCE(CASE WHEN ABS(CHECKSUM(NEWID())) % 2 = 0 THEN 1 END, 0) AS c FROM t` | `nullable` false, `expression` | 124 |
 | The same with a correlated `(SELECT TOP (1) CASE WHEN ABS(CHECKSUM(NEWID())) % 2 = 0 THEN 1 END FROM t AS o WHERE o.id = r.id)` as the argument | `nullable` false, `expression` | 126 |
+| `SELECT COALESCE(CAST(LAG(b) OVER (ORDER BY NEWID()) AS int), 0) AS c FROM t`, `b` nullable | `nullable` false, `expression` | 125 |
+| `SELECT COALESCE(CONVERT(int, LEAD(b) OVER (ORDER BY NEWID())), 0) AS c FROM t`, `b` nullable | `nullable` false, `expression` | 123 |
 
 Run alone on 2017 (CU31-GDR19) and 2025, five runs of 2,000 rows each:
 
@@ -19,6 +21,8 @@ Run alone on 2017 (CU31-GDR19) and 2025, five runs of 2,000 rows each:
 | The correlated subquery | 2,449 | 2,512 |
 | The `NEWID()` expression, the `COALESCE` inside `CAST(... AS bigint)` | 2,535 | 2,496 |
 | A computed column, or a `CROSS APPLY` column, of the same expression | 0 | 0 |
+
+A `CAST` or `CONVERT` hides what it converts from the proof: its type proof reads its target alone, so an argument that holds `OVER` or a user's function, which is otherwise refused, is proved inside one.  `COALESCE(LAG(b) OVER (ORDER BY NEWID()), 0)` itself stays nullable.
 
 `ISNULL` of the same expression gave no `NULL`, since it evaluates its argument once.  A view's column, a derived table's and a CTE's, read by the equivalent `CASE`, gave none either, but no plan promises that.
 
@@ -37,6 +41,7 @@ Hold every argument of `COALESCE` but the last, which is read once, to a conditi
 - Measure which arguments the realistic corpus and the end-to-end queries use, so that `COALESCE(MAX(x), 0)`, `COALESCE(a * 2, 0)` and a `COALESCE` over a view's column are not made noise without need, and move the SQL Server `Budgets` of `RealisticNullabilityNoiseTests` by what the change costs.
 - Measure on a server whether an aggregate, a window function or a deterministic function in an argument is evaluated once.
 - Check `GREATEST` and `LEAST`, which were not measured for this.
+- Make the type proof of `CAST` and `CONVERT` read their operand too, or the condition above misses what they wrap.
 
 Add the queries above to `BreakingAttempts` of `ProofTests`, and remove the limit from the manual.
 
