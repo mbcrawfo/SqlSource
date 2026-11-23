@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Linq;
+using System.Text.Json;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
@@ -35,13 +36,11 @@ public sealed class BundleJsonTests
     [Fact]
     public void Write_Outcome_IsAnObjectWithItsKind()
     {
-        BundleJson.Write(Info).ShouldContain("\"outcome\": {\n    \"kind\": \"entry\"\n  }");
-        BundleJson
-            .Write(Info with { Outcome = BundleOutcome.Failure("SQLSRC226", "describe parameters") })
-            .ShouldContain(
-                "\"outcome\": {\n    \"kind\": \"failure\",\n    \"id\": \"SQLSRC226\",\n"
-                    + "    \"step\": \"describe parameters\"\n  }"
-            );
+        OutcomeMembers(BundleJson.Write(Info)).ShouldBe([("kind", "entry")]);
+        OutcomeMembers(
+                BundleJson.Write(Info with { Outcome = BundleOutcome.Failure("SQLSRC226", "describe parameters") })
+            )
+            .ShouldBe([("kind", "failure"), ("id", "SQLSRC226"), ("step", "describe parameters")], ignoreOrder: true);
     }
 
     [Fact]
@@ -161,5 +160,14 @@ public sealed class BundleJsonTests
         text.ShouldNotEndWith("\n\n");
         text.ShouldNotContain("\r");
         text.ShouldContain("16.4 <\\\"x\\\">");
+    }
+
+    private static (string Name, string? Value)[] OutcomeMembers(string written)
+    {
+        using var document = JsonDocument.Parse(written);
+        var outcome = document.RootElement.GetProperty("outcome");
+
+        outcome.ValueKind.ShouldBe(JsonValueKind.Object);
+        return [.. outcome.EnumerateObject().Select(member => (member.Name, member.Value.GetString()))];
     }
 }
