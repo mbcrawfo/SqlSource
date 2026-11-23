@@ -195,6 +195,40 @@ public sealed class ConverterMethodTests
         ModelFiles(run).ShouldContain("App.GetEmailDto-Model.g.cs");
     }
 
+    // Two converters of one edge of the project's own source are reported where they are, at the converters, and block
+    // every column that needs the edge: a query with two of them has no method, whichever of its columns count.
+    [Fact]
+    public void Run_TwoColumnsOfAnEdgeThatTwoConvertersHave_GiveNoMethod()
+    {
+        var source = AppSourceOf(Struct)
+            .Replace(
+                "        public static long FromUserId(UserId id) => id.Value;",
+                "        public static long FromUserId(UserId id) => id.Value;\n\n"
+                    + "        [SqlSourceConverter]\n        public static Email EmailOf(string value) => new(value);",
+                StringComparison.Ordinal
+            );
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.email=App.Email\n-- name: GetEmails\nSELECT email, backup FROM users;\n\n"
+                + "-- name: CountUsers\nSELECT 1 AS n;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [
+                Entry(file, "GetEmails", [], [Column("email", Email), Column("backup", Email)]),
+                Entry(file, "CountUsers", [], [Column("n")]),
+            ],
+            source
+        );
+
+        run.Problems().ShouldAllBe(problem => problem.StartsWith("SQLSRC278 ", StringComparison.Ordinal));
+        run.Problems().Count.ShouldBe(2);
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(" CountUsers(\n");
+        methods.ShouldNotContain(" GetEmails(");
+    }
+
     [Fact]
     public void Run_ParameterWithoutTheWriteConverter_ReportsSqlsrc280()
     {

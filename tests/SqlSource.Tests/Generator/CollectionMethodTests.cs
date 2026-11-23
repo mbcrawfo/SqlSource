@@ -105,6 +105,27 @@ public sealed class CollectionMethodTests
         methods[1].Collection.ShouldBe(CollectionKind.Array);
     }
 
+    // Only a stream is given an array: any other collection type is the second method's too.
+    [Theory]
+    [InlineData("List")]
+    [InlineData("IList")]
+    [InlineData("ImmutableArray")]
+    public void Run_CollectionTypeThatIsNotAStream_KeepsItInTheSecondMethod(string name)
+    {
+        var kind = System.Enum.Parse<CollectionKind>(name);
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- generator: collection-method\n-- collection-type: "
+                + name
+                + "\n-- name: AddUser -> many\nINSERT INTO users (id) VALUES (@id) RETURNING id;\n"
+        );
+
+        var run = Plan(file);
+
+        run.ShouldBeClean();
+        MethodsOf(run).Select(method => method.Collection).ShouldBe([kind, kind]);
+    }
+
     // End to end: the query method streams, and the collection method beside it, an overload that takes the items,
     // returns an array.
     [Fact]

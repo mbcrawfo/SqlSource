@@ -869,6 +869,49 @@ public sealed class SharedModelTests
         ModelFiles(run).ShouldBe(["App.IdFilter-Model.g.cs"]);
     }
 
+    // The later of two methods queries whose input models of one name differ has no model of its own to take, so it
+    // gets no method, and the earlier keeps its own.
+    [Fact]
+    public void Run_SharedInputModelOfTwoMethodsQueriesWithDifferentParameters_GivesTheLaterNoMethod()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Repo;
+            }
+            """;
+        var a = new SqlFile(APath, "-- name: FindA\n-- input-model: Filter\nSELECT id FROM users WHERE id = @id;\n");
+        var b = new SqlFile(
+            BPath,
+            "-- name: FindB\n-- input-model: Filter\nSELECT id FROM users WHERE name = @name;\n"
+        );
+
+        var run = Run(
+            Source,
+            [
+                a,
+                Sidecars.Of(a, Entry(a, "FindA", [Parameter("id")], [Column("id")])),
+                b,
+                Sidecars.Of(b, Entry(b, "FindB", [Parameter("name", Text)], [Column("id")])),
+            ],
+            settings: /*lang=json,strict*/
+            """{"output": "Methods"}"""
+        );
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC257 /app/Repo/B.sql(2,1)-(2,23): The input model 'App.Filter' of the query 'FindB' is not the "
+                    + "same as the input model of that name of the query 'FindA' in A.sql: its property 1 is 'Name' "
+                    + $"here and 'Id' there.{Help257}",
+            ]);
+        var methods = run.Sources["App.Repo-Methods.g.cs"];
+        methods.ShouldContain(" FindA(\n");
+        methods.ShouldNotContain(" FindB(");
+    }
+
     // A list is an IEnumerable of its element at Methods and at Models alike, so a model of one name shared by a type
     // at each is one model.
     [Fact]

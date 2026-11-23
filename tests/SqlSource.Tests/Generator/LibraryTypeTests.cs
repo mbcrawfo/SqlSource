@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Converters;
+using SqlSource.Generation.Methods;
 using SqlSource.Generation.Types;
 using SqlSource.Settings;
 using SqlSource.Settings.Libraries;
@@ -663,6 +664,51 @@ public sealed class LibraryTypeTests
         columns[0].Library.ShouldBe(SqlLibrary.NodaTime);
         columns[1].Text.ShouldBe(JsonElement);
         columns[1].Library.ShouldBe(SqlLibrary.Json);
+    }
+
+    // The libraries a type's queries use, each once, in the order of the libraries and not of the columns.
+    [Fact]
+    public void Run_JsonAndNodaTimeOnInOneQuery_UsesBothInTheOrderOfTheLibraries()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- library-types: json=on nodatime=on\n\n-- name: ListEvents\nSELECT doc, at FROM events;\n"
+        );
+        var entry = Entry(
+            file,
+            "ListEvents",
+            [],
+            [Column("doc", Catalog("jsonb")), Column("at", Timestamptz, origin: EventsAt)]
+        );
+
+        var run = MethodRuns.Run(file, [entry], references: WithThePlugin);
+
+        run.ShouldBeClean();
+        StepOutputs
+            .Single<TypeMethods>(run, TrackingNames.TypeMethods)
+            .UsedLibraries.ShouldBe([
+                new LibraryUse(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql),
+                new LibraryUse(SqlLibrary.Json, DatabaseEngine.PostgreSql),
+            ]);
+    }
+
+    // A library's type that only a parameter has is a use of the library too.
+    [Fact]
+    public void Run_NodaTimeParameterOnly_UsesNodaTime()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: CountEvents -> one\nSELECT count(*) AS n FROM events WHERE at > @since;\n"
+        );
+        var entry = Entry(file, "CountEvents", [Parameter("since", Timestamptz)], [Column("n")]);
+
+        var run = MethodRuns.Run(file, [entry], references: WithThePlugin);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("global::NodaTime.Instant");
+        StepOutputs
+            .Single<TypeMethods>(run, TrackingNames.TypeMethods)
+            .UsedLibraries.ShouldBe([new LibraryUse(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql)]);
     }
 
     // PostGIS's types under NetTopologySuite's row, read by the plugin: a column of geometry, of geography in another
