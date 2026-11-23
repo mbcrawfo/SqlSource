@@ -296,6 +296,9 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             $"SELECT COALESCE(NULLIF({Flip}, 5), 0) AS c FROM dbo.proof_many",
             $"SELECT COALESCE(ISNULL({Flip}, NULL), 0) AS c FROM dbo.proof_many",
             $"SELECT COALESCE(COALESCE({Flip}, NULL), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(ISNULL(b, {Flip}), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(COALESCE(b, {Flip}), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(NULLIF(1, {Flip}), 0) AS c FROM dbo.proof_many",
             $"SELECT COALESCE(IIF({Flip} IS NULL, NULL, 1), 0) AS c FROM dbo.proof_many",
             $"SELECT COALESCE((SELECT TOP (1) {Flip} FROM dbo.proof_many AS o WHERE o.id = r.id), 0) AS c "
                 + "FROM dbo.proof_many AS r",
@@ -417,6 +420,31 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     [MemberData(nameof(ValuesReadTwice))]
     public Task DescribeAsync_ValueReadTwice_StaysNullable(string sql) =>
         WithRowsAsync(() => ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server));
+
+    // The server's source type is read only in the session's database, so a column of another database is not shown
+    // to be stored, by its name, a synonym, a derived table or a CTE, and an argument before the proved one stays
+    // nullable.  Its rows are not read: the limit is what is described.
+    [Theory]
+    [InlineData(
+        $"SELECT COALESCE(o.company, N'x') AS c FROM {SqlServerDatabases.RealisticDatabase}.dbo.customers AS o"
+    )]
+    [InlineData("SELECT COALESCE(o.company, N'x') AS c FROM dbo.proof_far AS o")]
+    [InlineData(
+        $"SELECT COALESCE(q.company, N'x') AS c FROM (SELECT company FROM {SqlServerDatabases.RealisticDatabase}"
+            + ".dbo.customers) AS q"
+    )]
+    [InlineData(
+        $"WITH q AS (SELECT company FROM {SqlServerDatabases.RealisticDatabase}.dbo.customers) "
+            + "SELECT COALESCE(company, N'x') AS c FROM q"
+    )]
+    public Task DescribeAsync_ColumnOfAnotherDatabase_StaysNullable(string sql) =>
+        WithRowsAsync(async () =>
+        {
+            await sqlServer.ExecuteAsync(
+                $"CREATE SYNONYM dbo.proof_far FOR {SqlServerDatabases.RealisticDatabase}.dbo.customers"
+            );
+            await ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server);
+        });
 
     // EOMONTH ignores an offset that is NULL, so no NULL row can be shown, and the form still does not rely on that.
     [Fact]
@@ -574,7 +602,7 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
 
     private Task DropAsync() =>
         sqlServer.ExecuteAsync(
-            "DROP FUNCTION IF EXISTS dbo.proof_flip, dbo.[COUNT]; "
+            "DROP SYNONYM IF EXISTS dbo.proof_far; DROP FUNCTION IF EXISTS dbo.proof_flip, dbo.[COUNT]; "
                 + "DROP VIEW IF EXISTS dbo.proof_random, dbo.proof_volatile_view; "
                 + "DROP TABLE IF EXISTS dbo.proof_many, dbo.proof_volatile, dbo.proof_dates, dbo.proof_shapes, "
                 + "dbo.proof_computed, dbo.proof_other, dbo.proof_rows"

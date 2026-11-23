@@ -36,9 +36,10 @@ internal sealed partial class ExpressionProofs
     private Proof OneValue(TokenRange range) =>
         Pieces(range) is { } pieces ? AllOf(pieces.Select(OneValueOfPiece)) : Proof.No;
 
-    // A literal, NULL or a parameter does.  A column does when it is stored in a table, whose row holds one value; a
-    // view's, a computed column and a derived table's expression may be evaluated once for each reference.  A subquery
-    // does not, since it can read another row each time.
+    // A literal, NULL or a parameter does.  A column does when it is stored in a table of the session's database, the
+    // only one whose source type "columns" reads, and whose row holds one value; a view's, a computed column and a
+    // derived table's expression may be evaluated once for each reference.  A subquery does not, since it can read
+    // another row each time.
     private Proof OneValueOfPiece(TokenRange piece)
     {
         var first = tokens[piece.Start];
@@ -76,7 +77,8 @@ internal sealed partial class ExpressionProofs
     }
 
     // A conversion to a built-in type, COALESCE, ISNULL and NULLIF give one value when what they read does, and so does
-    // an aggregate without OVER, computed once over its group's rows.  No other call is known to be deterministic.
+    // an aggregate without OVER, computed once over its group's rows.  AVG has no type proof (PrimaryType), so it
+    // counts only inside a CAST or CONVERT, whose type is its target.  No other call is known to be deterministic.
     private Proof OneValueOfCall(TokenRange piece)
     {
         if (CallOf(piece) is not { Window: null, WithinGroup: false, NamedWindow: false } call)

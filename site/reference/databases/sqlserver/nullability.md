@@ -54,7 +54,7 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - **A date function of values that are never null**: `DATEADD`, `DATEDIFF`, `DATEDIFF_BIG`, `DATEPART`, `DATENAME`, `YEAR`, `MONTH`, `DAY` and `EOMONTH`.
 - **`AT TIME ZONE` of a value and a time zone that are never null**, as in `placed_at AT TIME ZONE 'UTC'`.
 - **`LAG` and `LEAD` with a default**, as in `LAG(status, 1, 'none') OVER (...)`, when the value and the default are never null, the offset is a whole number written in the query, and neither is of a spatial type, of `hierarchyid` or of another .NET type.  It does not count as never null inside `CAST` or `CONVERT`, as a value of the `CASE` below, or as an argument of `COALESCE`, `GREATEST` or `LEAST`, alone or in arithmetic.
-- **`CASE WHEN x IS NULL THEN e ELSE x END`**, when `e` is never null, `x` is written the same both times, and `x` is a column stored in a table or is never null itself.  Neither may be of a spatial type, of `hierarchyid` or of another .NET type.
+- **`CASE WHEN x IS NULL THEN e ELSE x END`**, when `e` is never null, `x` is written the same both times, and `x` is a column stored in a table of the query's own database or is never null itself.  Neither may be of a spatial type, of `hierarchyid` or of another .NET type.
 - **A computed column declared `PERSISTED NOT NULL`, read from its table alone**, when all of these are true:
   - the `FROM` of the query names that one table and nothing else;
   - the column is an item of its own, or the query is `SELECT *` from that table;
@@ -77,9 +77,10 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 **What stays the same in a row.**  SQL Server can compute an argument of `COALESCE` twice: once to test it and once for the result.  So each argument before the one that is never null must be one of these:
 
 - a constant, `NULL` or a query parameter;
-- a column stored in a table, read directly or through a subquery in the `FROM` or a `WITH` query;
+- a column stored in a table of the query's own database, read directly or through a subquery in the `FROM` or a `WITH` query;
 - arithmetic of these, or `CAST`, `CONVERT` to a built-in type, `COALESCE`, `ISNULL` or `NULLIF` of these;
-- `SUM`, `MAX`, `MIN` or `AVG` of these, without `OVER (...)`.
+- `SUM`, `MAX` or `MIN` of these, without `OVER (...)`;
+- `AVG` of these, without `OVER (...)`, inside `CAST` or `CONVERT` to a built-in type.
 
 These answers assume that the connection that runs the query leaves `ANSI_WARNINGS` on, as Microsoft.Data.SqlClient does: see [limits](#limit-ansi-warnings-off).
 
@@ -91,6 +92,8 @@ These answers assume that the connection that runs the query leaves `ANSI_WARNIN
 - **A column of a recursive `WITH` query.**
 - **`COALESCE` over a column of each side of a `FULL JOIN`**, as in `COALESCE(i.id, p.invoice_id)`.
 - **`COALESCE` with an argument that can change before the one that is never null.**  This includes a `CASE`, a subquery, a window function, a date function, a computed column, a view's column and a column read `FOR SYSTEM_TIME`.  SQL Server can compute such a value again for the result, and the second value can be null.  Write `ISNULL(x, 0)`, which computes `x` once.
+- **`COALESCE` with a column of another database or of a linked server before the one that is never null.**  This holds when the query reads the table by its name, a synonym, a subquery in the `FROM` or a `WITH` query.  Write `ISNULL(x, 0)`.
+- **`COALESCE(AVG(x), 0)`**, unless the `AVG` is inside `CAST` or `CONVERT` to a built-in type.  Write `ISNULL(AVG(x), 0)`.
 - **`CASE WHEN x IS NULL THEN 0 ELSE x END` of a computed column, a view's column or a subquery's expression that can be null.**  The `CASE` reads `x` twice, and SQL Server can compute such a value again for the second read.  Write `ISNULL(x, 0)`, which is never null.
 - **A column that a filter keeps from being null.**  An example is a column that can hold null, under `WHERE x IS NOT NULL`.  Another is the optional side of a `LEFT JOIN` that the `WHERE` makes inner.
 - **A column of a query that is not one `SELECT`.**  Such a query keeps the answer of SQL Server, so a count or a sum in it can be null.  This holds for the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, for a `UNION`, `INTERSECT` or `EXCEPT`, for `FOR XML` or `FOR JSON`, and for several statements in one query.
@@ -130,6 +133,8 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - the columns of a recursive `WITH` query;
 - `COALESCE` over both sides of a `FULL JOIN`;
 - `COALESCE` over a value that can change, such as a `CASE` or a subquery;
+- `COALESCE` over a column of another database or of a linked server;
+- `COALESCE(AVG(x), 0)`;
 - a computed column that is not persisted;
 - a column that a filter keeps from being null;
 - a count or a sum in an `OUTPUT` clause or a `UNION`.
