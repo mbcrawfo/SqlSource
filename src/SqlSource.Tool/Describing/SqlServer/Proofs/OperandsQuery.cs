@@ -63,8 +63,8 @@ internal static class OperandsQuery
     }
 
     /// <summary>
-    /// What the server answered of each operand, by its index: whether it is not null, and whether its type is no CLR
-    /// type; or null when the answer proves none.
+    /// What the server answered of each operand, by its index: whether it is not null, whether its type is no CLR
+    /// type, and whether it is a stored column of a table; or null when the answer proves none.
     /// </summary>
     /// <param name="answer">The answer of <c>operands</c>.</param>
     /// <param name="count">The number of operands the text asked.</param>
@@ -72,7 +72,8 @@ internal static class OperandsQuery
     /// The answer proves none when it holds an error or error rows, or its visible rows are not
     /// <paramref name="count" /> rows named <c>1</c> to <paramref name="count" /> in order.  An operand is not null
     /// only when its row says <c>is_nullable</c> false; a row that cannot say is nullable.  Its type is no CLR type
-    /// only when <see cref="SqlServerTypes.MayBeClr" /> says so of its row.
+    /// only when <see cref="SqlServerTypes.MayBeClr" /> says so of its row.  It is stored only when its row names a
+    /// source column of a table and says it is not computed.
     /// </remarks>
     public static IReadOnlyList<OperandFacts>? AnswersOf(SqlServerColumnsAnswer answer, int count)
     {
@@ -100,7 +101,8 @@ internal static class OperandsQuery
         [
             .. visible.Select(static row => new OperandFacts(
                 !SqlServerColumns.NullableAsRecorded(row),
-                !SqlServerTypes.MayBeClr(row)
+                !SqlServerTypes.MayBeClr(row),
+                row is { SourceType: SqlServerColumns.Table, IsComputedColumn: false, SourceColumn: not null }
             )),
         ];
     }

@@ -36,10 +36,10 @@ ORDER BY u.id;
 
 ```sql mssql
 -- name: ListOrderMonths
--- column: month_end not null
+-- column: month_start not null
 SELECT
     id,
-    EOMONTH(placed_at) AS month_end
+    DATEFROMPARTS(YEAR(placed_at), MONTH(placed_at), 1) AS month_start
 FROM orders
 ORDER BY id;
 ```
@@ -54,11 +54,11 @@ The alias is in double quotes: `initcap(u.name) AS "display_name!"`.
 
 # [SQL Server](#tab/sqlserver)
 
-The alias is in brackets: `EOMONTH(placed_at) AS [month_end!]`.
+The alias is in brackets: `DATEFROMPARTS(YEAR(placed_at), MONTH(placed_at), 1) AS [month_start!]`.
 
 ---
 
-**What you get.**  `ListUserDisplayNamesDto.DisplayName` is a `string`, not a `string?`.  `ListOrderMonthsDto.MonthEnd` is a `DateTime`, not a `DateTime?`.
+**What you get.**  `ListUserDisplayNamesDto.DisplayName` is a `string`, not a `string?`.  `ListOrderMonthsDto.MonthStart` is a `DateTime`, not a `DateTime?`.
 
 **The rules you need.**
 
@@ -154,8 +154,8 @@ On SQL Server, a column most often gets a nullable property when:
 
 - It is on the optional side of an outer join or an `OUTER APPLY`.
 - A filter keeps it from being null, such as `WHERE x IS NOT NULL`.
-- It is a function such as `EOMONTH`, `DATEADD` or `AT TIME ZONE`, even of values that are never null.
-- It is `CASE WHEN x IS NULL THEN 0 ELSE x END`.  Write `ISNULL(x, 0)`, which is never null.
+- It is a function such as `DATEFROMPARTS` or `SWITCHOFFSET`, even of values that are never null.
+- It is `CASE WHEN x IS NULL THEN 0 ELSE x END` of a computed column, a view's column or a subquery's expression.  Write `ISNULL(x, 0)`, which is never null.
 - It is a count or a sum in a `UNION`, or in an `OUTPUT` clause.
 
 To fix one, [say that the column is never null](#not-null).  See [Which columns can be null](../reference/databases/sqlserver/nullability.md#nullability) and [the limit](../reference/databases/sqlserver/nullability.md#limit-columns-treated-as-nullable).

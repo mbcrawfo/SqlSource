@@ -60,6 +60,16 @@ internal abstract record Proof
         private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => answerOf(Index).NotClr;
     }
 
+    /// <summary>
+    /// Holds when the server names the operand's source as a stored column of a table, whatever its nullability: an
+    /// expression that reads the operand twice then reads one value.
+    /// </summary>
+    /// <param name="Index">The operand's index in <see cref="ExpressionProofs.Operands" />.</param>
+    internal sealed record Stored(int Index) : Proof
+    {
+        private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => answerOf(Index).Stored;
+    }
+
     /// <summary>Holds when one of its parts holds.</summary>
     internal sealed record AnyOf(IReadOnlyList<Proof> Parts) : Proof
     {
