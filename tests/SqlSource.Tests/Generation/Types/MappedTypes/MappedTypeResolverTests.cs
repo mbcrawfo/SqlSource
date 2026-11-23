@@ -155,6 +155,23 @@ public sealed class MappedTypeResolverTests
                 static int IMakes.Make() => 1;
             }
 
+            // Interfaces that inherit members they do not implement: none, a static abstract one, one next to an
+            // instance one, and a static virtual one.
+            public interface IInheritsShape : IShape;
+
+            public interface IInheritsMakes : IMakes;
+
+            public interface IMixed
+            {
+                static abstract int Make();
+
+                void Other();
+            }
+
+            public interface IInheritsMixed : IMixed;
+
+            public interface IInheritsDefault : IMakesByDefault;
+
             public enum Color
             {
                 Red,
@@ -295,6 +312,32 @@ public sealed class MappedTypeResolverTests
             public sealed class AccountId { }
 
             public sealed class Range<T> { }
+
+            public sealed class Outer<T>
+            {
+                public sealed class Inner<U> { }
+            }
+        }
+        """;
+
+    // Names that several types answer: Widget in the global namespace and in Zed, whose metadata names sort the other
+    // way round from their full names, and Gadget in two namespaces.
+    private const string AmbiguousSource = """
+        public sealed class Widget;
+
+        namespace Zed
+        {
+            public sealed class Widget;
+        }
+
+        namespace One
+        {
+            public sealed class Gadget;
+        }
+
+        namespace Two
+        {
+            public sealed class Gadget;
         }
         """;
 
@@ -337,8 +380,15 @@ public sealed class MappedTypeResolverTests
         )
     );
 
+    // A project whose short names Widget and Gadget each mean several types.
+    private static readonly Lazy<CSharpCompilation> AmbiguousProject = new(() =>
+        GeneratorHarness.CreateCompilation([new SourceFile("/app/MyApp.cs", AmbiguousSource)])
+    );
+
     [Theory]
     [InlineData("int", nameof(MappedTypeStatus.Found), true, true, "")]
+    [InlineData("object", nameof(MappedTypeStatus.Found), false, true, "")]
+    [InlineData("object[]", nameof(MappedTypeStatus.Found), false, true, "")]
     [InlineData("string", nameof(MappedTypeStatus.Found), false, true, "")]
     [InlineData("global::MyApp.UserId", nameof(MappedTypeStatus.Found), true, true, "")]
     [InlineData("global::System.Uri", nameof(MappedTypeStatus.Found), false, true, "")]
@@ -442,6 +492,14 @@ public sealed class MappedTypeResolverTests
         true,
         "CS0612,CS0618"
     )]
+    [InlineData(
+        "global::System.Collections.Generic.Dictionary<global::MyApp.OldThing, global::MyApp.Helpers>",
+        nameof(MappedTypeStatus.NotAPropertyType),
+        false,
+        false,
+        ""
+    )]
+    [InlineData("Twice", nameof(MappedTypeStatus.Ambiguous), false, false, "")]
     [InlineData("global::MyApp.Gone", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
     [InlineData("global::MyApp.OddId", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
     [InlineData("global::MyApp.Numbered", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
@@ -531,6 +589,15 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::System.Collections.Generic.List<global::System.Nullable<int>>")]
     [InlineData("global::MyApp.PairBox<object?, int?>")]
     [InlineData("global::MyApp.PairBox<global::System.ValueType?, int?>")]
+    [InlineData("global::MyApp.PairBox<global::System.Nullable<int>[], int?[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Nullable<int>[][], int?[][]>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<int>, "
+            + "global::System.Collections.Generic.List<int>>"
+    )]
+    [InlineData("global::System.Collections.Generic.List<global::System.Collections.Generic.IEnumerable<string>>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsShape>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsDefault>")]
     public void Resolve_GenericNameWhoseArgumentsMeetTheConstraints_IsFound(string name)
     {
         CompilerReports(name).ShouldBeEmpty();
@@ -575,6 +642,9 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::System.Collections.Generic.Dictionary<string, global::MyApp.ValueBox<string>>")]
     [InlineData("global::MyApp.ValueBox<string>[]")]
     [InlineData("global::MyApp.ValueBox<int?[]>")]
+    [InlineData("global::MyApp.PairBox<int[], int?[]>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsMakes>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsMixed>")]
     public void Resolve_GenericNameWhoseArgumentsBreakAConstraint_IsNotAPropertyType(string name)
     {
         CompilerReports(name).ShouldNotBeEmpty();
@@ -928,6 +998,173 @@ public sealed class MappedTypeResolverTests
         type.Package.ShouldBeNull();
     }
 
+    // A keyword as a type argument is the type it names: no other type of the name beside it, as the constraint of
+    // PairBox<T, U> asks, where U must be a T.
+    [Theory]
+    [InlineData("bool", "Boolean")]
+    [InlineData("byte", "Byte")]
+    [InlineData("sbyte", "SByte")]
+    [InlineData("short", "Int16")]
+    [InlineData("ushort", "UInt16")]
+    [InlineData("int", "Int32")]
+    [InlineData("uint", "UInt32")]
+    [InlineData("long", "Int64")]
+    [InlineData("ulong", "UInt64")]
+    [InlineData("nint", "IntPtr")]
+    [InlineData("nuint", "UIntPtr")]
+    [InlineData("char", "Char")]
+    [InlineData("float", "Single")]
+    [InlineData("double", "Double")]
+    [InlineData("decimal", "Decimal")]
+    [InlineData("string", "String")]
+    [InlineData("object", "Object")]
+    public void Resolve_KeywordAsATypeArgument_IsTheTypeItNames(string keyword, string typeName)
+    {
+        var name = $"global::MyApp.PairBox<global::System.{typeName}, {keyword}>";
+
+        CompilerReports(name).ShouldBeEmpty();
+        ResolvedStatusOf(name).ShouldBe(MappedTypeStatus.Found);
+    }
+
+    // The same, where the keyword is not the type the constraint asks for.
+    [Theory]
+    [InlineData("nint", "UIntPtr")]
+    [InlineData("nuint", "IntPtr")]
+    public void Resolve_KeywordAsATypeArgumentOfAnotherType_IsNotAPropertyType(string keyword, string typeName)
+    {
+        var name = $"global::MyApp.PairBox<global::System.{typeName}, {keyword}>";
+
+        CompilerReports(name).ShouldNotBeEmpty();
+        ResolvedStatusOf(name).ShouldBe(MappedTypeStatus.NotAPropertyType);
+    }
+
+    // The ids of the warnings of one name are the name's own: nothing of the name before it.
+    [Fact]
+    public void Resolve_NameAfterOneWithWarnings_HasNoneOfItsWarnings()
+    {
+        var types = MappedTypeResolver
+            .Resolve(
+                Project.Value,
+                TestSidecars.Of("global::MyApp.OldThing", "global::MyApp.UserId", "int"),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
+            .Types;
+
+        types
+            .Select(static type => type.WarningIds)
+            .ShouldBe([TestSidecars.Of("CS0612", "CS0618"), NoWarnings, NoWarnings]);
+    }
+
+    // A name that is written in full is given back as it was written, with no short name to write in full.
+    [Theory]
+    [InlineData("global::System.Collections.Generic.Dictionary<int,string>")]
+    [InlineData("System.Collections.Generic.List<int>")]
+    [InlineData("global::System.Collections.Generic.Dictionary<int,global::MyApp.Box<string>>")]
+    public void Resolve_NameWithNoShortName_KeepsItsTextAsWritten(string name)
+    {
+        var types = MappedTypeResolver
+            .Resolve(
+                Project.Value,
+                TestSidecars.Of(name),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
+            .Types;
+
+        var type = types.ShouldHaveSingleItem();
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Text.ShouldBe(name);
+    }
+
+    // Each short name in a name is written in full, and the rest of the name stays as it was written: the arguments
+    // before the first short name too, those of the parts around, and a part with none.
+    [Theory]
+    [InlineData("AccountId", "global::Brought.Client.AccountId")]
+    [InlineData("Range<AccountId>", "global::Brought.Client.Range<global::Brought.Client.AccountId>")]
+    [InlineData(
+        "System.Collections.Generic.Dictionary<int,AccountId>",
+        "global::System.Collections.Generic.Dictionary<int, global::Brought.Client.AccountId>"
+    )]
+    [InlineData(
+        "System.Collections.Generic.Dictionary<AccountId, int>",
+        "global::System.Collections.Generic.Dictionary<global::Brought.Client.AccountId, int>"
+    )]
+    [InlineData(
+        "System.Collections.Generic.Dictionary<AccountId, Range<int>>",
+        "global::System.Collections.Generic.Dictionary<global::Brought.Client.AccountId, "
+            + "global::Brought.Client.Range<int>>"
+    )]
+    [InlineData(
+        "System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<AccountId>>",
+        "global::System.Collections.Generic.Dictionary<int, "
+            + "global::System.Collections.Generic.List<global::Brought.Client.AccountId>>"
+    )]
+    [InlineData(
+        "global::Brought.Client.Outer<int>.Inner<AccountId>",
+        "global::Brought.Client.Outer<int>.Inner<global::Brought.Client.AccountId>"
+    )]
+    [InlineData(
+        "global::Brought.Client.Outer<AccountId>.Inner<int>",
+        "global::Brought.Client.Outer<global::Brought.Client.AccountId>.Inner<int>"
+    )]
+    [InlineData(
+        "global::Brought.Client.Outer<AccountId>.Inner<AccountId>",
+        "global::Brought.Client.Outer<global::Brought.Client.AccountId>.Inner<global::Brought.Client.AccountId>"
+    )]
+    [InlineData(
+        "global::Brought.Client.Outer<int>.Inner<Range<AccountId>>",
+        "global::Brought.Client.Outer<int>.Inner<global::Brought.Client.Range<global::Brought.Client.AccountId>>"
+    )]
+    public void Resolve_NameWithShortNames_IsWrittenInFull(string name, string written)
+    {
+        var type = ResolveBrought(name, TransitivePackageAssemblies.None);
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Text.ShouldBe(written);
+    }
+
+    // The binding of a name is its first short name's, and the arguments after it add none.
+    [Fact]
+    public void Resolve_ShortNamesAsTypeArguments_HaveTheFirstBinding()
+    {
+        var type = ResolveBrought(
+            "System.Collections.Generic.Dictionary<AccountId, Range<int>>",
+            TransitivePackageAssemblies.Of("Brought.Client")
+        );
+
+        type.Package.ShouldBe(new PackageBinding("AccountId", "Brought.Client.AccountId", "Brought.Client"));
+    }
+
+    [Fact]
+    public void Resolve_ShortNameThatSeveralTypesAnswer_GivesTheirFullNamesInOrdinalOrder()
+    {
+        var type = ResolveAmbiguous("Widget");
+
+        type.Status.ShouldBe(MappedTypeStatus.Ambiguous);
+        type.Candidates.ShouldBe(TestSidecars.Of("Zed.Widget", "global::Widget"));
+    }
+
+    // The candidates are those of the first short name that is ambiguous, not of a later one.
+    [Fact]
+    public void Resolve_TwoAmbiguousShortNamesAsArguments_GivesTheFirstsCandidates()
+    {
+        var type = ResolveAmbiguous("System.Collections.Generic.Dictionary<Gadget, Widget>");
+
+        type.Status.ShouldBe(MappedTypeStatus.Ambiguous);
+        type.Candidates.ShouldBe(TestSidecars.Of("One.Gadget", "Two.Gadget"));
+    }
+
+    // Candidates are for an ambiguous name alone: a name that fails first in the order of the statuses has none.
+    [Fact]
+    public void Resolve_NotFoundShortNameBesideAnAmbiguousOne_HasNoCandidates()
+    {
+        var type = ResolveAmbiguous("System.Collections.Generic.Dictionary<NoSuchType, Widget>");
+
+        type.Status.ShouldBe(MappedTypeStatus.NotFound);
+        type.Candidates.ShouldBe(NoCandidates);
+    }
+
     [Fact]
     public void Find_NameNotResolved_GivesNull()
     {
@@ -1043,6 +1280,17 @@ public sealed class MappedTypeResolverTests
                 BroughtProject.Value,
                 TestSidecars.Of(name),
                 packageAssemblies,
+                TestContext.Current.CancellationToken
+            )
+            .Types.ShouldHaveSingleItem();
+
+    // The record of the one name in the project whose short names are ambiguous.
+    private static MappedType ResolveAmbiguous(string name) =>
+        MappedTypeResolver
+            .Resolve(
+                AmbiguousProject.Value,
+                TestSidecars.Of(name),
+                TransitivePackageAssemblies.None,
                 TestContext.Current.CancellationToken
             )
             .Types.ShouldHaveSingleItem();
