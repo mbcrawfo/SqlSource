@@ -3805,7 +3805,7 @@ Under the output `models`, the constant or token method of the query is still ge
 
 When the message says to map the type, it names the key of the type by these rules:
 
-- **The key has the schema of the type.**  It is `public.address`, `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server.  A key without a schema must be a type that SqlSource knows.
+- **The key has the schema of the type.**  It is `public.address`, `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server.  A key without a schema must be a type that SqlSource knows.  A type named as an alias of another type keeps its schema, as in `pg_catalog.integer` or `sys.rowversion`, because the bare name means the other type.
 - **A schema or a name that needs quotes is in them**, as in `"my schema"."Order Item"`.
 - **A schema or a name with a line break, a tab or any other control character is written with escapes**, as in `"my schema".U&"Order\000AItem"`.  So the key can be written in a marker, which is one line.
 - **A name with a capital letter is quoted too**, as in `public."Status"`.  So an entry for it maps that type alone, and not one whose name differs only by case.

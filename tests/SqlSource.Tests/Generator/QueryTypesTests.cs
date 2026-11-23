@@ -227,6 +227,38 @@ public sealed class QueryTypesTests
             ]);
     }
 
+    // A type of the catalog named as an alias, which only a sidecar edited by hand has: the bare name is a key of
+    // another type, int4 or bpchar, so the help names this one with its schema, and that key maps it.
+    [Theory]
+    [InlineData("integer")]
+    [InlineData("character")]
+    public void Run_CompositeOfTheCatalogNamedAsAnAlias_IsSqlsrc246WithTheQualifiedKey(string name)
+    {
+        var type = TestSidecars.Postgres(name: name, kind: SidecarValues.Kind.Composite, internalName: name);
+        var mapped = new SqlFile(
+            GeneratorHarness.UsersPath,
+            $"-- type-override: pg_catalog.{name}=MyApp.Tag\n" + SqlTexts.GetUser
+        );
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("relation", type)])
+        );
+        var mappedRun = Run(
+            [NpgsqlReferences.Npgsql10],
+            mapped,
+            Entry(mapped, "GetUser", [], [Column("relation", type)])
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'relation' has the type '{name}', which SqlSource cannot give a "
+                + $"C# type.  Map it with the type override, as pg_catalog.{name}=<a C# type>.",
+        ]);
+        mappedRun.Diagnostics.ShouldBeEmpty();
+        StepOutputs.ColumnsOf(mappedRun).ShouldHaveSingleItem().Text.ShouldBe("global::MyApp.Tag");
+    }
+
     // The tool never writes record, unknown or void, or a kind this version does not know, so describing again
     // mends the sidecar.
     [Theory]
