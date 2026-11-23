@@ -852,6 +852,83 @@ public sealed class PlanOutputTests(PostgresDatabases postgres)
         root.Output.ShouldBe([printed]);
     }
 
+    // The child of an INSERT prints one entry for each attribute of the target in its order: a dropped one's as a NULL
+    // of its type, and a generated one's as a NULL it is computed over later.
+    [Theory]
+    [InlineData(
+        "INSERT INTO written.gone (a, b) VALUES (1, 'x') RETURNING b",
+        new[] { "1", "NULL::integer", "'x'::text" }
+    )]
+    [InlineData(
+        "INSERT INTO written.t (id, a) VALUES (1, 'x') ON CONFLICT DO NOTHING RETURNING a",
+        new[] { "1", "'x'::text", "'x'::text", "NULL::text", "NULL::text" }
+    )]
+    public async Task Explain_Insert_PrintsAValueForEachAttributeInItsOrder(string sql, string[] values)
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Written);
+
+            var root = await ExplainAsync(sql);
+
+            root.NodeType.ShouldBe(PlanNodeTypes.ModifyTable);
+            root.Operation.ShouldBe(PlanOperations.Insert);
+            root.Plans.ShouldHaveSingleItem().Output.ShouldBe(values);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropWritten);
+        }
+    }
+
+    // What InsertTargetOf reads: an upsert names its resolution, and an UPDATE is another operation.
+    [Theory]
+    [InlineData("INSERT INTO written.t (id) VALUES (1) ON CONFLICT (id) DO UPDATE SET a = 'x'", "Insert", "UPDATE")]
+    [InlineData("INSERT INTO written.t (id) VALUES (1) ON CONFLICT (id) DO NOTHING", "Insert", "NOTHING")]
+    [InlineData("INSERT INTO written.t (id) VALUES (1)", "Insert", null)]
+    [InlineData("UPDATE written.t SET a = 'x'", "Update", null)]
+    public async Task Explain_ModifyTable_PrintsItsOperationAndItsResolution(
+        string sql,
+        string operation,
+        string? resolution
+    )
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Written);
+
+            var root = await ExplainAsync(sql);
+
+            root.Operation.ShouldBe(operation);
+            root.ConflictResolution.ShouldBe(resolution);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropWritten);
+        }
+    }
+
+    // An INSERT prints the target's alias, and an UPDATE of a partitioned target a partition's, which names no
+    // instance.
+    [Theory]
+    [InlineData("INSERT INTO written.q (id) VALUES (1) RETURNING id + 1", "(q.id + 1)")]
+    [InlineData("UPDATE written.q SET a = 'x' RETURNING id + 1", "(q_1.id + 1)")]
+    public async Task Explain_PartitionedTarget_PrintsItsReturningList(string sql, string printed)
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Written);
+
+            var root = await ExplainAsync(sql);
+
+            root.Output.ShouldBe([printed]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropWritten);
+        }
+    }
+
     // The node and every node under it, whatever the relationship.
     private static PlanNode[] All(PlanNode node) => [node, .. node.Plans.SelectMany(All)];
 }

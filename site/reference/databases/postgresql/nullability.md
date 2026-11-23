@@ -13,7 +13,7 @@ LEFT JOIN customers c ON c.id = o.customer_id;
 
 For each column of a query, SqlSource says whether the column can be null or is never null.  If `orders.id`, `orders.placed_at` and `customers.name` are all `NOT NULL`, the columns `id` and `placed_at` of the sample are never null, but `name` can be null.  The `LEFT JOIN` gives a null name to an order with no customer.
 
-The usual reasons that a column can be null are an outer join, a view, or an expression such as `initcap(name)`.  A call of a function that the lists below do not name is such an expression.  The lists below give every rule.
+The usual reasons that a column can be null are an outer join, a query that reads a view's whole column list, or an expression such as `initcap(name)`.  A call of a function that the lists below do not name is such an expression.  The lists below give every rule.
 
 SqlSource treats a column as one that can be null unless it can show that the column is never null.  If it treats a column that is never null as one that can be null, the cost is a null check in your code.  It never gives you a wrong value.
 
@@ -21,6 +21,16 @@ SqlSource can tell that a column is never null when the column is one of these:
 
 - **A `NOT NULL` column of a table**, when no outer join of the query can fill it with null.
 - **`count(*)`, or `count(x)` of anything**, or a ranking over a window: `row_number()`, `rank()`, `dense_rank()`, `percent_rank()` or `cume_dist()`.  A count is `0` for no rows, never null.
+- **A column of a view that is never null by these rules in the view's own query**, when the query does not select the view's whole column list.  A `SELECT *` from a view keeps the model named after the view, whose columns can be null.
+- **A value that an `INSERT` writes and `RETURNING` returns**, when the value is never null by these rules and the `RETURNING` list is not the table's whole column list.  It does not count in any of these cases:
+  - The statement has `ON CONFLICT DO UPDATE`.
+  - The table, or any of its partitions, has a `BEFORE INSERT` row trigger, even a disabled one.
+  - The value is a query parameter.
+  - The value is in a `VALUES` list of more than one row.
+  - The value comes from a `UNION`, an `INTERSECT` or an `EXCEPT`.
+  - The table has a `DO ALSO` rule on `INSERT`.
+  - The table is partitioned, on PostgreSQL 15 or earlier.
+  - The query holds the word `OLD` or `NEW`, or the quoted name `"old"` or `"new"`, in any case.
 - **A constant** other than `NULL`, such as `1` or `'active'`.
 - **A test**: `IS NULL` or `IS NOT NULL`.
 - **Arithmetic or a comparison of values that are never null**, in one of these forms:
@@ -118,9 +128,9 @@ SqlSource treats a column as one that can be null when one of these is true:
   - It has a `DO INSTEAD` rule on `INSERT`, `UPDATE` or `DELETE`.
 - **An outer join can fill the column with null.**  This is a column of the optional side of a `LEFT`, `RIGHT` or `FULL` join.
 - **A list after a `NOT` or used as a value can make a joined column one that can be null.**  This is so when all of these are true:
-  - The query holds one of the words `LEFT`, `RIGHT`, `FULL`, `OUTER`, `ROLLUP`, `CUBE`, `GROUPING`, `MERGE`, `OLD` or `NEW`.
   - The query holds a [list](../../list-parameters.md#list-parameters) after a `NOT` or used as a value.
-  - The column is of a table that the query joins to another, on either side of the join.
+  - The column is of a table that the query joins to another, on either side of the join, or of a view whose query joins tables, or an expression over such a column.
+  - For a table's own column, the query holds one of the words `LEFT`, `RIGHT`, `FULL`, `OUTER`, `ROLLUP`, `CUBE`, `GROUPING`, `MERGE`, `OLD` or `NEW`.
 
   A condition such as `o.id NOT IN @ids` or `(o.id IN @ids) IS FALSE` can be on the optional side of a `LEFT JOIN`.  Then it drops the rows that the join fills with null, for every list but an empty one.  An empty list keeps those rows.  So SqlSource treats every joined column of such a query as one that can be null.  The column of a query with no join is not affected, and neither is any column of a query that holds none of the words.
 
@@ -133,7 +143,7 @@ SqlSource treats a column as one that can be null when one of these is true:
   - in the query's own select list, `ORDER BY`, `GROUP BY`, `RETURNING` or `SET`.
 
   A word counts in any case, anywhere outside a string, a comment or a quoted name.  It counts even as the name of a function, such as `left(name, 3)` in a query whose joins are all inner.  Two quoted names count as `OLD` and `NEW`: `"old"` and `"new"`, in any case.  So does a name written `U&"..."`.
-- **The column comes from a view or a materialized view.**  PostgreSQL does not record whether a view's column can be null.
+- **The column comes from a materialized view, or from a view that the rules above do not prove it of.**  PostgreSQL does not record whether a view's column can be null.  A query of a view's whole column list counts as such a query.
 - **The column comes from a foreign table.**  PostgreSQL does not enforce `NOT NULL` on its remote rows.
 - **It is `NULL`, or an expression that is not in the list above.**  For example:
   - `initcap(name)`, or a call of another function;
@@ -216,7 +226,9 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - a subquery of `min` or `max` that PostgreSQL reads from an index, such as `coalesce(max(id), 0)`;
 - a subquery as the `y` of an `IN` or an `= ANY`, or as a branch of a `UNION`, an `INTERSECT` or an `EXCEPT`;
 - a recursive `WITH` query;
-- the columns of a view.
+- a view's whole column list, a `GROUP BY` column of a view, and a column of a view over a `UNION`;
+- a value that an `INSERT` takes from a `VALUES` list of more than one row, or from a `UNION`, an `INTERSECT` or an `EXCEPT`;
+- a table's whole column list in `RETURNING`, and a value that an `UPDATE`, a `DELETE` or a `MERGE` writes.
 
 **What to do.**  Where you know that the column is never null, do one of these:
 

@@ -139,7 +139,7 @@ ORDER BY name;
 On PostgreSQL, a column most often gets a nullable property when:
 
 - It is on the optional side of a `LEFT`, `RIGHT` or `FULL` join.
-- It comes from a view, whose nullability PostgreSQL does not record.
+- It comes from a view, and the query reads the view's whole column list or the full rules do not prove the column.
 - It is a call of a function that the full rules do not list, such as `initcap(name)`.
 - It is `sum`, `max`, `min` or `avg` with no `GROUP BY`, which is null over no rows.
 - A `WITH` query or a subquery in `FROM` computes it, such as a `count(*)`, beside a column that keeps it from counting, such as a number that can be null or that the query does not read.

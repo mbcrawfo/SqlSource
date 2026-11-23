@@ -100,6 +100,20 @@ public sealed class OuterJoinGateTests
 
     // Whether a reference at a ModifyTable may be PostgreSQL 18's old or new row.
     [Theory]
+    [InlineData("INSERT INTO t (id) VALUES (1) RETURNING id")]
+    [InlineData("insert into t (id) values (1) returning id")]
+    [InlineData("WITH m AS (DELETE FROM s RETURNING id) INSERT INTO t SELECT id FROM m RETURNING id")]
+    public void NamesInsert_QueryThatHoldsTheWord_NamesIt(string sql) => OuterJoinGate.NamesInsert(sql).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("SELECT inserted FROM t")]
+    [InlineData("SELECT 'INSERT' FROM t")]
+    [InlineData("SELECT 1 -- INSERT")]
+    [InlineData("SELECT \"INSERT\" FROM t")]
+    public void NamesInsert_WordInALongerNameAStringACommentOrAQuotedName_DoesNotNameIt(string sql) =>
+        OuterJoinGate.NamesInsert(sql).ShouldBeFalse();
+
+    [Theory]
     [InlineData("INSERT INTO t (id) VALUES (1) RETURNING old.id")]
     [InlineData("INSERT INTO t (id) VALUES (1) RETURNING NEW.id")]
     [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS o) o.id")]

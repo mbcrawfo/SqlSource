@@ -81,6 +81,7 @@ internal static class PostgresFieldRules
         PostgresCallNames.Relations,
         PostgresCallNames.Overloads,
         PostgresCallNames.Casts,
+        PostgresCallNames.Triggers,
         PostgresCallNames.Deallocate,
     ];
 
@@ -193,6 +194,9 @@ internal static class PostgresFieldRules
         Add(PostgresCallNames.Overloads, "request.operators[]", FieldRule.Sql);
         Add(PostgresCallNames.Overloads, "answer.functions[]", FieldRule.Name(NameClass.Function));
         Add(PostgresCallNames.Overloads, "answer.operators[]", FieldRule.Sql);
+
+        Add(PostgresCallNames.Triggers, "request.relation.schema", FieldRule.Name(NameClass.Schema));
+        Add(PostgresCallNames.Triggers, "request.relation.name", FieldRule.Name(NameClass.Table));
 
         // The error of every call.  Prepare's position, a number into the query's SQL, is kept.
         foreach (var method in Methods)

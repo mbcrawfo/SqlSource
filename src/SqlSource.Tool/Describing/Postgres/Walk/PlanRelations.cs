@@ -13,16 +13,21 @@ internal static class PlanRelations
     /// <summary>
     /// The schema and the name of every relation scan in the whole tree, through every <c>Parent Relationship</c>
     /// (<c>Outer</c>, <c>Inner</c>, <c>Member</c>, <c>Subquery</c>, <c>InitPlan</c> and <c>SubPlan</c>), in schema
-    /// and name order, each once: empty when no scan prints both.
+    /// and name order, each once: empty when no scan prints both.  The target of a root <c>ModifyTable</c> is one too,
+    /// since a <c>RETURNING</c> list reads its columns, and an <c>INSERT</c> does not scan it.
     /// </summary>
     public static IReadOnlyList<PostgresRelationName> Of(PlanNode root) =>
         InOrder(
             root.SelfAndDescendants()
-                .Where(static node =>
-                    PlanInstances.ScansARelation(node) && node.Schema is not null && node.RelationName is not null
+                .Where(node =>
+                    (PlanInstances.ScansARelation(node) || (ReferenceEquals(node, root) && IsModifyTable(node)))
+                    && node.Schema is not null
+                    && node.RelationName is not null
                 )
                 .Select(static node => new PostgresRelationName(node.Schema!, node.RelationName!))
         );
+
+    private static bool IsModifyTable(PlanNode node) => node.NodeType == PlanNodeTypes.ModifyTable;
 
     /// <summary>
     /// The relations each once, in order of schema and then of name, each compared by ordinal: the order of what
