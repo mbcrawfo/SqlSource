@@ -15,6 +15,9 @@ Measured through the describer on 2025 (CU9-GDR1), over 500 rows:
 | `SELECT COALESCE(CAST(YEAR(LAG(d) OVER (ORDER BY NEWID())) AS int), 0) AS c FROM t`, `d` nullable | `nullable` false, `expression` | 133 |
 | `SELECT COALESCE(CONVERT(date, DATEADD(DAY, 1, LEAD(d) OVER (ORDER BY NEWID()))), '2020-01-01') AS c FROM t`, `d` nullable | `nullable` false, `expression` | 125 |
 | `SELECT COALESCE(CAST(LAG(d) OVER (ORDER BY NEWID()) AT TIME ZONE 'UTC' AS datetime2(0)), '2020-01-01') AS c FROM t`, `d` nullable | `nullable` false, `expression` | 132 |
+| `SELECT COALESCE(SUM(b) OVER (ORDER BY NEWID() ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING), 0) AS c FROM t`, `b` nullable | `nullable` false, `expression` | 121 |
+| `SELECT COALESCE(MAX(b) OVER (ORDER BY NEWID() ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING), 0) AS c FROM t`, `b` nullable | `nullable` false, `expression` | 126 |
+| `SELECT COALESCE(SUM(dbo.f(id)) OVER (PARTITION BY id), 0) AS c FROM t`, `dbo.f` reading a view over `NEWID()` | `nullable` false, `expression` | 126 |
 
 Run alone on 2017 (CU31-GDR19) and 2025, five runs of 2,000 rows each:
 
@@ -25,7 +28,7 @@ Run alone on 2017 (CU31-GDR19) and 2025, five runs of 2,000 rows each:
 | The `NEWID()` expression, the `COALESCE` inside `CAST(... AS bigint)` | 2,535 | 2,496 |
 | A computed column, or a `CROSS APPLY` column, of the same expression | 0 | 0 |
 
-A `CAST` or `CONVERT` hides what it converts from the proof: its type proof reads its target alone, so an argument that holds `OVER` or a user's function, which is otherwise refused, is proved inside one.  `COALESCE(LAG(b) OVER (ORDER BY NEWID()), 0)` itself stays nullable.
+Two paths reach an argument that holds `OVER`, an aggregate or a user's function.  A `CAST` or `CONVERT` hides its operand, since its type proof reads its target alone.  `SUM`, `MAX` and `MIN` with `OVER` need no `CAST`: `SUM`'s type proof is fixed, and `MAX` and `MIN` take their operand's.  `COALESCE(LAG(b) OVER (ORDER BY NEWID()), 0)` itself stays nullable.
 
 `ISNULL` of the same expression gave no `NULL`, since it evaluates its argument once.  A view's column, a derived table's and a CTE's, read by the equivalent `CASE`, gave none either, but no plan promises that.
 
@@ -42,11 +45,11 @@ High.  A generated property that cannot be null meets a `NULL`, and a query meth
 Hold every argument of `COALESCE` but the last, which is read once, to a condition that keeps its second read from being `NULL`: proved not null itself, or a stored column (`Proof.Stored`), or an expression shown to give one value in a row.  Before choosing that last rule:
 
 - Measure which arguments the realistic corpus and the end-to-end queries use, so that `COALESCE(MAX(x), 0)`, `COALESCE(a * 2, 0)` and a `COALESCE` over a view's column are not made noise without need, and move the SQL Server `Budgets` of `RealisticNullabilityNoiseTests` by what the change costs.
-- Measure on a server whether an aggregate, a window function or a deterministic function in an argument is evaluated once.
+- A window aggregate in an argument is evaluated twice, as the table shows.  Measure on a server whether an aggregate without `OVER` or a deterministic function is evaluated once.
 - Check `GREATEST` and `LEAST`, which were not measured for this.
 - Make the type proof of `CAST` and `CONVERT` read their operand too, or the condition above misses what they wrap.
 
-Add the queries above to `BreakingAttempts` of `ProofTests`, and remove the limit from the manual.
+Add the queries above to `ValuesReadTwice` of `ProofTests`, written over `dbo.proof_rows` and `dbo.proof_dates`: its test holds the describe alone, since over those few rows a random query may show no `NULL`.  Remove the limit from the manual.
 
 ## Trigger
 

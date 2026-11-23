@@ -52,7 +52,7 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - **`JSON_OBJECT` and `JSON_ARRAY`**, on SQL Server 2022 and later.
 - **A date function of values that are never null**: `DATEADD`, `DATEDIFF`, `DATEDIFF_BIG`, `DATEPART`, `DATENAME`, `YEAR`, `MONTH`, `DAY` and `EOMONTH`.
 - **`AT TIME ZONE` of a value and a time zone that are never null**, as in `placed_at AT TIME ZONE 'UTC'`.
-- **`LAG` and `LEAD` with a default**, as in `LAG(status, 1, 'none') OVER (...)`, when the value and the default are never null, the offset is a whole number written in the query, and neither is of a spatial type, of `hierarchyid` or of another .NET type.  A `CAST` or `CONVERT` of it does not count as never null, and neither does a `COALESCE` directly over it.
+- **`LAG` and `LEAD` with a default**, as in `LAG(status, 1, 'none') OVER (...)`, when the value and the default are never null, the offset is a whole number written in the query, and neither is of a spatial type, of `hierarchyid` or of another .NET type.  It does not count as never null inside `CAST` or `CONVERT`, as a value of the `CASE` below, or as an argument of `COALESCE`, `GREATEST` or `LEAST`, alone or in arithmetic.
 - **`CASE WHEN x IS NULL THEN e ELSE x END`**, when `e` is never null, `x` is written the same both times, and `x` is a column stored in a table or is never null itself.  Neither may be of a spatial type, of `hierarchyid` or of another .NET type.
 - **A computed column declared `PERSISTED NOT NULL`, read from its table alone**, when all of these are true:
   - the `FROM` of the query names that one table and nothing else;
