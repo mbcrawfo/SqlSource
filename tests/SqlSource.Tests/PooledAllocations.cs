@@ -6,7 +6,9 @@ namespace SqlSource.Tests;
 // any thread's allocations can bring, empties the pool, its arrays held by each thread included, and the next calls
 // allocate their arrays again.  It adds to the one measure it falls in, and the next measure finds the pool full, so
 // the least of a few measures is what the code allocates once the pool holds its arrays; an allocation the code makes
-// of its own is in every measure.
+// of its own is in every measure.  On code whose allocations tier-up moves, as the parser's, the least can be a low
+// the code passes through, so it suits an exact number only on code tier-up leaves alone, and otherwise a budget
+// with room.
 internal static class PooledAllocations
 {
     public const int Iterations = 20;

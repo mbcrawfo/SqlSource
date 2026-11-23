@@ -70,9 +70,10 @@ public sealed class SqlFileParserAllocationTests
     }
 
     // The bytes that one parse of the file allocates beyond one of the baseline, the median of a few pairs of measures.
-    // The runtime replaces the parser's code as it runs, and the new code allocates less, so a measure taken before the
-    // replacement and one taken after it differ by more than the files do.  A replacement falls in one pair, as a
-    // collection that empties the shared pool does, and the median leaves that pair out.
+    // The runtime replaces the parser's code as it runs, in steps that move what a parse allocates down and, in
+    // Release, partly back up, so two measures either side of a step differ by more or less than the files do.  Each
+    // step falls in one pair, as a collection that empties the shared pool does, and the median leaves those
+    // pairs out.
     private static double AddedByAParse(string text, string baseline, SqlDialect dialect)
     {
         CheckParses(text, dialect);
