@@ -96,20 +96,6 @@ public sealed class LibraryProbeTests
         probe.NodaTimeVersion.ShouldNotBeNull().Major.ShouldBe(3);
     }
 
-    // Of two references named NodaTime, the newer gives the version.
-    [Fact]
-    public void Read_TwoNodaTimeReferences_RecordsTheNewerVersion()
-    {
-        var probe = LibraryProbe.Read(
-            CompilationOf(
-                LibraryReferences.Synthetic("3.2.1.0", nodaTimeTypes: true, pluginExtensions: false),
-                LibraryReferences.Synthetic("3.4.0.0", nodaTimeTypes: true, pluginExtensions: false)
-            )
-        );
-
-        probe.NodaTimeVersion.ShouldBe(new Version(3, 4, 0, 0));
-    }
-
     // Of two packages named NodaTime of different versions, which a project references through two routes, the newer
     // gives the version, whichever is listed first.  The packages are strong-named, so the compilation keeps both.
     [Theory]
