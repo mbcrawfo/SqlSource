@@ -26,6 +26,8 @@ SqlSource can tell that a column is never null when the column is one of these:
   - The statement has `ON CONFLICT DO UPDATE`.
   - The table, or any of its partitions, has a `BEFORE INSERT` row trigger, even a disabled one.
   - The value is a query parameter.
+  - The value is in a `VALUES` list of more than one row.
+  - The value comes from a `UNION`, an `INTERSECT` or an `EXCEPT`.
   - The table has a `DO ALSO` rule on `INSERT`.
   - The table is partitioned, on PostgreSQL 15 or earlier.
   - The query holds the word `OLD` or `NEW`, or the quoted name `"old"` or `"new"`, in any case.
@@ -225,6 +227,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - a subquery as the `y` of an `IN` or an `= ANY`, or as a branch of a `UNION`, an `INTERSECT` or an `EXCEPT`;
 - a recursive `WITH` query;
 - a view's whole column list, a `GROUP BY` column of a view, and a column of a view over a `UNION`;
+- a value that an `INSERT` takes from a `VALUES` list of more than one row, or from a `UNION`, an `INTERSECT` or an `EXCEPT`;
 - a table's whole column list in `RETURNING`, and a value that an `UPDATE`, a `DELETE` or a `MERGE` writes.
 
 **What to do.**  Where you know that the column is never null, do one of these:

@@ -45,6 +45,11 @@ public sealed class WrittenValueTests(PostgresDatabases postgres)
             { "INSERT INTO written.t AS x (id, a) SELECT x.id + 10, x.label FROM written.src x RETURNING x.a", "n" },
             // A set operation prints its first branch's value alone.
             { "INSERT INTO written.t (id, a) SELECT 300, 'x' UNION ALL SELECT 301, NULL RETURNING a", "?" },
+            // Limits the manual lists: rows of literals through a Values Scan or a set operation are not read, and a
+            // default beside them is.
+            { "INSERT INTO written.t (id, a) VALUES (5, 'x'), (6, 'y') RETURNING a", "?" },
+            { "INSERT INTO written.t (id, a) SELECT 300, 'x' UNION ALL SELECT 301, 'y' RETURNING a", "?" },
+            { "INSERT INTO written.t (id, a) VALUES (5, 'x'), (6, 'y') RETURNING b", "n" },
             // ON CONFLICT: DO NOTHING returns only what it wrote, and DO UPDATE returns a row it did not.
             { "INSERT INTO written.t (id, a) VALUES (5, 'x') ON CONFLICT (id) DO NOTHING RETURNING a", "n" },
             {
