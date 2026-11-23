@@ -34,10 +34,8 @@ internal sealed partial class ExpressionProofs
     // forms whose type is fixed are of no CLR type; MAX and MIN are of their operand's type, COALESCE, GREATEST and
     // LEAST of one of their arguments', and CAST and CONVERT of their target, which proves only when it is built in.
     // AT TIME ZONE is a datetimeoffset, and the date forms take no CLR type, each proved only when it holds nothing
-    // that is never asked.  LAG and LEAD have no type proof, since COALESCE reads an argument twice and a window
-    // ordered by NEWID() gives two values, so no form that needs its operand's type proves over one.  CAST and
-    // CONVERT read their target alone, which still proves a COALESCE over a CAST of one (TD-0123).  A call of a
-    // schema's name may return a CLR type and cannot be asked.  Anything else is asked.
+    // that is never asked.  LAG and LEAD have no type proof, so no form that needs its operand's type proves over one.
+    // A call of a schema's name may return a CLR type and cannot be asked.  Anything else is asked.
     private Proof? PrimaryType(TokenRange piece)
     {
         if (AtTimeZoneOf(piece) is not null)
@@ -110,7 +108,7 @@ internal sealed partial class ExpressionProofs
             FormKind.Count or FormKind.Ranking or FormKind.Ntile or FormKind.Sum => Proof.Yes,
             FormKind.Json => Proof.Yes,
             FormKind.MaxOrMin => AggregateOperand(arguments) is { } operand ? TypeOf(operand) : Proof.No,
-            FormKind.CoalesceGreatestLeast => AllOf(Arguments(arguments).Select(TypeOf)),
+            FormKind.Coalesce or FormKind.GreatestOrLeast => AllOf(Arguments(arguments).Select(TypeOf)),
             FormKind.Cast => CastOperand(arguments) is null ? Proof.No : Proof.Yes,
             FormKind.Convert => CastTargets.IsBuiltIn(tokens, Arguments(arguments)[0]) ? Proof.Yes : Proof.No,
             FormKind.DateAddOrDiff or FormKind.DatePartOrName or FormKind.DateValue or FormKind.EndOfMonth =>

@@ -144,8 +144,8 @@
             "precision": 10,
             "scale": 2
           },
-          "nullable": false,
-          "nullableSource": "expression",
+          "nullable": true,
+          "nullableSource": "server",
           "origin": null,
           "identity": false,
           "computed": true

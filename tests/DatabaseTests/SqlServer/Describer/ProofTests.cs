@@ -27,6 +27,12 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     private const string NewFunctionsReason =
         "GREATEST, LEAST, JSON_OBJECT, JSON_ARRAY and WINDOW are new in SQL Server 2022";
 
+    // NULL or 1 at random, each time it is evaluated.
+    private const string Flip = "CASE WHEN ABS(CHECKSUM(NEWID())) % 2 = 0 THEN 1 END";
+
+    // NULL or the row's date at random, each time it is evaluated.
+    private const string FlipDate = "CASE WHEN ABS(CHECKSUM(NEWID())) % 2 = 0 THEN d END";
+
     // One query of each proved form, with the major it needs.  The arithmetic, GREATEST and LEAST are proved because
     // a is not null in every row, which "operands" asks the server; b and g are NULL in some.  No divisor is ever 0,
     // since a division by 0 is an error under ANSI_WARNINGS on, and not a NULL.
@@ -58,6 +64,19 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             { 0, "SELECT NTILE(2) OVER (ORDER BY b) AS c FROM dbo.proof_rows" },
             { 0, "SELECT COALESCE(b, a) AS c FROM dbo.proof_rows" },
             { 0, "SELECT COALESCE(g, 0) AS c FROM dbo.proof_rows GROUP BY ROLLUP (g)" },
+            // COALESCE over arguments that each give one value in a row, and over one that changes after the proved
+            // argument, which is never reached.
+            { 0, "SELECT COALESCE(b, g, 0) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT COALESCE(b * 2 + 1, 0) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT COALESCE(CONVERT(bigint, b), 0) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT COALESCE(NULLIF(b, 5), 0) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT COALESCE(ISNULL(b, g), 0) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT COALESCE(COALESCE(b, g), 0) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT COALESCE(MAX(b), 0) AS c FROM dbo.proof_rows GROUP BY g" },
+            { 0, "SELECT COALESCE(SUM(b), 0) AS c FROM dbo.proof_rows WHERE 1 = 0" },
+            { 0, "SELECT COALESCE(CAST(AVG(b) AS int), 0) AS c FROM dbo.proof_rows GROUP BY g" },
+            { 0, "SELECT COALESCE(q.b, 0) AS c FROM (SELECT b FROM dbo.proof_rows) AS q" },
+            { 0, $"SELECT COALESCE(a, {Flip}) AS c FROM dbo.proof_rows" },
             { 0, "SELECT CAST(a AS bigint) AS c FROM dbo.proof_rows" },
             { 0, "SELECT CONVERT(bigint, a) AS c FROM dbo.proof_rows" },
             { 0, "SELECT CONVERT(varchar(30), CAST(a AS money), 1) AS c FROM dbo.proof_rows" },
@@ -234,12 +253,29 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             { 0, "SELECT CASE WHEN g IS NULL THEN b ELSE g END AS c FROM dbo.proof_rows GROUP BY ROLLUP (g, b)" },
         };
 
-    // A CASE that reads a value twice proves nothing unless the value is a stored column: each of the first five can
-    // differ between its two reads, though no plan measured on 2017 or 2025 evaluates them twice.  COALESCE reads an
-    // argument twice too, and over a window ordered by NEWID() it does give a NULL, in about a quarter of many rows, so
-    // that the five rows here may show none and the describe alone is held.
+    // A form that reads a value twice proves nothing unless the value gives one value in a row.  Each of these can
+    // differ between its two reads, though no plan measured from 2017 to 2025 evaluates the computed column, the view's
+    // or the derived table's twice, and the window ordered by NEWID() gives a NULL only in some rows.  So the describe
+    // alone is held; ValuesThatChange runs the shapes that do break.
     public static TheoryData<string> ValuesReadTwice =>
         [
+            "SELECT COALESCE(flip, 0) AS c FROM dbo.proof_volatile",
+            "SELECT COALESCE(flip, 0) AS c FROM dbo.proof_volatile_view",
+            $"SELECT COALESCE(q.flip, 0) AS c FROM (SELECT {Flip} AS flip FROM dbo.proof_rows) AS q",
+            $"WITH q AS (SELECT {Flip} AS flip FROM dbo.proof_rows) SELECT COALESCE(flip, 0) AS c FROM q",
+            $"SELECT COALESCE(MAX({Flip}), 0) AS c FROM dbo.proof_rows GROUP BY id",
+            // The server names no source column for a column that a set operator or an UNPIVOT combines, or that a
+            // derived table computes, so none is shown to be stored.
+            "SELECT COALESCE(q.x, 0) AS c FROM (SELECT b AS x FROM dbo.proof_rows UNION ALL "
+                + "SELECT g FROM dbo.proof_rows) AS q",
+            "SELECT COALESCE(q.x, 0) AS c FROM (SELECT b AS x FROM dbo.proof_rows UNION "
+                + "SELECT g FROM dbo.proof_rows) AS q",
+            "WITH q AS (SELECT b AS x FROM dbo.proof_rows UNION ALL SELECT g FROM dbo.proof_rows) "
+                + "SELECT COALESCE(q.x, 0) AS c FROM q",
+            "SELECT COALESCE(u.x, 0) AS c FROM (SELECT id, b, g FROM dbo.proof_rows) AS p "
+                + "UNPIVOT (x FOR w IN (b, g)) AS u",
+            "SELECT COALESCE(q.total, 0) AS c FROM (SELECT SUM(b) AS total FROM dbo.proof_rows GROUP BY g) AS q",
+            "SELECT COALESCE(q.x, 0) AS c FROM (SELECT b * 2 AS x FROM dbo.proof_rows) AS q",
             "SELECT CASE WHEN flip IS NULL THEN 0 ELSE flip END AS c FROM dbo.proof_volatile",
             "SELECT CASE WHEN flip IS NULL THEN 0 ELSE flip END AS c FROM dbo.proof_volatile_view",
             "SELECT CASE WHEN q.flip IS NULL THEN 0 ELSE q.flip END AS c "
@@ -257,6 +293,92 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             "SELECT COALESCE(LAG(maybe) OVER (ORDER BY NEWID()) AT TIME ZONE 'UTC', SYSDATETIMEOFFSET()) AS c "
                 + "FROM dbo.proof_dates",
         ];
+
+    // The queries in which SQL Server evaluates a value twice in one row and returns NULL, measured from 2017 to 2025:
+    // COALESCE over a value that changes, however it is wrapped, and the other forms that expand to a CASE.  About a
+    // quarter of the 2,000 rows of dbo.proof_many are NULL, so that a run with none is out of the question.
+    public static TheoryData<string> ValuesThatChange =>
+        [
+            $"SELECT COALESCE({Flip}, 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE({Flip}, {Flip}, 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(b, {Flip}, 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(CAST({Flip} AS int), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(CONVERT(int, {Flip}), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE({Flip} + 1, 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(NULLIF({Flip}, 5), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(ISNULL({Flip}, NULL), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(COALESCE({Flip}, NULL), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(ISNULL(b, {Flip}), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(COALESCE(b, {Flip}), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(NULLIF(1, {Flip}), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(IIF({Flip} IS NULL, NULL, 1), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE((SELECT TOP (1) {Flip} FROM dbo.proof_many AS o WHERE o.id = r.id), 0) AS c "
+                + "FROM dbo.proof_many AS r",
+            "SELECT COALESCE(CAST(LAG(b) OVER (ORDER BY NEWID()) AS int), 0) AS c FROM dbo.proof_many",
+            "SELECT COALESCE(CONVERT(int, LEAD(b) OVER (ORDER BY NEWID())), 0) AS c FROM dbo.proof_many",
+            "SELECT COALESCE(CAST(YEAR(LAG(d) OVER (ORDER BY NEWID())) AS int), 0) AS c FROM dbo.proof_many",
+            "SELECT COALESCE(CONVERT(date, DATEADD(DAY, 1, LEAD(d) OVER (ORDER BY NEWID()))), '2020-01-01') AS c "
+                + "FROM dbo.proof_many",
+            "SELECT COALESCE(CAST(LAG(d) OVER (ORDER BY NEWID()) AT TIME ZONE 'UTC' AS datetime2(0)), '2020-01-01') "
+                + "AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(CAST(YEAR({FlipDate}) AS int), 0) AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(CONVERT(date, DATEADD(DAY, 1, {FlipDate})), '2020-01-01') AS c FROM dbo.proof_many",
+            $"SELECT COALESCE(CAST({FlipDate} AT TIME ZONE 'UTC' AS datetime2(0)), '2020-01-01') AS c "
+                + "FROM dbo.proof_many",
+            "SELECT COALESCE(SUM(b) OVER (ORDER BY NEWID() ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING), 0) AS c "
+                + "FROM dbo.proof_many",
+            "SELECT COALESCE(MAX(b) OVER (ORDER BY NEWID() ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING), 0) AS c "
+                + "FROM dbo.proof_many",
+            $"SELECT COALESCE(SUM({Flip}) OVER (PARTITION BY id), 0) AS c FROM dbo.proof_many",
+            "SELECT COALESCE(SUM(dbo.proof_flip(id)) OVER (PARTITION BY id), 0) AS c FROM dbo.proof_many",
+            "SELECT CHOOSE(ABS(CHECKSUM(NEWID())) % 2 + 1, 1, 2) AS c FROM dbo.proof_many",
+            $"SELECT CASE WHEN {Flip} IS NULL THEN 0 ELSE {Flip} END AS c FROM dbo.proof_many",
+            $"SELECT IIF({Flip} IS NULL, 0, {Flip}) AS c FROM dbo.proof_many",
+        ];
+
+    [Theory]
+    [MemberData(nameof(ValuesThatChange))]
+    public Task DescribeAsync_ValueThatChanges_NullableAndNullRow(string sql) =>
+        WithManyRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server);
+            (await NullRowsAsync(sql)).ShouldBeGreaterThan(0, sql);
+        });
+
+    // An aggregate over a named window is no aggregate of its group, and a CAST or CONVERT around it hides it from the
+    // type proof, so only the walk of what gives one value keeps these nullable.  WINDOW came with SQL Server 2022.
+    [Theory]
+    [InlineData("COALESCE(CAST(MAX(b) OVER w AS int), 0)")]
+    [InlineData("COALESCE(CONVERT(int, SUM(b) OVER w), 0)")]
+    [InlineData("COALESCE(CAST(MIN(b) OVER w AS bigint) + 1, 0)")]
+    [InlineData("COALESCE(CAST(AVG(b) OVER w AS int), 0)")]
+    public async Task DescribeAsync_NamedWindowThatChanges_NullableAndNullRow(string item)
+    {
+        sqlServer.SkipBelow(NewFunctions, NewFunctionsReason);
+        var sql =
+            $"SELECT {item} AS c FROM dbo.proof_many "
+            + "WINDOW w AS (ORDER BY NEWID() ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING)";
+        await WithManyRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server);
+            (await NullRowsAsync(sql)).ShouldBeGreaterThan(0, sql);
+        });
+    }
+
+    // GREATEST and LEAST evaluate an argument once, so one proved argument holds beside a value that changes.
+    [Theory]
+    [InlineData($"SELECT GREATEST({Flip}, 0) AS c FROM dbo.proof_many")]
+    [InlineData($"SELECT LEAST({Flip}, 0) AS c FROM dbo.proof_many")]
+    [InlineData($"SELECT GREATEST(CAST({Flip} AS int), 0) AS c FROM dbo.proof_many")]
+    public async Task DescribeAsync_GreatestOfAValueThatChanges_NotNullAndNoNullRow(string sql)
+    {
+        sqlServer.SkipBelow(NewFunctions, NewFunctionsReason);
+        await WithManyRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync(sql, false, SidecarValues.NullableSource.Expression);
+            (await NullRowsAsync(sql)).ShouldBe(0, sql);
+        });
+    }
 
     [Theory]
     [MemberData(nameof(ProvedForms))]
@@ -330,6 +452,31 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     [MemberData(nameof(ValuesReadTwice))]
     public Task DescribeAsync_ValueReadTwice_StaysNullable(string sql) =>
         WithRowsAsync(() => ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server));
+
+    // The server's source type is read only in the session's database, so a column of another database is not shown
+    // to be stored, by its name, a synonym, a derived table or a CTE, and an argument before the proved one stays
+    // nullable.  Its rows are not read: the limit is what is described.
+    [Theory]
+    [InlineData(
+        $"SELECT COALESCE(o.company, N'x') AS c FROM {SqlServerDatabases.RealisticDatabase}.dbo.customers AS o"
+    )]
+    [InlineData("SELECT COALESCE(o.company, N'x') AS c FROM dbo.proof_far AS o")]
+    [InlineData(
+        $"SELECT COALESCE(q.company, N'x') AS c FROM (SELECT company FROM {SqlServerDatabases.RealisticDatabase}"
+            + ".dbo.customers) AS q"
+    )]
+    [InlineData(
+        $"WITH q AS (SELECT company FROM {SqlServerDatabases.RealisticDatabase}.dbo.customers) "
+            + "SELECT COALESCE(company, N'x') AS c FROM q"
+    )]
+    public Task DescribeAsync_ColumnOfAnotherDatabase_StaysNullable(string sql) =>
+        WithRowsAsync(async () =>
+        {
+            await sqlServer.ExecuteAsync(
+                $"CREATE SYNONYM dbo.proof_far FOR {SqlServerDatabases.RealisticDatabase}.dbo.customers"
+            );
+            await ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server);
+        });
 
     // EOMONTH ignores an offset that is NULL, so no NULL row can be shown, and the form still does not rely on that.
     [Fact]
@@ -462,11 +609,35 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         }
     }
 
+    // The tables of the proofs, and dbo.proof_many, whose 2,000 rows hold b and d NULL in every other row, beside
+    // dbo.proof_flip, a user's function that gives its argument or NULL at random through a view over NEWID().
+    private Task WithManyRowsAsync(Func<Task> body) =>
+        WithRowsAsync(async () =>
+        {
+            await sqlServer.ExecuteAsync(
+                "CREATE TABLE dbo.proof_many (id int NOT NULL PRIMARY KEY, b int NULL, d datetime2(0) NULL)"
+            );
+            await sqlServer.ExecuteAsync(
+                "INSERT INTO dbo.proof_many (id, b, d) "
+                    + "SELECT n, CASE WHEN n % 2 = 0 THEN n END, "
+                    + "CASE WHEN n % 2 = 0 THEN DATEADD(DAY, n, CAST('2020-01-01' AS datetime2(0))) END "
+                    + "FROM (SELECT TOP (2000) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n "
+                    + "FROM sys.all_columns AS x CROSS JOIN sys.all_columns AS y) AS numbers"
+            );
+            await sqlServer.ExecuteAsync("CREATE VIEW dbo.proof_random AS SELECT NEWID() AS v");
+            await sqlServer.ExecuteAsync(
+                "CREATE FUNCTION dbo.proof_flip (@x int) RETURNS int AS BEGIN "
+                    + "RETURN (SELECT CASE WHEN ABS(CHECKSUM(v)) % 2 = 0 THEN @x END FROM dbo.proof_random) END"
+            );
+            await body();
+        });
+
     private Task DropAsync() =>
         sqlServer.ExecuteAsync(
-            "DROP FUNCTION IF EXISTS dbo.[COUNT]; DROP VIEW IF EXISTS dbo.proof_volatile_view; "
-                + "DROP TABLE IF EXISTS dbo.proof_volatile, dbo.proof_dates, dbo.proof_shapes, dbo.proof_computed, "
-                + "dbo.proof_other, dbo.proof_rows"
+            "DROP SYNONYM IF EXISTS dbo.proof_far; DROP FUNCTION IF EXISTS dbo.proof_flip, dbo.[COUNT]; "
+                + "DROP VIEW IF EXISTS dbo.proof_random, dbo.proof_volatile_view; "
+                + "DROP TABLE IF EXISTS dbo.proof_many, dbo.proof_volatile, dbo.proof_dates, dbo.proof_shapes, "
+                + "dbo.proof_computed, dbo.proof_other, dbo.proof_rows"
         );
 
     // The query's one column, described in a session of its own, must be as expected.
