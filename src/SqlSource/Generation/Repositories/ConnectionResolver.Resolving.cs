@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
+using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Placement;
@@ -12,10 +14,15 @@ namespace SqlSource.Generation.Repositories;
 internal static partial class ConnectionResolver
 {
     // What the resolution of one type has found so far.
-    private sealed class Resolving(TargetType type, IReadOnlyCollection<NeededDatabase> needed)
+    private sealed class Resolving(
+        TargetType type,
+        IReadOnlyCollection<NeededDatabase> needed,
+        string? simpleNameTakenBy
+    )
     {
         private readonly List<ResolvedConnection> _sources = [];
         private readonly List<string> _failed = [];
+        private readonly HashSet<string> _hiddenNames = [];
         private readonly ImmutableArray<DiagnosticInfo>.Builder _diagnostics =
             ImmutableArray.CreateBuilder<DiagnosticInfo>();
 
@@ -141,6 +148,25 @@ internal static partial class ConnectionResolver
                 return false;
             }
 
+            if (TakerOfTheSimpleName(database) is { } takenBy && IsReachedThroughTheTypesName(candidate))
+            {
+                var reached = candidate.Holder?.Name ?? candidate.Name;
+                if (_hiddenNames.Add(reached))
+                {
+                    Report(
+                        DiagnosticInfo.Create(
+                            SqlDiagnostics.RepositoryNameHidden,
+                            type.AttributeLocation,
+                            TypeName,
+                            reached,
+                            takenBy
+                        )
+                    );
+                }
+
+                return false;
+            }
+
             if (DriverEngineOf(candidate.DeclaredTypeName) is { } other && other != database.Engine)
             {
                 Report(
@@ -161,6 +187,28 @@ internal static partial class ConnectionResolver
             return true;
         }
 
+        // What the type's simple name means in a method of the database when that is not the type: a member that takes
+        // it, or an argument of the name, which a name with type arguments never is.  Only a type nested in a generic
+        // type is reached by that name.
+        private string? TakerOfTheSimpleName(NeededDatabase database)
+        {
+            if (simpleNameTakenBy is not null || !type.IsNestedInAGenericType)
+            {
+                return simpleNameTakenBy;
+            }
+
+            return type.Types[type.Types.Count - 1].Arity == 0 && IsAnArgumentsName(type.Name, database)
+                ? "the method argument '" + type.Name + "'"
+                : null;
+        }
+
+        // Whether a method reaches the member through the type's name: a static member of the type or of a base type,
+        // or a static holder.  A global is reached through its own type.
+        private static bool IsReachedThroughTheTypesName(ConnectionCandidate candidate) =>
+            candidate.Holder is { } holder
+                ? holder.IsStatic
+                : candidate.Tier == CandidateTier.Own && candidate.IsStatic;
+
         // The resolution, its databases in the order they are needed.
         public ConnectionResolution ToResolution() =>
             new(
@@ -172,7 +220,7 @@ internal static partial class ConnectionResolver
             );
 
         // A held member is reached through its holder, as the type reaches the holder, and a global through its type in
-        // full, which no argument or local can hide.
+        // full, which no argument or local can hide, with an @ on each await.
         private ConnectionSource SourceOf(ConnectionCandidate candidate)
         {
             var source = new ConnectionSource(
@@ -193,7 +241,7 @@ internal static partial class ConnectionResolver
                 { Tier: CandidateTier.Held, Holder: { } holder } => HeldThrough(source, candidate, holder),
                 { Tier: CandidateTier.Global, GlobalTypeText: { } typeText } => source with
                 {
-                    AccessText = typeText + "." + Escaped(candidate.Name),
+                    AccessText = WithAwaitEscaped(typeText) + "." + Escaped(candidate.Name),
                     LeadingName = null,
                 },
                 _ => source,
@@ -216,13 +264,14 @@ internal static partial class ConnectionResolver
                 HolderName = holder.Name,
                 HolderCanBeNull = holder.CanBeNull,
                 HolderMember = holder.Member,
-                HolderCastText = candidate.CastTypeText,
+                HolderCastText = candidate.CastTypeText is { } cast ? WithAwaitEscaped(cast) : null,
             };
         }
 
-        // The name the access starts with, which an argument or a local of the method could hide: a parameter's own,
-        // and the type's for a static member of a type that is not generic.  An instance member is reached through
-        // this, which nothing hides.
+        // The name the access starts with, which an argument or a local of the method could hide: a parameter's, and
+        // the type's for a static member reached by the type's simple name when the type is not generic, since a name
+        // with type arguments is never a local's.  An instance member is reached through this and any other static one
+        // from global::, which nothing hides.
         private string? LeadingNameOf(string name, CandidateMember member, bool isStatic)
         {
             if (member == CandidateMember.Parameter)
@@ -230,14 +279,14 @@ internal static partial class ConnectionResolver
                 return name;
             }
 
-            // A local of the type's name hides it only when the type is not generic: a name with type arguments is
-            // never a local's.
-            return isStatic && type.Types[type.Types.Count - 1].Arity == 0 ? type.Name : null;
+            return isStatic && type.IsNestedInAGenericType && type.Types[type.Types.Count - 1].Arity == 0
+                ? type.Name
+                : null;
         }
 
-        // A parameter by its name, a static member through the type as its own code writes it, which reaches a base
-        // type's static member too, and an instance member through this.  The type's name and type parameters are as
-        // they are written, so a keyword among them keeps its @.
+        // A parameter by its name, an instance member through this, and a static member through the type, which reaches
+        // a base type's static member too: in full, which a member of the type's name cannot hide, unless a type around
+        // it is generic, whose type parameters a nearer name can hide, when only the simple name is sure of the type.
         private string AccessTextOf(string name, CandidateMember member, bool isStatic)
         {
             var escaped = Escaped(name);
@@ -246,16 +295,63 @@ internal static partial class ConnectionResolver
                 return escaped;
             }
 
-            if (isStatic)
+            if (!isStatic)
             {
-                var declaration = type.Types[type.Types.Count - 1];
-                return declaration.Name + declaration.TypeParameters + "." + escaped;
+                return "this." + escaped;
             }
 
-            return "this." + escaped;
+            return (type.IsNestedInAGenericType ? SimpleTypeText() : FullTypeText()) + "." + escaped;
         }
 
-        private static string Escaped(string name) => SqlIdentifier.IsReservedKeyword(name) ? "@" + name : name;
+        // The type by its own name and type parameters as they are written, with an @ on an await.
+        private string SimpleTypeText()
+        {
+            var declaration = type.Types[type.Types.Count - 1];
+            return WithAwaitEscaped(declaration.Name + declaration.TypeParameters);
+        }
+
+        // The type from global::, each name and its type parameters as they are written, so a keyword keeps its @, and
+        // an await gets one, which an asynchronous method needs.
+        private string FullTypeText() =>
+            "global::"
+            + WithAwaitEscaped(
+                (type.Namespace.Length > 0 ? type.Namespace + "." : string.Empty)
+                    + string.Join(
+                        ".",
+                        type.Types.Select(static declaration => declaration.Name + declaration.TypeParameters)
+                    )
+            );
+
+        // The text with an @ before each identifier that is exactly await, unless it already has one.
+        private static string WithAwaitEscaped(string text)
+        {
+            const string Await = "await";
+            var at = text.IndexOf(Await, StringComparison.Ordinal);
+            if (at < 0)
+            {
+                return text;
+            }
+
+            var escaped = new StringBuilder(text.Length + 1);
+            var copied = 0;
+            for (; at >= 0; at = text.IndexOf(Await, at + Await.Length, StringComparison.Ordinal))
+            {
+                var end = at + Await.Length;
+                var startsAName =
+                    at == 0 || (text[at - 1] != '@' && !SyntaxFacts.IsIdentifierPartCharacter(text[at - 1]));
+                if (startsAName && (end == text.Length || !SyntaxFacts.IsIdentifierPartCharacter(text[end])))
+                {
+                    _ = escaped.Append(text, copied, at - copied).Append('@');
+                    copied = at;
+                }
+            }
+
+            return escaped.Append(text, copied, text.Length - copied).ToString();
+        }
+
+        // A name as a method writes it: with an @ on a keyword, and on await, which an asynchronous method cannot use.
+        private static string Escaped(string name) =>
+            SqlIdentifier.IsReservedKeyword(name) || name == "await" ? "@" + name : name;
 
         private static ConnectionSourceKind KindOf(CandidateType type) =>
             type switch

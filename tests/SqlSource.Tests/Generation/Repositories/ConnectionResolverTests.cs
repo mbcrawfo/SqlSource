@@ -492,7 +492,7 @@ public sealed class ConnectionResolverTests
         source.AccessText.ShouldBe("@string");
     }
 
-    // A static member, the type's own or a base type's, is reached through the type's name as its code writes it.
+    // A static member, the type's own or a base type's, is reached through the type in full, which nothing hides.
     [Fact]
     public void Resolve_StaticMemberOfAGenericType_IsAccessedThroughTheType()
     {
@@ -505,14 +505,14 @@ public sealed class ConnectionResolverTests
         var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
 
         var source = resolution.Sources.ShouldHaveSingleItem().Asynchronous;
-        source.AccessText.ShouldBe("Repo<T>.ConnectionString");
+        source.AccessText.ShouldBe("global::App.Repo<T>.ConnectionString");
         source.LeadingName.ShouldBeNull();
         source.TypeName.ShouldBe("App.Repo<T>");
     }
 
-    // A local of the type's name would hide a type that is not generic, which a static member is reached through.
+    // A local of the type's name cannot hide a type reached from global::, so the access has no leading name.
     [Fact]
-    public void Resolve_StaticMemberOfATypeThatIsNotGeneric_StartsWithTheType()
+    public void Resolve_StaticMemberOfATypeThatIsNotGeneric_HasNoLeadingName()
     {
         var type = TestModels.Type(types: [new TypeDeclaration("class", "Repo", "Repo", "", 0)]);
         var candidate = Candidate("ConnectionString", CandidateType.ConnectionString, CandidateMember.Property) with
@@ -525,15 +525,24 @@ public sealed class ConnectionResolverTests
             .Sources.ShouldHaveSingleItem()
             .Asynchronous;
 
-        source.AccessText.ShouldBe("Repo.ConnectionString");
-        source.LeadingName.ShouldBe("Repo");
+        source.AccessText.ShouldBe("global::App.Repo.ConnectionString");
+        source.LeadingName.ShouldBeNull();
     }
 
-    // The type's name is as its declaration writes it, so a keyword keeps its @.
-    [Fact]
-    public void Resolve_StaticMemberOfATypeNamedByAKeyword_EscapesTheTypesName()
+    // Each type around the repository is in the access, and a repository in no namespace starts at global::.
+    [Theory]
+    [InlineData("App", "global::App.Outer.Repo.ConnectionString")]
+    [InlineData("", "global::Outer.Repo.ConnectionString")]
+    public void Resolve_StaticMemberOfANestedType_NamesEachTypeInTheAccess(string @namespace, string access)
     {
-        var type = TestModels.Type(types: [new TypeDeclaration("class", "@class", "class", "<@int>", 1)]);
+        var type = TestModels.Type(
+            @namespace: @namespace,
+            types:
+            [
+                new TypeDeclaration("class", "Outer", "Outer", "", 0),
+                new TypeDeclaration("class", "Repo", "Repo", "", 0),
+            ]
+        );
         var candidate = Candidate("ConnectionString", CandidateType.ConnectionString, CandidateMember.Property) with
         {
             IsStatic = true,
@@ -541,7 +550,76 @@ public sealed class ConnectionResolverTests
 
         var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
 
-        resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe("@class<@int>.ConnectionString");
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe(access);
+    }
+
+    // An asynchronous method cannot use a bare await as a name, so each whole await of the path gets its @, and a name
+    // that holds the word or already has the @ stays as it is.
+    [Theory]
+    [InlineData("App", "await", "", "global::App.@await.X")]
+    [InlineData("await.Inner", "Repo", "", "global::@await.Inner.Repo.X")]
+    [InlineData("App", "@await", "", "global::App.@await.X")]
+    [InlineData("App", "awaiter", "", "global::App.awaiter.X")]
+    [InlineData("App", "Repo", "<await, Tawait, await2>", "global::App.Repo<@await, Tawait, await2>.X")]
+    public void Resolve_StaticMemberWithAwaitInItsPath_EscapesEachWholeAwait(
+        string @namespace,
+        string name,
+        string typeParameters,
+        string access
+    )
+    {
+        var value = name.TrimStart('@');
+        var arity = typeParameters.Length == 0 ? 0 : typeParameters.Split(',').Length;
+        var type = TestModels.Type(
+            @namespace: @namespace,
+            types: [new TypeDeclaration("class", name, value, typeParameters, arity)]
+        );
+        var candidate = Candidate("X", CandidateType.ConnectionString, CandidateMember.Property) with
+        {
+            IsStatic = true,
+        };
+
+        var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
+
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe(access);
+    }
+
+    // A repository nested in a generic type reaches a static member through its own name, whose first name a local can
+    // hide only when the repository is not generic, with an @ on each await.
+    [Theory]
+    [InlineData("Repo", "<T>", 1, "X", "Repo<T>.X", null)]
+    [InlineData("Repo", "", 0, "X", "Repo.X", "Repo")]
+    [InlineData("await", "", 0, "X", "@await.X", "await")]
+    [InlineData("Repo", "<await>", 1, "X", "Repo<@await>.X", null)]
+    [InlineData("Repo", "", 0, "await", "Repo.@await", "Repo")]
+    public void Resolve_StaticMemberNestedInAGenericType_UsesTheTypesOwnName(
+        string name,
+        string typeParameters,
+        int arity,
+        string member,
+        string access,
+        string? leading
+    )
+    {
+        var type = TestModels.Type(
+            types:
+            [
+                new TypeDeclaration("class", "Outer", "Outer", "<T>", 1),
+                new TypeDeclaration("class", name, name, typeParameters, arity),
+            ]
+        );
+        var candidate = Candidate(member, CandidateType.ConnectionString, CandidateMember.Property) with
+        {
+            IsStatic = true,
+        };
+
+        var source = ConnectionResolver
+            .Resolve(type, Shape(candidate), [Main])
+            .Sources.ShouldHaveSingleItem()
+            .Asynchronous;
+
+        source.AccessText.ShouldBe(access);
+        source.LeadingName.ShouldBe(leading);
     }
 
     // A source that returns no task serves both kinds of method.

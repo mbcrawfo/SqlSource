@@ -464,6 +464,21 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the type in full, {1} the static source or holder that its methods reach through the type's simple name,
+    // and {2} what that name means inside the type.  Reported at the type's attribute.
+    public static readonly DiagnosticDescriptor RepositoryNameHidden = new(
+        id: "SQLSRC039",
+        title: "Repository name is hidden from its static connection",
+        messageFormat: "The repository methods of '{0}' reach the static member '{1}' through the type's name, but "
+            + "inside the type that name means {2}.  Rename that member, or give the connection from an instance "
+            + "member.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc039",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -1462,6 +1477,7 @@ internal static class SqlDiagnostics
             ConnectionParameterHidden,
             RepositoryInterfaceNameNotValid,
             ExceptionsBeforeNet6,
+            RepositoryNameHidden,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

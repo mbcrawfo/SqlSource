@@ -3,6 +3,8 @@
 using System;
 using System.Linq;
 using Shouldly;
+using SqlSource.Generation;
+using SqlSource.Generation.Methods;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
@@ -30,6 +32,12 @@ public sealed class MethodCompileTests
         {
 
         """;
+
+    private const string Generate = "[SqlSourceGenerate(Source = \".\")]";
+
+    private const string PostgresMark = "[SqlSourceConnection(Database = \"postgres\")]";
+
+    private const string SqlServerMark = "[SqlSourceConnection(Database = \"mssql\")]";
 
     private static readonly SqlFile Postgres = new(
         GeneratorHarness.UsersPath,
@@ -380,13 +388,15 @@ public sealed class MethodCompileTests
         run.Sources["App.Strings-Methods.g.cs"]
             .ShouldContain("new global::Microsoft.Data.SqlClient.SqlConnection(sqlServer ?? ");
         run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("(this.Postgres() ?? ");
-        run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("(StringMethods.SqlServer(cancellationToken) ?? ");
+        run.Sources["App.StringMethods-Methods.g.cs"]
+            .ShouldContain("(global::App.StringMethods.SqlServer(cancellationToken) ?? ");
         run.Sources["App.DataSources-Methods.g.cs"].ShouldContain("await (this._postgres ?? ");
         run.Sources["App.DataSources-Methods.g.cs"].ShouldContain("await (this.SqlServer ?? ");
-        run.Sources["App.Factories-Methods.g.cs"].ShouldContain("= Factories.Open() ?? ");
+        run.Sources["App.Factories-Methods.g.cs"].ShouldContain("= global::App.Factories.Open() ?? ");
         run.Sources["App.Factories-Methods.g.cs"]
             .ShouldContain("= await this.OpenAsync(cancellationToken).ConfigureAwait(false) ?? ");
-        run.Sources["App.Borrowed-1-Methods.g.cs"].ShouldContain("var connection = Borrowed<T>.Postgres ?? ");
+        run.Sources["App.Borrowed-1-Methods.g.cs"]
+            .ShouldContain("var connection = global::App.Borrowed<T>.Postgres ?? ");
         run.Sources["App.Borrowed-1-Methods.g.cs"].ShouldContain("var connection = sqlServer ?? ");
     }
 
@@ -846,7 +856,8 @@ public sealed class MethodCompileTests
         run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
         run.Sources["App.Fields-Methods.g.cs"].ShouldContain("((global::App.IFactory)(this._factory ?? throw ");
         run.Sources["App.Properties-Methods.g.cs"].ShouldContain("((global::App.IFactory)(this.Holder ?? throw ");
-        run.Sources["App.Statics-Methods.g.cs"].ShouldContain("((global::App.IFactory)(Statics.Shared ?? throw ");
+        run.Sources["App.Statics-Methods.g.cs"]
+            .ShouldContain("((global::App.IFactory)(global::App.Statics.Shared ?? throw ");
         run.Sources["App.NullableStructs-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
         run.Sources["App.Structs-Methods.g.cs"].ShouldContain("((global::App.IFactory)factory).");
         run.Sources["App.Constrained-1-Methods.g.cs"].ShouldContain("((global::App.IFactory)(factory ?? throw ");
@@ -1016,9 +1027,580 @@ public sealed class MethodCompileTests
         run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("var source = factory ?? throw ");
         run.Sources["App.Parameters-Methods.g.cs"].ShouldContain("= source.Postgres() ?? throw ");
         run.Sources["App.Fields-Methods.g.cs"].ShouldContain("var source = this._factory ?? throw ");
-        run.Sources["App.Statics-Methods.g.cs"].ShouldContain("var source = Statics.Shared ?? throw ");
+        run.Sources["App.Statics-Methods.g.cs"].ShouldContain("var source = global::App.Statics.Shared ?? throw ");
         run.Sources["App.Statics-Methods.g.cs"]
             .ShouldContain("= await source.SqlServer(cancellationToken).ConfigureAwait(false) ?? throw ");
+    }
+
+    // A static source of a base type may have the repository's name, which inside the repository binds to the member
+    // before the type: the access goes through the type in full, wherever the type is declared.
+    [Theory]
+    [MemberData(nameof(RepositoriesNamedAsTheirBaseMember))]
+    public void Run_StaticSourceWithTheRepositorysName_Compiles(
+        string open,
+        string close,
+        string member,
+        string repository,
+        string access
+    )
+    {
+        var source =
+            SourcesUsings.Replace("namespace App\n{\n", string.Empty, StringComparison.Ordinal)
+            + open
+            + "\npublic abstract class RepositoryBase\n{\n"
+            + "    [SqlSourceConnection(Database = \"postgres\")]\n"
+            + $"    protected static string? {member} {{ get; set; }}\n\n"
+            + "    [SqlSourceConnection(Database = \"mssql\")]\n"
+            + "    protected static string? Other { get; set; }\n}\n\n"
+            + repository
+            + "\n"
+            + close
+            + "\n";
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources.Values.ShouldContain(text => text.Contains(access, StringComparison.Ordinal));
+    }
+
+    // A static holder of a base type may have the repository's name too, and its factory's members are reached through
+    // the same access.
+    [Theory]
+    [MemberData(nameof(RepositoriesNamedAsTheirBaseMember))]
+    public void Run_StaticHolderWithTheRepositorysName_Compiles(
+        string open,
+        string close,
+        string member,
+        string repository,
+        string access
+    )
+    {
+        var source =
+            SourcesUsings.Replace("namespace App\n{\n", string.Empty, StringComparison.Ordinal)
+            + open
+            + "\npublic class Factory\n{\n"
+            + MembersOf("factory", string.Empty)
+            + "}\n\npublic abstract class RepositoryBase\n{\n"
+            + $"    protected static Factory? {member} {{ get; set; }}\n}}\n\n"
+            + repository
+            + "\n"
+            + close
+            + "\n";
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        run.Sources.Values.ShouldContain(text => text.Contains(access, StringComparison.Ordinal));
+    }
+
+    // Where a repository named as its base type's static member can be declared: what opens and closes its namespace,
+    // the member's name as written, the repository's declaration, and the access the method writes.
+    public static TheoryData<string, string, string, string, string> RepositoriesNamedAsTheirBaseMember =>
+        new()
+        {
+            {
+                "namespace App {",
+                "}",
+                "Sample",
+                "[SqlSourceGenerate(Source = \".\")] public partial class Sample : RepositoryBase;",
+                "global::App.Sample.Sample"
+            },
+            {
+                string.Empty,
+                string.Empty,
+                "Sample",
+                "[SqlSourceGenerate(Source = \".\")] public partial class Sample : RepositoryBase;",
+                "global::Sample.Sample"
+            },
+            {
+                "namespace Sample {",
+                "}",
+                "Sample",
+                "[SqlSourceGenerate(Source = \".\")] public partial class Sample : RepositoryBase;",
+                "global::Sample.Sample.Sample"
+            },
+            {
+                "namespace @class {",
+                "}",
+                "@event",
+                "[SqlSourceGenerate(Source = \".\")] public partial class @event : RepositoryBase;",
+                "global::@class.@event.@event"
+            },
+            {
+                "namespace App {",
+                "}",
+                "Sample",
+                "[SqlSourceGenerate(Source = \".\")] public partial class Sample<T> : RepositoryBase;",
+                "global::App.Sample<T>.Sample"
+            },
+            {
+                "namespace App {",
+                "}",
+                "parameters",
+                "[SqlSourceGenerate(Source = \".\")] public partial class parameters : RepositoryBase;",
+                "global::App.parameters.parameters"
+            },
+            {
+                "namespace App {",
+                "}",
+                "Sample",
+                "public partial class await { [SqlSourceGenerate(Source = \".\")] "
+                    + "public partial class Sample : RepositoryBase; }",
+                "global::App.@await.Sample.Sample"
+            },
+            {
+                "namespace App {",
+                "}",
+                "Sample",
+                "[SqlSourceGenerate(Source = \".\")] public partial class Sample<await> : RepositoryBase;",
+                "global::App.Sample<@await>.Sample"
+            },
+        };
+
+    // A type parameter around the repository can have no name inside it, when a nearer type repeats it or has a nested
+    // type of its name, so a path from global:: could name another constructed type.  A repository nested in a generic
+    // type is reached through its own name.  The interface is off, whose declaration repeats the parameter.
+    [Theory]
+    [InlineData(
+        "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : RepositoryBase; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : RepositoryBase; }",
+        "Repo<T>.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<@T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : RepositoryBase; }",
+        "Repo<T>.Source"
+    )]
+    [InlineData(
+        "public partial class A<T> { public partial class B<T> { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : RepositoryBase; } }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class A<T> { public partial class B { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : RepositoryBase; } }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class A { public partial class B<T> { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : RepositoryBase; } }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class A<T, U> { public partial class B<U> { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : RepositoryBase; } }",
+        "Repo<T>.Source"
+    )]
+    [InlineData(
+        "public partial class A<T> { public partial class B<U> { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : RepositoryBase; } }",
+        "Repo<T>.Source"
+    )]
+    [InlineData(
+        "public class HidingBase : RepositoryBase { public class T { } } public partial class Outer<T> { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : HidingBase; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : RepositoryBase { public class T { } } }",
+        "Repo.Source"
+    )]
+    public void Run_StaticAccessNestedInAGenericType_UsesTheTypesOwnName(string repository, string access)
+    {
+        foreach (var source in StaticSourceAndHolderOf("Source", repository))
+        {
+            var run = RunRepositories(source);
+
+            run.ShouldBeClean();
+            var methods = run
+                .Sources.Single(file => file.Key.EndsWith("-Methods.g.cs", StringComparison.Ordinal))
+                .Value;
+            methods.ShouldContain(access);
+            methods.ShouldNotContain("." + access);
+        }
+    }
+
+    // Only a type nested in a generic type is reached by its simple name: nesting in other types keeps the full path.
+    [Fact]
+    public void Run_StaticAccessNestedInATypeThatIsNotGeneric_GoesThroughTheTypeInFull()
+    {
+        const string Repository =
+            "public partial class Outer { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : RepositoryBase; }";
+
+        foreach (var source in StaticSourceAndHolderOf("Source", Repository))
+        {
+            var run = RunRepositories(source);
+
+            run.ShouldBeClean();
+            run.Sources.Values.ShouldContain(text =>
+                text.Contains("global::App.Outer.Repo<T>.Source", StringComparison.Ordinal)
+            );
+        }
+    }
+
+    // Inside a repository nested in a generic type, a member that the simple name finds takes it from the repository,
+    // and a static access through it would read that member: the repository is refused, once for each static member
+    // it reaches through the name.
+    [Theory]
+    [InlineData("protected static string? Repo { get; set; }", "Repo", "the property App.Hiding.Repo")]
+    [InlineData("protected static string? Repo = null;", "Repo", "the field App.Hiding.Repo")]
+    [InlineData("protected static void Repo() { }", "Repo", "the method App.Hiding.Repo()")]
+    [InlineData("protected static void Repo<X>() { }", "Repo", "the method App.Hiding.Repo<X>()")]
+    [InlineData("protected class Repo { }", "Repo", "the class App.Hiding.Repo")]
+    [InlineData("protected static event System.Action? Repo;", "Repo", "the event App.Hiding.Repo")]
+    [InlineData("protected class Repo<X> { }", "Repo<U>", "the class App.Hiding.Repo<X>")]
+    [InlineData("protected static void Repo<X>() { }", "Repo<U>", "the method App.Hiding.Repo<X>()")]
+    [InlineData("", "parameters", "the method argument 'parameters'")]
+    [InlineData("", "cancellationToken", "the method argument 'cancellationToken'")]
+    [InlineData("", "Repo(string Repo)", "the primary-constructor parameter 'Repo'")]
+    [InlineData("protected static string? Repo { get; set; }", "Repo(int Repo)", "the property App.Hiding.Repo")]
+    public void Run_SimpleNameOfTheRepositoryTakenByAMember_ReportsSqlsrc039(
+        string member,
+        string repository,
+        string takenBy
+    )
+    {
+        var declarations =
+            "public class Hiding : RepositoryBase { "
+            + member
+            + " } public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class "
+            + repository
+            + " : Hiding; }";
+        var sources = StaticSourceAndHolderOf("Source", declarations);
+
+        var bySource = RunRepositories(sources[0]).Problems();
+        var holderRun = RunRepositories(sources[1]);
+        var byHolder = holderRun.Problems();
+
+        bySource.Count.ShouldBe(2);
+        _ = byHolder.ShouldHaveSingleItem();
+        foreach (var problem in bySource.Concat(byHolder))
+        {
+            problem.ShouldStartWith("SQLSRC039 ");
+            problem.ShouldContain("inside the type that name means " + takenBy + ".");
+        }
+
+        // The holder serves both databases and is reported once: the run's report lists a problem once whatever the
+        // planner found, so the planner's own list says it too.
+        StepOutputs
+            .Single<TypeMethods>(holderRun, TrackingNames.TypeMethods)
+            .Diagnostics.Count(diagnostic => diagnostic.Descriptor.Id == "SQLSRC039")
+            .ShouldBe(1);
+    }
+
+    // A nearest member can leave the name to another type: an inherited nested type of the repository's name that is
+    // another constructed type, and a type beyond a field of the repository's own type, which ends Color Color.
+    [Theory]
+    [InlineData(
+        "public partial class Outer<T> : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Outer<int>; }",
+        "the class App.Outer<int>.Repo"
+    )]
+    [InlineData(
+        "public class B0 : RepositoryBase { public class Repo { } } "
+            + "public class B1<X> : B0 { protected static Outer<X>.Repo? Repo; } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : B1<T>; }",
+        "the class App.B0.Repo"
+    )]
+    public void Run_SimpleNameTakenByAnotherType_ReportsSqlsrc039(string declarations, string takenBy)
+    {
+        foreach (var source in StaticSourceAndHolderOf("Source", declarations))
+        {
+            var problems = RunRepositories(source).Problems();
+
+            problems.ShouldNotBeEmpty();
+            foreach (var problem in problems)
+            {
+                problem.ShouldStartWith("SQLSRC039 ");
+                problem.ShouldContain("inside the type that name means " + takenBy + ".");
+            }
+        }
+    }
+
+    // The simple name still reaches the repository: a field or property of the repository's own type, which is C#'s
+    // Color Color rule, and a parameter of that type; an inherited nested type that is the repository; a member of
+    // another arity; a member the repository cannot reach; and an accessor or operator, which no name finds.
+    [Theory]
+    [InlineData(
+        "public class Hiding<X> : RepositoryBase { protected static Outer<X>.Repo? Repo { get; set; } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Hiding<T>; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Hiding<X> : RepositoryBase { protected static readonly Outer<X>.Repo? Repo = null; } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Hiding<T>; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { protected class Repo<X> { } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Hiding; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { protected static string? Repo { get; set; } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<U> : Hiding; }",
+        "Repo<U>.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class parameters<U> : Hiding; }",
+        "parameters<U>.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { protected static void Repo() { } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<U> : Hiding; }",
+        "Repo<U>.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo(Repo? Repo) : RepositoryBase; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<U>(string Repo) : RepositoryBase; }",
+        "Repo<U>.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Outer<T>; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<U> : Outer<T>; }",
+        "Repo<U>.Source"
+    )]
+    [InlineData(
+        "public partial class Outer<T> { public partial class Mid : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Mid; } }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Between<X> : Outer<X> { protected static Outer<X>.Repo? Repo; } "
+            + "public partial class Outer<T> : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Between<T>; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Between<X> : Outer<X> { } public partial class Outer<T> : RepositoryBase { "
+            + "[SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Between<T>; }",
+        "Repo.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { public int X => 0; } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class get_X : Hiding; }",
+        "get_X.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { public static Hiding operator +(Hiding a, Hiding b) => a; } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class op_Addition : Hiding; }",
+        "op_Addition.Source"
+    )]
+    [InlineData(
+        "public class Hiding : RepositoryBase { private static string? Repo { get; set; } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo : Hiding; }",
+        "Repo.Source"
+    )]
+    public void Run_SimpleNameThatStillReachesTheRepository_Compiles(string declarations, string access)
+    {
+        foreach (var source in StaticSourceAndHolderOf("Source", declarations))
+        {
+            var run = RunRepositories(source);
+
+            run.ShouldBeClean();
+            run.Sources.Values.ShouldContain(text => text.Contains(access, StringComparison.Ordinal));
+        }
+    }
+
+    // A source that a method does not reach through the type's name is not refused, whatever that name means: an
+    // instance member, the member of an instance holder, and a global.
+    [Theory]
+    [InlineData(
+        "public partial class Repo : Hiding { "
+            + PostgresMark
+            + " public string? Pg { get; set; } "
+            + SqlServerMark
+            + " public string? Ms { get; set; } }"
+    )]
+    [InlineData(
+        "public partial class Repo(F f) : Hiding; public class F { "
+            + PostgresMark
+            + " public string? Pg => \"\"; "
+            + SqlServerMark
+            + " public string? Ms => null; }"
+    )]
+    [InlineData("public partial class Repo : Hiding;")]
+    public void Run_SourceNotReachedThroughTheTakenName_Compiles(string repository)
+    {
+        var global = repository.EndsWith("Repo : Hiding;", StringComparison.Ordinal)
+            ? "public static class Db { "
+                + PostgresMark
+                + " public static string? Pg { get; set; } "
+                + SqlServerMark
+                + " public static string? Ms { get; set; } } "
+            : string.Empty;
+        var source =
+            SourcesUsings
+            + global
+            + "public class Hiding { protected static string? Repo { get; set; } } "
+            + "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + repository
+            + " }\n}\n";
+
+        RunRepositories(source).ShouldBeClean();
+    }
+
+    // Through the type's own name, a static member can have a name that an argument or a type parameter has.
+    [Theory]
+    [InlineData("cancellationToken")]
+    [InlineData("parameters")]
+    [InlineData("T")]
+    public void Run_StaticMemberNamedAsAnArgumentNestedInAGenericType_Compiles(string member)
+    {
+        const string Repository =
+            "public partial class Outer<T> { [SqlSourceGenerate(Source = \".\", GenerateInterface = false)] "
+            + "public partial class Repo<T> : RepositoryBase; }";
+
+        foreach (var source in StaticSourceAndHolderOf(member, Repository))
+        {
+            RunRepositories(source).ShouldBeClean();
+        }
+    }
+
+    // Each place of a source's access that can be named await: a method writes it with its @.
+    [Theory]
+    [InlineData(
+        Generate
+            + " public partial class Repo { "
+            + PostgresMark
+            + " public static string? await { get; set; } "
+            + SqlServerMark
+            + " public static string? Ms { get; set; } }"
+    )]
+    [InlineData(
+        Generate
+            + " public partial class Repo { "
+            + PostgresMark
+            + " public string? await { get; set; } "
+            + SqlServerMark
+            + " public string? Ms { get; set; } }"
+    )]
+    [InlineData(
+        Generate + " public partial class Repo(" + PostgresMark + " string await, " + SqlServerMark + " string ms);"
+    )]
+    [InlineData(
+        "public class F { "
+            + PostgresMark
+            + " public string? Pg => \"\"; "
+            + SqlServerMark
+            + " public string? Ms => null; } "
+            + Generate
+            + " public partial class Repo { private static readonly F? await = new(); }"
+    )]
+    [InlineData(
+        "public class F { "
+            + PostgresMark
+            + " public string? await => \"\"; "
+            + SqlServerMark
+            + " public string? Ms => null; } "
+            + Generate
+            + " public partial class Repo(F f);"
+    )]
+    [InlineData(
+        "public static class Db { "
+            + PostgresMark
+            + " public static string? await { get; set; } "
+            + SqlServerMark
+            + " public static string? Ms { get; set; } } "
+            + Generate
+            + " public partial class Repo;"
+    )]
+    [InlineData(
+        "public static class await { "
+            + PostgresMark
+            + " public static string? Pg { get; set; } "
+            + SqlServerMark
+            + " public static string? Ms { get; set; } } "
+            + Generate
+            + " public partial class Repo;"
+    )]
+    [InlineData(
+        "} namespace await { public static class Db { "
+            + PostgresMark
+            + " public static string? Pg { get; set; } "
+            + SqlServerMark
+            + " public static string? Ms { get; set; } } } namespace App { "
+            + Generate
+            + " public partial class Repo;"
+    )]
+    [InlineData(
+        "} namespace await { public interface IF { "
+            + PostgresMark
+            + " string? Pg { get; } "
+            + SqlServerMark
+            + " string? Ms { get; } } } namespace App { public class F : global::await.IF { "
+            + "string? global::await.IF.Pg => \"\"; string? global::await.IF.Ms => null; } "
+            + Generate
+            + " public partial class Repo(F f);"
+    )]
+    public void Run_ConnectionSourceWithAwaitInItsAccess_Compiles(string declarations)
+    {
+        var run = RunRepositories(SourcesUsings + declarations + "\n}\n");
+
+        run.ShouldBeClean();
+    }
+
+    // A source of the two kinds whose member has the name: a static source of each engine on a base type, and a static
+    // holder of a factory that gives both.
+    private static string[] StaticSourceAndHolderOf(string member, string repository)
+    {
+        var factory = SourcesUsings + "public class Factory\n{\n" + MembersOf("factory", string.Empty) + "}\n\n";
+        var end = repository + "\n}\n";
+        return
+        [
+            factory
+                + "public abstract class RepositoryBase\n{\n"
+                + "    [SqlSourceConnection(Database = \"postgres\")]\n"
+                + $"    protected static string? {member} {{ get; set; }}\n\n"
+                + "    [SqlSourceConnection(Database = \"mssql\")]\n"
+                + "    protected static string? Other { get; set; }\n}\n\n"
+                + end,
+            factory
+                + "public abstract class RepositoryBase\n{\n"
+                + $"    protected static Factory? {member} {{ get; set; }}\n}}\n\n"
+                + end,
+        ];
     }
 
     // A marked member of each engine, of the kind of connection source, instance or static as the modifier says, at
