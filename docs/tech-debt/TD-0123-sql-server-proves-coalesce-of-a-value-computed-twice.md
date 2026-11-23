@@ -12,6 +12,9 @@ Measured through the describer on 2025 (CU9-GDR1), over 500 rows:
 | The same with a correlated `(SELECT TOP (1) CASE WHEN ABS(CHECKSUM(NEWID())) % 2 = 0 THEN 1 END FROM t AS o WHERE o.id = r.id)` as the argument | `nullable` false, `expression` | 126 |
 | `SELECT COALESCE(CAST(LAG(b) OVER (ORDER BY NEWID()) AS int), 0) AS c FROM t`, `b` nullable | `nullable` false, `expression` | 125 |
 | `SELECT COALESCE(CONVERT(int, LEAD(b) OVER (ORDER BY NEWID())), 0) AS c FROM t`, `b` nullable | `nullable` false, `expression` | 123 |
+| `SELECT COALESCE(CAST(YEAR(LAG(d) OVER (ORDER BY NEWID())) AS int), 0) AS c FROM t`, `d` nullable | `nullable` false, `expression` | 133 |
+| `SELECT COALESCE(CONVERT(date, DATEADD(DAY, 1, LEAD(d) OVER (ORDER BY NEWID()))), '2020-01-01') AS c FROM t`, `d` nullable | `nullable` false, `expression` | 125 |
+| `SELECT COALESCE(CAST(LAG(d) OVER (ORDER BY NEWID()) AT TIME ZONE 'UTC' AS datetime2(0)), '2020-01-01') AS c FROM t`, `d` nullable | `nullable` false, `expression` | 132 |
 
 Run alone on 2017 (CU31-GDR19) and 2025, five runs of 2,000 rows each:
 

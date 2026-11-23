@@ -52,7 +52,7 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - **`JSON_OBJECT` and `JSON_ARRAY`**, on SQL Server 2022 and later.
 - **A date function of values that are never null**: `DATEADD`, `DATEDIFF`, `DATEDIFF_BIG`, `DATEPART`, `DATENAME`, `YEAR`, `MONTH`, `DAY` and `EOMONTH`.
 - **`AT TIME ZONE` of a value and a time zone that are never null**, as in `placed_at AT TIME ZONE 'UTC'`.
-- **`LAG` and `LEAD` with a default**, as in `LAG(status, 1, 'none') OVER (...)`, when the value and the default are never null, the offset is a whole number written in the query, and neither is of a spatial type, of `hierarchyid` or of another .NET type.  A `CAST` or `CONVERT` of it, and a `COALESCE` with it as an argument, do not count as never null.
+- **`LAG` and `LEAD` with a default**, as in `LAG(status, 1, 'none') OVER (...)`, when the value and the default are never null, the offset is a whole number written in the query, and neither is of a spatial type, of `hierarchyid` or of another .NET type.  A `CAST` or `CONVERT` of it does not count as never null, and neither does a `COALESCE` directly over it.
 - **`CASE WHEN x IS NULL THEN e ELSE x END`**, when `e` is never null, `x` is written the same both times, and `x` is a column stored in a table or is never null itself.  Neither may be of a spatial type, of `hierarchyid` or of another .NET type.
 - **A computed column declared `PERSISTED NOT NULL`, read from its table alone**, when all of these are true:
   - the `FROM` of the query names that one table and nothing else;
@@ -136,7 +136,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 
 **What you see.**  A column written with `COALESCE` gets a property that cannot be null, and some rows hold a null.
 
-**Why.**  SQL Server can compute an argument of `COALESCE` once to test it and again for the result.  When the argument gives a different value each time, such as an expression, a subquery or a window that calls `NEWID()`, the test can see a value and the result can be null.  SqlSource still treats that `COALESCE` as never null.
+**Why.**  SQL Server can compute an argument of `COALESCE` once to test it and again for the result.  When the argument gives a different value each time, such as an expression, a subquery or a window that calls `NEWID()`, the test can see a value and the result can be null.  SqlSource still treats that `COALESCE` as never null, and a `CAST` or `CONVERT` inside the `COALESCE` does not protect it.
 
 **What to do.**  Write `ISNULL(x, 0)`, which computes `x` once.
 

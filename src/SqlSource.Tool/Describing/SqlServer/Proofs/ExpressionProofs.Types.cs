@@ -34,9 +34,10 @@ internal sealed partial class ExpressionProofs
     // forms whose type is fixed are of no CLR type; MAX and MIN are of their operand's type, COALESCE, GREATEST and
     // LEAST of one of their arguments', and CAST and CONVERT of their target, which proves only when it is built in.
     // AT TIME ZONE is a datetimeoffset, and the date forms take no CLR type, each proved only when it holds nothing
-    // that is never asked.  LAG and LEAD have no type proof, since COALESCE reads an argument twice (TD-0123) and a
-    // window ordered by NEWID() gives two values.  A call of a schema's name may return a CLR type and cannot be asked.
-    // Anything else is asked.
+    // that is never asked.  LAG and LEAD have no type proof, since COALESCE reads an argument twice and a window
+    // ordered by NEWID() gives two values, so only a COALESCE directly over one is unproved: CAST and CONVERT read
+    // their target alone, which still proves a COALESCE over a CAST of one (TD-0123).  A call of a schema's name may
+    // return a CLR type and cannot be asked.  Anything else is asked.
     private Proof? PrimaryType(TokenRange piece)
     {
         if (AtTimeZoneOf(piece) is not null)
