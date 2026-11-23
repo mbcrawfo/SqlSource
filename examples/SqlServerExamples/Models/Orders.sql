@@ -35,11 +35,11 @@ GROUP BY u.id
 ORDER BY u.id;
 
 -- name: ListOrderMonths
--- summary: Each order with the last day of the month it was placed in.
--- column: month_end not null
+-- summary: Each order with the first day of the month it was placed in.
+-- column: month_start not null
 SELECT
     id,
-    EOMONTH(placed_at) AS month_end
+    DATEFROMPARTS(YEAR(placed_at), MONTH(placed_at), 1) AS month_start
 FROM orders
 ORDER BY id;
 

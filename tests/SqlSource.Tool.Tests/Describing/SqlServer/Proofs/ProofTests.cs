@@ -42,6 +42,17 @@ public sealed class ProofTests
     public void Holds_NotClrWithoutAnswers_DoesNotHold() => new Proof.NotClr(0).Holds(null).ShouldBeFalse();
 
     [Fact]
+    public void Holds_StoredOfAStoredColumn_IsTrueWhateverItsNullability() =>
+        new Proof.Stored(0).Holds([new OperandFacts(NotNull: false, NotClr: false, Stored: true)]).ShouldBeTrue();
+
+    [Fact]
+    public void Holds_StoredOfAnOperandNotNullAndNotStored_IsFalse() =>
+        new Proof.Stored(0).Holds([new OperandFacts(NotNull: true, NotClr: true)]).ShouldBeFalse();
+
+    [Fact]
+    public void Holds_StoredWithoutAnswers_DoesNotHold() => new Proof.Stored(0).Holds(null).ShouldBeFalse();
+
+    [Fact]
     public void Holds_AnyOf_IsTrueWhenOnePartHolds()
     {
         var proof = new Proof.AnyOf([new Proof.Operand(0), new Proof.Operand(1)]);

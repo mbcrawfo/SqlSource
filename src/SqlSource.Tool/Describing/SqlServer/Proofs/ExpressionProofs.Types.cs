@@ -3,8 +3,8 @@ using System.Linq;
 
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 
-// The type walk: the proof that a value is of no CLR type, which COALESCE, GREATEST, LEAST, CAST and CONVERT need of
-// their arguments (ExpressionProofs.Calls.cs).
+// The type walk: the proof that a value is of no CLR type, which COALESCE, GREATEST, LEAST, CAST, CONVERT, LAG, LEAD
+// and the CASE that guards a column need of their arguments (ExpressionProofs.Calls.cs, ExpressionProofs.Operators.cs).
 internal sealed partial class ExpressionProofs
 {
     // The proof that a value is of no CLR type, from its form where that tells, by asking the server otherwise.  A
@@ -33,9 +33,18 @@ internal sealed partial class ExpressionProofs
     // The type proof of a piece that is a primary, or null when it is none.  A literal, NULL, a count subquery and the
     // forms whose type is fixed are of no CLR type; MAX and MIN are of their operand's type, COALESCE, GREATEST and
     // LEAST of one of their arguments', and CAST and CONVERT of their target, which proves only when it is built in.
-    // A call of a schema's name may return a CLR type and cannot be asked.  Anything else is asked.
+    // AT TIME ZONE is a datetimeoffset, and the date forms take no CLR type, each proved only when it holds nothing
+    // that is never asked.  LAG and LEAD have no type proof, since COALESCE reads an argument twice and a window
+    // ordered by NEWID() gives two values, so no form that needs its operand's type proves over one.  CAST and
+    // CONVERT read their target alone, which still proves a COALESCE over a CAST of one (TD-0123).  A call of a
+    // schema's name may return a CLR type and cannot be asked.  Anything else is asked.
     private Proof? PrimaryType(TokenRange piece)
     {
+        if (AtTimeZoneOf(piece) is not null)
+        {
+            return HoldsWhatIsNeverAsked(piece) ? Proof.No : Proof.Yes;
+        }
+
         var first = tokens[piece.Start];
         if (piece.Count == 1 && (first.Kind is TsqlTokenKind.String or TsqlTokenKind.Number || first.Is("NULL")))
         {
@@ -104,6 +113,9 @@ internal sealed partial class ExpressionProofs
             FormKind.CoalesceGreatestLeast => AllOf(Arguments(arguments).Select(TypeOf)),
             FormKind.Cast => CastOperand(arguments) is null ? Proof.No : Proof.Yes,
             FormKind.Convert => CastTargets.IsBuiltIn(tokens, Arguments(arguments)[0]) ? Proof.Yes : Proof.No,
+            FormKind.DateAddOrDiff or FormKind.DatePartOrName or FormKind.DateValue or FormKind.EndOfMonth =>
+                HoldsWhatIsNeverAsked(arguments) ? Proof.No : Proof.Yes,
+            FormKind.LagOrLead => Proof.No,
             _ => throw UnexpectedEnumValueException.Of(kind),
         };
 

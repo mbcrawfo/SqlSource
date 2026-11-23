@@ -4,7 +4,7 @@
     "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // The output of every .sql file of this folder: models, so that each query gets its SQL and its models.\n  \"output\": \"models\",\n}\n",
     "{\n  \"$schema\": \"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json\",\n  // No settings file above this folder applies to the project.\n  \"root\": true,\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  \"typeOverrides\": {\n    // Every date is a DateOnly, which Dapper reads through DateOnlyHandler.\n    \"date\": \"System.DateOnly\",\n  },\n  \"columnTypes\": {\n    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.\n    \"order_lines.order_id\": \"OrderId\",\n  },\n  \"libraryTypes\": {\n    // SQL Server turns a library on only when asked, so the project turns on NodaTime, NetTopologySuite and\n    // System.Text.Json, whose types only the methods of Methods/ get.  The type override above still wins over NodaTime\n    // for every date, which stays a DateOnly.\n    \"nodaTime\": \"on\",\n    \"netTopologySuite\": \"on\",\n    \"json\": \"on\",\n  },\n}\n"
   ],
-  "input": "-- The queries of the orders.  Their output is models, set by this folder's sqlsource.json, so each gets a model of\n-- its parameters and one of its rows, from its entry in Orders.sql.json.  The parameters are in camelCase, which Dapper\n-- binds to the properties of the input model.\n\n-- name: GetOrder\n-- summary: One order and the name of its customer.\nSELECT\n    o.id,\n    o.status,\n    o.placed_at,\n    o.shipped_on,\n    u.name AS customer_name\nFROM orders AS o\nINNER JOIN users AS u ON o.user_id = u.id\nWHERE o.id = @orderId;\n\n-- name: ListOrdersPlacedSince\n-- summary: The latest orders placed since a time, newest first.\n-- param: @count int\nSELECT TOP (@count)\n    id,\n    placed_at\nFROM orders\nWHERE placed_at >= @since\nORDER BY placed_at DESC;\n\n-- name: CountShippedOrders\n-- summary: How many orders of each user have shipped.\nSELECT\n    u.id,\n    COUNT(o.shipped_on) AS shipped\nFROM users AS u\nLEFT JOIN orders AS o ON u.id = o.user_id\nGROUP BY u.id\nORDER BY u.id;\n\n-- name: ListOrderMonths\n-- summary: Each order with the last day of the month it was placed in.\n-- column: month_end not null\nSELECT\n    id,\n    EOMONTH(placed_at) AS month_end\nFROM orders\nORDER BY id;\n\n-- name: AddOrder\n-- summary: Places a new order for a user, and returns what the database filled in.\nINSERT INTO orders (user_id)\nOUTPUT INSERTED.id, INSERTED.status, INSERTED.placed_at\nVALUES (@userId);\n",
+  "input": "-- The queries of the orders.  Their output is models, set by this folder's sqlsource.json, so each gets a model of\n-- its parameters and one of its rows, from its entry in Orders.sql.json.  The parameters are in camelCase, which Dapper\n-- binds to the properties of the input model.\n\n-- name: GetOrder\n-- summary: One order and the name of its customer.\nSELECT\n    o.id,\n    o.status,\n    o.placed_at,\n    o.shipped_on,\n    u.name AS customer_name\nFROM orders AS o\nINNER JOIN users AS u ON o.user_id = u.id\nWHERE o.id = @orderId;\n\n-- name: ListOrdersPlacedSince\n-- summary: The latest orders placed since a time, newest first.\n-- param: @count int\nSELECT TOP (@count)\n    id,\n    placed_at\nFROM orders\nWHERE placed_at >= @since\nORDER BY placed_at DESC;\n\n-- name: CountShippedOrders\n-- summary: How many orders of each user have shipped.\nSELECT\n    u.id,\n    COUNT(o.shipped_on) AS shipped\nFROM users AS u\nLEFT JOIN orders AS o ON u.id = o.user_id\nGROUP BY u.id\nORDER BY u.id;\n\n-- name: ListOrderMonths\n-- summary: Each order with the first day of the month it was placed in.\n-- column: month_start not null\nSELECT\n    id,\n    DATEFROMPARTS(YEAR(placed_at), MONTH(placed_at), 1) AS month_start\nFROM orders\nORDER BY id;\n\n-- name: AddOrder\n-- summary: Places a new order for a user, and returns what the database filled in.\nINSERT INTO orders (user_id)\nOUTPUT INSERTED.id, INSERTED.status, INSERTED.placed_at\nVALUES (@userId);\n",
   "expected": {
     "startDialect": "mssql",
     "startOptions": [],
@@ -39,16 +39,16 @@
       ["Text", 837, 978],
       ["LineComment", 978, 1002],
       ["Text", 1002, 1003],
-      ["LineComment", 1003, 1074],
-      ["Text", 1074, 1075],
-      ["LineComment", 1075, 1104],
-      ["Text", 1104, 1182],
-      ["LineComment", 1182, 1199],
-      ["Text", 1199, 1200],
-      ["LineComment", 1200, 1283],
-      ["Text", 1283, 1377],
-      ["Parameter", 1377, 1384],
-      ["Text", 1384, 1387]
+      ["LineComment", 1003, 1075],
+      ["Text", 1075, 1076],
+      ["LineComment", 1076, 1107],
+      ["Text", 1107, 1220],
+      ["LineComment", 1220, 1237],
+      ["Text", 1237, 1238],
+      ["LineComment", 1238, 1321],
+      ["Text", 1321, 1415],
+      ["Parameter", 1415, 1422],
+      ["Text", 1422, 1425]
     ],
     "spans": [
       { "kind": "markerComment", "start": 285, "end": 302, "name": null, "default": null },
@@ -62,11 +62,11 @@
       { "kind": "markerComment", "start": 755, "end": 782, "name": null, "default": null },
       { "kind": "markerComment", "start": 783, "end": 837, "name": null, "default": null },
       { "kind": "markerComment", "start": 978, "end": 1002, "name": null, "default": null },
-      { "kind": "markerComment", "start": 1003, "end": 1074, "name": null, "default": null },
-      { "kind": "markerComment", "start": 1075, "end": 1104, "name": null, "default": null },
-      { "kind": "markerComment", "start": 1182, "end": 1199, "name": null, "default": null },
-      { "kind": "markerComment", "start": 1200, "end": 1283, "name": null, "default": null },
-      { "kind": "parameter", "start": 1377, "end": 1384, "name": "userId", "default": null }
+      { "kind": "markerComment", "start": 1003, "end": 1075, "name": null, "default": null },
+      { "kind": "markerComment", "start": 1076, "end": 1107, "name": null, "default": null },
+      { "kind": "markerComment", "start": 1220, "end": 1237, "name": null, "default": null },
+      { "kind": "markerComment", "start": 1238, "end": 1321, "name": null, "default": null },
+      { "kind": "parameter", "start": 1415, "end": 1422, "name": "userId", "default": null }
     ],
     "error": null,
     "hasOtherErrors": false

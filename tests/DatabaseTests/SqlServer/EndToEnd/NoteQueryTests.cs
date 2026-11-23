@@ -116,9 +116,9 @@ public sealed class NoteQueryTests(SqlServerDatabases sqlServer)
         var months = await connection.ListAccountMonths(cancellationToken: token);
 
         months.ShouldBe([
-            new ListAccountMonthsDto(new AccountId(1), new DateOnly(2024, 1, 31)),
-            new ListAccountMonthsDto(new AccountId(2), new DateOnly(2024, 2, 29)),
-            new ListAccountMonthsDto(new AccountId(3), new DateOnly(2024, 3, 31)),
+            new ListAccountMonthsDto(new AccountId(1), new DateOnly(2024, 1, 1)),
+            new ListAccountMonthsDto(new AccountId(2), new DateOnly(2024, 2, 1)),
+            new ListAccountMonthsDto(new AccountId(3), new DateOnly(2024, 3, 1)),
         ]);
     }
 
