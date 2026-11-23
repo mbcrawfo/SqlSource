@@ -29,7 +29,7 @@ public sealed class SqlFileParserAllocationTests
 
     private const int Queries = 50;
 
-    private const int Iterations = 20;
+    private const int Pairs = 5;
 
     [Theory]
     [InlineData(nameof(SqlDialect.Ansi), false, false)]
@@ -57,31 +57,59 @@ public sealed class SqlFileParserAllocationTests
         var plain = CreateFile(hasDialect: false, keepsComments: false, hasParams: false);
         var withParams = CreateFile(hasDialect: false, keepsComments: false, hasParams: true);
 
-        var added = AllocatedByAParse(withParams, SqlDialect.Ansi) - AllocatedByAParse(plain, SqlDialect.Ansi);
-
-        (added / Queries).ShouldBeLessThan(BudgetInBytesPerQueryForAParam);
+        (AddedByAParse(withParams, plain, SqlDialect.Ansi) / Queries).ShouldBeLessThan(BudgetInBytesPerQueryForAParam);
     }
 
     // The bytes that one parse of the file allocates, as an average over a number of parses.
     private static double AllocatedByAParse(string text, SqlDialect dialect)
     {
+        CheckParses(text, dialect);
+
+        return PooledAllocations.Of(() => SqlFileParser.Parse(text, "Queries.sql", dialect))
+            / (double)PooledAllocations.Iterations;
+    }
+
+    // The bytes that one parse of the file allocates beyond one of the baseline, the median of a few pairs of measures.
+    // The runtime replaces the parser's code as it runs, in steps that move what a parse allocates down and, in
+    // Release, partly back up, so two measures either side of a step differ by more or less than the files do.  Each
+    // step falls in one pair, as a collection that empties the shared pool does, and the median leaves those
+    // pairs out.
+    private static double AddedByAParse(string text, string baseline, SqlDialect dialect)
+    {
+        CheckParses(text, dialect);
+        CheckParses(baseline, dialect);
+
+        // The first parses pay for one-off work: JIT compilation, static initialisers and the shared buffer pool.
+        _ = AllocatedByParses(text, dialect);
+        _ = AllocatedByParses(baseline, dialect);
+
+        var differences = new long[Pairs];
+        for (var pair = 0; pair < Pairs; pair++)
+        {
+            var allocated = AllocatedByParses(text, dialect);
+            differences[pair] = allocated - AllocatedByParses(baseline, dialect);
+        }
+
+        Array.Sort(differences);
+        return differences[Pairs / 2] / (double)PooledAllocations.Iterations;
+    }
+
+    private static long AllocatedByParses(string text, SqlDialect dialect)
+    {
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var iteration = 0; iteration < PooledAllocations.Iterations; iteration++)
+        {
+            _ = SqlFileParser.Parse(text, "Queries.sql", dialect);
+        }
+
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+    }
+
+    private static void CheckParses(string text, SqlDialect dialect)
+    {
         var parsed = SqlFileParser.Parse(text, "Queries.sql", dialect);
         parsed.Blocks.Count.ShouldBe(Queries);
         parsed.Errors.ShouldBeEmpty();
-
-        // The first parses pay for one-off work: JIT compilation, static initialisers and the shared buffer pool.
-        for (var iteration = 0; iteration < Iterations; iteration++)
-        {
-            _ = SqlFileParser.Parse(text, "Queries.sql", dialect);
-        }
-
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var iteration = 0; iteration < Iterations; iteration++)
-        {
-            _ = SqlFileParser.Parse(text, "Queries.sql", dialect);
-        }
-
-        return (GC.GetAllocatedBytesForCurrentThread() - before) / (double)Iterations;
     }
 
     // A file like the ones the generator is written for: a preamble, and queries that mix line comments, block
