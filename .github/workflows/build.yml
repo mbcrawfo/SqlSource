@@ -34,6 +34,9 @@ env:
   # and pack jobs cannot disagree.
   BuildNumber: ${{ github.run_number }}
   VersionSuffix: ${{ inputs.version-suffix }}
+  # Where SqlServerStart saves a SQL Server container that crashed at its start, its console log and the archive of
+  # its /var/opt/mssql/log with the dump, for the job to upload (TD-0072).
+  SQLSOURCE_TESTS_SQLSERVER_CRASHES: ${{ github.workspace }}/artifacts/sqlserver-crashes
 
 jobs:
   # The checks that need only Docker.
@@ -305,6 +308,17 @@ jobs:
         if: ${{ !cancelled() && steps.postgis.outcome == 'success' }}
         run: tools/build-postgis-image.sh --unchanged "$POSTGIS_IMAGE_ID"
 
+      # The SQL Server containers that crashed at their start, which SqlServerStart saved before it removed them: see
+      # TD-0072.  Most runs have none, and upload nothing.
+      - name: Upload SQL Server crashes
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sqlserver-crash-${{ matrix.key }}
+          path: ${{ env.SQLSOURCE_TESTS_SQLSERVER_CRASHES }}
+          if-no-files-found: ignore
+          retention-days: 30
+
       # Whatever the tests wrote, even when some failed, as the coverage report of a failed run shows what did pass.
       - name: Upload Cobertura files
         if: ${{ !cancelled() }}
@@ -454,6 +468,17 @@ jobs:
         run: >-
           dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
           --report-github --report-github-summary-include-passed false
+
+      # The SQL Server containers that crashed at their start, which SqlServerStart saved before it removed them: see
+      # TD-0072.  Most runs have none, and upload nothing.
+      - name: Upload SQL Server crashes
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sqlserver-crash-floor
+          path: ${{ env.SQLSOURCE_TESTS_SQLSERVER_CRASHES }}
+          if-no-files-found: ignore
+          retention-days: 30
 
   # Packs the generator and the tool, checks both packages, and uploads them for publish.yml.  The package checks do
   # not wait for the tests: publish.yml needs the whole of this workflow, so a package is never pushed from a run whose
