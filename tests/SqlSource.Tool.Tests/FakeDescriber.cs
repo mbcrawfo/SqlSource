@@ -142,6 +142,9 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
 
     public Exception? CloseException { get; set; }
 
+    // Runs as a session is closed, before CloseException is thrown, for a test that cancels the run there.
+    public Action? OnClose { get; set; }
+
     // Runs before each query is described, for a test that cancels the run there.
     public Func<DescribeRequest, Task>? BeforeDescribe { get; set; }
 
@@ -302,6 +305,7 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
         public ValueTask DisposeAsync()
         {
             owner.Closed++;
+            owner.OnClose?.Invoke();
             return owner.CloseException is { } exception ? throw exception : ValueTask.CompletedTask;
         }
     }
