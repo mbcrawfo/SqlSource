@@ -71,6 +71,7 @@ Find the message of the exception in this list.  Each entry gives the cause, wha
 ## A query is not described, or a file is not found
 
 - **`sqlsource describe` stops with SQLSRC200 and names `EnableUnmappedTypes`, on PostgreSQL.**  A column of a range of your own stops the run.  See [a range of your own](../reference/databases/postgresql/types.md#limit-user-defined-range).
+- **`sqlsource describe` prints `Stack overflow.`, on PostgreSQL.**  An array parameter of a type whose name starts with `_` stops the run.  See [an array parameter of such a type](../reference/databases/postgresql/types.md#limit-array-parameter-underscore).
 - **Two projects include one `.sql` file, and entries are missing from its sidecar.**  A run of the tool on one project can remove the entries that the other project needs.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
 - **SQLSRC224 with `Npgsql cannot read the database's types`, on PostgreSQL.**  An operator `=` of your own on `oid` or `"char"`, in a schema before `pg_catalog` on the search path, stops Npgsql from reading the types.  See [an operator on `oid` or `"char"`](../reference/databases/postgresql/index.md#limit-operator-on-oid).
 - **Describing is slow on a table with thousands of partitions, on PostgreSQL.**  The tool looks at every partition of a partitioned table.  See [many partitions](../reference/databases/postgresql/index.md#limit-many-partitions).

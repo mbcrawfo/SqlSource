@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0125`
+Next id: `TD-0126`
 
 ## Active items
 
@@ -45,6 +45,7 @@ Next id: `TD-0125`
 | [TD-0121](TD-0121-repository-interface-of-a-repeated-type-parameter.md) | Open | 2026-11-22 | Low | A repository around which an inner type parameter or a nested type hides an outer type parameter implements another constructed type's interface, and a repeated parameter raises CS0693 in its generated interface |
 | [TD-0122](TD-0122-model-in-a-namespace-named-await.md) | Open | 2026-11-22 | Low | A model in a namespace with a part named `await` is written without its `@`, so an asynchronous method that names it fails with CS4003 |
 | [TD-0124](TD-0124-describing-a-user-defined-range-stops-the-run.md) | Open | 2026-11-23 | Medium | Describing a column of a user-defined PostgreSQL range ends the run with `SQLSRC200`, since Npgsql refuses an unmapped range and the tool neither opts in nor turns the exception into a failure |
+| [TD-0125](TD-0125-array-parameter-of-a-type-named-with-an-underscore.md) | Open | 2026-11-23 | Medium | An array parameter of a PostgreSQL type whose name starts with `_` crashes `sqlsource describe` with a stack overflow in Npgsql, with no `SQLSRC` error |
 
 ## Columns
 

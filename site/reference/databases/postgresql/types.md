@@ -142,3 +142,19 @@ A type that the table does not name gets its C# type by its kind:
 **Why.**  Npgsql reads a range of your own only after an opt-in, and `sqlsource describe` does not make it.
 
 **What to do.**  Select a value that Npgsql can read.  Cast the column to `text`, as in `SELECT span::text AS span`, or select its bounds as columns of their own, with `lower(span)` and `upper(span)`.
+
+<a id="limit-array-parameter-underscore"></a>
+
+### An array parameter of a type named with `_` crashes `sqlsource describe`
+
+**What you see.**  `sqlsource describe` prints `Stack overflow.` and stops with the exit code 134.  It reports no SQLSRC error and does not name the query.
+
+**Why.**  Npgsql fails on an array of a type whose own name starts with `_`, such as `public._mood[]`, when it is the type of a parameter.  A column of that type is not affected.
+
+**What to do.**  Declare the parameter as `text` with a [`-- param:` marker](../../parameters.md#param-marker), and cast it in the query:
+
+```sql postgres
+-- name: FindByMoods
+-- param: @moods text
+SELECT id FROM people WHERE moods = @moods::public._mood[];
+```
