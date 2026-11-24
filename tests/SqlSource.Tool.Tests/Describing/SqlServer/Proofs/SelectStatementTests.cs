@@ -303,6 +303,38 @@ public sealed class SelectStatementTests
         _ = ctes[0].Body.ShouldNotBeNull();
         ctes[1].Columns.ShouldBeNull();
         ctes[1].Body.ShouldBeNull();
+        ctes[1].Branches.ShouldNotBeNull().Count.ShouldBe(2);
+    }
+
+    // A recursive CTE is read as the branches of its set operators, its own name among those its FROM reads.
+    [Fact]
+    public void Read_RecursiveCte_GivesEachBranch()
+    {
+        var (tokens, statement) = Read(
+            "WITH t (n) AS (SELECT 1 UNION ALL (SELECT n + 1 FROM t WHERE n < 5 UNION ALL SELECT n FROM t)) "
+                + "SELECT n FROM t"
+        );
+
+        var cte = statement.ShouldNotBeNull().Ctes.ShouldHaveSingleItem();
+        cte.Body.ShouldBeNull();
+        string.Join(
+                '|',
+                cte.Branches.ShouldNotBeNull().Select(branch => Text(tokens, branch.Items.Single().Expression))
+            )
+            .ShouldBe("1|n + 1|n");
+    }
+
+    // A branch the reader cannot follow leaves the whole CTE unread, and the query is still read.
+    [Theory]
+    [InlineData("WITH t (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t FOR XML PATH) SELECT n FROM t")]
+    [InlineData("WITH t (n) AS (SELECT 1 UNION ALL) SELECT n FROM t")]
+    [InlineData("WITH t (n) AS (SELECT 1 UNION ALL (SELECT 2) x) SELECT n FROM t")]
+    public void Read_CteWithABranchNotRead_HasNoBranches(string sql)
+    {
+        var cte = Read(sql).Statement.ShouldNotBeNull().Ctes.ShouldHaveSingleItem();
+
+        cte.Branches.ShouldBeNull();
+        cte.Body.ShouldBeNull();
     }
 
     // WINDOW is no reserved word, so "window" may be an alias or a column.  A WINDOW clause is only

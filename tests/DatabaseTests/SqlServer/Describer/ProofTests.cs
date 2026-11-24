@@ -690,6 +690,98 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             (await NullRowsAsync(select, with)).ShouldBeGreaterThan(0, select);
         });
 
+    // A column of a CTE of several branches, a recursive one among them, that every branch proves, a recursive member
+    // with the CTE's own columns taken as not null, though the server answers every column of a recursive CTE nullable.
+    [Theory]
+    [InlineData("WITH t (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 5)", "SELECT n AS c FROM t")]
+    [InlineData(
+        "WITH t (id, x, depth) AS (SELECT id, a, 1 FROM dbo.proof_rows UNION ALL SELECT r.id, t.x + r.a, t.depth + 1 "
+            + "FROM dbo.proof_rows AS r JOIN t ON r.id = t.id + 1 WHERE t.depth < 3)",
+        "SELECT x AS c FROM t"
+    )]
+    // A stored column that the anchor's WHERE keeps from NULL, carried by the recursion.
+    [InlineData(
+        "WITH t (b, depth) AS (SELECT b, 1 FROM dbo.proof_rows WHERE b > 0 "
+            + "UNION ALL SELECT t.b, t.depth + 1 FROM t WHERE t.depth < 3)",
+        "SELECT b AS c FROM t"
+    )]
+    // Two columns that the recursion swaps, each proved only with the other.
+    [InlineData(
+        "WITH t (x, y, n) AS (SELECT a, id, 1 FROM dbo.proof_rows UNION ALL SELECT y, x, n + 1 FROM t WHERE n < 3)",
+        "SELECT x AS c FROM t"
+    )]
+    [InlineData(
+        "WITH t (s, n) AS (SELECT CAST(a AS varchar(100)), 1 FROM dbo.proof_rows UNION ALL "
+            + "SELECT CAST(t.s + '>' + CAST(t.n AS varchar(10)) AS varchar(100)), n + 1 FROM t WHERE n < 3)",
+        "SELECT s AS c FROM t"
+    )]
+    [InlineData(
+        "WITH t (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 5)",
+        "SELECT t.n AS c FROM t LEFT JOIN dbo.proof_other AS o ON o.id = t.n"
+    )]
+    // A CTE of several branches that is not recursive.
+    [InlineData(
+        "WITH q (x) AS (SELECT a FROM dbo.proof_rows UNION ALL SELECT COUNT(b) FROM dbo.proof_rows)",
+        "SELECT q.x AS c FROM q"
+    )]
+    public Task DescribeAsync_CteOfSeveralBranches_NotNullAndNoNullRow(string with, string select) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync($"{with} {select}", false, SidecarValues.NullableSource.Expression);
+            (await RowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+            (await NullRowsAsync(select, with)).ShouldBe(0, select);
+        });
+
+    // A CTE of several branches with a branch that gives NULL in that place, or read through an outer join.
+    [Theory]
+    [InlineData(
+        "WITH t (b, n) AS (SELECT a, 1 FROM dbo.proof_rows UNION ALL "
+            + "SELECT r.b, t.n + 1 FROM dbo.proof_rows AS r JOIN t ON r.id = t.n WHERE t.n < 3)",
+        "SELECT b AS c FROM t"
+    )]
+    // The anchor's NULL of y reaches x through the swap.
+    [InlineData(
+        "WITH t (x, y, n) AS (SELECT a, b, 1 FROM dbo.proof_rows UNION ALL SELECT y, x, n + 1 FROM t WHERE n < 3)",
+        "SELECT x AS c FROM t"
+    )]
+    [InlineData(
+        "WITH t (n) AS (SELECT 1 UNION ALL SELECT NULL UNION ALL SELECT n + 1 FROM t WHERE n < 3)",
+        "SELECT n AS c FROM t"
+    )]
+    [InlineData(
+        "WITH t (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 2)",
+        "SELECT t.n AS c FROM dbo.proof_rows AS r LEFT JOIN t ON t.n = r.id"
+    )]
+    [InlineData(
+        "WITH q (x) AS (SELECT a FROM dbo.proof_rows UNION ALL SELECT b FROM dbo.proof_rows)",
+        "SELECT q.x AS c FROM q"
+    )]
+    // An earlier CTE of several branches that lets a NULL through, read by a later one.
+    [InlineData(
+        "WITH t (n) AS (SELECT 1 UNION ALL SELECT NULL), u (n) AS (SELECT n FROM t UNION ALL SELECT 2)",
+        "SELECT n AS c FROM u"
+    )]
+    // Inside u, proof_rows is the table: a CTE sees only the CTEs before it, and the later one of that name gives no
+    // NULL.
+    [InlineData(
+        "WITH u (x) AS (SELECT b FROM proof_rows UNION ALL SELECT 1), proof_rows (b) AS (SELECT 1 UNION ALL SELECT 2)",
+        "SELECT x AS c FROM u"
+    )]
+    [InlineData(
+        "WITH u (x) AS (SELECT b FROM proof_rows UNION ALL SELECT 1), proof_rows (b) AS (SELECT 1)",
+        "SELECT x AS c FROM u"
+    )]
+    [InlineData(
+        "WITH u (x) AS (SELECT proof_rows.b FROM proof_rows UNION ALL SELECT 1), proof_rows (b) AS (SELECT 7)",
+        "SELECT u.x AS c FROM u"
+    )]
+    public Task DescribeAsync_CteOfSeveralBranchesThatLetsANullThrough_NullableAndNullRow(string with, string select) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync($"{with} {select}", true, SidecarValues.NullableSource.Server);
+            (await NullRowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+        });
+
     // Read from its one table, c is a row of that table, which the constraint keeps not null, though the server calls
     // its expression nullable (it answers "(1) PERSISTED NOT NULL" not null itself, design fact 5); through an outer
     // join that finds no row, or in the total of a ROLLUP, it is NULL, and the server still names it as the source.

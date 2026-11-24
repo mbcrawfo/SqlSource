@@ -40,6 +40,11 @@ public sealed partial class StoreQueries(DbConnection connection)
     public Task<IEnumerable<ListOrderMonthsDto>> ListOrderMonthsAsync() =>
         connection.QueryAsync<ListOrderMonthsDto>(Sql.ListOrderMonths);
 
+    // CalendarDay and DayNumber are a DateOnly and an int, not nullable: the recursive WITH query starts each order at
+    // a day that is never null and adds a day to it, so the tool shows that no row holds a null.
+    public Task<IEnumerable<ListShippingDaysDto>> ListShippingDaysAsync() =>
+        connection.QueryAsync<ListShippingDaysDto>(Sql.ListShippingDays);
+
     // The OUTPUT clause gives the rows of the statement: the order as the database filled it in.
     public Task<AddOrderDto> AddOrderAsync(int userId) =>
         connection.QuerySingleAsync<AddOrderDto>(Sql.AddOrder, new AddOrderParams(userId));
