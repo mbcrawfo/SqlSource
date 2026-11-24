@@ -106,7 +106,7 @@ internal static class CaptureRenamer
 
         foreach (var call in calls)
         {
-            engine.Derive(call, run.At(PlaceOf(call)));
+            engine.Derive(call, calls, run.At(PlaceOf(call)));
         }
     }
 
