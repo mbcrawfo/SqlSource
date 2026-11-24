@@ -333,6 +333,29 @@ public sealed class QueryTypesTests
         ]);
     }
 
+    // A composite or a range of the catalog named as an array, which only a sidecar edited by hand has: its key would
+    // be read as the array, so the help offers none and says to describe the query again.
+    [Theory]
+    [InlineData("_int4", SidecarValues.Kind.Composite)]
+    [InlineData("_foo", SidecarValues.Kind.Composite)]
+    [InlineData("_foo", SidecarValues.Kind.Range)]
+    [InlineData("_foo", SidecarValues.Kind.Multirange)]
+    public void Run_CatalogTypeNamedAsAnArray_IsSqlsrc246ToDescribeAgain(string name, string kind)
+    {
+        var type = TestSidecars.Postgres(name: name, kind: kind, internalName: name, subtype: Catalog("float8"));
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("value", type)])
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'value' has the type '{name}', which SqlSource cannot give a C# "
+                + "type.  Run 'sqlsource describe'.",
+        ]);
+    }
+
     // A range of the catalog that the map lacks, which only a sidecar edited by hand has: its bare name is no key, or
     // is a key of another type, so the help names it with its schema, and that key maps it.
     [Theory]

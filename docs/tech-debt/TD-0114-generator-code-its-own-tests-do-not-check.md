@@ -27,7 +27,7 @@ A scope sees only its own source and the tests of its own folder, so code whose 
 
 ## Impact
 
-Low today.  In the eleven files measured, the tests of `SqlSource.Tests.Generation` left 963 mutants alive.  The driver tests killed 750 of them, new tests killed 111, 4 more make an existing test hang, and the other 98 need no test, each for the reason in [the list of them](../superpowers/specs/2026-11-23-td-0114-mutants-that-need-no-test.md).  Those files also held one wrong help text, now fixed, so a gap here can hide a real fault.  It risks a change that the folder's own tests let through, and a slower and less precise failure, from a whole-generator test, where a unit test would have named the fault.
+Low today.  In the eleven files measured, the tests of `SqlSource.Tests.Generation` left 963 mutants alive.  The driver tests killed 750 of them, new tests killed 111, 4 more make an existing test hang, and the other 98 need no test, each for the reason in [the list of them](../superpowers/specs/2026-11-23-td-0114-mutants-that-need-no-test.md).  The work also found wrong keys in the help of `SQLSRC246`, now fixed, so a gap here can hide a real fault.  It risks a change that the folder's own tests let through, and a slower and less precise failure, from a whole-generator test, where a unit test would have named the fault.
 
 ## Proposed fix
 

@@ -84,6 +84,18 @@ internal static class PostgresTypeMap
             return TypeMapping.Failed(TypeMappingKind.NotWrittenByTheTool, key);
         }
 
+        // The key pg_catalog._x is read as the array x[], so no key names a composite or a range of pg_catalog called
+        // _x.  No server has one, so only a sidecar edited by hand does.
+        if (
+            kind is PostgresTypeKind.Composite or PostgresTypeKind.Range or PostgresTypeKind.Multirange
+            && IsSystemType(type)
+            && type.InternalName is { Length: > 1 } name
+            && name[0] == '_'
+        )
+        {
+            return TypeMapping.Failed(TypeMappingKind.NotWrittenByTheTool, key);
+        }
+
         return kind switch
         {
             PostgresTypeKind.Array => type.Element is { } element
