@@ -16,7 +16,7 @@ internal static class RunUnitFinder
     /// The unit, or the error that says why there is none.
     /// </summary>
     /// <param name="argument">The path as given, or null when none was.  A message names it by its position when it
-    /// holds <c>=</c> or <c>;</c>.</param>
+    /// may not be printed.</param>
     /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
     public static Outcome<RunUnit, ToolDiagnostic> Find(UsageValue? argument, string workingDirectory)
     {

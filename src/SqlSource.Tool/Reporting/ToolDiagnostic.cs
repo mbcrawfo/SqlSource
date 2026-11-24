@@ -61,6 +61,19 @@ internal sealed record ToolDiagnostic(
         AtFile(ToolDiagnostics.FileCannotBeChanged, path, UsageValue.Quoted(path), tried, reason);
 
     /// <summary>
+    /// <c>SQLSRC218</c> at a file that a token of the command line named.  A token that may not be printed is named by
+    /// its position, at no file, and without the system's reason, which quotes the path.
+    /// </summary>
+    /// <param name="path">The full path of the file.</param>
+    /// <param name="tried">What could not be done to it: <c>written</c>, <c>deleted</c> or <c>read</c>.</param>
+    /// <param name="reason">Why, as the system said it.</param>
+    /// <param name="given">The token that named the file, or null when none did.</param>
+    public static ToolDiagnostic NotChanged(string path, string tried, string reason, UsageValue? given) =>
+        given is { MayBePrintedAsPath: false }
+            ? Create(ToolDiagnostics.FileCannotBeChanged, given.NamedAsPath(path), tried, "the system refused")
+            : NotChanged(path, tried, reason);
+
+    /// <summary>
     /// An error at a file, at no position in it, whose message does not quote that file first, as an error at a
     /// sidecar that quotes its <c>.sql</c> file.
     /// </summary>

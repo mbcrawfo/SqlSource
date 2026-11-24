@@ -429,6 +429,49 @@ public sealed class SecretTests : IDisposable
         log.ShouldContain("\"run.start\"");
     }
 
+    // A password typed alone where a path stands holds neither "=" nor ";".  The error names its position, and the log
+    // holds the mark.
+    [Theory]
+    [InlineData("203", "The path at position 2", new[] { Secrets.Marker })]
+    [InlineData("207", "The path at position 3", new[] { "--project", Secrets.Marker })]
+    [InlineData("218", "The path at position 3", new[] { "--log", Secrets.Marker + "/run" })]
+    [InlineData("206", "The project manifest at position 3", new[] { "--manifest", Secrets.Marker })]
+    [InlineData("213", "the path at position 3", new[] { "--env-file", Secrets.Marker })]
+    public async Task Run_PasswordWherePathsStand_IsNeverPrinted(string id, string named, string[] args)
+    {
+        var result = await _scene.DescribeAsync(args);
+
+        ShouldHold(result, id);
+        result.Error.ShouldContain(named);
+    }
+
+    [Fact]
+    public async Task Run_PasswordWhereAPathStandsWithLog_IsTheMarkInTheLog()
+    {
+        var result = await _scene.DescribeAsync(Secrets.Marker, "--log", "run.log");
+
+        ShouldHold(result, "203");
+        var log = LogReader.Read(_scene.Run.Folder.PathOf("run.log"));
+        log[0]
+            .GetProperty("arguments")
+            .EnumerateArray()
+            .Select(static item => item.GetString())
+            .ShouldBe(["describe", "***", "--log", "run.log"]);
+        (
+            await File.ReadAllTextAsync(_scene.Run.Folder.PathOf("run.log"), TestContext.Current.CancellationToken)
+        ).ShouldNotContain(Secrets.Marker);
+    }
+
+    // A mistyped path from a folder that exists is still of use to the person who typed it.
+    [Fact]
+    public async Task Run_MistypedPathFromAFolderThatExists_IsNamedInFull()
+    {
+        var result = await _scene.DescribeAsync("./Typo/App");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain($"'{_scene.Run.Folder.PathOf("Typo/App")}'");
+    }
+
     // Where a path of diagnose stands, the file of --query and the bundle of --scrub, and the name of --query, under
     // --log and SQLSOURCE_LOG.  Nothing of the value is printed, and run.start holds the mark in its place.
     [Theory]

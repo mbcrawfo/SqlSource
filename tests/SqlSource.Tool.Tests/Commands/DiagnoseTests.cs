@@ -382,6 +382,37 @@ public sealed class DiagnoseTests : IDisposable
         Directory.Exists(_scene.PathOf("missing")).ShouldBeFalse();
     }
 
+    // A password typed after --out still names the file, and the lines say where by its position.
+    [Fact]
+    public async Task Diagnose_OutThatReadsAsNoPath_IsNamedByItsPosition()
+    {
+        _ = _scene.AddCase(_scene.Case(Plain));
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", Secrets.Marker);
+
+        result.ExitCode.ShouldBe(0);
+        result.Error.ShouldBeEmpty();
+        result.Out.ShouldContain("sqlsource: bundle written to the path at position 5\n");
+        result.Out.ShouldContain("sqlsource: mapping written beside the bundle, with '.mapping.json' after its name\n");
+        result.Out.ShouldNotContain(Secrets.Marker);
+        File.Exists(_scene.PathOf(Secrets.Marker)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Diagnose_OutThatReadsAsNoPathAndCannotBeWritten_IsSQLSRC218ByItsPosition()
+    {
+        _ = _scene.AddCase(_scene.Case(Plain));
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", Secrets.Marker + "/r");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldStartWith(
+            "sqlsource : error SQLSRC218: The path at position 5 could not be written: the system refused\n"
+        );
+        result.Error.ShouldNotContain(Secrets.Marker);
+    }
+
     // The zip is written, and then its mapping cannot be: the error is at the mapping, which the user needs to read
     // what comes back.
     [Fact]

@@ -24,7 +24,12 @@ public sealed class RunUnitTests : IDisposable
     private RunUnit? Find(string? argument, int position = 2)
     {
         var found = RunUnitFinder.Find(
-            argument is null ? null : new UsageValue(null, argument, position),
+            argument is null
+                ? null
+                : new UsageValue(null, argument, position)
+                {
+                    MayBePrintedAsPath = !PathToken.HoldsConnectionText(argument),
+                },
             _folder.Path
         );
         if (found.Succeeded)
@@ -262,7 +267,7 @@ public sealed class RunUnitTests : IDisposable
     {
         var folder = _folder.CreateFolder("a=b");
 
-        var found = RunUnitFinder.Find(new UsageValue(null, "App", 2), folder);
+        var found = RunUnitFinder.Find(new UsageValue(null, "App", 2) { MayBePrintedAsPath = true }, folder);
 
         found.Succeeded.ShouldBeFalse();
         new Reporter(_error).Report(found.Failure);

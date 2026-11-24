@@ -1,4 +1,3 @@
-using System;
 using System.CommandLine;
 using SqlSource.Tool.Reporting;
 
@@ -18,11 +17,18 @@ namespace SqlSource.Tool;
 internal sealed record UsageValue(Option? Option, string Text, int Position)
 {
     /// <summary>
-    /// Whether a message may print the path this value gave: it holds no <c>=</c> and no <c>;</c>, which a connection
-    /// string is made of, so a connection string typed where a path stands is not printed.  The rule reads the token
-    /// and not the full path, which may hold them in a folder that is no secret.
+    /// Whether the value holds <c>=</c> or <c>;</c>, which a connection string is made of.  A command refuses such a
+    /// value of an option that only ever names a file.
     /// </summary>
-    public bool MayBePrintedAsPath => Text.AsSpan().IndexOfAny('=', ';') < 0;
+    public bool HoldsConnectionText => PathToken.HoldsConnectionText(Text);
+
+    /// <summary>
+    /// Whether a message or the log may repeat the path this value gave.  <see cref="Usage.WithPathsJudgedFrom" />
+    /// decides it once, before the run makes any file, so that a log the run itself made does not make its own name
+    /// printable.  A value nothing judged is held back.  The rule reads the token and not the full path, which may
+    /// hold anything in a folder that is no secret.
+    /// </summary>
+    public bool MayBePrintedAsPath { get; init; }
 
     /// <summary>
     /// How a message names the path this value gave: the full path in quotes, or else its position.  A message that

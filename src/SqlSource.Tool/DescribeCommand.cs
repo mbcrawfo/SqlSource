@@ -341,7 +341,7 @@ internal static class DescribeCommand
                 + "is not a path";
         }
 
-        return !isOnline && !manifest.MayBePrintedAsPath
+        return !isOnline && manifest.HoldsConnectionText
             ? $"{Cli.LinePrefix}the value of option '{ManifestOption}' at position {manifest.Position} holds "
                 + "'=' or ';', "
                 + "which a manifest's path may not"

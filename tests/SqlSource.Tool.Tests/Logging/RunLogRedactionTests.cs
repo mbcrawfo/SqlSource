@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.SqlServer;
@@ -76,8 +77,66 @@ public sealed class RunLogRedactionTests : IDisposable
 
         usage.Messages.ShouldBeEmpty();
         LoggedArguments
-            .Of(usage, line)
+            .Of(usage.WithPathsJudgedFrom(_scene.Run.Folder.Path), line)
             .ShouldBe(LogValue.ListOfTexts(["diagnose", .. logged.Split('|'), .. args[^2..]]));
+    }
+
+    // A password typed where a path goes is the mark in every place, and a log the run itself made does not make its
+    // own name a path: the verdict was taken before the file existed.
+    [Theory]
+    [InlineData("describe", Secrets.Marker)]
+    [InlineData("describe", "--project", Secrets.Marker)]
+    [InlineData("describe", "--env-file", Secrets.Marker)]
+    [InlineData("describe", "--log", Secrets.Marker)]
+    [InlineData("describe", "--manifest", Secrets.Marker)]
+    [InlineData("diagnose", "--query", Secrets.Marker + ":Q", "--out", "r.zip")]
+    [InlineData("diagnose", "--scrub", Secrets.Marker, "--out", "r.zip")]
+    [InlineData("diagnose", "--scrub", "raw.zip", "--out", Secrets.Marker)]
+    public void LoggedArguments_PasswordTypedWhereAPathGoes_IsTheMark(params string[] line)
+    {
+        var usage = UsageCheck.Check(Cli.BuildCommands(), line);
+
+        usage.Messages.ShouldBeEmpty();
+        var logged = LoggedArguments.Of(usage.WithPathsJudgedFrom(_scene.Run.Folder.Path), line);
+
+        logged.ShouldBe(
+            LogValue.ListOfTexts([
+                .. line.Select(token =>
+                    token.Contains(Secrets.Marker, StringComparison.Ordinal) ? Redaction.Mark : token
+                ),
+            ])
+        );
+    }
+
+    // What the build gave stays, and so does the word that says to read no file.
+    [Theory]
+    [InlineData("describe", "--manifest", "BuildManifest", "--online", "auto", "--log", "BuildLog")]
+    [InlineData("describe", "--manifest", "BuildManifest", "--online", "true", "--env-file", "BuildEnv")]
+    [InlineData("describe", "--env-file", "none")]
+    [InlineData("describe", "--env-file", " NONE ")]
+    public void LoggedArguments_PathsTheRuleLeavesInPlace_AreAsTyped(params string[] line)
+    {
+        var usage = UsageCheck.Check(Cli.BuildCommands(), line);
+
+        usage.Messages.ShouldBeEmpty();
+        LoggedArguments
+            .Of(usage.WithPathsJudgedFrom(_scene.Run.Folder.Path), line)
+            .ShouldBe(LogValue.ListOfTexts(line));
+    }
+
+    [Fact]
+    public async Task Run_LogNamedLikeAPassword_HoldsNoTokenOfItsOwnPath()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = "Host=db";
+
+        var result = await _scene.DescribeAsync("--log", Secrets.Marker);
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        var text = await File.ReadAllTextAsync(
+            _scene.Run.Folder.PathOf(Secrets.Marker),
+            TestContext.Current.CancellationToken
+        );
+        text.ShouldNotContain(Secrets.Marker);
     }
 
     // The value was typed where "name=value" stands and the shell split it: the line is wrong, and nothing is logged.

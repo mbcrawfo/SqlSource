@@ -79,6 +79,25 @@ $ dotnet sqlsource describe src/App/Queries/Users.sql src/App/Queries/Orders.sql
 - **Each `.sql` path must be a file that a type of the run claims.**  If it is not, the tool reports [SQLSRC212](../diagnostics.md#sqlsrc212), and the rest of the run goes on.
 - **A relative path starts from the current folder.**
 
+<a id="paths"></a>
+
+### How an error names a path
+
+An error names a path that you typed in full, unless the path may be a secret typed in the wrong place.  Then it names the path by its position on the command line, and the log holds `***` in its place:
+
+```console
+$ dotnet sqlsource describe S3cret
+sqlsource : error SQLSRC203: The path at position 2 is not a .sln, .slnx or .csproj file, or a directory that holds one
+```
+
+A path is named in full when it holds neither `=` nor `;` and one of these is true:
+
+- it ends in `.sln`, `.slnx`, `.csproj`, `.sql`, `.env`, `.log`, `.json`, `.jsonl` or `.zip`, in any case;
+- it names a file or a folder that exists when the run starts;
+- it holds `/` or `\`, and the first folder it names exists, as `src/Typo/App` does when `src` exists.
+
+The rule holds for every place a path goes: the path of `describe` or `diagnose`, a `.sql` path, and the values of `--project`, `--log`, `--env-file` and `--manifest`; the file of `--query`, `--scrub` and `--out` of `diagnose`; and the bundle of `replay`.  The value `none` of `--env-file` is always written.  Under `--online`, the paths of `--manifest`, `--log` and `--env-file` are the build's own, and are always named in full.
+
 <a id="options"></a>
 
 ### Options
@@ -195,11 +214,11 @@ It finds the value as written, with the spaces at its ends trimmed, or as the dr
 - each password of a connection string, where it stands apart from other letters, digits and underscores, and is at least four characters long;
 - in the same way, the password that the PostgreSQL driver reads from `PGPASSWORD` or a password file, when the connection string gives none;
 - in the record of your command line, every value of `--database` and `--connection`;
-- a value typed where a path goes, when it holds `=` or `;`, as a connection string does.  A path goes in these places: the path of `describe` or `diagnose`, a `.sql` path, a value of `--project`, a value of `--query` or `--scrub` of `diagnose`, and the bundle of `replay`.
+- a path that an error names by its position, as [how an error names a path](#paths) says.
 
 These can appear in the log as written ([a limit](connections.md#limit-short-password)):
 
-- a value typed where a path goes, or after `--log`, `--env-file` or `--out`, that holds neither `=` nor `;`, such as a password typed alone;
+- a secret typed where a path goes that reads as a path, such as one that ends in `.sql`;
 - a password shorter than four characters;
 - a password that is the name of its logical database or of its dialect, such as `postgres`;
 - the password of a PostgreSQL password file that is a pipe, such as `PGPASSFILE=<(...)` in a shell;

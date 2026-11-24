@@ -56,7 +56,18 @@ public sealed class RunProjectsTests : IDisposable
 
     // As the values of --project come from the command line: each follows the option, from position 3.
     private Task<ImmutableArray<ProjectManifest>> FindAsync(RunUnit unit, params string[] named) =>
-        FindValuesAsync(unit, [.. named.Select((text, index) => new UsageValue(ProjectOption, text, 3 + (2 * index)))]);
+        FindValuesAsync(
+            unit,
+            [
+                .. named.Select(
+                    (text, index) =>
+                        new UsageValue(ProjectOption, text, 3 + (2 * index))
+                        {
+                            MayBePrintedAsPath = !PathToken.HoldsConnectionText(text),
+                        }
+                ),
+            ]
+        );
 
     private async Task<ImmutableArray<ProjectManifest>> FindValuesAsync(RunUnit unit, params UsageValue[] named) =>
         (await FindProjectsAsync(unit, named)).Manifests;

@@ -124,7 +124,7 @@ internal sealed class CliRun : IDisposable
         using var error = NewWriter();
         var host = CreateHost(output, error);
         var reporter = new Reporter(host.Error);
-        var usage = UsageCheck.Check(Cli.BuildCommands(), args);
+        var usage = UsageCheck.Check(Cli.BuildCommands(), args).WithPathsJudgedFrom(host.WorkingDirectory);
 
         var plan = await PlanSteps.PlanAsync(
             usage,

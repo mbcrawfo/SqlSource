@@ -11,6 +11,12 @@ namespace SqlSource.Tool.Describing;
 /// <param name="EnvFile">The full path of the <c>.env</c> file the run reads, or null when it reads none.</param>
 internal sealed record ConnectionSources(ImmutableArray<ConnectionArgument> Given, string UnitFolder, string? EnvFile)
 {
+    /// <summary>
+    /// How a message names the <c>.env</c> file the run looks for: its full path, or the position of an
+    /// <c>--env-file</c> token that may not be printed.  Null when the run reads none.
+    /// </summary>
+    public string? EnvFileNamed { get; init; } = EnvFile;
+
     /// <summary>The sources without the values of <c>--connection</c>, which are secrets.</summary>
     public override string ToString() =>
         $"ConnectionSources {{ Given = {Given.Length}, UnitFolder = {UnitFolder}, EnvFile = {EnvFile} }}";
