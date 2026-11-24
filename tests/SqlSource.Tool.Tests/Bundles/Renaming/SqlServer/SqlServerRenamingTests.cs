@@ -121,6 +121,7 @@ public sealed class SqlServerRenamingTests
     [InlineData("operands", "MSSQLSystemResource", "dbo")]
     [InlineData("table", "mssqlsystemresource", "sales")]
     [InlineData("columns", "mssqlsystemresource", null)]
+    [InlineData("origins", "master", "sys")]
     public void IsEngineRow_ARowOfTheServers_IsTrue(string method, string database, string? schema)
     {
         var row = new JsonObject { ["sourceDatabase"] = database, ["sourceSchema"] = schema };
@@ -182,6 +183,7 @@ public sealed class SqlServerRenamingTests
     [InlineData("columns")]
     [InlineData("operands")]
     [InlineData("table")]
+    [InlineData("origins")]
     public void IsEngineRow_AColumnOfTheServersThroughALinkedServer_IsFalse(string method)
     {
         var row = new JsonObject

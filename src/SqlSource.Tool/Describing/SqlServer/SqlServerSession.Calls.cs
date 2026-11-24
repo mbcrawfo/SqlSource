@@ -74,6 +74,21 @@ internal sealed partial class SqlServerSession
             cancellationToken
         );
 
+    // The server's answer, in browse mode 1, of the column each column of a view or an inline function passes on,
+    // through the text of "columns".
+    private Task<SqlServerColumnsAnswer> OriginsAsync(
+        string query,
+        SqlServerColumnsRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        AskAsync(
+            SqlServerCallNames.Origins,
+            request,
+            _live.OriginsAsync,
+            (asked, answer, durationMs) => SqlServerEvents.Origins(_log, query, asked, answer, durationMs),
+            cancellationToken
+        );
+
     private Task<SqlServerColumnsAnswer> TableAsync(
         string query,
         SqlServerTableRequest request,

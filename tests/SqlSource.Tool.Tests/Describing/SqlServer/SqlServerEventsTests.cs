@@ -283,10 +283,13 @@ public sealed class SqlServerEventsTests
         Member(members, "rows").ShouldBe(LogValue.ListOf([]));
     }
 
-    // "operands" asks what "columns" asks, of another text: its event holds the members of "columns", in their order,
-    // for an answer with rows, one of error rows and one of an error.
-    [Fact]
-    public void Operands_Written_LikeColumns()
+    // "operands" asks what "columns" asks, of another text, and "origins" of the same text in another browse mode: each
+    // event holds the members of "columns", in their order, for an answer with rows, one of error rows and one of an
+    // error.
+    [Theory]
+    [InlineData("operands")]
+    [InlineData("origins")]
+    public void OperandsAndOrigins_Written_LikeColumns(string method)
     {
         var request = new SqlServerColumnsRequest("SELECT nickname\nAS [1]\nFROM dbo.users WHERE id = @id", "@id int");
         SqlServerColumnsAnswer[] answers =
@@ -301,11 +304,19 @@ public sealed class SqlServerEventsTests
             var operands = new RecordingLog();
             var columns = new RecordingLog();
 
-            SqlServerEvents.Operands(operands, "GetUser", request, answer, 4);
+            if (method == SqlServerCallNames.Operands)
+            {
+                SqlServerEvents.Operands(operands, "GetUser", request, answer, 4);
+            }
+            else
+            {
+                SqlServerEvents.Origins(operands, "GetUser", request, answer, 4);
+            }
+
             SqlServerEvents.Columns(columns, "GetUser", request, answer, 4);
 
             var (name, members) = operands.Events.ShouldHaveSingleItem();
-            name.ShouldBe("operands");
+            name.ShouldBe(method);
             var written = columns.Events.ShouldHaveSingleItem().Members;
             NamesOf(members).ShouldBe(NamesOf(written));
             NamesOf(members)[..3].ShouldBe(["query", "sql", "params"]);

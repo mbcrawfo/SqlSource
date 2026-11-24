@@ -39,6 +39,13 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - `CONCAT`;
 - a `CASE` or an `IIF` whose every result is never null.
 
+**SqlSource treats a column of a spatial type, of `hierarchyid` or of another .NET type as one that can be null, though SQL Server says it is never null**, unless the column is one of these:
+
+- a `NOT NULL` column of a table, read as the table stores it, from the table or through a subquery, a `WITH` query, a view or a function that returns a table, any of which passes it on;
+- a column of a `UNION`, `INTERSECT` or `EXCEPT` of the query itself, not of a subquery, a `WITH` query or a view, whose every `SELECT` gives such a column of a table at that place.
+
+`UNION ALL`, `UNION`, `INTERSECT`, `EXCEPT` and a `VALUES` list convert a string to the .NET type when another of their values has that type, and `geometry` and `geography` read the text `NULL`, in any case, as null.  SQL Server still says that such a column is never null, also when it is read through a subquery, a `WITH` query, a view or a function, or inside an expression.
+
 **SqlSource also treats these as never null, where SQL Server does not**, in a query that is one `SELECT`, or several joined by `UNION`, `INTERSECT` or `EXCEPT`, with or without a `WITH` clause:
 
 - **A count**: `COUNT` and `COUNT_BIG`, with or without `OVER (...)`.  A count is `0` for no rows, never null.
@@ -151,7 +158,8 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - `COALESCE(AVG(x), 0)`;
 - a computed column that is not persisted;
 - a column that a filter keeps from being null in a form such as `x IN (1, 2)` or `x BETWEEN 1 AND 2`;
-- a count or a sum in an `OUTPUT` clause.
+- a count or a sum in an `OUTPUT` clause;
+- a column of a spatial type, of `hierarchyid` or of another .NET type that is read from a table variable, that a `VALUES` list or an expression gives, or that a `UNION`, `INTERSECT` or `EXCEPT` inside a subquery, a `WITH` query, a view or a function gives, as [which columns can be null](#nullability) says.
 
 **What to do.**  Do one of these:
 
@@ -168,20 +176,6 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 **Why.**  The connection turns `ANSI_WARNINGS` off.  With `ANSI_WARNINGS` and `ARITHABORT` both off, SQL Server returns null in place of some errors: an arithmetic overflow, a value too large for its type, or a division by zero.
 
 **What to do.**  Leave `ANSI_WARNINGS` on, as Microsoft.Data.SqlClient turns it on when it connects.  Run no `SET ANSI_WARNINGS OFF` on a connection that runs your queries.
-
-<a id="limit-clr-set-operator"></a>
-
-### Null from a spatial column of a `UNION ALL` whose property cannot be null
-
-**What you see.**  A `geometry` or `geography` column gets a property that cannot be null, and the query returns a null in it.  The column combines a spatial value with a string, in a `UNION ALL` or a `VALUES` list.  The combination can be in the query, a subquery, a `WITH` query or a view.
-
-**Why.**  SQL Server converts the string to the spatial type, and converts the text `NULL`, in any case, to null.  SQL Server still says that the column is never null.
-
-**What to do.**  Do one of these:
-
-- Give the column a `-- column: name null` marker, which says that it can be null.
-- End the alias of the column with `?`.
-- Keep strings that hold `NULL` out of the column.
 
 <a id="limit-ansi-nulls-off"></a>
 

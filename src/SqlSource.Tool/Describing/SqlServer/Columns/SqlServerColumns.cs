@@ -40,8 +40,11 @@ internal static class SqlServerColumns
     /// <summary>The source type, OBJECTPROPERTYEX's BaseType, of a table.</summary>
     internal const string Table = "U";
 
-    // The source type of a view.
-    private const string View = "V";
+    /// <summary>The source type of a view.</summary>
+    internal const string View = "V";
+
+    /// <summary>The source type of an inline table-valued function.</summary>
+    internal const string InlineFunction = "IF";
 
     /// <summary>The rows that are not hidden, in order: the only rows that are columns of the result.</summary>
     /// <param name="rows">The rows of <c>columns</c> or of <c>table</c>, the hidden ones included.</param>
@@ -53,6 +56,16 @@ internal static class SqlServerColumns
     /// </summary>
     /// <param name="row">A row of <c>columns</c>.</param>
     internal static bool NullableAsRecorded(SqlServerColumnRow row) => row.IsNullable ?? true;
+
+    /// <summary>
+    /// Whether the row names as its source a stored column of a table of the session's database: a source column, the
+    /// <see cref="SqlServerColumnRow.SourceType" /> of a table and not computed.  Its value is then that column's, read
+    /// once in a row and converted to no other type: the server names no source for a column that a set operator, a
+    /// <c>VALUES</c> list or an expression makes.
+    /// </summary>
+    /// <param name="row">A row of <c>columns</c>, <c>operands</c> or <c>table</c>.</param>
+    internal static bool IsStored(SqlServerColumnRow row) =>
+        row is { SourceType: Table, IsComputedColumn: false, SourceColumn: not null };
 
     /// <summary>
     /// The visible columns, in order, each with why it has no origin; or the ordinal of the first that has no name.
