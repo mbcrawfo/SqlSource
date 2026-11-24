@@ -334,7 +334,8 @@ public sealed class SqlServerStartTests : IDisposable
     [InlineData("nightly.yml", 3)]
     public void Workflow_SqlServerCrashes_SetsTheVariableAndUploadsItsFolder(string workflow, int uploads)
     {
-        var text = File.ReadAllText(RepositoryRoot.Path(".github", "workflows", workflow));
+        // A checkout on Windows may end its lines with CRLF.
+        var text = File.ReadAllText(RepositoryRoot.Path(".github", "workflows", workflow)).ReplaceLineEndings("\n");
 
         text.ShouldContain(
             $"\n  {SqlServerStart.CrashesVariable}: ${{{{ github.workspace }}}}/artifacts/sqlserver-crashes\n"
