@@ -495,7 +495,7 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor DotEnvCannotBeRead = new(
         id: "SQLSRC285",
         title: ".env file cannot be read",
-        messageFormat: "'{0}' cannot be read: {1}",
+        messageFormat: "{0} cannot be read: {1}",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

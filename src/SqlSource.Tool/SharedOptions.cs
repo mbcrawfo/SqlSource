@@ -233,7 +233,7 @@ internal static class SharedOptions
         // "=" and ";" are what a connection string is made of: the value may be one typed after the option.  The
         // build's paths may hold them, as a project's name may, and the owner ruled that a path the build writes is
         // no secret, so under --online a message prints such a path in full.
-        return !isOnline && !value.MayBePrintedAsPath
+        return !isOnline && value.HoldsConnectionText
             ? $"{Cli.LinePrefix}the value of option '{option}' at position {value.Position} holds '=' or ';', which "
                 + $"{ofWhat} may not"
             : null;

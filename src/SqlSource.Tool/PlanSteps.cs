@@ -45,6 +45,7 @@ internal static class PlanSteps
             // The build has evaluated the project, so MSBuild is not asked again, and the project is the unit.
             manifests = await RunProjects.FromManifestAsync(
                 Path.GetFullPath(manifestValue.Text, context.Host.WorkingDirectory),
+                manifestValue,
                 context
             );
             if (manifests.IsEmpty)
@@ -250,7 +251,15 @@ internal static class PlanSteps
     internal static ConnectionSources SourcesOf(Usage usage, RunUnit unit, ToolHost host)
     {
         var unitFolder = UnitFolderOf(unit);
-        return new ConnectionSources(ConnectionsOf(usage), unitFolder, EnvFileOf(usage, unitFolder, host));
+        var envFile = EnvFileOf(usage, unitFolder, host);
+        return new ConnectionSources(ConnectionsOf(usage), unitFolder, envFile)
+        {
+            EnvFileHeldAt =
+                envFile is not null
+                && SharedOptions.ValuesOf(usage, SharedOptions.EnvFile) is [{ MayBePrintedAsPath: false } held]
+                    ? held.Position
+                    : null,
+        };
     }
 
     // The arguments of the command: the unit, and the .sql paths.
