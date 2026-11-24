@@ -22,6 +22,7 @@ internal sealed partial class ExpressionProofs
         ["MAX"] = FormKind.MaxOrMin,
         ["MIN"] = FormKind.MaxOrMin,
         ["COALESCE"] = FormKind.Coalesce,
+        ["ISNULL"] = FormKind.IsNull,
         ["GREATEST"] = FormKind.GreatestOrLeast,
         ["LEAST"] = FormKind.GreatestOrLeast,
         ["CAST"] = FormKind.Cast,
@@ -50,6 +51,7 @@ internal sealed partial class ExpressionProofs
         Sum,
         MaxOrMin,
         Coalesce,
+        IsNull,
         GreatestOrLeast,
         Cast,
         Convert,
@@ -143,6 +145,7 @@ internal sealed partial class ExpressionProofs
                 : Proof.No,
             FormKind.Sum or FormKind.MaxOrMin => Aggregate(arguments, window, rows),
             FormKind.Coalesce => window is null ? Coalesce(arguments, rows) : Proof.No,
+            FormKind.IsNull => window is null ? IsNull(arguments, rows) : Proof.No,
             // Each reads an argument once, so one proved argument is enough, whatever the others do.
             FormKind.GreatestOrLeast => window is null
                 ? AllOf([

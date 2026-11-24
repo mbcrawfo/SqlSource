@@ -3,7 +3,8 @@ using System.Linq;
 
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 
-// COALESCE, which reads an argument twice, and the proof that a value gives one value in a row.
+// COALESCE, which reads an argument twice, ISNULL, which reads each once, and the proof that a value gives one value
+// in a row.
 internal sealed partial class ExpressionProofs
 {
     // COALESCE(a, b, c) is CASE WHEN a IS NOT NULL THEN a WHEN b IS NOT NULL THEN b ELSE c END, and SQL Server can
@@ -58,6 +59,36 @@ internal sealed partial class ExpressionProofs
         }
 
         return AllOf([AnyOf(alternatives), .. parts.Select(TypeOf)]);
+    }
+
+    // ISNULL(a, b) is a when a is not null, and b converted to a's type otherwise.  It reads a once, as the
+    // documentation of COALESCE says, so one proved argument proves it, whatever the other gives.  It converts b to a's
+    // type, and is of b's type when a is NULL, so neither may be of a CLR type.
+    //
+    // A column of each side of the last FULL JOIN prove it together, as for COALESCE, with no argument read twice: in a
+    // row of a's side a is not null, and in any other b is.  Each must be stored, which an absent side makes NULL and
+    // not a property of another source's CLR column.
+    private Proof IsNull(TokenRange arguments, bool rows)
+    {
+        if (Arguments(arguments) is not [var value, var replacement])
+        {
+            return Proof.No;
+        }
+
+        var alternatives = new List<Proof> { Expression(value, rows), Expression(replacement, rows) };
+        if (filtered?.SideOf(value) is { } side && filtered.SideOf(replacement) is { } other && side != other)
+        {
+            alternatives.Add(
+                AllOf([
+                    SideLeaf(value, side, rows),
+                    SideLeaf(replacement, other, rows),
+                    StoredLeaf(value),
+                    StoredLeaf(replacement),
+                ])
+            );
+        }
+
+        return AllOf([AnyOf(alternatives), TypeOf(value), TypeOf(replacement)]);
     }
 
     // The proof that two reads of a value in one row agree: arithmetic of pieces that each do.  Anything this does not

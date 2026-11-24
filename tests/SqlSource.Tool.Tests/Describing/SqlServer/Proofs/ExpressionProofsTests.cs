@@ -351,18 +351,17 @@ public sealed class ExpressionProofsTests
     // Anything else inside a form is asked whole.
     [InlineData("COALESCE(t.a & t.b, NULL)", "", true, false, "t.a & t.b")]
     [InlineData("COALESCE(t.a COLLATE Latin1_General_BIN, NULL)", "", true, false, "t.a COLLATE Latin1_General_BIN")]
-    [InlineData("COALESCE(ISNULL(t.a, 0), NULL)", "", true, false, "ISNULL(t.a, 0)")]
     [InlineData("COALESCE(NULLIF(t.a, 0), NULL)", "", true, false, "NULLIF(t.a, 0)")]
     [InlineData("COALESCE(IIF(t.a > 0, 1, 0), NULL)", "", true, false, "IIF(t.a > 0, 1, 0)")]
     [InlineData("COALESCE(TRY_CONVERT(int, t.a), NULL)", "", true, false, "TRY_CONVERT(int, t.a)")]
     [InlineData("COALESCE(PARSE(t.s AS int USING 'en-US'), NULL)", "", true, false, "PARSE(t.s AS int USING 'en-US')")]
     // A ":" of JSON_OBJECT is no "::".
     [InlineData(
-        "COALESCE(ISNULL(JSON_OBJECT('a': UPPER(t.x)), ''), NULL)",
+        "COALESCE(NULLIF(JSON_OBJECT('a': UPPER(t.x)), ''), NULL)",
         "",
         true,
         false,
-        "ISNULL(JSON_OBJECT('a': UPPER(t.x)), '')"
+        "NULLIF(JSON_OBJECT('a': UPPER(t.x)), '')"
     )]
     // An item that is one leaf alone, its outer parentheses aside, is what the server answered already: it proves
     // nothing and asks nothing.  An operator around the leaf makes a form, which asks it, as a sign does above.
@@ -371,7 +370,6 @@ public sealed class ExpressionProofsTests
     [InlineData("(SELECT TOP (1) o.x FROM o)", "", false, false, "")]
     [InlineData("CASE WHEN t.a > 0 THEN 1 ELSE 0 END", "", false, false, "")]
     [InlineData("TRY_CAST(t.a AS int)", "", false, false, "")]
-    [InlineData("ISNULL(t.a, 0)", "", false, false, "")]
     [InlineData("t.a + 1", "", true, false, "t.a")]
     // A user's function, or anything that holds one, is never asked.  Each item that is no form stands inside
     // COALESCE(..., NULL), since a leaf alone asks nothing.
@@ -390,9 +388,27 @@ public sealed class ExpressionProofsTests
     [InlineData("[COUNT](t.a)", "GROUP BY t.b", false, false, "")]
     [InlineData("JSON_ARRAYAGG(t.a)", "GROUP BY t.b", false, false, "")]
     [InlineData("JSON_OBJECTAGG(t.k : t.v)", "GROUP BY t.b", false, false, "")]
-    [InlineData("COALESCE(ISNULL(MAX(t.a), 0), NULL)", "GROUP BY t.b", false, false, "")]
+    [InlineData("COALESCE(NULLIF(MAX(t.a), 0), NULL)", "GROUP BY t.b", false, false, "")]
     [InlineData("COALESCE(CASE WHEN SUM(t.a) > 0 THEN 1 ELSE 0 END, NULL)", "GROUP BY t.b", false, false, "")]
     [InlineData("COALESCE(LAG(t.a, @n, 0) OVER (ORDER BY t.id), NULL)", "", false, false, "")]
+    // ISNULL(a, b) is a, or b converted to a's type, so one proved argument proves it, with both of no CLR type.  A
+    // literal, or an argument a user's function or something never asked holds, has its own proof.
+    [InlineData("ISNULL(t.a, 0)", "", true, true, "t.a")]
+    [InlineData("isnull(0, t.a)", "", true, true, "t.a")]
+    [InlineData("ISNULL(t.a, t.b)", "", true, false, "t.a|t.b")]
+    [InlineData("ISNULL(t.a, NULL)", "", true, false, "t.a")]
+    [InlineData("ISNULL(NULL, t.a)", "", true, false, "t.a")]
+    [InlineData("ISNULL(@p, 0)", "", true, true, "@p")]
+    [InlineData("ISNULL(NULL, NULL)", "", false, false, "")]
+    [InlineData("COALESCE(ISNULL(t.a, 0), NULL)", "", true, true, "t.a")]
+    [InlineData("ISNULL(MAX(t.a), 0)", "GROUP BY t.b", true, true, "t.a")]
+    [InlineData("ISNULL(t.a, 0)", "GROUP BY ROLLUP (t.a)", true, true, "t.a")]
+    [InlineData("ISNULL(t.a, t.b)", "GROUP BY ROLLUP (t.a, t.b)", false, false, "")]
+    [InlineData("ISNULL(dbo.f(t.a), 0)", "", false, false, "")]
+    [InlineData("ISNULL(t.a, 0, 1)", "", false, false, "")]
+    [InlineData("ISNULL(t.a)", "", false, false, "")]
+    [InlineData("ISNULL(t.a, 0) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("[ISNULL](t.a, 0)", "", false, false, "")]
     // Columns, in the select's context.
     [InlineData("t.a", "GROUP BY ROLLUP (t.a)", false, false, "")]
     [InlineData("COALESCE(t.a, NULL)", "GROUP BY t.a", true, false, "t.a")]
@@ -435,6 +451,7 @@ public sealed class ExpressionProofsTests
     [InlineData("MAX(t.a)", "GROUP BY t.b", false)]
     [InlineData("MIN(t.a)", "GROUP BY t.b", false)]
     [InlineData("COALESCE(t.a, 0)", "", false)]
+    [InlineData("ISNULL(t.a, 0)", "", false)]
     [InlineData("GREATEST(t.a, 0)", "", false)]
     [InlineData("LEAST(t.a, 0)", "", false)]
     [InlineData("CAST(t.a AS int)", "", true)]
@@ -492,6 +509,11 @@ public sealed class ExpressionProofsTests
     [InlineData("COALESCE(t.a + t.b, 0)", "")]
     [InlineData("COALESCE(CASE WHEN t.a > 0 THEN t.s END, 'NULL')", "")]
     [InlineData("COALESCE(ISNULL(t.s, 'x'), 'NULL')", "")]
+    [InlineData("ISNULL(t.s, 'NULL')", "")]
+    [InlineData("ISNULL(t.a, t.s)", "")]
+    // ISNULL(NULL, s) is of s's type, so a CLR type in either argument is ISNULL's.
+    [InlineData("COALESCE(ISNULL(NULL, t.s), 'NULL')", "")]
+    [InlineData("COALESCE(ISNULL(t.a, t.s), 'NULL')", "")]
     [InlineData("COALESCE((SELECT TOP (1) o.s FROM o), 'NULL')", "")]
     [InlineData("CAST(COALESCE(t.s, 'NULL') AS varbinary(max))", "")]
     [InlineData("COALESCE(COALESCE(t.s, 'NULL'), 'x')", "")]
@@ -810,6 +832,10 @@ public sealed class ExpressionProofsTests
     [InlineData("COALESCE(a.x, b.y)", "FROM dbo.a FULL JOIN dbo.b WITH (NOLOCK) ON b.id = a.id")]
     [InlineData("COALESCE(a.x, b.y)", FullJoin + " GROUP BY COALESCE(a.x, b.y)")]
     [InlineData("SUM(COALESCE(a.x, b.y))", FullJoin + " GROUP BY ROLLUP (a.z)")]
+    [InlineData("ISNULL(a.x, b.y)", FullJoin)]
+    [InlineData("ISNULL(b.y, a.x)", FullJoin + " WHERE a.z > 0 OR b.z > 0")]
+    [InlineData("ISNULL(c.x, b.y)", "FROM dbo.a AS a JOIN dbo.c AS c ON c.id = a.id " + FullJoinOfB)]
+    [InlineData("COALESCE(ISNULL(a.x, b.y), NULL)", FullJoin)]
     public void Of_CoalesceOverAFullJoin_ProvedByEachSide(string item, string from)
     {
         var (proof, operands) = ProveOverItsRows($"SELECT {item} AS c {from}");
@@ -843,6 +869,14 @@ public sealed class ExpressionProofsTests
     [InlineData("COALESCE(a.x, RAND(), b.y)", FullJoin)]
     [InlineData("COALESCE(a.x, b.y)", FullJoin + " GROUP BY ROLLUP (COALESCE(a.x, b.y))")]
     [InlineData("COALESCE(a.x, b.y)", FullJoin + " GROUP BY ALL COALESCE(a.x, b.y)")]
+    // ISNULL the same.
+    [InlineData("ISNULL(a.x, a.y)", FullJoin)]
+    [InlineData("ISNULL(x, b.y)", FullJoin)]
+    [InlineData("ISNULL(a.x + 0, b.y)", FullJoin)]
+    [InlineData("ISNULL(a.x, b.y)", FullJoin + " FULL JOIN dbo.c AS c ON c.id = b.id")]
+    [InlineData("ISNULL(a.x, b.y)", FullJoin + " RIGHT JOIN dbo.c AS c ON c.id = b.id")]
+    [InlineData("ISNULL(a.x, b.y)", "FROM dbo.a AS a LEFT JOIN dbo.b AS b ON b.id = a.id")]
+    [InlineData("ISNULL(a.x, b.y)", FullJoin + " GROUP BY ROLLUP (ISNULL(a.x, b.y))")]
     public void Of_CoalesceOverAFullJoin_StaysUnproved(string item, string from)
     {
         var (proof, operands) = ProveOverItsRows($"SELECT {item} AS c {from}");
@@ -872,6 +906,42 @@ public sealed class ExpressionProofsTests
                 ),
             ])
             .ShouldBeFalse();
+    }
+
+    // ISNULL reads its first argument once, so its pair needs no argument to give one value, but each must be a stored
+    // column, which a side that is absent makes NULL, and each side's own answer not null.
+    [Theory]
+    [InlineData(true, true, true, true, true, true)]
+    [InlineData(false, true, true, true, true, false)]
+    [InlineData(true, false, true, true, true, false)]
+    [InlineData(true, true, false, true, true, false)]
+    [InlineData(true, true, true, false, true, false)]
+    [InlineData(true, true, true, true, false, false)]
+    public void Of_IsnullOfEachSideOfAFullJoin_AsksEachSideAlone(
+        bool leftNotNull,
+        bool rightNotNull,
+        bool firstStored,
+        bool secondStored,
+        bool notClr,
+        bool holds
+    )
+    {
+        var (proof, operands) = ProveOverItsRows($"SELECT ISNULL(a.x, b.y) AS c {FullJoin}");
+
+        operands.ShouldBe([
+            ("a.x", OperandScope.Rows),
+            ("b.y", OperandScope.Rows),
+            ("a.x", OperandScope.LeftSide),
+            ("b.y", OperandScope.RightSide),
+        ]);
+        proof
+            .Holds([
+                new OperandFacts(false, notClr, firstStored),
+                new OperandFacts(false, notClr, secondStored),
+                new OperandFacts(leftNotNull, true),
+                new OperandFacts(rightNotNull, true),
+            ])
+            .ShouldBe(holds);
     }
 
     private const string FullJoinOfB = "FULL JOIN dbo.b AS b ON b.id = a.id";

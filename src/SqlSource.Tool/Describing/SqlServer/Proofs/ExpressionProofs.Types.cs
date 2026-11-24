@@ -3,8 +3,9 @@ using System.Linq;
 
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 
-// The type walk: the proof that a value is of no CLR type, which COALESCE, GREATEST, LEAST, CAST, CONVERT, LAG, LEAD
-// and the CASE that guards a column need of their arguments (ExpressionProofs.Calls.cs, ExpressionProofs.Operators.cs).
+// The type walk: the proof that a value is of no CLR type, which COALESCE, ISNULL, GREATEST, LEAST, CAST, CONVERT, LAG,
+// LEAD and the CASE that guards a column need of their arguments (ExpressionProofs.Calls.cs,
+// ExpressionProofs.Operators.cs).
 internal sealed partial class ExpressionProofs
 {
     // The proof that a value is of no CLR type, from its form where that tells, by asking the server otherwise.  A
@@ -32,7 +33,8 @@ internal sealed partial class ExpressionProofs
 
     // The type proof of a piece that is a primary, or null when it is none.  A literal, NULL, a count subquery and the
     // forms whose type is fixed are of no CLR type; MAX and MIN are of their operand's type, COALESCE, GREATEST and
-    // LEAST of one of their arguments', and CAST and CONVERT of their target, which proves only when it is built in.
+    // LEAST of one of their arguments', ISNULL of its first argument's, or of its second's when the first is NULL, and
+    // CAST and CONVERT of their target, which proves only when it is built in.
     // AT TIME ZONE is a datetimeoffset, and the date forms take no CLR type, each proved only when it holds nothing
     // that is never asked.  LAG and LEAD have no type proof, so no form that needs its operand's type proves over one.
     // A call of a schema's name may return a CLR type and cannot be asked.  Anything else is asked.
@@ -108,7 +110,9 @@ internal sealed partial class ExpressionProofs
             FormKind.Count or FormKind.Ranking or FormKind.Ntile or FormKind.Sum => Proof.Yes,
             FormKind.Json => Proof.Yes,
             FormKind.MaxOrMin => AggregateOperand(arguments) is { } operand ? TypeOf(operand) : Proof.No,
-            FormKind.Coalesce or FormKind.GreatestOrLeast => AllOf(Arguments(arguments).Select(TypeOf)),
+            FormKind.Coalesce or FormKind.IsNull or FormKind.GreatestOrLeast => AllOf(
+                Arguments(arguments).Select(TypeOf)
+            ),
             FormKind.Cast => CastOperand(arguments) is null ? Proof.No : Proof.Yes,
             FormKind.Convert => CastTargets.IsBuiltIn(tokens, Arguments(arguments)[0]) ? Proof.Yes : Proof.No,
             FormKind.DateAddOrDiff or FormKind.DatePartOrName or FormKind.DateValue or FormKind.EndOfMonth =>

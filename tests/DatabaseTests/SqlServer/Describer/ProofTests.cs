@@ -86,6 +86,13 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             { 0, "SELECT COALESCE(CAST(AVG(b) AS int), 0) AS c FROM dbo.proof_rows GROUP BY g" },
             { 0, "SELECT COALESCE(q.b, 0) AS c FROM (SELECT b FROM dbo.proof_rows) AS q" },
             { 0, $"SELECT COALESCE(a, {Flip}) AS c FROM dbo.proof_rows" },
+            // ISNULL, which reads its first argument once, by either argument proved, beside one that changes too; and
+            // by a column of each side of a FULL JOIN, whose rows have one side or the other.
+            { 0, "SELECT ISNULL(b, a + 1) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT ISNULL(a + 0, b) AS c FROM dbo.proof_rows" },
+            { 0, $"SELECT ISNULL(a + 0, {Flip}) AS c FROM dbo.proof_rows" },
+            { 0, $"SELECT ISNULL(r.id, o.id) AS c {RowsFullJoinOther}" },
+            { 0, $"SELECT ISNULL(o.id, r.id) AS c {RowsFullJoinOther} WHERE COALESCE(r.a, -1) <> 30" },
             { 0, "SELECT CAST(a AS bigint) AS c FROM dbo.proof_rows" },
             { 0, "SELECT CONVERT(bigint, a) AS c FROM dbo.proof_rows" },
             { 0, "SELECT CONVERT(varchar(30), CAST(a AS money), 1) AS c FROM dbo.proof_rows" },
@@ -217,6 +224,19 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             { 0, "SELECT CONVERT(varchar(30), SYSDATETIME(), @style) AS c FROM dbo.proof_rows" },
             { 0, "SELECT TRY_CAST(N'x' + CAST(a AS nvarchar(10)) AS int) AS c FROM dbo.proof_rows" },
             { 0, "SELECT COALESCE(b, NULL) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT ISNULL(b, NULL) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT ISNULL(b, g) AS c FROM dbo.proof_rows" },
+            { 0, $"SELECT ISNULL(r.id, o.rows_id) AS c {RowsFullJoinOther}" },
+            {
+                0,
+                $"SELECT ISNULL(r.id, o.id) AS c {RowsFullJoinOther} "
+                    + "FULL JOIN dbo.proof_computed AS p ON p.id = o.id + 100"
+            },
+            {
+                0,
+                "SELECT ISNULL(p.id, o.id) AS c FROM dbo.proof_rows AS r "
+                    + "LEFT JOIN dbo.proof_computed AS p ON p.id = r.id FULL JOIN dbo.proof_other AS o ON o.id = r.id"
+            },
             { 0, "SELECT dbo.COUNT(a) AS c FROM dbo.proof_rows" },
             { 0, "SELECT [dbo].[COUNT](a) AS c FROM dbo.proof_rows" },
             {
@@ -817,6 +837,16 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         "SELECT COALESCE(l.id, m.id) AS c FROM l FULL JOIN m ON m.rows_id = l.id"
     )]
     [InlineData("", $"SELECT SUM(COALESCE(r.id, o.id)) AS c {RowsFullJoinOther} GROUP BY ROLLUP (r.g)")]
+    // The proof reads no ON: a row of a FULL JOIN has one side or the other, whether no row matches or an OR does.
+    [InlineData(
+        "",
+        "SELECT COALESCE(r.id, o.id) AS c FROM dbo.proof_rows AS r FULL JOIN dbo.proof_other AS o ON 1 = 0"
+    )]
+    [InlineData(
+        "",
+        "SELECT COALESCE(r.id, o.id) AS c FROM dbo.proof_rows AS r "
+            + "FULL JOIN dbo.proof_other AS o ON o.rows_id = r.id OR o.id = r.id + 1"
+    )]
     public Task DescribeAsync_CoalesceOverAFullJoin_NotNullAndNoNullRow(string with, string select) =>
         WithRowsAsync(async () =>
         {
