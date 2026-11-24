@@ -73,8 +73,9 @@ internal static class TypeDiagnostics
                 at,
                 subject,
                 typeName,
-                "No type override can name it, since its key would mean an array.  Give it a C# type with a -- column: "
-                    + "marker, or a -- param: marker for a parameter"
+                "No type override can name it, since its key would mean an array.  Give a column a C# type with a "
+                    + "-- column: marker.  Declare a parameter as text with a -- param: marker, and cast it in the "
+                    + "query"
             ),
             // NpgsqlRange<T> is a type of the driver, which a project without it cannot name.
             TypeMappingKind.UserDefinedRange => DiagnosticInfo.Create(

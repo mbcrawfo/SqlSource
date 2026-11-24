@@ -357,19 +357,21 @@ public sealed class QueryTypesTests
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'value' has the type '{name}', which SqlSource cannot give a C# "
-                + "type.  No type override can name it, since its key would mean an array.  Give it a C# type with a "
-                + "-- column: marker, or a -- param: marker for a parameter.",
+                + "type.  No type override can name it, since its key would mean an array.  Give a column a C# type "
+                + "with a -- column: marker.  Declare a parameter as text with a -- param: marker, and cast it in the "
+                + "query.",
         ]);
         markedRun.Diagnostics.ShouldBeEmpty();
         StepOutputs.ColumnsOf(markedRun).ShouldHaveSingleItem().Text.ShouldBe("string");
     }
 
-    // The help's other marker: a -- param: marker gives a parameter of such a type its C# type.
+    // A parameter of such a type cannot take a C# type from its marker, since the driver cannot bind it: the help has
+    // it declared as text and cast in the query.  Only a sidecar edited by hand holds such a parameter.
     [Fact]
-    public void Run_ParameterOfACatalogTypeNamedAsAnArray_TakesItsTypeFromItsMarker()
+    public void Run_ParameterOfACatalogTypeNamedAsAnArray_IsSqlsrc246SayingToCastIt()
     {
         var type = TestSidecars.Postgres(name: "_foo", kind: SidecarValues.Kind.Composite, internalName: "_foo");
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- param: @id -> string\nSELECT @id;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @id;\n");
 
         var run = Run(
             [NpgsqlReferences.Npgsql10],
@@ -377,12 +379,45 @@ public sealed class QueryTypesTests
             Entry(file, "GetUser", [Parameter("id", type)], [Column("id", Catalog("int4"))])
         );
 
-        run.Diagnostics.ShouldBeEmpty();
-        StepOutputs
-            .Single<FileTypes>(run, TrackingNames.FileTypes)
-            .Queries.ShouldHaveSingleItem()
-            .Parameters.ShouldHaveSingleItem()
-            .Text.ShouldBe("string");
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The parameter 'id' has the type '_foo', which SqlSource cannot give a C# "
+                + "type.  No type override can name it, since its key would mean an array.  Give a column a C# type "
+                + "with a -- column: marker.  Declare a parameter as text with a -- param: marker, and cast it in the "
+                + "query.",
+        ]);
+    }
+
+    // An array of such a type, or a domain over one, has a key of its own: the help names it, and it maps the column.
+    [Theory]
+    [InlineData("array", "_foo[]", "pg_catalog._foo[]", "string[]")]
+    [InlineData("domain", "label", "public.label", "string")]
+    public void Run_TypeOverACatalogTypeNamedAsAnArray_IsSqlsrc246WithItsOwnKey(
+        string form,
+        string typeName,
+        string key,
+        string mappedTo
+    )
+    {
+        var element = TestSidecars.Postgres(name: "_foo", kind: SidecarValues.Kind.Composite, internalName: "_foo");
+        var type = form == "array" ? ArrayOf(element) : DomainOf("label", element);
+        var mapped = new SqlFile(
+            GeneratorHarness.UsersPath,
+            $"-- type-override: {key}={mappedTo}\n" + SqlTexts.GetUser
+        );
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("value", type)])
+        );
+        var mappedRun = Run([NpgsqlReferences.Npgsql10], mapped, Entry(mapped, "GetUser", [], [Column("value", type)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'value' has the type '{typeName}', which SqlSource cannot give a C# "
+                + $"type.  Map it with the type override, as {key}=<a C# type>.",
+        ]);
+        mappedRun.Diagnostics.ShouldBeEmpty();
+        StepOutputs.ColumnsOf(mappedRun).ShouldHaveSingleItem().Text.ShouldBe(mappedTo);
     }
 
     // A range of the catalog that the map lacks, which only a sidecar edited by hand has: its bare name is no key, or

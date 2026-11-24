@@ -38,7 +38,8 @@ internal enum TypeMappingKind
     /// <summary>
     /// A composite, range or multirange of <c>pg_catalog</c> whose name is <c>_</c> and at least one more character,
     /// which a superuser can move there.  The key <c>pg_catalog._x</c> means the array <c>x[]</c>, so no type override
-    /// names it, and a marker of the query gives it a C# type.
+    /// names it.  A <c>-- column:</c> marker gives a column a C# type, and a parameter is declared as <c>text</c> with
+    /// a <c>-- param:</c> marker and cast in the query.
     /// </summary>
     NamedAsAnArray,
 

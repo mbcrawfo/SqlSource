@@ -102,6 +102,31 @@ public sealed class PostgresTypeMapTests
             false,
             "_foo"
         ),
+        // An array of such a type or a domain over one has a key of its own, which an entry can name.
+        ["array of a composite of pg_catalog named as an array"] = new(
+            ArrayOf(ModelRuns.Catalog("_foo", SidecarValues.Kind.Composite)),
+            "!Unreadable",
+            false,
+            "_foo[]"
+        ),
+        ["domain over a composite of pg_catalog named as an array"] = new(
+            DomainOf("label", ModelRuns.Catalog("_foo", SidecarValues.Kind.Composite)),
+            "!Unreadable",
+            false,
+            "public.label"
+        ),
+        ["domain over an array of such a composite"] = new(
+            DomainOf("label", ArrayOf(ModelRuns.Catalog("_foo", SidecarValues.Kind.Composite))),
+            "!Unreadable",
+            false,
+            "_foo[]"
+        ),
+        ["array of a domain over such a composite"] = new(
+            ArrayOf(DomainOf("label", ModelRuns.Catalog("_foo", SidecarValues.Kind.Composite))),
+            "!Unreadable",
+            false,
+            "public.label"
+        ),
         // A name of _ alone is no array's, so pg_catalog._ names this type.
         ["composite of pg_catalog named _"] = new(
             ModelRuns.Catalog("_", SidecarValues.Kind.Composite),
