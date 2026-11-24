@@ -24,23 +24,31 @@ internal static class OperandsQuery
     /// <summary>The text of <c>operands</c> for a query and the operands its proofs ask.</summary>
     /// <param name="sql">The query's SQL, which the tokens were read from.</param>
     /// <param name="tokens">The query's tokens.</param>
-    /// <param name="statement">The query, as <see cref="SelectStatement.Read" /> read it.</param>
+    /// <param name="with">The query's <c>WITH</c> clause, empty when it has none.</param>
+    /// <param name="body">The <c>SELECT</c> or branch whose rows the operands are read over.</param>
     /// <param name="operands">The operands, none empty, in the order they are numbered from one.</param>
+    /// <param name="cuts">
+    /// The tokens to leave out of its <c>FROM</c>, each the <c>LEFT</c> or <c>OUTER</c> of a join that the <c>WHERE</c>
+    /// makes inner, in order.
+    /// </param>
     /// <remarks>
     /// Each piece is the SQL from its first token's start to its last token's end, so a comment inside it is kept.
-    /// The alias of each operand stands on a line of its own, where no line comment of the operand reaches it.
+    /// The alias of each operand stands on a line of its own, where no line comment of the operand reaches it, and so
+    /// does the text after a cut.
     /// </remarks>
     public static string Text(
         string sql,
         IReadOnlyList<TsqlToken> tokens,
-        SelectStatement statement,
-        IReadOnlyList<TokenRange> operands
+        TokenRange with,
+        SelectBody body,
+        IReadOnlyList<TokenRange> operands,
+        IReadOnlyList<int>? cuts = null
     )
     {
         var text = new StringBuilder();
-        if (!statement.With.IsEmpty)
+        if (!with.IsEmpty)
         {
-            _ = text.Append(Piece(sql, tokens, statement.With)).Append('\n');
+            _ = text.Append(Piece(sql, tokens, with)).Append('\n');
         }
 
         _ = text.Append("SELECT ")
@@ -54,9 +62,9 @@ internal static class OperandsQuery
                         + "]"
                 )
             );
-        if (statement.Body.FromThroughWhere is { } from)
+        if (body.FromThroughWhere is { } from)
         {
-            _ = text.Append('\n').Append(Piece(sql, tokens, from));
+            _ = text.Append('\n').AppendJoin('\n', Uncut(from, cuts ?? []).Select(part => Piece(sql, tokens, part)));
         }
 
         return text.ToString();
@@ -105,6 +113,26 @@ internal static class OperandsQuery
                 row is { SourceType: SqlServerColumns.Table, IsComputedColumn: false, SourceColumn: not null }
             )),
         ];
+    }
+
+    // The runs of the range between the tokens to leave out.
+    private static IEnumerable<TokenRange> Uncut(TokenRange range, IReadOnlyList<int> cuts)
+    {
+        var start = range.Start;
+        foreach (var cut in cuts)
+        {
+            if (cut > start)
+            {
+                yield return new TokenRange(start, cut);
+            }
+
+            start = cut + 1;
+        }
+
+        if (start < range.End)
+        {
+            yield return new TokenRange(start, range.End);
+        }
     }
 
     private static string Piece(string sql, IReadOnlyList<TsqlToken> tokens, TokenRange range) =>

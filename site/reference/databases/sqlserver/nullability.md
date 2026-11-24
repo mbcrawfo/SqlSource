@@ -39,7 +39,7 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - `CONCAT`;
 - a `CASE` or an `IIF` whose every result is never null.
 
-**SqlSource also treats these as never null, where SQL Server does not**, in a query that is one `SELECT`, with or without a `WITH` clause:
+**SqlSource also treats these as never null, where SQL Server does not**, in a query that is one `SELECT`, or several joined by `UNION`, `INTERSECT` or `EXCEPT`, with or without a `WITH` clause:
 
 - **A count**: `COUNT` and `COUNT_BIG`, with or without `OVER (...)`.  A count is `0` for no rows, never null.
 - **A subquery that is a count alone and returns one row**, such as `(SELECT COUNT(*) FROM dbo.orders AS o WHERE o.customer_id = c.id)`, with no `GROUP BY`, `HAVING`, `TOP` or `OFFSET`.
@@ -59,6 +59,15 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
   - the `FROM` of the query names that one table and nothing else;
   - the column is an item of its own, or the query is `SELECT *` from that table;
   - the query has no `ROLLUP`, `CUBE` or `GROUPING SETS`.
+
+- **A column that the `WHERE` keeps from being null**, as `shipped_on` in `WHERE shipped_on IS NOT NULL`, when all of these are true:
+  - the column is stored in a table of the query's own database;
+  - the condition is `x IS NOT NULL`, `x LIKE p`, `x NOT LIKE p` or a comparison such as `x = @id` or `x > 0`, of `x` alone;
+  - `AND` joins the condition to the rest of the `WHERE`, and no `OR` or `NOT` applies to it;
+  - the query writes `x` the same way in the condition and where it reads it, with the same table alias.
+- **A `NOT NULL` column of the optional side of a `LEFT JOIN`, when the `WHERE` makes the join inner.**  The `WHERE` must hold such a condition on a column of that side, written with its table alias, as `o.status` in `WHERE o.status = @status`.  The joins of the `FROM` must be plain joins, one after the other.
+- **A column read from a `WITH` query whose own `WHERE` keeps it from being null**, when the `WITH` query is one `SELECT` that returns the column itself, and no outer join of the outer query can fill it with null.
+- **A column of `UNION`, `UNION ALL`, `INTERSECT` or `EXCEPT`, when each `SELECT` gives a value that is never null in that place.**  Each `SELECT` is read on its own, with its own `FROM` and `WHERE`.
 
 **SqlSource treats none of these items as never null in two kinds of query:**
 
@@ -82,7 +91,7 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - `SUM`, `MAX` or `MIN` of these, without `OVER (...)`;
 - `AVG` of these, without `OVER (...)`, inside `CAST` or `CONVERT` to a built-in type.
 
-These answers assume that the connection that runs the query leaves `ANSI_WARNINGS` on, as Microsoft.Data.SqlClient does: see [limits](#limit-ansi-warnings-off).
+These answers assume that the connection that runs the query leaves `ANSI_WARNINGS` and `ANSI_NULLS` on, as Microsoft.Data.SqlClient does: see [`ANSI_WARNINGS` off](#limit-ansi-warnings-off) and [`ANSI_NULLS` off](#limit-ansi-nulls-off).
 
 **SqlSource treats these as columns that can be null, though some of them never are:**
 
@@ -96,8 +105,11 @@ These answers assume that the connection that runs the query leaves `ANSI_WARNIN
 - **`COALESCE` with a column that a subquery or a `WITH` query combines or computes, before the one that is never null.**  This includes a column of a `UNION` or `UNION ALL`, a column of an `UNPIVOT`, and a column such as `SUM(x) AS total`.  Write `ISNULL(x, 0)`.
 - **`COALESCE(AVG(x), 0)`**, unless the `AVG` is inside `CAST` or `CONVERT` to a built-in type.  Write `ISNULL(AVG(x), 0)`.
 - **`CASE WHEN x IS NULL THEN 0 ELSE x END` of a computed column, a view's column or a subquery's expression that can be null.**  The `CASE` reads `x` twice, and SQL Server can compute such a value again for the second read.  Write `ISNULL(x, 0)`, which is never null.
-- **A column that a filter keeps from being null.**  An example is a column that can hold null, under `WHERE x IS NOT NULL`.  Another is the optional side of a `LEFT JOIN` that the `WHERE` makes inner.
-- **A column of a query that is not one `SELECT`.**  Such a query keeps the answer of SQL Server, so a count or a sum in it can be null.  This holds for the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, for a `UNION`, `INTERSECT` or `EXCEPT`, for `FOR XML` or `FOR JSON`, and for several statements in one query.
+- **A column that a filter keeps from being null in another form**, such as `x IN (1, 2)`, `x BETWEEN 1 AND 2`, `x + 1 > 0` or a condition under `OR`.
+- **A computed column, a view's column or a subquery's expression that the `WHERE` tests.**  SQL Server can compute such a value again for the result, and the second value can be null.
+- **The optional side of a `LEFT JOIN` whose condition in the `WHERE` names the column without its table alias**, or whose `FROM` also holds an `APPLY`, a comma, a join hint or a join in parentheses.
+- **A column of a `UNION`, `INTERSECT` or `EXCEPT` with a `SELECT` that can give null in that place**, or with `*` in its select list.
+- **A column of a query that is not a `SELECT`, or that the tool does not read.**  Such a query keeps the answer of SQL Server, so a count or a sum in it can be null.  This holds for the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, for `FOR XML` or `FOR JSON`, and for several statements in one query.
 - **A conversion to `geometry`, `geography`, `hierarchyid` or another .NET type**, since SQL Server can convert the text `'NULL'` to such a type as null: `CAST(N'NULL' AS geometry)` is null.
 - **`COALESCE`, `GREATEST` or `LEAST` over a value of such a type**, for the same reason: `COALESCE(shape, 'NULL')` is null.
 - **A column of a query that uses `window` as a name**, an alias or a column without brackets, as in `FROM dbo.panes window`.  Such a query keeps the answer of SQL Server.  Write `[window]`.
@@ -138,8 +150,8 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - `COALESCE` over a column of a `UNION` or an `UNPIVOT`, or one that a subquery computes;
 - `COALESCE(AVG(x), 0)`;
 - a computed column that is not persisted;
-- a column that a filter keeps from being null;
-- a count or a sum in an `OUTPUT` clause or a `UNION`.
+- a column that a filter keeps from being null in a form such as `x IN (1, 2)` or `x BETWEEN 1 AND 2`;
+- a count or a sum in an `OUTPUT` clause.
 
 **What to do.**  Do one of these:
 
@@ -156,3 +168,13 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 **Why.**  The connection turns `ANSI_WARNINGS` off.  With `ANSI_WARNINGS` and `ARITHABORT` both off, SQL Server returns null in place of some errors: an arithmetic overflow, a value too large for its type, or a division by zero.
 
 **What to do.**  Leave `ANSI_WARNINGS` on, as Microsoft.Data.SqlClient turns it on when it connects.  Run no `SET ANSI_WARNINGS OFF` on a connection that runs your queries.
+
+<a id="limit-ansi-nulls-off"></a>
+
+### Null from a filtered column whose property cannot be null, with `ANSI_NULLS` off
+
+**What you see.**  A column whose property cannot be null holds a null when the query runs.  The `WHERE` compares the column with a query parameter, as in `WHERE x = @id` or `WHERE x <> @id`.
+
+**Why.**  The connection turns `ANSI_NULLS` off.  With `ANSI_NULLS` off, `x = @id` keeps a row whose `x` is null when `@id` is null, and `x <> @id` keeps that row when `@id` is not null.
+
+**What to do.**  Leave `ANSI_NULLS` on, as Microsoft.Data.SqlClient turns it on when it connects.  Run no `SET ANSI_NULLS OFF` on a connection that runs your queries.

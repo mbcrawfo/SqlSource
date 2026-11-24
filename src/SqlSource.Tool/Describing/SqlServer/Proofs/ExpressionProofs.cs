@@ -36,7 +36,19 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// which an overflow is an error and not a <c>NULL</c>.
 /// </para>
 /// </remarks>
-internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBody body)
+/// <param name="tokens">The query's tokens.</param>
+/// <param name="body">The <c>SELECT</c> or branch whose items are proved.</param>
+/// <param name="filtered">What its <c>FROM</c> and <c>WHERE</c> keep from being <c>NULL</c>, if read.</param>
+/// <param name="asksLoneLeaf">
+/// True when the server's answer about an item that is one leaf is not the column's: the item is one branch of several,
+/// or <c>operands</c> reads a <c>LEFT JOIN</c> that the <c>WHERE</c> makes inner.
+/// </param>
+internal sealed partial class ExpressionProofs(
+    IReadOnlyList<TsqlToken> tokens,
+    SelectBody body,
+    FilteredRows? filtered = null,
+    bool asksLoneLeaf = false
+)
 {
     // The built-in aggregates.  A leaf that holds one is never asked, so a name too many only proves less.
     private static readonly HashSet<string> Aggregates =
@@ -91,7 +103,7 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
 
         _leaves.Clear();
         var proof = Expression(expression, rows: false);
-        return proof is Proof.Operand leaf && IsTheWholeItem(_leaves[leaf.Index], expression)
+        return !asksLoneLeaf && proof is Proof.Operand leaf && IsTheWholeItem(_leaves[leaf.Index], expression)
             ? Proof.No
             : Numbered(proof);
     }
@@ -120,7 +132,7 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
         };
     }
 
-    private static Proof AllOf(IEnumerable<Proof> parts)
+    internal static Proof AllOf(IEnumerable<Proof> parts)
     {
         var kept = new List<Proof>();
         foreach (var part in parts)
@@ -382,7 +394,13 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
         }
 
         _leaves.Add(range);
-        return new Proof.Operand(_leaves.Count - 1);
+        var index = _leaves.Count - 1;
+
+        // A filter tests the value and the result reads it again, so what it keeps from NULL holds only of a value
+        // that gives one value in a row: a stored column.
+        return filtered?.KeepsFromNull(range) == true
+            ? new Proof.AnyOf([new Proof.Operand(index), new Proof.Stored(index)])
+            : new Proof.Operand(index);
     }
 
     // OVER, an aggregate's name before "(", or a name after "." or "::" before "(", a call of a schema's name or a

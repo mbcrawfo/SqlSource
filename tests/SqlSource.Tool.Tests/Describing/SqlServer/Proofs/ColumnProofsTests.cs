@@ -19,8 +19,8 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read("SELECT COUNT(*) AS n FROM dbo.users", ExpressionRow(1, "n"));
 
-        proofs.OperandsSql.ShouldBeNull();
-        proofs.OperandCount.ShouldBe(0);
+        proofs.OperandQueries.ShouldBeEmpty();
+        proofs.OperandQueries.Count.ShouldBe(0);
         Nullability(proofs.Apply(null)).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
     }
 
@@ -29,8 +29,10 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read("SELECT COALESCE(nickname, name) AS shown FROM dbo.users", ExpressionRow(1, "shown"));
 
-        proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users");
-        proofs.OperandCount.ShouldBe(2);
+        proofs
+            .OperandQueries.ShouldHaveSingleItem()
+            .Sql.ShouldBe("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users");
+        proofs.OperandQueries.ShouldHaveSingleItem().Count.ShouldBe(2);
         Nullability(proofs.Apply([new OperandFacts(false, true, Stored: true), new OperandFacts(true, true)]))
             .ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
         Nullability(proofs.Apply(Answers(false, true))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
@@ -48,7 +50,9 @@ public sealed class ColumnProofsTests
             ExpressionRow(2, "b")
         );
 
-        proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users");
+        proofs
+            .OperandQueries.ShouldHaveSingleItem()
+            .Sql.ShouldBe("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users");
         Nullability(proofs.Apply([new OperandFacts(false, true, Stored: true), new OperandFacts(true, true)]))
             .ShouldBe([(false, SidecarValues.NullableSource.Expression), (true, SidecarValues.NullableSource.Server)]);
         Nullability(proofs.Apply(Answers(true, false)))
@@ -76,7 +80,7 @@ public sealed class ColumnProofsTests
             }
         );
 
-        proofs.OperandsSql.ShouldBeNull();
+        proofs.OperandQueries.ShouldBeEmpty();
         Nullability(proofs.Apply(null))
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
     }
@@ -87,7 +91,7 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read("SELECT COUNT(*) AS n FROM dbo.users", ExpressionRow(1, "other"));
 
-        proofs.OperandsSql.ShouldBeNull();
+        proofs.OperandQueries.ShouldBeEmpty();
         Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
 
@@ -96,19 +100,203 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read("SELECT COUNT(*) AS n, COUNT(*) AS m FROM dbo.users", ExpressionRow(1, "n"));
 
-        proofs.OperandsSql.ShouldBeNull();
+        proofs.OperandQueries.ShouldBeEmpty();
         Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
+
+    // A column of a set operator is proved when its item is proved in every branch, each asked over its own rows.
+    [Fact]
+    public void Apply_SetOperator_ProvedWhenEveryBranchIs()
+    {
+        var proofs = Read(
+            "SELECT nickname AS shown FROM dbo.users UNION SELECT name FROM dbo.orders",
+            ExpressionRow(1, "shown")
+        );
+
+        proofs.OperandQueries.ShouldBe([
+            new ColumnProofs.OperandQuery("SELECT nickname\nAS [1]\nFROM dbo.users", 1),
+            new ColumnProofs.OperandQuery("SELECT name\nAS [1]\nFROM dbo.orders", 1),
+        ]);
+        Nullability(proofs.Apply(Answers(true, true))).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply(Answers(true, false))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply(Answers(false, true))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    [Theory]
+    [InlineData("SELECT COUNT(*) AS n FROM dbo.users UNION ALL SELECT COUNT(*) FROM dbo.orders", false)]
+    [InlineData("SELECT COUNT(*) AS n FROM dbo.users EXCEPT SELECT 1", false)]
+    [InlineData("SELECT COUNT(*) AS n FROM dbo.users INTERSECT SELECT COUNT(*) FROM dbo.orders", false)]
+    [InlineData("SELECT COUNT(*) AS n FROM dbo.users UNION ALL SELECT NULL", true)]
+    [InlineData("SELECT NULL AS n UNION ALL SELECT COUNT(*) FROM dbo.users", true)]
+    [InlineData("SELECT COUNT(*) AS n FROM dbo.users UNION ALL SELECT 1, 2", true)]
+    [InlineData("SELECT COUNT(*) AS n FROM dbo.users UNION ALL SELECT * FROM dbo.orders", true)]
+    [InlineData("SELECT COUNT(*) AS other FROM dbo.users UNION ALL SELECT COUNT(*) AS n FROM dbo.orders", true)]
+    public void Apply_SetOperatorOfTheText_ProvedOnlyByEveryBranch(string sql, bool nullable)
+    {
+        var proofs = Read(sql, ExpressionRow(1, "n"));
+
+        Nullability(proofs.Apply(null))
+            .ShouldBe([
+                (nullable, nullable ? SidecarValues.NullableSource.Server : SidecarValues.NullableSource.Expression),
+            ]);
+    }
+
+    // The operands of a later branch come after the earlier branch's in the one list of answers.
+    [Fact]
+    public void Apply_SecondColumnOfASetOperator_ReadsItsBranchesOwnOperands()
+    {
+        var proofs = Read(
+            "SELECT a AS x, b AS y FROM dbo.t UNION ALL SELECT c, d FROM dbo.u",
+            ExpressionRow(1, "x"),
+            ExpressionRow(2, "y")
+        );
+
+        proofs.OperandQueries.Select(static query => query.Count).ShouldBe([2, 2]);
+        Nullability(proofs.Apply(Answers(true, false, true, false)))
+            .ShouldBe([(false, SidecarValues.NullableSource.Expression), (true, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply(Answers(false, true, false, true)))
+            .ShouldBe([(true, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Expression)]);
+    }
+
+    // A filter proves a column only when the server shows it stored, since the result reads the value again.
+    [Theory]
+    [InlineData("SELECT nickname FROM dbo.users WHERE nickname IS NOT NULL")]
+    [InlineData("SELECT nickname FROM dbo.users WHERE nickname LIKE @q")]
+    [InlineData("SELECT u.nickname FROM dbo.users AS u WHERE u.nickname > 'a' AND u.id > 0")]
+    [InlineData("WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM q")]
+    [InlineData("WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a') SELECT r.nickname FROM q AS r")]
+    [InlineData("WITH q (nickname) AS (SELECT n FROM dbo.users WHERE n > 'a') SELECT nickname FROM q")]
+    [InlineData(
+        "WITH p AS (SELECT nickname FROM dbo.users WHERE nickname > 'a'), q AS (SELECT nickname FROM p) "
+            + "SELECT nickname FROM q"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT id, nickname FROM dbo.users WHERE nickname > 'a') "
+            + "SELECT q.nickname FROM q JOIN dbo.orders AS o ON o.user_id = q.id"
+    )]
+    public void Apply_FilteredColumn_ProvedWhenStored(string sql)
+    {
+        var proofs = Read(sql, ExpressionRow(1, "nickname"));
+
+        proofs.OperandQueries.ShouldHaveSingleItem().Count.ShouldBe(1);
+        Nullability(proofs.Apply([new OperandFacts(false, true, Stored: true)]))
+            .ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply([new OperandFacts(false, true, Stored: false)]))
+            .ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // What no filter keeps from NULL asks nothing of a lone column.
+    [Theory]
+    [InlineData("SELECT nickname FROM dbo.users WHERE name IS NOT NULL")]
+    [InlineData("SELECT nickname FROM dbo.users WHERE nickname IS NULL")]
+    [InlineData("SELECT nickname FROM dbo.users WHERE nickname > 'a' OR id > 0")]
+    [InlineData("SELECT nickname FROM dbo.users WHERE NOT nickname > 'a'")]
+    [InlineData("SELECT u.nickname FROM dbo.users AS u WHERE nickname > 'a'")]
+    [InlineData("SELECT nickname FROM dbo.users WHERE NICKNAME > 'a'")]
+    [InlineData("SELECT a.nickname FROM dbo.users AS a JOIN dbo.users AS b ON b.id = a.id WHERE b.nickname > 'a'")]
+    [InlineData("WITH q AS (SELECT nickname FROM dbo.users) SELECT nickname FROM q")]
+    [InlineData("WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM Q")]
+    [InlineData("WITH q AS (SELECT nickname FROM dbo.users WHERE id > 0 OR nickname > 'a') SELECT nickname FROM q")]
+    [InlineData(
+        "WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY ROLLUP (nickname)) "
+            + "SELECT nickname FROM q"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY ALL nickname) SELECT nickname FROM q"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a' UNION ALL SELECT NULL) SELECT nickname FROM q"
+    )]
+    [InlineData("WITH q AS (SELECT * FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM q")]
+    [InlineData("WITH q AS (SELECT name AS nickname FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM q")]
+    [InlineData(
+        "WITH q AS (SELECT id, nickname FROM dbo.users WHERE nickname > 'a') "
+            + "SELECT q.nickname FROM dbo.orders AS o LEFT JOIN q ON q.id = o.user_id"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT id, nickname FROM dbo.users WHERE nickname > 'a') "
+            + "SELECT q.nickname FROM q RIGHT JOIN dbo.orders AS o ON q.id = o.user_id"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT id, nickname FROM dbo.users WHERE nickname > 'a') "
+            + "SELECT nickname FROM q CROSS APPLY (SELECT 1 AS one) AS o"
+    )]
+    public void Apply_ColumnNoFilterKeeps_StaysNullable(string sql)
+    {
+        var proofs = Read(sql, ExpressionRow(1, "nickname"));
+
+        proofs.OperandQueries.ShouldBeEmpty();
+        Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // Under a grouping set a total's row holds NULL, and GROUP BY ALL a group no row of the WHERE holds, so a filter
+    // proves nothing of a grouping column.
+    [Theory]
+    [InlineData("SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY ROLLUP (nickname)")]
+    [InlineData("SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY CUBE (nickname)")]
+    [InlineData("SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY GROUPING SETS ((nickname), ())")]
+    [InlineData("SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY ALL nickname")]
+    public void Apply_FilteredGroupingColumnOfATotal_StaysNullable(string sql)
+    {
+        var proofs = Read(sql, ExpressionRow(1, "nickname"));
+
+        Nullability(proofs.Apply([new OperandFacts(true, true, Stored: true)]))
+            .ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // A conjunct over the optional side of a LEFT JOIN makes it inner, so "operands" reads the join without its LEFT
+    // and asks a lone column there, whose answer over those rows is what the server gives an inner join.
+    [Theory]
+    [InlineData("LEFT JOIN")]
+    [InlineData("LEFT OUTER JOIN")]
+    [InlineData("LEFT /* c */ OUTER -- d\n JOIN")]
+    public void Read_LeftJoinTheWhereMakesInner_AsksItWithoutItsLeft(string join)
+    {
+        var proofs = Read(
+            $"SELECT o.total FROM dbo.users AS u {join} dbo.orders AS o ON o.user_id = u.id WHERE o.status = 1",
+            ExpressionRow(1, "total")
+        );
+
+        proofs
+            .OperandQueries.ShouldHaveSingleItem()
+            .Sql.ShouldBe(
+                "SELECT o.total\nAS [1]\nFROM dbo.users AS u\nJOIN dbo.orders AS o ON o.user_id = u.id "
+                    + "WHERE o.status = 1"
+            );
+        Nullability(proofs.Apply(Answers(true))).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply(Answers(false))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // A filter of another source, or a chain the reader cannot follow, leaves every LEFT in place and asks no lone
+    // column.
+    [Theory]
+    [InlineData("SELECT o.total FROM dbo.users AS u LEFT JOIN dbo.orders AS o ON o.user_id = u.id WHERE u.id = 1")]
+    [InlineData("SELECT o.total FROM dbo.users AS u LEFT JOIN dbo.orders AS o ON o.user_id = u.id WHERE status = 1")]
+    [InlineData("SELECT o.total FROM dbo.users AS u LEFT JOIN dbo.orders AS o ON o.user_id = u.id WHERE O.status = 1")]
+    [InlineData(
+        "SELECT o.total FROM dbo.users AS u LEFT JOIN dbo.orders AS o ON o.user_id = u.id "
+            + "WHERE o.status = 1 OR u.id = 1"
+    )]
+    [InlineData(
+        "SELECT o.total FROM dbo.users AS u LEFT HASH JOIN dbo.orders AS o ON o.user_id = u.id WHERE o.status = 1"
+    )]
+    [InlineData(
+        "SELECT o.total FROM dbo.users AS u LEFT JOIN dbo.orders AS o JOIN dbo.items AS i ON i.order_id = o.id "
+            + "ON o.user_id = u.id WHERE o.status = 1"
+    )]
+    [InlineData(
+        "SELECT o.total FROM dbo.users AS u OUTER APPLY (SELECT total, status FROM dbo.orders) AS o WHERE o.status = 1"
+    )]
+    public void Read_NoJoinMadeInner_AsksNothing(string sql) =>
+        Read(sql, ExpressionRow(1, "total")).OperandQueries.ShouldBeEmpty();
 
     [Fact]
     public void Read_RefusedText_ProvesNothing()
     {
-        var proofs = Read(
-            "SELECT COUNT(*) AS n FROM dbo.users UNION ALL SELECT COUNT(*) AS n FROM dbo.orders",
-            ExpressionRow(1, "n")
-        );
+        var proofs = Read("SELECT COUNT(*) AS n FROM dbo.users FOR JSON PATH", ExpressionRow(1, "n"));
 
-        proofs.OperandsSql.ShouldBeNull();
+        proofs.OperandQueries.ShouldBeEmpty();
         Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
 
@@ -117,7 +305,7 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read("SELECT u.*, COUNT(*) OVER () AS n FROM dbo.users AS u", IdColumn, ExpressionRow(2, "n"));
 
-        proofs.OperandsSql.ShouldBeNull();
+        proofs.OperandQueries.ShouldBeEmpty();
         Nullability(proofs.Apply(null))
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
     }
@@ -131,7 +319,7 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read(sql, ExpressionRow(1, "y"));
 
-        proofs.OperandsSql.ShouldBeNull();
+        proofs.OperandQueries.ShouldBeEmpty();
         Nullability(proofs.Apply(Answers(true, true))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
 
@@ -145,9 +333,9 @@ public sealed class ColumnProofsTests
             ExpressionRow(1, "y")
         );
 
-        proofs.OperandsSql.ShouldBe(
-            "SELECT x\nAS [1]\nFROM dbo.users offset RIGHT JOIN dbo.orders AS o ON o.user_id = id"
-        );
+        proofs
+            .OperandQueries.ShouldHaveSingleItem()
+            .Sql.ShouldBe("SELECT x\nAS [1]\nFROM dbo.users offset RIGHT JOIN dbo.orders AS o ON o.user_id = id");
     }
 
     // A column whose own row is of a CLR type gets no proof of its expression: a string converted to the type may be
@@ -170,7 +358,7 @@ public sealed class ColumnProofsTests
             }
         );
 
-        proofs.OperandsSql.ShouldBeNull();
+        proofs.OperandQueries.ShouldBeEmpty();
         Nullability(proofs.Apply(Answers(true))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
 
@@ -181,7 +369,7 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read("SELECT COALESCE(nickname, N'NULL') AS shown FROM dbo.users", ExpressionRow(1, "shown"));
 
-        proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1]\nFROM dbo.users");
+        proofs.OperandQueries.ShouldHaveSingleItem().Sql.ShouldBe("SELECT nickname\nAS [1]\nFROM dbo.users");
         Nullability(proofs.Apply([new OperandFacts(NotNull: true, NotClr: false, Stored: true)]))
             .ShouldBe([(true, SidecarValues.NullableSource.Server)]);
         Nullability(proofs.Apply([new OperandFacts(false, NotClr: true, Stored: true)]))
@@ -201,7 +389,7 @@ public sealed class ColumnProofsTests
             }
         );
 
-        proofs.OperandsSql.ShouldBeNull();
+        proofs.OperandQueries.ShouldBeEmpty();
         Nullability(proofs.Apply(null)).ShouldBe([(false, SidecarValues.NullableSource.Server)]);
     }
 
@@ -216,7 +404,7 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read(sql, IdColumn, PersistedColumn(2));
 
-        proofs.OperandsSql.ShouldBeNull();
+        proofs.OperandQueries.ShouldBeEmpty();
         Nullability(proofs.Apply(null))
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Catalog)]);
     }
@@ -229,7 +417,7 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read(sql, IdColumn, ExpressionRow(2, "nickname"), PersistedColumn(3));
 
-        proofs.OperandsSql.ShouldBeNull();
+        proofs.OperandQueries.ShouldBeEmpty();
         Nullability(proofs.Apply(null))
             .ShouldBe([
                 (false, SidecarValues.NullableSource.Server),

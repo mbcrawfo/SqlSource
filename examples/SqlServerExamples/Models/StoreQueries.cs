@@ -31,6 +31,10 @@ public sealed partial class StoreQueries(DbConnection connection)
     public Task<IEnumerable<CountShippedOrdersDto>> CountShippedOrdersAsync() =>
         connection.QueryAsync<CountShippedOrdersDto>(Sql.CountShippedOrders);
 
+    // ShippedOn is a DateOnly and not a DateOnly?: the column can hold null, and the WHERE keeps those rows out.
+    public Task<IEnumerable<ListShippedOrdersDto>> ListShippedOrdersAsync() =>
+        connection.QueryAsync<ListShippedOrdersDto>(Sql.ListShippedOrders);
+
     // MonthStart is a DateOnly and not a DateOnly?, by the query's -- column: marker, which leaves the column's name
     // alone for Dapper: DATEFROMPARTS of parts that are never null is not null, though the tool cannot show it.
     public Task<IEnumerable<ListOrderMonthsDto>> ListOrderMonthsAsync() =>

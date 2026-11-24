@@ -29,17 +29,25 @@ internal abstract record Proof
     public bool Holds(IReadOnlyList<OperandFacts>? answers) =>
         Evaluate(index => answers is not null && index < answers.Count ? answers[index] : default);
 
+    /// <summary>The same proof with each operand's index moved by <paramref name="offset" />.</summary>
+    /// <remarks>Each branch of a set operator numbers its operands from 0, and the answers are one list.</remarks>
+    public abstract Proof Shifted(int offset);
+
     private protected abstract bool Evaluate(Func<int, OperandFacts> answerOf);
 
     /// <summary>Holds from the text alone.</summary>
     internal sealed record Always : Proof
     {
+        public override Proof Shifted(int offset) => this;
+
         private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => true;
     }
 
     /// <summary>Never holds.</summary>
     internal sealed record Never : Proof
     {
+        public override Proof Shifted(int offset) => this;
+
         private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => false;
     }
 
@@ -47,6 +55,8 @@ internal abstract record Proof
     /// <param name="Index">The operand's index in <see cref="ExpressionProofs.Operands" />.</param>
     internal sealed record Operand(int Index) : Proof
     {
+        public override Proof Shifted(int offset) => new Operand(Index + offset);
+
         private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => answerOf(Index).NotNull;
     }
 
@@ -57,6 +67,8 @@ internal abstract record Proof
     /// <param name="Index">The operand's index in <see cref="ExpressionProofs.Operands" />.</param>
     internal sealed record NotClr(int Index) : Proof
     {
+        public override Proof Shifted(int offset) => new NotClr(Index + offset);
+
         private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => answerOf(Index).NotClr;
     }
 
@@ -67,12 +79,16 @@ internal abstract record Proof
     /// <param name="Index">The operand's index in <see cref="ExpressionProofs.Operands" />.</param>
     internal sealed record Stored(int Index) : Proof
     {
+        public override Proof Shifted(int offset) => new Stored(Index + offset);
+
         private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => answerOf(Index).Stored;
     }
 
     /// <summary>Holds when one of its parts holds.</summary>
     internal sealed record AnyOf(IReadOnlyList<Proof> Parts) : Proof
     {
+        public override Proof Shifted(int offset) => new AnyOf([.. Parts.Select(part => part.Shifted(offset))]);
+
         private protected override bool Evaluate(Func<int, OperandFacts> answerOf) =>
             Parts.Any(part => part.Evaluate(answerOf));
     }
@@ -80,6 +96,8 @@ internal abstract record Proof
     /// <summary>Holds when every one of its parts holds, and it has one.</summary>
     internal sealed record AllOf(IReadOnlyList<Proof> Parts) : Proof
     {
+        public override Proof Shifted(int offset) => new AllOf([.. Parts.Select(part => part.Shifted(offset))]);
+
         private protected override bool Evaluate(Func<int, OperandFacts> answerOf) =>
             Parts.Count > 0 && Parts.All(part => part.Evaluate(answerOf));
     }
