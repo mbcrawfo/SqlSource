@@ -267,6 +267,43 @@ public sealed class RunLogRedactionTests : IDisposable
             .ShouldBe("password *** refused, table latest_orders");
     }
 
+    // A password too short to be a token is removed where it is a password key's value, and only there.
+    [Fact]
+    public async Task Run_DescriberThatLogsAShortPasswordAsAKeysValue_HasTheMarkThereAlone()
+    {
+        _scene.Describer.Secrets = ["pg"];
+        _scene.Describer.OnOpen = (log, _) =>
+            log.Write("connect", new LogMember("message", "refused Host=other;Password=pg; user pg, pg_class"));
+
+        _ = await LoggedWithAsync("Host=db;Password=pg");
+
+        LogReader
+            .Events(Log, "postgres.connect")
+            .ShouldHaveSingleItem()
+            .GetProperty("message")
+            .GetString()
+            .ShouldBe("refused Host=other;Password=***; user pg, pg_class");
+    }
+
+    // A value whose halves are two members written in the reverse order is in no joined text in order.
+    [Fact]
+    public async Task Run_DescriberThatLogsAValueInTwoMembersInReverse_HasTheMarkInBoth()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            var half = value.Length / 2;
+            log.Write("split", new LogMember("tail", value[half..] + " after"), new LogMember("head", value[..half]));
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var logged = LogReader.Events(Log, "postgres.split").ShouldHaveSingleItem();
+        logged.GetProperty("tail").GetString().ShouldBe("*** after");
+        logged.GetProperty("head").GetString().ShouldBe("***");
+    }
+
     // The events of the SQL Server describer hold the SQL, the declarations, the server's rows and its messages, so the
     // value is searched in each: the fake describer writes them through its log as the real one does.  The scene's fake
     // describer is PostgreSQL's, so the events of these tests are named postgres.parameters, postgres.probe,
