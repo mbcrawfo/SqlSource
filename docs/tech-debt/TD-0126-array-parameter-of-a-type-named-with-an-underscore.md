@@ -1,4 +1,4 @@
-# TD-0125: An array parameter of a type named with an underscore crashes the tool
+# TD-0126: An array parameter of a type named with an underscore crashes the tool
 
 ## Problem
 

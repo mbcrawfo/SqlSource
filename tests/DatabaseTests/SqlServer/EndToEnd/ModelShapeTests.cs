@@ -350,7 +350,7 @@ public sealed class ModelShapeTests
             $"{Namespace}.ListRemindersDto",
             ModelShape.SealedRecord,
             ("Id", typeof(int), false),
-            ("RemindAt", typeof(TimeSpan?), true)
+            ("RemindAt", typeof(TimeSpan), false)
         );
 
     [Fact]

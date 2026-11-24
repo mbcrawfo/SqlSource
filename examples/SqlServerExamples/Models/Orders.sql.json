@@ -251,6 +251,58 @@
         }
       ]
     },
+    "ListShippedOrders": {
+      "hash": "df0e908e444e63855b2ff009dcbdddff10ae0037d7821b976c6c54df53d11ce8",
+      "toolVersion": "0.2.1",
+      "database": "mssql",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "shipped_on",
+          "type": {
+            "name": "date",
+            "maxLength": 3,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "shipped_on"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "ListOrderMonths": {
       "hash": "b2d4bf5193a6ff24d7f5d013707eba83d635d52f948386ff3fb2a5b370eba7a0",
       "toolVersion": "0.2.1",

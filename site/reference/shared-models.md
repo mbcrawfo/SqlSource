@@ -36,6 +36,7 @@ The rows are the rows of the table when all of these are true:
 
 - **On PostgreSQL, a view, a materialized view and a foreign table count as a table here.**  On SQL Server, a view does.
 - **On SQL Server, the columns of a table are those that `SELECT *` gives.**  So a `HIDDEN` period column of a system-versioned table is not one of them.
+- **On SQL Server, a written-out list whose `WHERE` keeps a column that can hold null from being null gets a model of its own.**  Its column is never null there, so it no longer has the nullability of the table column.  `SELECT *` with the same `WHERE` keeps the table model.
 - **The name is the PascalCase of the name of the table, with the output suffix after it.**  The PascalCase follows the rule of [property names](model-properties.md#property-names).  The PascalCase of the schema comes before it when the schema is not `public` for PostgreSQL or `dbo` for SQL Server.  So `users` gives `UsersDto`, `order_lines` gives `OrderLinesDto`, and `billing.invoices` gives `BillingInvoicesDto`.  No word is made singular.
 - **A table gives no table model when its name, or the name of its schema, gives no identifier.**  The model of the query is then named after the query, with no error.  Such names include `"order-lines"`, and a name that ends in `!` or `?`.
 - **`-- output-model:` wins over the name of the table.**

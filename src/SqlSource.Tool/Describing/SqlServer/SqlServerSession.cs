@@ -321,17 +321,25 @@ internal sealed partial class SqlServerSession : DescriberSession
     )
     {
         var proofs = ColumnProofs.Read(request.Sql, built, rows);
-        if (proofs.OperandsSql is not { } operandsSql)
+        if (proofs.OperandQueries.Count == 0)
         {
             return proofs.Apply(null);
         }
 
-        var answer = await OperandsAsync(
-            request.Name,
-            new SqlServerColumnsRequest(operandsSql, declarations),
-            cancellationToken
-        );
-        return proofs.Apply(OperandsQuery.AnswersOf(answer, proofs.OperandCount));
+        // One call for each branch that asks.  A branch whose answer proves nothing leaves its operands unanswered, and
+        // only the proofs that need them fail.
+        var answers = new List<OperandFacts>();
+        foreach (var query in proofs.OperandQueries)
+        {
+            var answer = await OperandsAsync(
+                request.Name,
+                new SqlServerColumnsRequest(query.Sql, declarations),
+                cancellationToken
+            );
+            answers.AddRange(OperandsQuery.AnswersOf(answer, query.Count) ?? new OperandFacts[query.Count]);
+        }
+
+        return proofs.Apply(answers);
     }
 
     // The table whose column list the columns are, or the first check that failed.  "table" is asked only when every
