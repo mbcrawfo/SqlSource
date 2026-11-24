@@ -199,7 +199,10 @@ internal sealed class FakeEngineRenaming(
     public IEnumerable<string> WordsOf(RenamingField field) =>
         field.Value.Split([',', ' '], StringSplitOptions.RemoveEmptyEntries);
 
-    public void Derive(RenamingCall call, IRenamingScope scope) => derive?.Invoke(call, scope);
+    public void Derive(RenamingCall call, IReadOnlyList<RenamingCall> calls, IRenamingScope scope) =>
+        derive?.Invoke(call, scope);
+
+    public void DeriveEntry(JsonObject entry, IReadOnlyList<RenamingCall> calls) { }
 
     // The members of the calls with those of a FakeFailure in the answer of each.  The failure's argument is the
     // query's name, as FakeDescriber.Failure gives it.

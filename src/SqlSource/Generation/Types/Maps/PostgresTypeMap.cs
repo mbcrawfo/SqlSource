@@ -106,10 +106,8 @@ internal static class PostgresTypeMap
                 ? WithOwnKey(Map(baseType, column, overrideOf, libraries), type, "")
                 : TypeMapping.Failed(TypeMappingKind.NotWrittenByTheTool, key),
             PostgresTypeKind.Enum => TypeMapping.Mapped(key, StringKeyword, false),
-            PostgresTypeKind.Range or PostgresTypeKind.Multirange => TypeMapping.Failed(
-                TypeMappingKind.UserDefinedRange,
-                key
-            ),
+            PostgresTypeKind.Range => TypeMapping.Failed(TypeMappingKind.UserDefinedRange, key),
+            PostgresTypeKind.Multirange => TypeMapping.Failed(TypeMappingKind.UserDefinedMultirange, key),
             // No Npgsql reads a base type of pg_catalog that the map lacks, and its bare name is not a key.
             PostgresTypeKind.Base when IsSystemType(type) => TypeMapping.Failed(
                 TypeMappingKind.CastToText,

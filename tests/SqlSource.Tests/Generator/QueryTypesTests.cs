@@ -308,6 +308,46 @@ public sealed class QueryTypesTests
         ]);
     }
 
+    // Npgsql reads a multirange as an array of its range, so the help maps a user's multirange to an array, which then
+    // builds.
+    [Fact]
+    public void Run_UserDefinedMultirange_IsSqlsrc246WithAnArrayOfTheRange()
+    {
+        var floatMultirange = TestSidecars.Postgres(
+            name: "floatmultirange",
+            kind: SidecarValues.Kind.Multirange,
+            schema: "public",
+            internalName: "floatmultirange",
+            subtype: Catalog("float8")
+        );
+        var mapped = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.floatmultirange=NpgsqlTypes.NpgsqlRange<double>[]\n" + SqlTexts.GetUser
+        );
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("spans", floatMultirange)])
+        );
+        var mappedRun = Run(
+            [NpgsqlReferences.Npgsql10],
+            mapped,
+            Entry(mapped, "GetUser", [], [Column("spans", floatMultirange)])
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'spans' has the type 'floatmultirange', which SqlSource cannot give "
+                + "a C# type.  Map it with the type override, as public.floatmultirange=NpgsqlTypes.NpgsqlRange<T>[] "
+                + "with the data source's EnableUnmappedTypes().",
+        ]);
+        mappedRun.Diagnostics.ShouldBeEmpty();
+        StepOutputs
+            .ColumnsOf(mappedRun)
+            .ShouldHaveSingleItem()
+            .Text.ShouldBe("global::NpgsqlTypes.NpgsqlRange<double>[]");
+    }
+
     // The range's help writes its key as the type override reads it, so a name that needs quotes is given with them.
     [Fact]
     public void Run_UserDefinedRangeWhoseNameNeedsQuotes_HelpQuotesIt()
@@ -423,10 +463,14 @@ public sealed class QueryTypesTests
     // A range of the catalog that the map lacks, which only a sidecar edited by hand has: its bare name is no key, or
     // is a key of another type, so the help names it with its schema, and that key maps it.
     [Theory]
-    [InlineData("integer", SidecarValues.Kind.Range)]
-    [InlineData("integer", SidecarValues.Kind.Multirange)]
-    [InlineData("newrange", SidecarValues.Kind.Range)]
-    public void Run_RangeOfTheCatalogThatTheMapLacks_IsSqlsrc246WithTheQualifiedKey(string name, string kind)
+    [InlineData("integer", SidecarValues.Kind.Range, "NpgsqlTypes.NpgsqlRange<T>")]
+    [InlineData("integer", SidecarValues.Kind.Multirange, "NpgsqlTypes.NpgsqlRange<T>[]")]
+    [InlineData("newrange", SidecarValues.Kind.Range, "NpgsqlTypes.NpgsqlRange<T>")]
+    public void Run_RangeOfTheCatalogThatTheMapLacks_IsSqlsrc246WithTheQualifiedKey(
+        string name,
+        string kind,
+        string mappedTo
+    )
     {
         var range = TestSidecars.Postgres(name: name, kind: kind, internalName: name, subtype: Catalog("float8"));
         var mapped = new SqlFile(
@@ -443,8 +487,8 @@ public sealed class QueryTypesTests
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'span' has the type '{name}', which SqlSource cannot give a C# "
-                + $"type.  Map it with the type override, as pg_catalog.{name}=NpgsqlTypes.NpgsqlRange<T> with the "
-                + "data source's EnableUnmappedTypes().",
+                + $"type.  Map it with the type override, as pg_catalog.{name}={mappedTo} with the data source's "
+                + "EnableUnmappedTypes().",
         ]);
         mappedRun.Diagnostics.ShouldBeEmpty();
         StepOutputs.ColumnsOf(mappedRun).ShouldHaveSingleItem().Text.ShouldBe("global::MyApp.Tag");

@@ -295,7 +295,11 @@ public sealed class ColumnTests(PostgresDatabases postgres)
         ORDER BY a.attnum
         """;
 
-    private Task MakeOwnTablesAsync() => postgres.ExecuteAsync(ScratchSchema.ColumnTypes);
+    private async Task MakeOwnTablesAsync()
+    {
+        await postgres.ExecuteAsync(ScratchSchema.ColumnTypes);
+        await postgres.ExecuteAsync(ScratchSchema.UserTypes);
+    }
 
     private async Task<List<string>> FormatTypesOfAsync(string table)
     {
@@ -316,8 +320,10 @@ public sealed class ColumnTests(PostgresDatabases postgres)
     private static SidecarOrigin Origin(string table, string column, string schema = "public") =>
         new(schema, table, column);
 
-    // Every column of every table and view of the fixture schema, and of the table of these tests: the name the
+    // Every column of every table and view of the fixture schema, and of the tables of these tests: the name the
     // describer spells is the one format_type gives the column, domains, enums, arrays and ranges included.
+    // user_types holds a range of a user's own, its multirange, an array of it and a domain over it, which Npgsql
+    // reads only after EnableUnmappedTypes, and arrays of types whose names start with "_".
     [Theory]
     [InlineData("users")]
     [InlineData("orders")]
@@ -327,7 +333,9 @@ public sealed class ColumnTests(PostgresDatabases postgres)
     [InlineData("active_users")]
     [InlineData("user_orders")]
     [InlineData("modifiers")]
+    [InlineData("readings")]
     [InlineData("column_types")]
+    [InlineData("user_types")]
     public async Task DescribeAsync_EveryColumnOfATable_IsSpelledAsFormatTypeSpellsIt(string table)
     {
         await MakeOwnTablesAsync();

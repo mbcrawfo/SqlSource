@@ -46,7 +46,7 @@ internal enum ScenarioTag
 internal sealed record Setup(
     ConnectionStart Connection = ConnectionStart.Open,
     CallerTransaction Transaction = CallerTransaction.None,
-    // The engine's name of a data source: "default", "multiplexing", "nodatime", "gis", "billing".
+    // The engine's name of a data source: "default", "multiplexing", "nodatime", "unmapped", "gis", "billing".
     string Source = "default",
     // A fresh database for each run.
     bool Writes = false,
