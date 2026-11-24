@@ -329,6 +329,11 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
         // extension's type as before, and describes as before against a database without PostGIS.
         _ = builder.UseNetTopologySuite();
 
+        // Without it Npgsql throws for a column of a user's own range, of its multirange or of a domain over it, and
+        // refuses a parameter of one; the manual tells an application to call it for such a type.  It changes nothing
+        // of another type's column or parameter.
+        _ = builder.EnableUnmappedTypes();
+
         var driverLog = NpgsqlRunLogger.For(log);
         if (driverLog is not null)
         {

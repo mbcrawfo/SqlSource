@@ -40,6 +40,40 @@ public sealed class PostgresBindNamesTests
         LongEnumInDottedSchema
     );
 
+    // An enum, a composite and a domain whose names start with "_", and their arrays, "_" and the element's name.
+    private static readonly PostgresTypeRow UnderscoreEnum = PostgresRows.EnumOf(16670, "_feel", "a");
+
+    private static readonly PostgresTypeRow UnderscoreEnumArray = PostgresRows.ArrayOf(16671, "__feel", UnderscoreEnum);
+
+    private static readonly PostgresTypeRow UnderscoreComposite = PostgresRows.CompositeOf(16672, "_tag");
+
+    private static readonly PostgresTypeRow UnderscoreCompositeArray = PostgresRows.ArrayOf(
+        16673,
+        "__tag",
+        UnderscoreComposite
+    );
+
+    private static readonly PostgresTypeRow UnderscoreDomain = PostgresRows.DomainOf(16674, "_dom", PostgresRows.Int4);
+
+    private static readonly PostgresTypeRow UnderscoreDomainArray = PostgresRows.ArrayOf(
+        16675,
+        "__dom",
+        UnderscoreDomain
+    );
+
+    private static readonly PostgresTypeRow UnderscoreEnumInDottedSchema = PostgresRows.EnumIn(
+        16676,
+        "a.b",
+        "_feel",
+        "a"
+    );
+
+    private static readonly PostgresTypeRow UnderscoreEnumInDottedSchemaArray = PostgresRows.ArrayOf(
+        16677,
+        "__feel",
+        UnderscoreEnumInDottedSchema
+    );
+
     private static readonly PostgresTypeRow[] Known =
     [
         PostgresRows.Int4,
@@ -66,6 +100,14 @@ public sealed class PostgresBindNamesTests
         LongEnumArray,
         LongEnumInDottedSchema,
         LongEnumInDottedSchemaArray,
+        UnderscoreEnum,
+        UnderscoreEnumArray,
+        UnderscoreComposite,
+        UnderscoreCompositeArray,
+        UnderscoreDomain,
+        UnderscoreDomainArray,
+        UnderscoreEnumInDottedSchema,
+        UnderscoreEnumInDottedSchemaArray,
     ];
 
     public static TheoryData<long, string> Names =>
@@ -92,6 +134,12 @@ public sealed class PostgresBindNamesTests
             { LongEnum.Oid, "public." + LongName },
             // Npgsql refuses the element's name and [] as too long, and binds the array's own name.
             { LongEnumArray.Oid, "public._" + LongName[..62] },
+            { UnderscoreEnum.Oid, "public._feel" },
+            // Npgsql reads a leading "_" as an array's, so the element's name and [] would make it recurse until the
+            // stack overflows: the array is its own name.
+            { UnderscoreEnumArray.Oid, "public.__feel" },
+            { UnderscoreCompositeArray.Oid, "public.__tag" },
+            { UnderscoreDomainArray.Oid, "public.__dom" },
         };
 
     public static TheoryData<long> NamesWithADot =>
@@ -101,6 +149,7 @@ public sealed class PostgresBindNamesTests
             PostgresRows.WithDottedName.Oid,
             PostgresRows.WithDottedNameArray.Oid,
             LongEnumInDottedSchemaArray.Oid,
+            UnderscoreEnumInDottedSchemaArray.Oid,
         ];
 
     [Theory]
