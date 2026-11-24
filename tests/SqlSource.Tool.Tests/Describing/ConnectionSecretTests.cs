@@ -31,6 +31,24 @@ public sealed class ConnectionSecretTests
             ["billing", "postgres"]
         ).Parts.ShouldBe(["Billing"]);
 
+    // What is too short or too common to be a token is found as a password key's value alone.
+    [Fact]
+    public void KeyedParts_ShortAndRunWordParts_AreThoseLongestFirstWithoutBlanksWholesOrRepeats() =>
+        new ConnectionSecret(
+            "pg",
+            ["pg", "x", "postgres", "", " ", null, "abc", "x", "hunter22"],
+            ["postgres"]
+        ).KeyedParts.ShouldBe(["postgres", "abc", "x"]);
+
+    [Fact]
+    public void IsIn_KeyedPartAsAKeysValue_IsTrueAndElsewhereFalse()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=pg", ["pg"]);
+
+        secret.IsIn("refused Password=pg;").ShouldBeTrue();
+        secret.IsIn("relation pg_class, user pg").ShouldBeFalse();
+    }
+
     [Fact]
     public void Wholes_ValueWithSpaceAndAForm_AreAllThreeLongestFirst() =>
         new ConnectionSecret(" Host=db;Password=pw ", forms: ["Host=db;Password=pw;Port=5432"]).Wholes.ShouldBe([

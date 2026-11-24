@@ -29,6 +29,14 @@ namespace SqlSource.Tool.Describing;
 /// separator, and a token ends at the end of a text either way, so only those that hold a line break (as they are or
 /// written with <c>\n</c>) are searched joined with one.
 /// </para>
+/// <para>
+/// <see cref="OfEveryPair" /> also searches every two texts joined, in both orders, for a whole form or a part cut in
+/// two, as a member's name and a later member's value, or two values written in the reverse order.  It does not join
+/// them: a whole or a part over two texts ends the first with its head and starts the second with the rest, so each cut
+/// of it is looked for at the ends of each text, and the search grows with the number of texts and not with its square.
+/// A part's ends are judged as a token's against the text beside them.  A keyed part is not searched so: its key would
+/// have to be found over two texts as well.
+/// </para>
 /// </remarks>
 internal static class JoinedRedaction
 {
@@ -44,21 +52,51 @@ internal static class JoinedRedaction
     /// Lists of indexes into <paramref name="texts" />, each searched joined in the order it names, for the texts that
     /// a describer wrote the value over with others between them.
     /// </param>
-    public static string[] Of(IReadOnlyList<string> texts, ConnectionSecret secret, params IReadOnlyList<int>[] subsets)
+    public static string[] Of(
+        IReadOnlyList<string> texts,
+        ConnectionSecret secret,
+        params IReadOnlyList<int>[] subsets
+    ) => Cleaned(texts, secret, everyPair: false, subsets);
+
+    /// <summary>
+    /// The texts cleaned as <see cref="Of" /> cleans them, and also where a whole form or a part stands over two of
+    /// them joined in either order.
+    /// </summary>
+    /// <param name="texts">The strings of an event, in the order they were written.</param>
+    /// <param name="secret">The connection's value and its secret parts.</param>
+    /// <param name="subsets">The lists of indexes that <see cref="Of" /> takes.</param>
+    public static string[] OfEveryPair(
+        IReadOnlyList<string> texts,
+        ConnectionSecret secret,
+        params IReadOnlyList<int>[] subsets
+    ) => Cleaned(texts, secret, everyPair: true, subsets);
+
+    private static string[] Cleaned(
+        IReadOnlyList<string> texts,
+        ConnectionSecret secret,
+        bool everyPair,
+        IReadOnlyList<int>[] subsets
+    )
     {
         var cuts = new List<(int Start, int End)>?[texts.Count];
-        var lineWholes = WithBreaks(secret.Wholes);
-        var lineParts = WithBreaks(secret.Parts);
+        var plain = new Forms(secret.Wholes, secret.Parts, secret.KeyedParts);
+        var lines = new Forms(WithBreaks(secret.Wholes), WithBreaks(secret.Parts), WithBreaks(secret.KeyedParts));
         int[] all = [.. Enumerable.Range(0, texts.Count)];
         foreach (var index in all)
         {
-            Cut(texts, [index], string.Empty, secret.Wholes, secret.Parts, cuts);
+            Cut(texts, [index], string.Empty, plain, cuts);
         }
 
         foreach (var group in subsets.Prepend(all).Where(static group => group.Count > 0))
         {
-            Cut(texts, group, string.Empty, secret.Wholes, secret.Parts, cuts);
-            Cut(texts, group, Break, lineWholes, lineParts, cuts);
+            Cut(texts, group, string.Empty, plain, cuts);
+            Cut(texts, group, Break, lines, cuts);
+        }
+
+        if (everyPair)
+        {
+            CutPairs(texts, string.Empty, plain, cuts);
+            CutPairs(texts, Break, lines, cuts);
         }
 
         return
@@ -78,18 +116,17 @@ internal static class JoinedRedaction
                 .Distinct(StringComparer.Ordinal),
         ];
 
-    // Adds to the cuts of each text of the group the slices of it that the wholes and the parts cover in the group's
-    // texts joined.
+    // Adds to the cuts of each text of the group the slices of it that the wholes, the parts and the keyed parts cover
+    // in the group's texts joined.
     private static void Cut(
         IReadOnlyList<string> texts,
         IReadOnlyList<int> group,
         string separator,
-        IReadOnlyList<string> wholes,
-        IReadOnlyList<string> parts,
+        Forms forms,
         List<(int Start, int End)>?[] cuts
     )
     {
-        if (wholes.Count == 0 && parts.Count == 0)
+        if (forms.IsEmpty)
         {
             return;
         }
@@ -101,7 +138,7 @@ internal static class JoinedRedaction
             starts[i] = starts[i - 1] + texts[group[i - 1]].Length + separator.Length;
         }
 
-        foreach (var whole in wholes)
+        foreach (var whole in forms.Wholes)
         {
             for (
                 var found = joined.IndexOf(whole, StringComparison.Ordinal);
@@ -113,15 +150,29 @@ internal static class JoinedRedaction
             }
         }
 
+        foreach (var (found, length) in Found(joined, forms.Parts, Redaction.NextToken))
+        {
+            Cover(texts, group, starts, found, found + length, cuts);
+        }
+
+        foreach (var (found, length) in Found(joined, forms.Keyed, Redaction.NextKeyed))
+        {
+            Cover(texts, group, starts, found, found + length, cuts);
+        }
+    }
+
+    // Where each part stands as the search finds it, with its length.
+    private static IEnumerable<(int Found, int Length)> Found(
+        string text,
+        IReadOnlyList<string> parts,
+        Func<string, string, int, int> next
+    )
+    {
         foreach (var part in parts)
         {
-            for (
-                var found = Redaction.NextToken(joined, part, 0);
-                found >= 0;
-                found = Redaction.NextToken(joined, part, found + 1)
-            )
+            for (var found = next(text, part, 0); found >= 0; found = next(text, part, found + 1))
             {
-                Cover(texts, group, starts, found, found + part.Length, cuts);
+                yield return (found, part.Length);
             }
         }
     }
@@ -145,6 +196,99 @@ internal static class JoinedRedaction
             {
                 (cuts[group[i]] ??= []).Add((from - starts[i], to - starts[i]));
             }
+        }
+    }
+
+    // Adds the slices that a whole or a part covers over two different texts joined with the separator, in either
+    // order.  With no separator a form is cut between two of its characters, so each text holds some of it; with the
+    // break, the form is cut at a break of its own, which the separator stands for, and a half may be empty.
+    private static void CutPairs(
+        IReadOnlyList<string> texts,
+        string separator,
+        Forms forms,
+        List<(int Start, int End)>?[] cuts
+    )
+    {
+        foreach (
+            var (form, isPart) in forms
+                .Wholes.Select(static whole => (whole, false))
+                .Concat(forms.Parts.Select(static part => (part, true)))
+        )
+        {
+            foreach (var cut in CutsOf(form, separator))
+            {
+                var head = form[..cut];
+                var tail = form[(cut + separator.Length)..];
+                var ends = Matching(texts, text => EndsWith(text, head, form, isPart));
+                var begins = Matching(texts, text => BeginsWith(text, tail, form, isPart));
+                foreach (var index in ends.Where(index => begins.Any(other => other != index)))
+                {
+                    AddSlice(cuts, index, texts[index].Length - head.Length, texts[index].Length);
+                }
+
+                foreach (var index in begins.Where(index => ends.Any(other => other != index)))
+                {
+                    AddSlice(cuts, index, 0, tail.Length);
+                }
+            }
+        }
+    }
+
+    // Where the form may be cut: between two characters, or at each break that the separator stands for.
+    private static IEnumerable<int> CutsOf(string form, string separator) =>
+        separator.Length == 0
+            ? Enumerable.Range(1, Math.Max(form.Length - 1, 0))
+            : Enumerable
+                .Range(0, form.Length)
+                .Where(index => string.CompareOrdinal(form, index, separator, 0, separator.Length) == 0);
+
+    // The indexes of the texts that hold the side.
+    private static List<int> Matching(IReadOnlyList<string> texts, Func<string, bool> holds)
+    {
+        List<int> found = [];
+        for (var index = 0; index < texts.Count; index++)
+        {
+            if (holds(texts[index]))
+            {
+                found.Add(index);
+            }
+        }
+
+        return found;
+    }
+
+    // Whether the text ends with the head of the form, and, for a part, begins it where a token may begin.
+    private static bool EndsWith(string text, string head, string form, bool isPart)
+    {
+        if (!text.EndsWith(head, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var before = text.Length - head.Length - 1;
+        return !isPart || !Redaction.IsWordCharacter(form[0]) || before < 0 || !Redaction.IsWordCharacter(text[before]);
+    }
+
+    // Whether the text begins with the tail of the form, and, for a part, ends it where a token may end.
+    private static bool BeginsWith(string text, string tail, string form, bool isPart)
+    {
+        if (!text.StartsWith(tail, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var after = tail.Length;
+        return !isPart
+            || !Redaction.IsWordCharacter(form[^1])
+            || after == text.Length
+            || !Redaction.IsWordCharacter(text[after]);
+    }
+
+    private static void AddSlice(List<(int Start, int End)>?[] cuts, int index, int start, int end)
+    {
+        if (start < end)
+        {
+            (cuts[index] ??= []).Add((start, end));
         }
     }
 
@@ -174,5 +318,11 @@ internal static class JoinedRedaction
         }
 
         return marked.Append(text, from, text.Length - from).ToString();
+    }
+
+    // The wholes, the parts and the keyed parts that one search looks for.
+    private sealed record Forms(IReadOnlyList<string> Wholes, IReadOnlyList<string> Parts, IReadOnlyList<string> Keyed)
+    {
+        public bool IsEmpty => Wholes.Count == 0 && Parts.Count == 0 && Keyed.Count == 0;
     }
 }
