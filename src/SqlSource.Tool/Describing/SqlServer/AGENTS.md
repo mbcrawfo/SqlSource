@@ -21,7 +21,8 @@
   5. `columns` once the parameters are typed, with every parameter declared;
   6. then `operands`, only when a proof needs the server, with the declarations of `columns`;
   7. then `origins`, the text of `columns` in browse mode 1, only when a column of a CLR type answered not null is a view's or an inline function's;
-  8. and `table` only when every column has an origin in one table, since a call that fails for a table the match never reads would fail the query.
+  8. then `table` for each of `ColumnProofs.ComputedTables`, whose failure proves nothing;
+  9. and `table` for the match only when every column has an origin in one table, since a call that fails for a table the match never reads would fail the query, reusing step 8's answer for it.
 - **A `parameters` that fails with `11501` asks `columns` with the declared parameters alone**, and `SqlServerErrors.AfterRefusal` reports the two answers.
 - **A parameter is declared only when its `-- param:` marker gives a type.**
 - **The type of an inferred one is declared to `columns` by `Types/SqlServerTypes.Declared`, a user type's names in brackets, and never by `Spelled`, which is for messages**: the server refuses `dbo.User`, whose name is a keyword.
@@ -39,7 +40,7 @@
 - **`columns` and `table` read `sys.dm_exec_describe_first_result_set` in browse mode 2, and a hidden row is dropped before anything is built** (`SqlServerLive`, `Columns/SqlServerColumns`, [browse mode 2](../../../../docs/architecture/sqlserver-describer.md#browse-mode-2)).  Mode 1 names a view's base table as the origin and adds hidden columns that differ between versions, and mode 2's one hidden row, `ROWSTAT`, must reach no model.
 - **There is no plan walk, and every entry with rows records `plan` as `skipped`.**
 - **What `operands` and `origins` answer never fails the describe**: an answer of `operands` that proves nothing leaves the column as the server answered it, and one of `origins` that shows nothing leaves a CLR column nullable.
-- **Nothing but `ColumnProofs`, which reads the text for one table alone, acts on a row's `PersistedNotNull`**: it says what the catalog holds, not what the query reads, and through an outer join the column is `NULL` while the server still names it as the source.
+- **Nothing but `ColumnProofs`, which reads the text for a table no join makes `NULL`, acts on a row's `PersistedNotNull` or `ComputedDefinition`**: they say what the catalog holds, not what the query reads, and through an outer join the column is `NULL` while the server still names it as the source.
 - **`table`'s text is built from the catalog names the server gave as the origin, and never from the user's text** (`SqlServerLive.TableSelect`): each name in brackets with `]` written twice.
 
 ## Driver logging

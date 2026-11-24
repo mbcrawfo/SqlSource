@@ -169,6 +169,41 @@ internal sealed class FilteredRows
         return at == full ? OperandScope.RightSide : null;
     }
 
+    /// <summary>
+    /// True when the range, a column alone or a <c>q.*</c>, reads a source that is a table no join of these rows can
+    /// make <c>NULL</c>: its one source is no derived table, is not optional, and has no one-part name that a CTE has,
+    /// compared ignoring case.
+    /// </summary>
+    /// <remarks>
+    /// The server names a table as the source of a column that a derived table or a CTE passes on, and names it still
+    /// where an outer join makes the column <c>NULL</c>, so a row of the result is a row of that table only so.  A
+    /// CTE's name is compared ignoring case, as a database whose collation ignores it resolves the name; whether the
+    /// source is a table, and no view or function, the caller reads from the column's row.
+    /// </remarks>
+    public bool IsOfATableNoJoinMakesNull(TokenRange range)
+    {
+        string[]? parts;
+        if (range.Count == 3 && _tokens[range.End - 1].IsSymbol("*"))
+        {
+            parts =
+                _tokens[range.End - 2].IsSymbol(".")
+                && RowFilter.NameOf(_tokens, new TokenRange(range.Start, range.Start + 1)) is [var qualifier]
+                    ? [qualifier, "*"]
+                    : null;
+        }
+        else
+        {
+            parts = RowFilter.NameOf(_tokens, range);
+        }
+
+        return parts is not null
+            && SourceOf(parts) is { IsDerived: false, IsOptional: false } source
+            && (
+                source.OnePartName is not { } name
+                || !_ctes.Any(cte => string.Equals(cte.Name, name, StringComparison.OrdinalIgnoreCase))
+            );
+    }
+
     /// <summary>True when the range is a column alone that these rows hold no <c>NULL</c> of.</summary>
     public bool KeepsFromNull(TokenRange range) =>
         RowFilter.NameOf(_tokens, range) is { } parts && (_filter.Keeps(parts) || IsKeptByACte(parts));

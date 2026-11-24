@@ -130,8 +130,9 @@ internal sealed partial class SqlServerSession : DescriberSession
     /// with the list, before any <c>probe</c>, so that a text whose parameters the two read differently is not probed;
     /// then, for each reused parameter whose copies' types differ, the probes of its copies; then <c>columns</c>, with
     /// the SQL as written and every parameter declared; then <c>operands</c>, when a proof of a column needs the
-    /// server, with the same declarations; then, when every column has an origin in one table, <c>table</c> for it,
-    /// and the match.
+    /// server, with the same declarations; then <c>origins</c>, when a column of a CLR type needs it; then
+    /// <c>table</c> for each table whose computed column a proof reads; then, when every column has an origin in one
+    /// table, <c>table</c> for it, unless the proofs asked it already, and the match.
     /// </para>
     /// <para>
     /// A <c>parameters</c> that fails with <see cref="SqlServerErrors.RefusedBatch" /> asks <c>columns</c> with the
@@ -283,14 +284,14 @@ internal sealed partial class SqlServerSession : DescriberSession
             );
         }
 
-        var proved = await ProvedAsync(request, built.Value, rows.Value, declarations, cancellationToken);
+        var (proved, tables) = await ProvedAsync(request, built.Value, rows.Value, declarations, cancellationToken);
         foreach (var column in proved)
         {
             SqlServerEvents.Column(_log, request.Name, column.Column, column.NoOriginReason);
         }
 
         var columns = new EquatableArray<SidecarColumn>([.. proved.Select(static column => column.Column)]);
-        var matched = await MatchAsync(request, columns, cancellationToken);
+        var matched = await MatchAsync(request, columns, tables, cancellationToken);
         if (!matched.Succeeded)
         {
             return Failed(matched.Failure);
@@ -311,10 +312,14 @@ internal sealed partial class SqlServerSession : DescriberSession
 
     // The columns, each that a proof shows cannot be NULL answered not null, through "operands" when a proof needs the
     // server, and each of a CLR type that may hold the type's Null nullable, unless "origins" shows that the view or
-    // the function it is read from passes a stored column on.  What "operands" and "origins" answer never fails the
-    // describe: an answer that proves nothing leaves the proofs of the text alone, and every other column keeps the
-    // server's answer.
-    private async Task<IReadOnlyList<BuiltColumn>> ProvedAsync(
+    // the function it is read from passes a stored column on, and each computed column read as a row of its table not
+    // null when its definition is over the rows of "table" for that table.  What "operands", "origins" and that "table"
+    // answer never fails the describe: an answer that proves nothing leaves the proofs of the text alone, and every
+    // other column keeps the server's answer.  The answers of "table" go to the match, which asks no table twice.
+    private async Task<(
+        IReadOnlyList<BuiltColumn> Columns,
+        IReadOnlyDictionary<(string Schema, string Table), SqlServerColumnsAnswer> Tables
+    )> ProvedAsync(
         DescribeRequest request,
         IReadOnlyList<BuiltColumn> built,
         IReadOnlyList<SqlServerColumnRow> rows,
@@ -351,23 +356,41 @@ internal sealed partial class SqlServerSession : DescriberSession
             origins = proofs.OriginsOf(answer);
         }
 
-        return proofs.Apply(answers, origins);
+        // Each table whose computed column the proofs read, after "origins": an answer with an error or error rows
+        // proves nothing.
+        var asked = new Dictionary<(string Schema, string Table), SqlServerColumnsAnswer>();
+        var tables = new Dictionary<(string Schema, string Table), IReadOnlyList<SqlServerColumnRow>>();
+        foreach (var (schema, table) in proofs.ComputedTables)
+        {
+            var answer = await TableAsync(request.Name, new SqlServerTableRequest(schema, table), cancellationToken);
+            asked[(schema, table)] = answer;
+            if (answer is { Error: null, Errors: null or { Count: 0 }, Rows: { } described })
+            {
+                tables[(schema, table)] = described;
+            }
+        }
+
+        return (proofs.Apply(answers, origins, tables), asked);
     }
 
     // The table whose column list the columns are, or the first check that failed.  "table" is asked only when every
     // column has an origin in one table, since the first two checks need none, and a call that fails for a table the
-    // match never reads would fail the query.  Its rows are corrected as the columns of SELECT * from the table alone
-    // are, so that a query the proofs corrected is compared with a table they corrected.
+    // match never reads would fail the query.  An answer the proofs were given for the table is taken, and "table" is
+    // not asked again.  Its rows are corrected as the columns of SELECT * from the table alone are, so that a query
+    // the proofs corrected is compared with a table they corrected.
     private async Task<Outcome<(SidecarTable? Table, string TableMatch), DescribeFailure>> MatchAsync(
         DescribeRequest request,
         EquatableArray<SidecarColumn> columns,
+        IReadOnlyDictionary<(string Schema, string Table), SqlServerColumnsAnswer> asked,
         CancellationToken cancellationToken
     )
     {
         IReadOnlyList<SqlServerColumnRow>? rows = null;
         if (SqlServerTableMatcher.TableOf(columns) is { Schema: { } schema, Table: { } name })
         {
-            var answer = await TableAsync(request.Name, new SqlServerTableRequest(schema, name), cancellationToken);
+            var answer = asked.TryGetValue((schema, name), out var given)
+                ? given
+                : await TableAsync(request.Name, new SqlServerTableRequest(schema, name), cancellationToken);
             var described = RowsOf(request, answer, DescribeStep.TableMatch, SqlServerCallNames.Table);
             if (!described.Succeeded)
             {

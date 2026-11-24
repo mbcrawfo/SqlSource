@@ -492,13 +492,12 @@ public sealed class ColumnProofsTests
             ]);
     }
 
-    // The column through a join, a derived table or a CTE, under a grouping set, as an operand of an expression or of
-    // a scalar subquery, in parentheses, which IsColumn does not take for a column alone, or by a * that is not the
-    // one item of one table: the server's answer stands, since a row of the result may be no row of the table (an
-    // outer join gives NULL).
+    // The column through an outer join's optional side, a derived table or a CTE, under a grouping set, as an operand
+    // of an expression or of a scalar subquery, in parentheses, which IsColumn does not take for a column alone, or by
+    // a * that is not the one item of one table: the server's answer stands, since a row of the result may be no row
+    // of the table (an outer join gives NULL).
     [Theory]
     [InlineData("SELECT o.id, u.name_len_p FROM dbo.orders AS o LEFT JOIN dbo.users AS u ON u.id = o.user_id")]
-    [InlineData("SELECT o.id, u.name_len_p FROM dbo.orders AS o JOIN dbo.users AS u ON u.id = o.user_id")]
     [InlineData("SELECT u.id, u.name_len_p FROM (SELECT * FROM dbo.users) AS u")]
     [InlineData("WITH users AS (SELECT * FROM dbo.users) SELECT id, name_len_p FROM users")]
     [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY ROLLUP (id, name_len_p)")]

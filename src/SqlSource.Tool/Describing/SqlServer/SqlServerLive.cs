@@ -75,6 +75,8 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
     // persisted_not_null is the tool's own too: whether the source, under the same condition and a table of sys.tables,
     // has its column computed PERSISTED NOT NULL in sys.computed_columns, the name compared under the database's
     // collation, as the server resolves a name.  The server's is_nullable judges the column's expression instead.
+    // computed_definition is the tool's own as well: the definition of that computed column, under the same condition,
+    // persisted or not, which the proofs read; NULL for any other row.
     private const string ColumnsSql = """
         SELECT d.is_hidden, d.column_ordinal, d.name, d.is_nullable, d.system_type_name, d.max_length, d.precision,
             d.scale, d.user_type_schema, d.user_type_name, d.assembly_qualified_type_name, d.source_server,
@@ -95,7 +97,16 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                     THEN 1
                     ELSE 0
                 END AS bit
-            ) AS persisted_not_null
+            ) AS persisted_not_null,
+            CASE
+                WHEN d.is_computed_column = 1 THEN (
+                    SELECT c.definition
+                    FROM sys.computed_columns AS c
+                    JOIN sys.tables AS t ON t.object_id = c.object_id
+                    WHERE c.object_id = s.source_id
+                        AND c.name = d.source_column COLLATE DATABASE_DEFAULT
+                )
+            END AS computed_definition
         FROM sys.dm_exec_describe_first_result_set(@tsql, @params, @browse) AS d
         CROSS APPLY (
             SELECT CASE
@@ -331,7 +342,8 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                             BoolOf(reader, "is_identity_column"),
                             BoolOf(reader, "is_computed_column"),
                             StringOf(reader, "source_type"),
-                            BoolOf(reader, "persisted_not_null")
+                            BoolOf(reader, "persisted_not_null"),
+                            StringOf(reader, "computed_definition")
                         )
                     );
                 }
