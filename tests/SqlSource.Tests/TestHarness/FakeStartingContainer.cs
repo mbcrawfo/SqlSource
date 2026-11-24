@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using DotNet.Testcontainers.Containers;
@@ -16,13 +18,27 @@ internal sealed class FakeStartingContainer(Exception? failure = null) : IStarti
     // Thrown by the read of the log, which succeeds when it is null.
     public Exception? LogFailure { get; set; }
 
+    // Thrown by the save of an archive after it has written Archive, as a copy cut off partway is.
+    public Exception? ArchiveFailure { get; set; }
+
     public (string Stdout, string Stderr) Logs { get; init; } = ("", "");
+
+    // The bytes of the archive of any folder.
+    public byte[] Archive { get; set; } = [1, 2, 3];
+
+    // The folders whose archive was saved, in order.
+    public List<string> ArchivedFolders { get; } = [];
+
+    // How many times it had been disposed when its last archive was saved.
+    public int DisposalsWhenArchived { get; private set; }
 
     public int Starts { get; private set; }
 
     public int LogReads { get; private set; }
 
     public int Disposals { get; private set; }
+
+    public string Id { get; init; } = "fake-container";
 
     public string Image { get; init; } = "fake:1";
 
@@ -38,6 +54,17 @@ internal sealed class FakeStartingContainer(Exception? failure = null) : IStarti
     {
         LogReads++;
         return LogFailure is null ? Task.FromResult(Logs) : Task.FromException<(string, string)>(LogFailure);
+    }
+
+    public async Task SaveArchiveAsync(string path, Stream destination, CancellationToken token)
+    {
+        ArchivedFolders.Add(path);
+        DisposalsWhenArchived = Disposals;
+        await destination.WriteAsync(Archive, token);
+        if (ArchiveFailure is not null)
+        {
+            throw ArchiveFailure;
+        }
     }
 
     public ValueTask DisposeAsync()

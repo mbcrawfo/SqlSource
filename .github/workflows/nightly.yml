@@ -40,6 +40,9 @@ env:
   SOLUTION: SqlSource.slnx
   CONFIGURATION: Release
   DOTNET_NOLOGO: 'true'
+  # Where SqlServerStart saves a SQL Server container that crashed at its start, its console log and the archive of
+  # its /var/opt/mssql/log with the dump, for the job to upload (TD-0072).
+  SQLSOURCE_TESTS_SQLSERVER_CRASHES: ${{ github.workspace }}/artifacts/sqlserver-crashes
 
 jobs:
   test:
@@ -332,6 +335,17 @@ jobs:
           dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
           --report-github --report-github-summary-include-passed false
 
+      # The SQL Server containers that crashed at their start, which SqlServerStart saved before it removed them: see
+      # TD-0072.  Most runs have none, and upload nothing.
+      - name: Upload SQL Server crashes
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sqlserver-crash-${{ matrix.major }}
+          path: ${{ env.SQLSOURCE_TESTS_SQLSERVER_CRASHES }}
+          if-no-files-found: ignore
+          retention-days: 30
+
   # Runs the allocation tests of tests/DatabaseTests/QueryMethodAllocation on PostgreSQL's default image, alone and
   # without coverage, which allocates in the process it measures.  A red job means a generated method may allocate
   # more than its hand-written twin: tests/DatabaseTests/QueryMethodAllocation/README.md says how to read it.
@@ -405,6 +419,17 @@ jobs:
           -p:RunQueryMethodAllocation=true
           --filter-namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer
           --report-github --report-github-summary-include-passed false
+
+      # The SQL Server containers that crashed at their start, which SqlServerStart saved before it removed them: see
+      # TD-0072.  Most runs have none, and upload nothing.
+      - name: Upload SQL Server crashes
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sqlserver-crash-allocation
+          path: ${{ env.SQLSOURCE_TESTS_SQLSERVER_CRASHES }}
+          if-no-files-found: ignore
+          retention-days: 30
 
   # Runs the comparisons of tests/DatabaseTests/Postgres.SyncAsync, each synchronous query method beside its
   # asynchronous twin, on PostgreSQL's default image, without coverage.  A red job means a synchronous method may
@@ -491,3 +516,14 @@ jobs:
           dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
           -p:RunSyncAsync=true
           --report-github --report-github-summary-include-passed false
+
+      # The SQL Server containers that crashed at their start, which SqlServerStart saved before it removed them: see
+      # TD-0072.  Most runs have none, and upload nothing.
+      - name: Upload SQL Server crashes
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sqlserver-crash-sync-async
+          path: ${{ env.SQLSOURCE_TESTS_SQLSERVER_CRASHES }}
+          if-no-files-found: ignore
+          retention-days: 30

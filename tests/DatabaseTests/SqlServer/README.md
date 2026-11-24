@@ -22,7 +22,7 @@ CI runs these tests on both images; run the floor image locally to find a failur
 
 SQL Server's images are built for x64 alone.  On Apple silicon Docker runs them under emulation: the first run takes minutes while the image is pulled, and a start with the image already pulled takes seconds.
 
-Every container of the project starts through `SqlServerStart` of the harness: a container whose server crashes at its start ([TD-0072](../../../docs/tech-debt/TD-0072-sql-server-2025-container-crashes-at-start-in-ci.md)) is replaced once, by a new one, and the crash is reported.  `SqlServerStartTests` of `tests/SqlSource.Tests/TestHarness/` proves that over fakes, with no container.
+Every container of the project starts through `SqlServerStart` of the harness: a container whose server crashes at its start ([TD-0072](../../../docs/tech-debt/TD-0072-sql-server-2025-container-crashes-at-start-in-ci.md)) is saved, its console log and the archive of its `/var/opt/mssql/log` with the dump, in a folder under the one that `SQLSOURCE_TESTS_SQLSERVER_CRASHES` names, or under the system's temporary folder without it, and is replaced once, by a new one; each crash is reported with its crash id and its folder.  CI sets the variable and uploads the folder as an artifact, and the item says how to read it.  `SqlServerStartTests` of `tests/SqlSource.Tests/TestHarness/` proves that over fakes, with no container.
 
 ## The images
 
