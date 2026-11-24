@@ -145,23 +145,24 @@ public sealed class ExpressionProofsTests
     [InlineData("SUM(SUM(t.a)) OVER ()", "GROUP BY ROLLUP (t.b)", true, false, "t.a")]
     [InlineData("SUM(COUNT(*)) OVER (PARTITION BY t.b)", "GROUP BY t.b", true, true, "")]
     // COALESCE, GREATEST and LEAST: one argument proved, and every argument of a type that is no CLR type, which is
-    // asked of each that is not a literal, in any context, a parameter's and a grouping set's included.
+    // asked of each that is not a literal, in any context, a parameter's and a grouping set's included.  An argument
+    // of COALESCE before the proved one must also give one value, which these answers, none of them stored, do not say.
     [InlineData("COALESCE(t.a, t.b)", "", true, false, "t.a|t.b")]
-    [InlineData("COALESCE(t.a, 0)", "", true, true, "t.a")]
+    [InlineData("COALESCE(t.a, 0)", "", true, false, "t.a")]
     [InlineData("COALESCE(t.a, NULL, @p)", "", true, false, "t.a|@p")]
     [InlineData("COALESCE(t.a, t.b)", "GROUP BY ROLLUP (t.a, t.b)", false, false, "")]
-    [InlineData("COALESCE(t.a, 0)", "GROUP BY ROLLUP (t.a)", true, true, "t.a")]
-    [InlineData("COALESCE(MAX(t.a), 0)", "", true, true, "t.a")]
+    [InlineData("COALESCE(t.a, 0)", "GROUP BY ROLLUP (t.a)", false, false, "t.a")]
+    [InlineData("COALESCE(MAX(t.a), 0)", "", false, false, "t.a")]
     [InlineData("COALESCE(NULL, @p)", "", false, false, "")]
     [InlineData("GREATEST(t.a, t.b)", "", true, false, "t.a|t.b")]
     [InlineData("LEAST(t.a, 1)", "", true, true, "t.a")]
     [InlineData("GREATEST(t.a, @p)", "", true, false, "t.a|@p")]
     [InlineData("GREATEST(@p, NULL)", "", false, false, "")]
     // An argument whose type is known from its form asks nothing; one whose type cannot be asked proves nothing.
-    [InlineData("COALESCE(CAST(t.a AS int), 0)", "", true, true, "")]
-    [InlineData("COALESCE(SUM(t.a), 0)", "GROUP BY t.b", true, true, "")]
+    [InlineData("COALESCE(CAST(t.a AS int), 0)", "", true, false, "t.a")]
+    [InlineData("COALESCE(SUM(t.a), 0)", "GROUP BY t.b", true, false, "t.a")]
     [InlineData("COALESCE(JSON_OBJECT('a': t.a), N'')", "", true, true, "")]
-    [InlineData("COALESCE(t.a * 2, 0)", "", true, true, "t.a")]
+    [InlineData("COALESCE(t.a * 2, 0)", "", true, false, "t.a")]
     [InlineData("COALESCE(dbo.f(t.a), 0)", "", false, false, "")]
     [InlineData("COALESCE(MAX(dbo.f(t.a)), 0)", "GROUP BY t.b", false, false, "")]
     [InlineData("COALESCE(LAG(t.a) OVER (ORDER BY t.id), 0)", "", false, false, "")]
@@ -241,7 +242,7 @@ public sealed class ExpressionProofsTests
     [InlineData("t.a AT TIME ZONE 'UTC' AT TIME ZONE @z", "", false, false, "")]
     [InlineData("t.a AT TIME ZONE 'UTC'", "GROUP BY ROLLUP (t.a)", false, false, "")]
     // AT is no reserved word: only the three words are the operator, and a side that is no primary is a leaf.
-    [InlineData("COALESCE(t.at, 0)", "", true, true, "t.at")]
+    [InlineData("COALESCE(t.at, 0)", "", true, false, "t.at")]
     [InlineData("t.a AT TIME 'UTC'", "", false, false, "")]
     [InlineData("t.a COLLATE c AT TIME ZONE 'UTC'", "", false, false, "")]
     [InlineData("t.a AT TIME ZONE 'UTC' COLLATE c", "", false, false, "")]
@@ -261,8 +262,8 @@ public sealed class ExpressionProofsTests
     [InlineData("COALESCE(YEAR(MAX(t.d)), 0)", "GROUP BY t.b", false, false, "")]
     [InlineData("COALESCE(LAG(t.d) OVER (ORDER BY t.id) AT TIME ZONE 'UTC', 0)", "", false, false, "")]
     [InlineData("COALESCE(dbo.f(t.d) AT TIME ZONE 'UTC', 0)", "", false, false, "")]
-    [InlineData("COALESCE(DATEADD(DAY, 1, t.d), 0)", "", true, true, "")]
-    [InlineData("COALESCE(t.d AT TIME ZONE 'UTC', 0)", "", true, true, "")]
+    [InlineData("COALESCE(DATEADD(DAY, 1, t.d), 0)", "", true, false, "t.d")]
+    [InlineData("COALESCE(t.d AT TIME ZONE 'UTC', 0)", "", true, false, "t.d")]
     [InlineData("LAG(SUM(t.a), 1, 0) OVER (ORDER BY t.b)", "GROUP BY t.b", true, false, "t.a")]
     [InlineData("LAG(t.a) OVER (ORDER BY t.id)", "", false, false, "")]
     [InlineData("LAG(t.a, 1) OVER (ORDER BY t.id)", "", false, false, "")]
@@ -466,7 +467,12 @@ public sealed class ExpressionProofsTests
         var typeProof = typed.Of(typedBody.Items.ShouldHaveSingleItem().Expression);
 
         typeProof
-            .Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: false), typed.Operands.Count)])
+            .Holds([
+                .. Enumerable.Repeat(
+                    new OperandFacts(NotNull: true, NotClr: false, Stored: true),
+                    typed.Operands.Count
+                ),
+            ])
             .ShouldBe(typeFixed);
     }
 
@@ -504,8 +510,12 @@ public sealed class ExpressionProofsTests
 
         var count = proofs.Operands.Count;
         count.ShouldBeGreaterThan(0, Texts(sql, tokens, proofs.Operands));
-        proof.Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: true), count)]).ShouldBeTrue();
-        proof.Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: false), count)]).ShouldBeFalse();
+        proof
+            .Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: true, Stored: true), count)])
+            .ShouldBeTrue();
+        proof
+            .Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: false, Stored: true), count)])
+            .ShouldBeFalse();
     }
 
     // The default of LAG and LEAD and the fallback of the CASE are held of no CLR type themselves, whatever the value's
@@ -546,6 +556,111 @@ public sealed class ExpressionProofsTests
 
         proofs.Operands.Count.ShouldBe(1);
         proof.Holds([new OperandFacts(notNull, notClr, stored)]).ShouldBe(holds);
+    }
+
+    // COALESCE reads an argument twice, so an argument before the one that proves it must give one value in a row.
+    // Every operand here is stored and answered nullable, so that only what the walk reads can prove the literal's
+    // branch.
+    [Theory]
+    [InlineData("COALESCE(t.a, 0)", "", true)]
+    [InlineData("COALESCE(t.a, 0)", "GROUP BY ROLLUP (t.a)", true)]
+    [InlineData("COALESCE(@p, 0)", "", true)]
+    [InlineData("COALESCE(NULL, 0)", "", true)]
+    [InlineData("COALESCE('x', 0)", "", true)]
+    [InlineData("COALESCE((t.a), 0)", "", true)]
+    [InlineData("COALESCE(-t.a * 2 + 1, 0)", "", true)]
+    [InlineData("COALESCE(t.a, t.b, 0)", "", true)]
+    [InlineData("COALESCE(CAST(t.a AS bigint), 0)", "", true)]
+    [InlineData("COALESCE(CONVERT(varchar(30), t.a, 1), 0)", "", true)]
+    [InlineData("COALESCE(NULLIF(t.a, 0), 0)", "", true)]
+    [InlineData("COALESCE(ISNULL(t.a, t.b), 0)", "", true)]
+    [InlineData("COALESCE(COALESCE(t.a, t.b), 0)", "", true)]
+    [InlineData("COALESCE(MAX(t.a), 0)", "", true)]
+    [InlineData("COALESCE(MIN(t.a), 0)", "GROUP BY t.b", true)]
+    [InlineData("COALESCE(SUM(DISTINCT t.a), 0)", "GROUP BY t.b", true)]
+    [InlineData("COALESCE(CAST(AVG(ALL t.a * 2) AS int), 0)", "GROUP BY t.b", true)]
+    [InlineData("COALESCE(AVG(t.a), 0)", "GROUP BY t.b", false)]
+    // A value that can change, however it is wrapped.
+    [InlineData("COALESCE(CASE WHEN t.a > 0 THEN t.a END, 0)", "", false)]
+    [InlineData("COALESCE((SELECT TOP (1) o.x FROM o), 0)", "", false)]
+    [InlineData("COALESCE(t.a, (SELECT TOP (1) o.x FROM o), 0)", "", false)]
+    [InlineData("COALESCE(RAND(), 0)", "", false)]
+    [InlineData("COALESCE(t.a, RAND(), 0)", "", false)]
+    [InlineData("COALESCE(RAND() + t.a, 0)", "", false)]
+    [InlineData("COALESCE(CAST(RAND() AS int), 0)", "", false)]
+    [InlineData("COALESCE(CONVERT(int, RAND()), 0)", "", false)]
+    [InlineData("COALESCE(CONVERT(varchar(30), t.a, @p), 0)", "", false)]
+    [InlineData("COALESCE(CAST(t.a AS geometry), 0)", "", false)]
+    [InlineData("COALESCE(NULLIF(RAND(), 0), 0)", "", false)]
+    [InlineData("COALESCE(ISNULL(RAND(), NULL), 0)", "", false)]
+    [InlineData("COALESCE(COALESCE(RAND(), NULL), 0)", "", false)]
+    [InlineData("COALESCE(ISNULL(t.a, RAND()), 0)", "", false)]
+    [InlineData("COALESCE(COALESCE(t.a, RAND()), 0)", "", false)]
+    [InlineData("COALESCE(NULLIF(t.a, RAND()), 0)", "", false)]
+    [InlineData("COALESCE(MAX(RAND()), 0)", "GROUP BY t.b", false)]
+    [InlineData("COALESCE(SUM(t.a) OVER (PARTITION BY t.b), 0)", "", false)]
+    [InlineData("COALESCE(MAX(t.a) OVER (ORDER BY NEWID()), 0)", "", false)]
+    [InlineData("COALESCE(LAG(t.a) OVER (ORDER BY t.id), 0)", "", false)]
+    [InlineData("COALESCE(CAST(LAG(t.a) OVER (ORDER BY NEWID()) AS int), 0)", "", false)]
+    [InlineData("COALESCE(CONVERT(int, LEAD(t.a) OVER (ORDER BY NEWID())), 0)", "", false)]
+    [InlineData("COALESCE(CAST(MAX(t.a) OVER w AS int), 0)", "WINDOW w AS (ORDER BY NEWID())", false)]
+    [InlineData("COALESCE(CONVERT(int, SUM(t.a) OVER w), 0)", "WINDOW w AS (ORDER BY NEWID())", false)]
+    [InlineData("COALESCE(dbo.f(t.a), 0)", "", false)]
+    [InlineData("COALESCE([SUM](t.a), 0)", "", false)]
+    [InlineData("COALESCE([ISNULL](t.a, 0), 0)", "", false)]
+    [InlineData("COALESCE(YEAR(t.d), 0)", "", false)]
+    [InlineData("COALESCE(t.d AT TIME ZONE 'UTC', 0)", "", false)]
+    [InlineData("COALESCE(t.a COLLATE Latin1_General_BIN, 0)", "", false)]
+    [InlineData("COALESCE(@@ROWCOUNT, 0)", "", false)]
+    [InlineData("COALESCE(t.x.value('(/a)[1]', 'int'), 0)", "", false)]
+    public void Of_CoalesceBeforeAProvedArgument_NeedsOneValue(string item, string tail, bool holds)
+    {
+        var (_, _, proofs, body) = Read($"SELECT {item} AS c FROM t AS t {tail}");
+
+        var proof = proofs.Of(body.Items.ShouldHaveSingleItem().Expression);
+
+        proof
+            .Holds([.. Enumerable.Repeat(new OperandFacts(false, NotClr: true, Stored: true), proofs.Operands.Count)])
+            .ShouldBe(holds, item);
+    }
+
+    // An argument after the proved one is never reached, so it may change.  One before it may not, unless it is itself
+    // proved.
+    [Theory]
+    [InlineData("COALESCE(t.a, RAND())", true, false, true)]
+    [InlineData("COALESCE(t.a, RAND(), 0)", true, false, true)]
+    [InlineData("COALESCE(t.a, t.b)", false, true, false)]
+    public void Of_CoalesceByPosition_ReadsOnlyTheArgumentsBefore(
+        string item,
+        bool firstNotNull,
+        bool secondNotNull,
+        bool holds
+    )
+    {
+        var (_, _, proofs, body) = Read($"SELECT {item} AS c FROM t AS t");
+
+        var proof = proofs.Of(body.Items.ShouldHaveSingleItem().Expression);
+
+        var facts = Enumerable
+            .Range(0, proofs.Operands.Count)
+            .Select(index => new OperandFacts(index == 0 ? firstNotNull : secondNotNull, NotClr: true))
+            .ToList();
+        proof.Holds(facts).ShouldBe(holds, item);
+    }
+
+    // GREATEST and LEAST read an argument once, so one proved argument is enough beside one that changes.
+    [Theory]
+    [InlineData("GREATEST(RAND(), 0)")]
+    [InlineData("LEAST(t.a, 1)")]
+    public void Of_GreatestOrLeast_NeedsNoOneValue(string item)
+    {
+        var (_, _, proofs, body) = Read($"SELECT {item} AS c FROM t AS t");
+
+        var proof = proofs.Of(body.Items.ShouldHaveSingleItem().Expression);
+
+        proof
+            .Holds([.. Enumerable.Repeat(new OperandFacts(false, NotClr: true), proofs.Operands.Count)])
+            .ShouldBeTrue();
     }
 
     // CAST and CONVERT prove only to a built-in type that is no CLR type, written as one word, with or without its
@@ -628,7 +743,8 @@ public sealed class ExpressionProofsTests
         Texts(sql, tokens, proofs.Operands).ShouldBe("t.b|t.a");
         second.Holds(Answers(false, true)).ShouldBeTrue();
         second.Holds(Answers(true, false)).ShouldBeFalse();
-        first.Holds(Answers(false, true)).ShouldBeTrue();
+        first.Holds([new OperandFacts(false, true, Stored: true), new OperandFacts(true, true)]).ShouldBeTrue();
+        first.Holds(Answers(false, true)).ShouldBeFalse();
     }
 
     private static (bool Proved, bool Unproved, string Operands) Prove(string item, string tail)

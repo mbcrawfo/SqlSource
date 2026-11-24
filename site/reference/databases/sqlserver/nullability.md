@@ -46,14 +46,15 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - **A rank**: `ROW_NUMBER()`, `RANK()` and `DENSE_RANK()`, and `NTILE` of a whole number, `NTILE(4)`, with `OVER (...)`.
 - **`SUM`, `MAX` and `MIN` of a value that is never null, in a query with a `GROUP BY` whose every group has a row.**  A `GROUP BY` with `ROLLUP`, `CUBE` or `GROUPING SETS` counts too.
 - **`SUM`, `MAX` and `MIN` of a value that is never null, with `OVER (...)` whose frame holds the current row.**  A window that gives no frame has such a frame.
-- **`COALESCE`, `GREATEST` and `LEAST` with an argument that is never null**, and no argument of a spatial type, of `hierarchyid` or of another .NET type.  See [a `COALESCE` over a value that changes](#limit-coalesce-computed-twice).
+- **`COALESCE` with an argument that is never null**, when every argument before it stays the same in a row, as the list below says, and no argument is of a spatial type, of `hierarchyid` or of another .NET type.
+- **`GREATEST` and `LEAST` with an argument that is never null**, and no argument of a spatial type, of `hierarchyid` or of another .NET type.
 - **`CAST` and `CONVERT` of a value that is never null to a built-in type**, such as `int`, `decimal(10, 2)`, `nvarchar(max)` or `datetime2`.  This holds when the type is written as SQL Server names it, and when the style of `CONVERT`, if it has one, is a whole number written in the query.  `TRY_CAST` and `TRY_CONVERT` can be null.
 - **Arithmetic of values that are never null**: `+`, `-`, `*`, `/` and `%`, as in `SUM(quantity * unit_price)`.
 - **`JSON_OBJECT` and `JSON_ARRAY`**, on SQL Server 2022 and later.
 - **A date function of values that are never null**: `DATEADD`, `DATEDIFF`, `DATEDIFF_BIG`, `DATEPART`, `DATENAME`, `YEAR`, `MONTH`, `DAY` and `EOMONTH`.
 - **`AT TIME ZONE` of a value and a time zone that are never null**, as in `placed_at AT TIME ZONE 'UTC'`.
 - **`LAG` and `LEAD` with a default**, as in `LAG(status, 1, 'none') OVER (...)`, when the value and the default are never null, the offset is a whole number written in the query, and neither is of a spatial type, of `hierarchyid` or of another .NET type.  It does not count as never null inside `CAST` or `CONVERT`, as a value of the `CASE` below, or as an argument of `COALESCE`, `GREATEST` or `LEAST`, alone or in arithmetic.
-- **`CASE WHEN x IS NULL THEN e ELSE x END`**, when `e` is never null, `x` is written the same both times, and `x` is a column stored in a table or is never null itself.  Neither may be of a spatial type, of `hierarchyid` or of another .NET type.
+- **`CASE WHEN x IS NULL THEN e ELSE x END`**, when `e` is never null, `x` is written the same both times, and `x` is a column stored in a table of the query's own database or is never null itself.  Neither may be of a spatial type, of `hierarchyid` or of another .NET type.
 - **A computed column declared `PERSISTED NOT NULL`, read from its table alone**, when all of these are true:
   - the `FROM` of the query names that one table and nothing else;
   - the column is an item of its own, or the query is `SELECT *` from that table;
@@ -73,6 +74,14 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - **A call that names a window of the `WINDOW` clause, `OVER w`, is never one of the items above.**
 - **A function of your own, called with its schema, `dbo.f(x)`, is never one of the items above.**
 
+**What stays the same in a row.**  SQL Server can compute an argument of `COALESCE` twice: once to test it and once for the result.  So each argument before the one that is never null must be one of these:
+
+- a constant, `NULL` or a query parameter;
+- a column stored in a table of the query's own database, read directly, or through a subquery in the `FROM` or a `WITH` query that returns the column itself and has no `UNION`;
+- arithmetic of these, or `CAST`, `CONVERT` to a built-in type, `COALESCE`, `ISNULL` or `NULLIF` of these;
+- `SUM`, `MAX` or `MIN` of these, without `OVER (...)`;
+- `AVG` of these, without `OVER (...)`, inside `CAST` or `CONVERT` to a built-in type.
+
 These answers assume that the connection that runs the query leaves `ANSI_WARNINGS` on, as Microsoft.Data.SqlClient does: see [limits](#limit-ansi-warnings-off).
 
 **SqlSource treats these as columns that can be null, though some of them never are:**
@@ -82,6 +91,10 @@ These answers assume that the connection that runs the query leaves `ANSI_WARNIN
 - **A computed column declared `PERSISTED NOT NULL` and read through a join, a view, a subquery or a `WITH` query**, with the same exception.
 - **A column of a recursive `WITH` query.**
 - **`COALESCE` over a column of each side of a `FULL JOIN`**, as in `COALESCE(i.id, p.invoice_id)`.
+- **`COALESCE` with an argument that can change before the one that is never null.**  This includes a `CASE`, a subquery, a window function, a date function, a computed column, a view's column and a column read `FOR SYSTEM_TIME`.  SQL Server can compute such a value again for the result, and the second value can be null.  Write `ISNULL(x, 0)`, which computes `x` once.
+- **`COALESCE` with a column of another database or of a linked server before the one that is never null.**  This holds when the query reads the table by its name, a synonym, a subquery in the `FROM` or a `WITH` query.  Write `ISNULL(x, 0)`.
+- **`COALESCE` with a column that a subquery or a `WITH` query combines or computes, before the one that is never null.**  This includes a column of a `UNION` or `UNION ALL`, a column of an `UNPIVOT`, and a column such as `SUM(x) AS total`.  Write `ISNULL(x, 0)`.
+- **`COALESCE(AVG(x), 0)`**, unless the `AVG` is inside `CAST` or `CONVERT` to a built-in type.  Write `ISNULL(AVG(x), 0)`.
 - **`CASE WHEN x IS NULL THEN 0 ELSE x END` of a computed column, a view's column or a subquery's expression that can be null.**  The `CASE` reads `x` twice, and SQL Server can compute such a value again for the second read.  Write `ISNULL(x, 0)`, which is never null.
 - **A column that a filter keeps from being null.**  An example is a column that can hold null, under `WHERE x IS NOT NULL`.  Another is the optional side of a `LEFT JOIN` that the `WHERE` makes inner.
 - **A column of a query that is not one `SELECT`.**  Such a query keeps the answer of SQL Server, so a count or a sum in it can be null.  This holds for the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, for a `UNION`, `INTERSECT` or `EXCEPT`, for `FOR XML` or `FOR JSON`, and for several statements in one query.
@@ -120,6 +133,10 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - `DATEFROMPARTS`, `SWITCHOFFSET` and other functions of values that are never null;
 - the columns of a recursive `WITH` query;
 - `COALESCE` over both sides of a `FULL JOIN`;
+- `COALESCE` over a value that can change, such as a `CASE` or a subquery;
+- `COALESCE` over a column of another database or of a linked server;
+- `COALESCE` over a column of a `UNION` or an `UNPIVOT`, or one that a subquery computes;
+- `COALESCE(AVG(x), 0)`;
 - a computed column that is not persisted;
 - a column that a filter keeps from being null;
 - a count or a sum in an `OUTPUT` clause or a `UNION`.
@@ -128,17 +145,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 
 - Give such a column a `-- column: name not null` marker, as [which columns can be null](#nullability) shows.
 - End the alias of the column with `!`.
-- In the place of a `CASE` that tests `x` for null, write `ISNULL(x, 0)`.
-
-<a id="limit-coalesce-computed-twice"></a>
-
-### Null from a `COALESCE` over a value that changes
-
-**What you see.**  A column written with `COALESCE` gets a property that cannot be null, and some rows hold a null.
-
-**Why.**  SQL Server can compute an argument of `COALESCE` once to test it and again for the result.  When the argument gives a different value each time, such as an expression, a subquery or a window that calls `NEWID()`, the test can see a value and the result can be null.  SqlSource still treats that `COALESCE` as never null, and a `CAST` or `CONVERT` inside the `COALESCE` does not protect it.
-
-**What to do.**  Write `ISNULL(x, 0)`, which computes `x` once.
+- In the place of a `COALESCE` or a `CASE` that replaces the null of `x`, write `ISNULL(x, 0)`.
 
 <a id="limit-ansi-warnings-off"></a>
 

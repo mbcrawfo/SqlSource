@@ -21,9 +21,9 @@ internal sealed partial class ExpressionProofs
         ["SUM"] = FormKind.Sum,
         ["MAX"] = FormKind.MaxOrMin,
         ["MIN"] = FormKind.MaxOrMin,
-        ["COALESCE"] = FormKind.CoalesceGreatestLeast,
-        ["GREATEST"] = FormKind.CoalesceGreatestLeast,
-        ["LEAST"] = FormKind.CoalesceGreatestLeast,
+        ["COALESCE"] = FormKind.Coalesce,
+        ["GREATEST"] = FormKind.GreatestOrLeast,
+        ["LEAST"] = FormKind.GreatestOrLeast,
         ["CAST"] = FormKind.Cast,
         ["CONVERT"] = FormKind.Convert,
         ["JSON_OBJECT"] = FormKind.Json,
@@ -49,7 +49,8 @@ internal sealed partial class ExpressionProofs
         Ntile,
         Sum,
         MaxOrMin,
-        CoalesceGreatestLeast,
+        Coalesce,
+        GreatestOrLeast,
         Cast,
         Convert,
         Json,
@@ -141,8 +142,9 @@ internal sealed partial class ExpressionProofs
                 ? Proof.Yes
                 : Proof.No,
             FormKind.Sum or FormKind.MaxOrMin => Aggregate(arguments, window, rows),
-            // TD-0123: COALESCE evaluates an argument twice, so one that is not deterministic can make it NULL here.
-            FormKind.CoalesceGreatestLeast => window is null
+            FormKind.Coalesce => window is null ? Coalesce(arguments, rows) : Proof.No,
+            // Each reads an argument once, so one proved argument is enough, whatever the others do.
+            FormKind.GreatestOrLeast => window is null
                 ? AllOf([
                     AnyOf(Arguments(arguments).Select(argument => Expression(argument, rows))),
                     .. Arguments(arguments).Select(TypeOf),
