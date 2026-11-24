@@ -43,8 +43,11 @@ internal enum TypeMappingKind
     /// </summary>
     NamedAsAnArray,
 
-    /// <summary>A range of a subtype the map does not list, or a multirange of such a range.</summary>
+    /// <summary>A range of a subtype the map does not list.</summary>
     UserDefinedRange,
+
+    /// <summary>A multirange of a range of a subtype the map does not list, read as an array of the range.</summary>
+    UserDefinedMultirange,
 
     /// <summary>
     /// With no driver referenced, the type's C# type is the driver's: of the <c>NpgsqlTypes</c> namespace for Npgsql,

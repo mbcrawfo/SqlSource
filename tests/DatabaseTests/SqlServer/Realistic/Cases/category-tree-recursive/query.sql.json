@@ -25,8 +25,8 @@
             "precision": 10,
             "scale": 0
           },
-          "nullable": true,
-          "nullableSource": "server",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": false,
           "computed": false
@@ -55,8 +55,8 @@
             "precision": 0,
             "scale": 0
           },
-          "nullable": true,
-          "nullableSource": "server",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": false,
           "computed": false
@@ -70,8 +70,8 @@
             "precision": 0,
             "scale": 0
           },
-          "nullable": true,
-          "nullableSource": "server",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": false,
           "computed": false
@@ -85,8 +85,8 @@
             "precision": 10,
             "scale": 0
           },
-          "nullable": true,
-          "nullableSource": "server",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": false,
           "computed": false

@@ -3297,6 +3297,8 @@ The query is `SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL`:
 
 **A parameter that is an array of a domain, and that the query returns as a column.**  This difference has no `@` in it.  An example is `-- param: @p email_t[]`.  Npgsql sends it as an array of the base type of the domain.  So the column is `character varying[]` for Npgsql, and `email_t[]` for SqlSource.  The help is then `Npgsql sends a parameter that is an array of a domain as an array of the domain's base type, so the column it is returned as has another type; cast the column, @p::varchar[] for an array of a domain over varchar` in place of the first example's help.
 
+**A parameter that is an array of a type `x`, when the schema also has a type named `_x`.**  Whichever was created first, PostgreSQL gave the array of `x` another name, and Npgsql sends `x[]` as the type `_x`.  The `server:` line is then `42883: operator does not exist`, with `x[]` and `_x`: see [the limit](reference/databases/postgresql/types.md#limit-array-of-a-renamed-type).
+
 - **An error of the check that says nothing of how Npgsql reads the SQL is [SQLSRC225](#sqlsrc225), at the same step.**  A lost connection is one.
 - **If the SQL is plain and the two readings still differ, report it.**
 
@@ -3306,6 +3308,7 @@ The query is `SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL`:
 - For a misread `:name`, rename the parameter, so that it is not the name of a column that a slice reads.
 - For a schema that changed, run `describe` again.
 - For an array of a domain, cast the column to the type you want: `@p::varchar[]`.
+- For an array of a type `x` beside a type `_x`, declare the parameter as `text` with `-- param:` and cast it, `@p::public.x[]`.
 
 **On SQL Server.**  The tool compares the parameters that SqlSource reads in the query with those that SQL Server reports, ignoring case.  The message names each one that only one of them reads.
 
@@ -3356,6 +3359,7 @@ This is a known limit, and not a fault of the query.  Npgsql cannot send a value
 - `regclass`, which `WHERE c.oid = @t::regclass` gives a parameter, and the other types of the system catalogs that Npgsql does not load, such as `aclitem`, `txid_snapshot` and `pg_node_tree`;
 - a type whose schema or whose name holds a `.`, which cannot be written to Npgsql without ambiguity, since `a.b.c` could name more than one type;
 - a type of an extension that Npgsql cannot send, such as `seg`.
+- an array of an enum or a range whose own name starts with `_`, such as `public._mood[]`, since Npgsql reads the `_` as the mark of an array: see [the limit](reference/databases/postgresql/types.md#limit-array-parameter-underscore).
 
 These are bound:
 
@@ -3789,8 +3793,8 @@ Under the output `models`, the constant or token method of the query is still ge
   - Map it with the [type override](reference/type-mapping.md#setting-type-overrides) to the C# type that your application reads it as: `public.address=MyApp.Address` for a type that the data source maps.
   - Select its fields as columns of their own.
 - **A range of a subtype that SqlSource does not know, and a multirange of one.**  Do both of these:
-  1. Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of the C# type of its subtype: `public.floatrange=NpgsqlTypes.NpgsqlRange<double>`.
-  2. Call `EnableUnmappedTypes()` on the data source builder.  Without it, Npgsql cannot read the type.
+  1. Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of the C# type of its subtype, and a multirange to an array of it: `public.floatrange=NpgsqlTypes.NpgsqlRange<double>` and `public.floatmultirange=NpgsqlTypes.NpgsqlRange<double>[]`.
+  2. Call `EnableUnmappedTypes()` on the data source builder.  Without it, Npgsql cannot read or send the type.
 
   A project that does not reference Npgsql cannot name `NpgsqlTypes.NpgsqlRange<T>`, so the message tells it to reference Npgsql first.
 - **`cube` on Npgsql 8 or 9**, which cannot read it.  Update Npgsql to 10, which reads it as `NpgsqlTypes.NpgsqlCube`.  Or cast the column to `text` in the query, as the message says.

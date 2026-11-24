@@ -80,6 +80,9 @@ internal static class EntryRenamer
     /// <param name="run">The run, whose mapping holds the names of the capture and the query.</param>
     /// <param name="expected">The raw <c>expected.json</c>, which <c>BundleReplay.ExpectedOf</c> reads.</param>
     /// <param name="query">The renamed <c>query.sql</c>.</param>
+    /// <param name="calls">
+    /// The capture's calls, renamed and derived, for <see cref="IEngineRenaming.DeriveEntry" />.
+    /// </param>
     /// <param name="token">Ends the plan of the query.</param>
     /// <exception cref="ArgumentException">The raw file is no sidecar of one entry that this tool reads.</exception>
     public static string? Rename(
@@ -87,6 +90,7 @@ internal static class EntryRenamer
         RenamingRun run,
         string expected,
         string query,
+        IReadOnlyList<RenamingCall> calls,
         CancellationToken token
     )
     {
@@ -100,6 +104,7 @@ internal static class EntryRenamer
         var (name, node) = queries.Single();
         var entry = node!.AsObject();
         JsonStrings.Visit(entry, string.Empty, found => Member(engine, run, found));
+        engine.DeriveEntry(entry, calls);
         var key = run.Field(FieldRule.Name(NameClass.Query), Field(name, string.Empty, null), engineRow: false, Place);
         _ = queries.Remove(name);
         queries[key] = entry;
