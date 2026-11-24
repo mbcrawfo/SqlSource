@@ -19,10 +19,12 @@ namespace SqlSource.Tool.Describing;
 /// password that equals a whole word still finds that word.
 /// </para>
 /// <para>
-/// Some parts are dropped.  One shorter than <see cref="MinimumPartLength" /> would match too much ordinary text.
-/// One that equals a word the run writes of the database itself, its logical name or the engine's name, is printed
-/// whatever the describer does, as <see cref="EntrySecretCheck" /> says of the value, so removing it hides nothing:
-/// the password <c>postgres</c> would otherwise print <c>query: GetUser, database app, *** 16.4</c>.
+/// Some parts are not found as tokens.  One shorter than <see cref="MinimumPartLength" /> would match too much ordinary
+/// text.  One that equals a word the run writes of the database itself, its logical name or the engine's name, is
+/// printed whatever the describer does, as <see cref="EntrySecretCheck" /> says of the value, so removing it hides
+/// nothing: the password <c>postgres</c> would otherwise print <c>query: GetUser, database app, *** 16.4</c>.  Those
+/// are <see cref="KeyedParts" />, found only where they stand as the value of a password key
+/// (<see cref="Redaction.HoldsKeyed" />), as a driver quotes a connection string: <c>Password=pg;</c>.
 /// </para>
 /// <para>
 /// It is a class and not a record, since a record prints its members.
@@ -30,9 +32,9 @@ namespace SqlSource.Tool.Describing;
 /// </remarks>
 /// <param name="value">The connection's value.</param>
 /// <param name="parts">
-/// The secret parts the describer gave.  A part that is null, empty or white space, shorter than
-/// <see cref="MinimumPartLength" />, equal to the whole value or to one of <paramref name="runWords" />, and a part
-/// given twice are dropped.
+/// The secret parts the describer gave.  A part that is null, empty or white space, equal to a whole form, and a part
+/// given twice are dropped.  One shorter than <see cref="MinimumPartLength" /> or equal to one of
+/// <paramref name="runWords" /> is a keyed part.
 /// </param>
 /// <param name="runWords">
 /// The words the run writes of the database itself: its logical name and the engine's canonical name.  They are
@@ -53,13 +55,9 @@ internal sealed class ConnectionSecret(
     /// <summary>The length below which a part is dropped.</summary>
     public const int MinimumPartLength = 4;
 
-    // Both are made once, the parts from the wholes, since a part that equals a whole adds nothing.
-    private readonly (ImmutableArray<string> Wholes, ImmutableArray<string> Parts) _kept = Keep(
-        value,
-        parts,
-        runWords,
-        forms
-    );
+    // All are made once, the parts from the wholes, since a part that equals a whole adds nothing.
+    private readonly (ImmutableArray<string> Wholes, ImmutableArray<string> Parts, ImmutableArray<string> Keyed) _kept =
+        Keep(value, parts, runWords, forms);
 
     /// <summary>The connection's value.</summary>
     public string Value { get; } = value;
@@ -75,15 +73,24 @@ internal sealed class ConnectionSecret(
     /// </summary>
     public ImmutableArray<string> Parts => _kept.Parts;
 
-    /// <summary>Whether the text holds a whole form anywhere, or a part as a token.</summary>
+    /// <summary>
+    /// The parts that are found only as the value of a password key: those shorter than
+    /// <see cref="MinimumPartLength" /> or equal to a word the run writes, longest first.
+    /// </summary>
+    public ImmutableArray<string> KeyedParts => _kept.Keyed;
+
+    /// <summary>
+    /// Whether the text holds a whole form anywhere, a part as a token, or a keyed part as the value of a password key.
+    /// </summary>
     public bool IsIn(string text) =>
         Wholes.Any(whole => text.Contains(whole, StringComparison.Ordinal))
-        || Parts.Any(part => Redaction.HoldsToken(text, part));
+        || Parts.Any(part => Redaction.HoldsToken(text, part))
+        || KeyedParts.Any(part => Redaction.HoldsKeyed(text, part));
 
     /// <summary>The secret without its value and its parts: it is a secret.</summary>
     public override string ToString() => nameof(ConnectionSecret);
 
-    private static (ImmutableArray<string> Wholes, ImmutableArray<string> Parts) Keep(
+    private static (ImmutableArray<string> Wholes, ImmutableArray<string> Parts, ImmutableArray<string> Keyed) Keep(
         string value,
         IEnumerable<string?>? parts,
         IEnumerable<string>? runWords,
@@ -91,7 +98,10 @@ internal sealed class ConnectionSecret(
     )
     {
         var wholes = WholesOf(value, forms);
-        return (wholes, PartsOf(wholes, parts, runWords));
+        var words = new HashSet<string>(runWords ?? [], StringComparer.Ordinal);
+        var given = GivenParts(wholes, parts);
+        bool AsToken(string part) => part.Length >= MinimumPartLength && !words.Contains(part);
+        return (wholes, [.. given.Where(AsToken)], [.. given.Where(part => !AsToken(part))]);
     }
 
     private static ImmutableArray<string> WholesOf(string value, IEnumerable<string?>? forms) =>
@@ -105,21 +115,15 @@ internal sealed class ConnectionSecret(
                 .OrderByDescending(static whole => whole.Length),
         ];
 
-    private static ImmutableArray<string> PartsOf(
-        ImmutableArray<string> wholes,
-        IEnumerable<string?>? parts,
-        IEnumerable<string>? runWords
-    )
+    // The parts that are neither blank nor a whole form, each once and longest first.
+    private static List<string> GivenParts(ImmutableArray<string> wholes, IEnumerable<string?>? parts)
     {
-        var dropped = new HashSet<string>(runWords ?? [], StringComparer.Ordinal);
-        dropped.UnionWith(wholes);
+        var dropped = new HashSet<string>(wholes, StringComparer.Ordinal);
         return
         [
             .. (parts ?? [])
                 .OfType<string>()
-                .Where(part =>
-                    part.Length >= MinimumPartLength && !string.IsNullOrWhiteSpace(part) && !dropped.Contains(part)
-                )
+                .Where(part => !string.IsNullOrWhiteSpace(part) && !dropped.Contains(part))
                 .Distinct(StringComparer.Ordinal)
                 .OrderByDescending(static part => part.Length),
         ];

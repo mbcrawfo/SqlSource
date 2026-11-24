@@ -136,7 +136,8 @@ internal static class CaptureJson
     /// break is escaped in the file, and a password after an escaped line break (<c>\nhunter22</c>) has the letter
     /// <c>n</c> before it there and is no token.  The strings of one request or answer are searched as the strings of
     /// a log event are (<see cref="JoinedRedaction" />): each alone and joined, so that a value split over two of them
-    /// is found.
+    /// is found, but not each two of them in either order, as a log's are.  An answer can hold thousands of a
+    /// catalog's names, and two of them that make a password together would refuse a capture that holds none.
     /// </para>
     /// <para>
     /// Only the values of strings are searched, and no name of a member: those are fixed by the records of the calls,

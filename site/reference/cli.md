@@ -213,15 +213,16 @@ The log is your own record of what the run did.  It holds your names, your SQL a
 It finds the value as written, with the spaces at its ends trimmed, or as the driver writes it again.  The tool also writes these as `***`:
 
 - each password of a connection string, where it stands apart from other letters, digits and underscores, and is at least four characters long;
-- in the same way, the password that the PostgreSQL driver reads from `PGPASSWORD` or a password file, when the connection string gives none;
+- a shorter password, or one that is the name of its logical database or of its dialect, where a message gives it as the value of a password, as in `Password=pg;`;
+- in the same way, the password that the PostgreSQL driver reads from `PGPASSWORD`, or from the entry of a password file that it would use for the connection, when the connection string gives none;
 - in the record of your command line, every value of `--database` and `--connection`;
 - a path that an error names by its position, as [how an error names a path](#paths) says.
 
 These can appear in the log as written ([a limit](connections.md#limit-short-password)):
 
 - a secret typed where a path goes that reads as a path, such as one that ends in `.sql`;
-- a password shorter than four characters;
-- a password that is the name of its logical database or of its dialect, such as `postgres`;
+- a password shorter than four characters, where a message does not give it as the value of a password;
+- a password that is the name of its logical database or of its dialect, such as `postgres`, where a message does not give it as the value of a password;
 - the password of a PostgreSQL password file that is a pipe, such as `PGPASSFILE=<(...)` in a shell;
 - the login, in an error of SQL Server about a query, such as an error for a database that the login may not open.
 

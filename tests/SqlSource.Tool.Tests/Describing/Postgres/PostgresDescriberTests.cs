@@ -95,13 +95,46 @@ public sealed class PostgresDescriberTests
             .ShouldBe(["ownpass1"]);
     }
 
+    // Npgsql reads the default file of the system it runs on, and not the other's.
     [Fact]
-    public void SecretsOf_DefaultPasswordFileOfHome_IsItsPasswords()
+    public void SecretsOf_DefaultPasswordFiles_AreTheSystemsAlone()
     {
         using var folder = new TempFolder();
         _ = folder.WriteFile(".pgpass", "h:5432:db:u:homepass1\n");
+        _ = folder.WriteFile(Path.Combine("postgresql", "pgpass.conf"), "h:5432:db:u:apppass1\n");
 
-        new PostgresDescriber().SecretsOf("Host=h", Environments.Of(("HOME", folder.Path))).ShouldBe(["homepass1"]);
+        new PostgresDescriber()
+            .SecretsOf("Host=h", Environments.Of(("HOME", folder.Path), ("APPDATA", folder.Path)))
+            .ShouldBe([OperatingSystem.IsWindows() ? "apppass1" : "homepass1"]);
+    }
+
+    // The entry Npgsql would use is found from the string's host, port, database and user, and PGUSER for a string
+    // without one.
+    [Theory]
+    [InlineData("Host=pg1;Port=6000;Database=db;Username=u", null, "match")]
+    [InlineData("Host=pg1:6000;Database=db;Username=u", null, "match")]
+    [InlineData("Host=pg1;Port=6000;Database=db", "u", "match")]
+    [InlineData("Host=pg1;Port=6000;Username=u", null, "other-db")]
+    [InlineData("Host=pg1;Port=6000;Database=db", null, "other-user|match|fallback")]
+    [InlineData("Host=pg2;Port=6000;Database=db;Username=u", null, "fallback")]
+    public void SecretsOf_PasswordFile_IsTheEntriesThatMayMatchUpToTheFirstSure(
+        string connection,
+        string? pgUser,
+        string expected
+    )
+    {
+        using var folder = new TempFolder();
+        var file = folder.WriteFile(
+            "pgpass",
+            "pg1:5432:db:u:other-port\npg1:6000:billing:u:other-db\npg1:6000:db:bob:other-user\npg1:6000:db:u:match\n"
+                + "*:*:*:*:fallback\n"
+        );
+
+        var environment = pgUser is null
+            ? Environments.Of(("PGPASSFILE", file))
+            : Environments.Of(("PGPASSFILE", file), ("PGUSER", pgUser));
+
+        new PostgresDescriber().SecretsOf(connection, environment).ShouldBe(expected.Split('|'));
     }
 
     [Fact]

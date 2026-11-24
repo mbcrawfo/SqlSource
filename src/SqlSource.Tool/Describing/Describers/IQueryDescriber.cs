@@ -41,8 +41,9 @@ internal interface IQueryDescriber
     /// gives none.  Any other exception is a bug, and <c>SQLSRC200</c>.  A password that the driver takes from
     /// elsewhere is not in the value, and is given all the same when the describer can know it: from the host's
     /// environment, through <paramref name="getEnvironmentVariable" /> and never the process's own, and from a file
-    /// that the driver would read.  The run keeps no part shorter than
-    /// <see cref="ConnectionSecret.MinimumPartLength" />, and none that equals the database's name or the engine's.
+    /// that the driver would read.  The run finds a part shorter than
+    /// <see cref="ConnectionSecret.MinimumPartLength" />, or one that equals the database's name or the engine's, only
+    /// as a password key's value (<see cref="ConnectionSecret.KeyedParts" />).
     /// </remarks>
     /// <param name="connection">The connection's value.</param>
     /// <param name="getEnvironmentVariable">The host's environment, which a driver may read a password from.</param>
