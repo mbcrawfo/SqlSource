@@ -27,6 +27,24 @@ public sealed class RedactionTests
     public void HoldsToken_PartAtAnEdge_IsWhetherItStandsAsAToken(string text, string part, bool expected) =>
         Redaction.HoldsToken(text, part).ShouldBe(expected);
 
+    // A short password and one that is a word of the run are hidden where a message quotes them as a key's value, as a
+    // driver quotes a connection string, and nowhere else.
+    [Theory]
+    [InlineData("refused Host=db;Password=pg;Port=1", "refused Host=db;Password=***;Port=1")]
+    [InlineData("PWD = 'pg' and psw:\"pg\"", "PWD = '***' and psw:\"***\"")]
+    [InlineData( /*lang=json,strict*/
+        "{\"password\": \"postgres\"}", /*lang=json,strict*/
+        "{\"password\": \"***\"}"
+    )]
+    [InlineData("SSL Password=pg PGPASSWORD=pg", "SSL Password=*** PGPASSWORD=***")]
+    [InlineData("Password=pg_x;Password=pgpg;Pwd=pg-1", "Password=pg_x;Password=pgpg;Pwd=***-1")]
+    [InlineData("relation pg_class, user \"postgres\", database app, postgres 16.4", null)]
+    [InlineData("xpwd=pg newpsw=pg pwdx=pg password pg x=pg", null)]
+    public void Of_ShortOrRunWordPassword_IsTheMarkAsAPasswordKeysValueAlone(string text, string? expected) =>
+        Redaction
+            .Of(text, new ConnectionSecret("Host=other;Password=pg", ["pg", "postgres"], ["postgres"]))
+            .ShouldBe(expected ?? text);
+
     // A part that holds another as a token is replaced first.
     [Fact]
     public void Of_PartThatHoldsAShorterOneAsAToken_IsReplacedWhole() =>
