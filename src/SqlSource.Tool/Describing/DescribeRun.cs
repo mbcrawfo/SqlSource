@@ -177,7 +177,12 @@ internal static class DescribeRun
         RunContext context
     )
     {
-        var environment = ConnectionEnvironment.Load(sources.UnitFolder, sources.EnvFile, context.Host);
+        var environment = ConnectionEnvironment.Load(
+            sources.UnitFolder,
+            sources.EnvFile,
+            context.Host,
+            sources.EnvFileHeldAt
+        );
         foreach (var error in environment.Errors)
         {
             context.Reporter.Report(error);

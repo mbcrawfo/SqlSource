@@ -24,8 +24,7 @@ namespace SqlSource.Tool;
 /// same values in the same order (<c>DescribeCommand.ReadsValuesAs</c>, <c>ReplayCommand.ReadsValuesAs</c> for the
 /// <c>--log</c> of <c>replay</c>, and <c>DiagnoseCommand.ReadsValuesAs</c> for the options of <c>diagnose</c>,
 /// <c>--query</c>, <c>--out</c> and <c>--scrub</c> among them).  A token that one takes for the value of an option and
-/// the other for the path is printed as a path: what is left of that risk is
-/// <c>docs/tech-debt/TD-0023-path-without-an-equals-sign-is-printed-as-given.md</c>.
+/// the other for the path would be printed by the rule of a path, <see cref="PathToken.MayBePrinted" />.
 /// </para>
 /// <para>
 /// <c>Check_EveryAcceptedCommandLine_IsReadTheSameBySystemCommandLine</c> holds the two together over every command

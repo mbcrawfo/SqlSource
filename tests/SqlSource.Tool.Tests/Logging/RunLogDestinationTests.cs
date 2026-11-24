@@ -193,6 +193,21 @@ public sealed class RunLogDestinationTests : IDisposable
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
     }
 
+    // A log named like a password: the error names it by its position, without the system's words, which quote it.
+    [Fact]
+    public async Task Run_LogThatReadsAsNoPathAndStopsBeingWritable_IsSqlsrc218ByItsPosition()
+    {
+        _scene.Run.CreateFile = static _ => new FullStream();
+
+        var result = await _scene.DescribeAsync("--log", Secrets.Marker);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith(
+            "sqlsource : error SQLSRC218: The path at position 3 could not be written: the system refused\n"
+        );
+        result.Error.ShouldNotContain(Secrets.Marker);
+    }
+
     // The build's log path can hold "=" or ";", which a run under --online takes, and the owner ruled that a path the
     // build writes is no secret: a message prints it in full, with the system's reason.
     [Theory]

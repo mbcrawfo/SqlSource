@@ -2221,7 +2221,7 @@ Reported by: the tool.
 $ dotnet sqlsource describe src/App/App.csproj
 ```
 
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2241,7 +2241,7 @@ Reported by: the tool.
 $ dotnet sqlsource describe App.slnx
 ```
 
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2258,7 +2258,7 @@ The path given to `sqlsource describe` does not exist, or it is a file that is n
 1. Give the path of a solution, of a C# project, or of a folder that holds exactly one of them.
 
 - **A solution filter, `.slnf`, and a project of another language are not read.**
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2335,6 +2335,7 @@ Here the SqlSource package of the project and the `sqlsource` tool are of differ
 1. Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool`.
 
 - **When the build runs the tool, the message names the manifest file that the build wrote, by its full path**, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, whatever the path holds.
+- **A `--manifest` path that you typed and that may be a secret is named by its position**, as `The project manifest at position 3 cannot be read`: see [how an error names a path](reference/cli.md#paths).  A reason of the system is then only `the system would not read it`, since its words repeat the path.
 - **Any other reason, such as one that names a line, is a bug in SqlSource.**  The package wrote a file that the tool of its own version does not expect.  [Report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
 See: [Install the tool](reference/cli.md#install-the-tool)
@@ -2356,7 +2357,7 @@ sqlsource : error SQLSRC207: '/work/Tools.csproj' is not a project of '/work/App
 
 1. Give the path of a `.csproj` file that the solution lists.  `dotnet sln list` shows them.
 
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).
 
 See: [Options](reference/cli.md#options)
 
@@ -2519,7 +2520,7 @@ sqlsource : error SQLSRC212: '/work/App/Queries/User.sql' is not a .sql file tha
 
 - **The rest of the run goes on.**
 - **On Linux and macOS, a path written with backslashes whose `..` go above the root of the file system is reported here too**, with its `..` as typed.
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2555,7 +2556,7 @@ The error is reported once for a database, at its first query that must be descr
 - Give the connection in one of the ways that the `help:` line names.
 - Leave the database out of the run with `--database`.
 
-**The `help:` line names the `.env` file that the run reads**, whether or not the file is there.  It is the one in the folder of the solution or project that the run is on, or the one that `--env-file` names.  The line ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`.  So you see that a `.env` file elsewhere, such as in a folder above the project's, is not read.  Under `--env-file none` the line says `The run reads no .env file` instead.  The run never reads a `.env` file in a folder above its own.
+**The `help:` line names the `.env` file that the run reads**, whether or not the file is there.  It is the one in the folder of the solution or project that the run is on, or the one that `--env-file` names.  The line ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`.  So you see that a `.env` file elsewhere, such as in a folder above the project's, is not read.  Under `--env-file none` the line says `The run reads no .env file` instead.  An `--env-file` path that may be a secret is named by its position, as `the path at position 3`: see [how an error names a path](reference/cli.md#paths).  The run never reads a `.env` file in a folder above its own.
 
 **A run on a solution reads the `.env` file beside the solution, and not one in the folder of a project.**  A project of the database can have a `.env` file in its folder, or in a folder between it and the folder of the solution.  Then the `help:` line names each such file, in the place of the sentence above, as `The run did not read /work/App/.env: it reads /work/.env alone, and --env-file, or SqlSourceEnvFile in a build, names another`.  Do one of these:
 
@@ -2706,11 +2707,13 @@ For a log:
 - **The log cannot be made or emptied as the run starts.**  Its folder is not there, it is a folder, or the system does not let the tool write it.  Nothing runs, and the exit code is 1.  Give a path that can be written, or run the command from another folder.
 - **The path ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a log is not written over a .sql file, a sidecar, a project or a solution`.  It touches nothing and runs nothing, so that a name left out before a `.sql` path does not empty that file.  Give the log a name of its own.
 - **The log stops being writable while the run goes on**, as when the disk is full.  The run finishes and writes its sidecars.  The error is reported once at the end, and the exit code is 1.  The log holds what was written before it stopped.
+- **A `--log` path that may be a secret is named by its position**, as `The path at position 3 could not be written: the system refused`: see [how an error names a path](reference/cli.md#paths).  The reason of the system is left out, since its words repeat the path.
 
 For a bundle of `diagnose`:
 
 - **The path of `--out` ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a bundle is not written over a .sql file, a sidecar, a project or a solution`, before it describes anything, and touches nothing.  Give the bundle a name of its own, such as `report.zip`.
 - **The bundle or its mapping cannot be written.**  Its folder is not there, it is a folder, or the system does not let the tool write it.  The query has been described by then.  Nothing is written past the file that failed: when the mapping fails, the bundle is written and its line printed, and the error is at the mapping.  The exit code is 1.  Run the command again with an `--out` in a folder that exists and can be written.
+- **An `--out` path that may be a secret is named by its position**, as for a log.  When the bundle is written, its lines say `bundle written to the path at position 5` and `mapping written beside the bundle, with '.mapping.json' after its name`, and a mapping that cannot be written is `The mapping beside the path at position 5`.
 
 See: [Logs](reference/cli.md#logs), [making a bundle with `diagnose`](reference/bundles.md#diagnose)
 
@@ -2837,7 +2840,7 @@ sqlsource : error SQLSRC222: '/srv/locked' cannot be read: Access to the path '/
 
 1. Give yourself the right to read the folder.
 
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.  The reason is then only `the system would not list its files`, since the words of the system repeat the path.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).  The reason is then only `the system would not list its files`, since the words of the system repeat the path.
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -5194,6 +5197,8 @@ The run goes on as if the file gave no connection at all.  So the tool reports [
 $ dotnet sqlsource describe /work/App
 /work/App/.env : error SQLSRC285: '/work/App/.env' cannot be read: Access to the path '/work/App/.env' is denied.
 ```
+
+An `--env-file` path that may be a secret is named by its position, as `The path at position 3 cannot be read: the system would not read it`, since the words of the system repeat the path: see [how an error names a path](reference/cli.md#paths).
 
 **Fix:** do one of these.
 
