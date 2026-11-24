@@ -387,6 +387,44 @@ public sealed class ColumnTests(SqlServerDatabases sqlServer)
         }
     }
 
+    // A database of a collation other than the server's: the catalog's names and the describe's are compared under the
+    // database's, so "columns" answers and reads the PERSISTED NOT NULL column there.
+    [Fact]
+    public async Task ColumnsAsync_DatabaseOfAnotherCollation_ReadsPersistedNotNull()
+    {
+        const string CaseSensitive = "td_case_sensitive";
+        await sqlServer.ExecuteAsync(
+            $"IF DB_ID(N'{CaseSensitive}') IS NOT NULL BEGIN ALTER DATABASE {CaseSensitive} SET SINGLE_USER "
+                + $"WITH ROLLBACK IMMEDIATE; DROP DATABASE {CaseSensitive}; END; "
+                + $"CREATE DATABASE {CaseSensitive} COLLATE Latin1_General_CS_AS"
+        );
+        try
+        {
+            await sqlServer.ExecuteAsync(
+                $"EXEC {CaseSensitive}.sys.sp_executesql N'CREATE TABLE dbo.t "
+                    + "(id int NOT NULL PRIMARY KEY, c AS CAST(id * 2 AS int) PERSISTED NOT NULL)'"
+            );
+            await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionStringOf(CaseSensitive));
+
+            var answer = await new SqlServerLive(session.Connection).ColumnsAsync(
+                new SqlServerColumnsRequest("SELECT c FROM dbo.t", null),
+                TestContext.Current.CancellationToken
+            );
+
+            answer.Error.ShouldBeNull(
+                string.Join("; ", answer.Error?.Errors.Select(static error => error.Message) ?? [])
+            );
+            answer.Errors.ShouldBeNull(string.Join("; ", answer.Errors?.Select(static error => error.Message) ?? []));
+            answer.Rows.ShouldNotBeNull().Single(static row => !row.IsHidden).PersistedNotNull.ShouldBe(true);
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync(
+                $"ALTER DATABASE {CaseSensitive} SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE {CaseSensitive}"
+            );
+        }
+    }
+
     // The text reaches the server whole, however long: a query after a comment of 5,000 characters, which a text cut
     // at 4,000 would leave open.
     [Fact]
