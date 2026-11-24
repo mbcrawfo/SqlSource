@@ -50,10 +50,13 @@ internal sealed record Usage(
     private static bool MayBePrinted(UsageValue value, string workingDirectory, bool isOnline) =>
         value.Option?.Name switch
         {
-            null or SharedOptions.Project or DiagnoseCommand.OutOption or DiagnoseCommand.ScrubOption =>
-                PathToken.MayBePrinted(value.Text, workingDirectory),
-            SharedOptions.Log or DescribeCommand.ManifestOption => isOnline
-                || PathToken.MayBePrinted(value.Text, workingDirectory),
+            null or SharedOptions.Project or DiagnoseCommand.ScrubOption => PathToken.MayBePrinted(
+                value.Text,
+                workingDirectory
+            ),
+            DiagnoseCommand.OutOption => PathToken.MayBePrinted(value.Text, workingDirectory, isWritten: true),
+            SharedOptions.Log => isOnline || PathToken.MayBePrinted(value.Text, workingDirectory, isWritten: true),
+            DescribeCommand.ManifestOption => isOnline || PathToken.MayBePrinted(value.Text, workingDirectory),
             SharedOptions.EnvFile => isOnline
                 || string.Equals(value.Text.Trim(), DotEnvSearch.NoneValue, StringComparison.OrdinalIgnoreCase)
                 || PathToken.MayBePrinted(value.Text, workingDirectory),

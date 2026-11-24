@@ -50,6 +50,15 @@ public sealed class PathTokenTests : IDisposable
     public void MayBePrinted_TokenThatDoesNotReadAsAPath_IsFalse(string token) =>
         PathToken.MayBePrinted(token, _folder).ShouldBeFalse();
 
+    // A log or a bundle that an earlier run wrote under a password does not make that password a path.
+    [Theory]
+    [InlineData("Notes", false)]
+    [InlineData("src", true)]
+    [InlineData("src/Typo/App", true)]
+    [InlineData("run.log", true)]
+    public void MayBePrinted_TokenOfAFileTheToolWrites_CountsNoFileThatExists(string token, bool expected) =>
+        PathToken.MayBePrinted(token, _folder, isWritten: true).ShouldBe(expected);
+
     [Fact]
     public void MayBePrinted_FullPathInAFolderThatExists_IsTrue() =>
         PathToken.MayBePrinted(Path.Combine(_folder, "src", "Typo", "App"), _folder).ShouldBeTrue();

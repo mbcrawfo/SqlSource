@@ -36,7 +36,11 @@ internal static class PathToken
     /// </summary>
     /// <param name="text">The token.</param>
     /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
-    public static bool MayBePrinted(string text, string workingDirectory)
+    /// <param name="isWritten">
+    /// Whether the token names a file the tool writes, a log or a bundle.  A file there does not count, since an
+    /// earlier run may have written it under the password typed by mistake.
+    /// </param>
+    public static bool MayBePrinted(string text, string workingDirectory, bool isWritten = false)
     {
         if (HoldsConnectionText(text))
         {
@@ -49,7 +53,7 @@ internal static class PathToken
         }
 
         var path = Path.Combine(workingDirectory, text);
-        return File.Exists(path) || Directory.Exists(path) || StartsAtAFolder(text, workingDirectory);
+        return (!isWritten && File.Exists(path)) || Directory.Exists(path) || StartsAtAFolder(text, workingDirectory);
     }
 
     // The first folder that the token names, after its root, exists.  A token of one name has none.

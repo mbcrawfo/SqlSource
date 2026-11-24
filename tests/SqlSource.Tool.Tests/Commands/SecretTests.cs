@@ -445,6 +445,25 @@ public sealed class SecretTests : IDisposable
         result.Error.ShouldContain(named);
     }
 
+    // A manifest the system will not read, as one whose name is too long for it: its words quote the path, so the
+    // error leaves them out.
+    [Fact]
+    public async Task Run_ManifestThatReadsAsNoPathAndCannotBeRead_IsSqlsrc206ByItsPositionWithoutTheSystemsWords()
+    {
+        _scene.Run.ReadTextFile = path =>
+            Path.GetFileName(path) == Secrets.Marker
+                ? throw new IOException($"The path '{path}' is too long")
+                : Hosts.ReadUnderTheTemporaryFolder(path);
+
+        var result = await _scene.DescribeAsync("--manifest", Secrets.Marker);
+
+        ShouldHold(result, "206");
+        result.Error.ShouldStartWith(
+            "sqlsource : error SQLSRC206: The project manifest at position 3 cannot be read: "
+                + "the system would not read it\n"
+        );
+    }
+
     [Fact]
     public async Task Run_PasswordWhereAPathStandsWithLog_IsTheMarkInTheLog()
     {

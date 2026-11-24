@@ -94,7 +94,7 @@ A path is named in full when it holds neither `=` nor `;` and one of these is tr
 
 - it is empty, as an unset variable of a shell gives;
 - it ends in `.sln`, `.slnx`, `.csproj`, `.sql`, `.env`, `.log`, `.json`, `.jsonl` or `.zip`, in any case;
-- it names a file or a folder that exists when the run starts;
+- it names a file or a folder that exists when the run starts, or, for `--log` and `--out`, whose files the tool writes, a folder;
 - it holds `/` or `\`, and the first folder it names exists, as `src/Typo/App` does when `src` exists.
 
 The rule holds for every place a path goes: the path of `describe` or `diagnose`, a `.sql` path, and the values of `--project`, `--log`, `--env-file` and `--manifest`; the file of `--query`, `--scrub` and `--out` of `diagnose`; and the bundle of `replay`.  The value `none` of `--env-file` is always written.  Under `--online`, the paths of `--manifest`, `--log` and `--env-file` are the build's own, and are always named in full.

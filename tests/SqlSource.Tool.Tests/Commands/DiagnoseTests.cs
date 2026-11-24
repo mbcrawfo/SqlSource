@@ -388,6 +388,8 @@ public sealed class DiagnoseTests : IDisposable
     {
         _ = _scene.AddCase(_scene.Case(Plain));
 
+        // The second run finds the bundle the first one wrote, and still names it by its position.
+        _ = await _scene.DiagnoseAsync("--query", Query, "--out", Secrets.Marker);
         var result = await _scene.DiagnoseAsync("--query", Query, "--out", Secrets.Marker);
 
         result.ExitCode.ShouldBe(0);

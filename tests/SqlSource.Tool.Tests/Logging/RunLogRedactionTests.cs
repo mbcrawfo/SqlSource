@@ -129,6 +129,8 @@ public sealed class RunLogRedactionTests : IDisposable
     {
         _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = "Host=db";
 
+        // The second run finds the file the first one wrote.
+        _ = await _scene.DescribeAsync("--log", Secrets.Marker);
         var result = await _scene.DescribeAsync("--log", Secrets.Marker);
 
         result.ExitCode.ShouldBe(0, result.Error);
