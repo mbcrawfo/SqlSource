@@ -6,8 +6,10 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Quoting;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Types;
 
 namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
 
@@ -173,7 +175,55 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     public void Derive(RenamingCall call, IReadOnlyList<RenamingCall> calls, IRenamingScope scope) { }
 
-    public void DeriveEntry(JsonObject entry, IReadOnlyList<RenamingCall> calls) { }
+    /// <summary>
+    /// Gives each type of the renamed entry that is a CLR type of a user's own its name made again from its renamed
+    /// user type, by <see cref="SqlServerTypes.UserClrName" />, as the describer makes it from the renamed rows.
+    /// Such a type has an assembly-qualified name and a schema that is not <c>sys</c>, and the server gives it no
+    /// system type name, so its name is the describer's and never the server's.  Renamed as a
+    /// <see cref="FieldRule.TypeSpelling" />, a name whose schema or name holds a space, a <c>]</c> or a dot would not
+    /// be the one the replay makes.
+    /// </summary>
+    public void DeriveEntry(JsonObject entry, IReadOnlyList<RenamingCall> calls)
+    {
+        foreach (var list in (string[])[SidecarKeys.Parameters, SidecarKeys.Columns])
+        {
+            if (entry[list] is not JsonArray items)
+            {
+                continue;
+            }
+
+            foreach (var item in items)
+            {
+                if (item?[SidecarKeys.Type] is JsonObject type && UserClrNameOf(type) is { } name)
+                {
+                    type[SidecarKeys.Name] = name;
+                }
+            }
+        }
+    }
+
+    // The name of a type record whose user type is a CLR type of a user's own: one with a name and an
+    // assembly-qualified name, in a schema that is not sys, exactly, as SystemSchemas.IsSqlServer compares it.
+    private static string? UserClrNameOf(JsonObject type)
+    {
+        if (
+            type[SidecarKeys.UserType] is not JsonObject user
+            || user[SidecarKeys.Name] is not JsonValue nameValue
+            || !nameValue.TryGetValue<string>(out var name)
+            || user[SidecarKeys.AssemblyQualifiedName] is not JsonValue assembly
+            || !assembly.TryGetValue<string>(out var assemblyName)
+            || assemblyName.Length == 0
+        )
+        {
+            return null;
+        }
+
+        var schema =
+            user[SidecarKeys.Schema] is JsonValue schemaValue && schemaValue.TryGetValue<string>(out var text)
+                ? text
+                : null;
+        return SystemSchemas.IsSqlServer(schema) ? null : SqlServerTypes.UserClrName(schema, name);
+    }
 
     // A folded name of geometry, geography or hierarchyid, whose version is digits parted by dots.
     private static bool IsSystemClrType(string folded)

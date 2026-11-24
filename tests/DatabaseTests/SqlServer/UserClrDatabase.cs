@@ -20,6 +20,12 @@ internal static class UserClrDatabase
     // The type's assembly, as CREATE ASSEMBLY names it: the name of its manifest.
     private const string Assembly = "SqlSource.DatabaseTests.SqlServer.ClrType";
 
+    // Creates the assembly in a database from its bytes, the parameter @bits.
+    public const string CreateAssembly = $"CREATE ASSEMBLY [{Assembly}] FROM @bits WITH PERMISSION_SET = SAFE;";
+
+    // The class of the type, as CREATE TYPE ... EXTERNAL NAME names it.
+    public const string ExternalName = $"[{Assembly}].[{Assembly}.Grade]";
+
     // The net48 build, which the project embeds as the resource ServerClrType.dll.
     public static byte[] AssemblyBytes()
     {
@@ -63,12 +69,7 @@ internal static class UserClrDatabase
         await ExecuteAsync(server, $"CREATE DATABASE [{Name}];", token);
 
         await using var database = sourceOf(Name);
-        await ExecuteAsync(
-            database,
-            $"CREATE ASSEMBLY [{Assembly}] FROM @bits WITH PERMISSION_SET = SAFE;",
-            token,
-            new SqlParameter("@bits", bits)
-        );
+        await ExecuteAsync(database, CreateAssembly, token, new SqlParameter("@bits", bits));
         foreach (var path in EndToEndFiles.SchemaAndSeed(EndToEndEngine.SqlServer, Name))
         {
             await EndToEndFiles.RunAsync(database, path, EndToEndEngine.SqlServer, token);

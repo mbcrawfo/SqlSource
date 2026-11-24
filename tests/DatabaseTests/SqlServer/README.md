@@ -114,10 +114,11 @@ A count under the budget fails, and the budget is lowered in that change, so the
 `Renaming/` holds the tests of SQL Server's part of the renaming of a bug-report bundle that need the server or its corpora ([SQL Server's tests](../../../docs/architecture/bundles.md#sql-servers-tests)); the tests that need neither are in `tests/SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/`.
 
 - **`RealisticRenamingTests`**, in `UsesSqlServer`, captures each case of [the realistic corpus](#the-realistic-corpus) on the `realistic` database, as a bundle captures one, and renames it with SQL Server's part.  The renaming must succeed, so its proof replays the renamed bundle to its renamed entry, or to the case's refusal, the id and the step that its `case.json` names.  A described case keeps the original's provenance, and nothing of the names and literals of `Realistic/schema.sql`, `Realistic/seed.sql` and the case's query is left in a string that the renaming renames.  A case that needs a later major than the server's is skipped.
+- **`UserClrRenamingTests`**, in `UsesSqlServer`, captures a column and a parameter of a CLR type of a user's own, of a plain name, of a schema with a space and a name with a `]`, and of a name with a dot, each in a database of its own with the assembly of `user_clr`, and renames each: the proof replays the renamed bundle to its renamed entry, and nothing of the names is left.
 - **`VocabularyTests`**, in `UsesSqlServer`, asks the server for its system types and for each documented function of `DocumentedFunctions` it knows, and fails for each one that `SqlServerVocabulary` lacks.
 - **`CorpusWordsTests`** needs no server.  Every word of the queries of the describer's fixtures and of the realistic cases must be the vocabulary's or be listed in `CorpusUserWords`, as the user's or as a system object's name, no word of the user's may be the vocabulary's, and every listed word must be in some case.
 
-The first two run on the floor image and on the default one.  What to do when one of them fails after an image moves is in [the images](#the-images).
+The first three run on the floor image and on the default one.  What to do when one of them fails after an image moves is in [the images](#the-images).
 
 ## The end-to-end project
 

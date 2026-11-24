@@ -86,7 +86,7 @@ internal static class SqlServerTypes
     {
         if (
             row is not { MaxLength: { } maxLength, Precision: { } precision, Scale: { } scale }
-            || (row.SystemTypeName ?? UserClrName(row)) is not { } name
+            || (row.SystemTypeName ?? UserClrNameOf(row)) is not { } name
         )
         {
             throw new InvalidOperationException(
@@ -100,15 +100,16 @@ internal static class SqlServerTypes
         return new SqlServerType(name, maxLength, precision, scale, userType);
     }
 
-    // The name of a CLR type of a user's own assembly, to which the server gives no system type name: its user type as
-    // a message names it, schema.name, as Spelled does.  Null for a row with no type name that is no such type.
-    private static string? UserClrName(ISqlServerTypeRow row)
-    {
-        if (row is not { UserTypeName: { } name, AssemblyQualifiedTypeName: not null })
-        {
-            return null;
-        }
+    /// <summary>
+    /// The name of a CLR type of a user's own assembly, to which the server gives no system type name: its user type
+    /// as a message names it, <c>schema.name</c>, as <see cref="Spelled" /> does.  The one rule of that name, which
+    /// the bundle renaming of SQL Server makes again from the renamed schema and name.
+    /// </summary>
+    public static string UserClrName(string? schema, string name) => schema is null ? name : schema + "." + name;
 
-        return row.UserTypeSchema is { } schema ? schema + "." + name : name;
-    }
+    // The name of a row with no type name that is a CLR type of a user's own, or null for a row that is no such type.
+    private static string? UserClrNameOf(ISqlServerTypeRow row) =>
+        row is { UserTypeName: { } name, AssemblyQualifiedTypeName: not null }
+            ? UserClrName(row.UserTypeSchema, name)
+            : null;
 }
