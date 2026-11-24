@@ -494,8 +494,8 @@ public sealed class SqlServerRenamingTests
     public void WordsOf_EntryTypeName_IsEachWordAndPunctuation(string name, string[] words) =>
         Engine.WordsOf(EntryTypeName(name, null)).ShouldBe(words);
 
-    // A system type's spelling is renamed as SQL whose new words are types; a user CLR type's name is left for
-    // DeriveEntry, though the lexer cannot read it.
+    // A type's spelling is renamed as SQL whose new words are types, the name of a typed xml's collection among them; a
+    // user CLR type's name is left for DeriveEntry, though the lexer cannot read it.
     [Fact]
     public void RenameOwn_EntryTypeName_RenamesASpellingAndLeavesAUserClrName()
     {
@@ -503,6 +503,9 @@ public sealed class SqlServerRenamingTests
         var scope = RenamingRun.For(Engine, mapping, "SELECT 1", RenamingCopies.None).At("expected.json");
 
         Engine.RenameOwn(EntryTypeName("nvarchar(50)", null), scope).ShouldBe("nvarchar(50)");
+        var typedXml = Engine.RenameOwn(EntryTypeName("xml(CONTENT dbo.Grades)", null), scope);
+        typedXml.ShouldStartWith("xml(CONTENT dbo.");
+        typedXml.ShouldNotContain("Grades", Case.Insensitive);
         Engine
             .RenameOwn(EntryTypeName("dbo.a'Grade", UserType("dbo", "a'Grade", "Grade, Grades")), scope)
             .ShouldBe("dbo.a'Grade");
