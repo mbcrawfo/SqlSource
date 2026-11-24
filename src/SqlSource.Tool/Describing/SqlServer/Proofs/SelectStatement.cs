@@ -10,10 +10,12 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// Each <c>SELECT</c> of its query, in order, one or one for each side of its set operators, the anchor and recursive
 /// members of a recursive CTE among them; or null when the reader cannot follow one.
 /// </param>
+/// <param name="Close">The index of the <c>)</c> that closes its query.</param>
 internal sealed record CommonTableExpression(
     string Name,
     IReadOnlyList<string>? Columns,
-    IReadOnlyList<SelectBody>? Branches
+    IReadOnlyList<SelectBody>? Branches,
+    int Close
 )
 {
     /// <summary>Its query when that is one <c>SELECT</c> the reader follows, or null.</summary>
@@ -181,7 +183,12 @@ internal sealed record SelectStatement(
             // A recursive CTE's members read its own name.
             string[] visible = [.. ctes.Select(static cte => cte.Name), name];
             ctes.Add(
-                new CommonTableExpression(name, columns, ReadBranches(tokens, new TokenRange(at + 2, close), visible))
+                new CommonTableExpression(
+                    name,
+                    columns,
+                    ReadBranches(tokens, new TokenRange(at + 2, close), visible),
+                    close
+                )
             );
 
             at = close + 1;

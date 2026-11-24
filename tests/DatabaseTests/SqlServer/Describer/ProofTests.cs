@@ -761,6 +761,20 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         "WITH t (n) AS (SELECT 1 UNION ALL SELECT NULL), u (n) AS (SELECT n FROM t UNION ALL SELECT 2)",
         "SELECT n AS c FROM u"
     )]
+    // Inside u, proof_rows is the table: a CTE sees only the CTEs before it, and the later one of that name gives no
+    // NULL.
+    [InlineData(
+        "WITH u (x) AS (SELECT b FROM proof_rows UNION ALL SELECT 1), proof_rows (b) AS (SELECT 1 UNION ALL SELECT 2)",
+        "SELECT x AS c FROM u"
+    )]
+    [InlineData(
+        "WITH u (x) AS (SELECT b FROM proof_rows UNION ALL SELECT 1), proof_rows (b) AS (SELECT 1)",
+        "SELECT x AS c FROM u"
+    )]
+    [InlineData(
+        "WITH u (x) AS (SELECT proof_rows.b FROM proof_rows UNION ALL SELECT 1), proof_rows (b) AS (SELECT 7)",
+        "SELECT u.x AS c FROM u"
+    )]
     public Task DescribeAsync_CteOfSeveralBranchesThatLetsANullThrough_NullableAndNullRow(string with, string select) =>
         WithRowsAsync(async () =>
         {

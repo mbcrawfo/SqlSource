@@ -214,6 +214,28 @@ public sealed partial class CteProofsTests
             .ShouldBe([Server]);
     }
 
+    // A branch's call sees only the CTEs up to its own, as the branch does: inside u, v is a table, which the later CTE
+    // v must not hide.  A recursive member still sees its own CTE.
+    [Fact]
+    public void Read_LaterCte_LeftOutOfABranchsCall()
+    {
+        var proofs = Read(
+            "WITH u (x) AS (SELECT v.n FROM v UNION ALL SELECT x + 1 FROM u WHERE x < 3), "
+                + "v (n) AS (SELECT 1 UNION ALL SELECT 2) SELECT x FROM u",
+            Rows("x")
+        );
+
+        proofs
+            .OperandQueries.Skip(1)
+            .Select(static query => query.Sql)
+            .ShouldBe([
+                "WITH u (x) AS (SELECT v.n FROM v UNION ALL SELECT x + 1 FROM u WHERE x < 3)\nSELECT v.n\nAS [1]\n"
+                    + "FROM v",
+                "WITH u (x) AS (SELECT v.n FROM v UNION ALL SELECT x + 1 FROM u WHERE x < 3)\nSELECT x\nAS [1]\n"
+                    + "FROM u WHERE x < 3",
+            ]);
+    }
+
     // A CTE that no proof reads asks nothing.
     [Fact]
     public void Read_CteNotRead_AsksNothingOfIt()

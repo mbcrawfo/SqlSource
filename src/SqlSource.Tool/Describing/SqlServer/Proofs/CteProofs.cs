@@ -12,7 +12,9 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// <para>
 /// A row of such a CTE is a row of one of its branches, so a column is not null when every branch proves its item at
 /// that place.  Each branch is proved as a <c>SELECT</c> of its own, by <see cref="ExpressionProofs" /> over its own
-/// <c>FROM</c> and <c>WHERE</c>, behind the query's <c>WITH</c> clause, with one <c>operands</c> call.  Its lone leaf
+/// <c>FROM</c> and <c>WHERE</c>, with one <c>operands</c> call behind the <c>WITH</c> clause cut after its CTE: the
+/// branch sees only the CTEs before its own and its own, so a later CTE of the name of a table it reads must not hide
+/// that table.  Its lone leaf
 /// is asked, since what <c>columns</c> answered is the column of all the branches together.
 /// </para>
 /// <para>
@@ -113,6 +115,7 @@ internal sealed class CteProofs
         var columns = new Dictionary<int, IReadOnlyDictionary<int, IReadOnlyList<Proof>>>();
         foreach (var (place, cte) in read)
         {
+            var with = new TokenRange(statement.With.Start, statement.Ctes[place].Close + 1);
             var offsets = new int[cte.Bodies.Count];
             for (var at = 0; at < cte.Bodies.Count; at++)
             {
@@ -122,7 +125,7 @@ internal sealed class CteProofs
                 {
                     queries.Add(
                         new ColumnProofs.OperandQuery(
-                            OperandsQuery.Text(sql, tokens, statement.With, cte.Bodies[at], operands),
+                            OperandsQuery.Text(sql, tokens, with, cte.Bodies[at], operands),
                             operands.Count
                         )
                     );
