@@ -77,8 +77,9 @@ internal static class TypeDiagnostics
                     + "-- column: marker.  Declare a parameter as text with a -- param: marker, and cast it in the "
                     + "query"
             ),
-            // NpgsqlRange<T> is a type of the driver, which a project without it cannot name.
-            TypeMappingKind.UserDefinedRange => DiagnosticInfo.Create(
+            // NpgsqlRange<T> is a type of the driver, which a project without it cannot name.  Npgsql reads a
+            // multirange as an array of its range.
+            TypeMappingKind.UserDefinedRange or TypeMappingKind.UserDefinedMultirange => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
                 at,
                 subject,
@@ -86,7 +87,12 @@ internal static class TypeDiagnostics
                 (column == NpgsqlColumn.None ? "Reference Npgsql, then map" : "Map")
                     + " it with the type override, as "
                     + AsAKey(key, engine)
-                    + "=NpgsqlTypes.NpgsqlRange<T> with the data source's EnableUnmappedTypes()"
+                    + (
+                        failure.Kind == TypeMappingKind.UserDefinedMultirange
+                            ? "=NpgsqlTypes.NpgsqlRange<T>[]"
+                            : "=NpgsqlTypes.NpgsqlRange<T>"
+                    )
+                    + " with the data source's EnableUnmappedTypes()"
             ),
             TypeMappingKind.NeedsDriver => engine switch
             {

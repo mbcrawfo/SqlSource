@@ -1,0 +1,28 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListReadingsOfKinds\n-- param: @kinds reading_kind_with_a_name_of_exactly_sixty_three_characters_long[]\nSELECT r.id\nFROM readings AS r\nWHERE @kinds IS NOT NULL;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 28],
+      ["Text", 28, 29],
+      ["LineComment", 29, 111],
+      ["Text", 111, 149],
+      ["Parameter", 149, 155],
+      ["Text", 155, 169]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 28, "name": null, "default": null },
+      { "kind": "markerComment", "start": 29, "end": 111, "name": null, "default": null },
+      { "kind": "parameter", "start": 149, "end": 155, "name": "kinds", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

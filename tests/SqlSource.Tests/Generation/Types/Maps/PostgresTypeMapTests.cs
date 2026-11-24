@@ -67,7 +67,7 @@ public sealed class PostgresTypeMapTests
                 SidecarValues.Kind.Multirange,
                 subtype: User("floatrange", SidecarValues.Kind.Range)
             ),
-            "!UserDefinedRange",
+            "!UserDefinedMultirange",
             false,
             "public.floatmultirange"
         ),

@@ -92,7 +92,12 @@ internal sealed class PostgresRenaming : IEngineRenaming
     }
 
     /// <inheritdoc />
-    public void Derive(RenamingCall call, IRenamingScope scope) => PostgresDerivations.Derive(call, scope);
+    public void Derive(RenamingCall call, IReadOnlyList<RenamingCall> calls, IRenamingScope scope) =>
+        PostgresDerivations.Derive(call, calls, scope);
+
+    /// <inheritdoc />
+    public void DeriveEntry(JsonObject entry, IReadOnlyList<RenamingCall> calls) =>
+        PostgresDerivations.DeriveEntry(entry, calls);
 
     /// <summary>
     /// Which of PostgreSQL's own strings a member is.  The field table gives the rule to these members alone, so any

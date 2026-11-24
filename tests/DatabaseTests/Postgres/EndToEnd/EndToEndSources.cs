@@ -57,6 +57,16 @@ internal static class EndToEndSources
         return builder.Build();
     }
 
+    // "app" as App sets it up, with EnableUnmappedTypes(), which the manual tells an application to call for a range of
+    // its own: without it Npgsql reads no reading_range of Queries/Ranges.sql and sends none.
+    public static NpgsqlDataSource AppWithUnmappedTypes(PostgresDatabases postgres)
+    {
+        var builder = new NpgsqlDataSourceBuilder(postgres.ConnectionStringOf(PostgresDatabases.AppDatabase));
+        _ = builder.MapEnum<NoteKind>();
+        _ = builder.EnableUnmappedTypes();
+        return builder.Build();
+    }
+
     // "gis" of the PostGIS container, with Npgsql.NetTopologySuite's plugin, which reads and writes the geometries of
     // the queries of NetTopologySuite/, whose folder turns the library back on.
     public static NpgsqlDataSource GisWithNetTopologySuite(PostgisDatabases postgis)

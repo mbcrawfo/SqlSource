@@ -1,0 +1,28 @@
+{
+  "fileName": "query.sql",
+  "settings": [
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- name: ListReadingsAtLevels\n-- param: @levels _reading_level[]\nSELECT r.id\nFROM readings AS r\nWHERE @levels IS NOT NULL;\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "ansi",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 29],
+      ["Text", 29, 30],
+      ["LineComment", 30, 64],
+      ["Text", 64, 102],
+      ["Parameter", 102, 109],
+      ["Text", 109, 123]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 29, "name": null, "default": null },
+      { "kind": "markerComment", "start": 30, "end": 64, "name": null, "default": null },
+      { "kind": "parameter", "start": 102, "end": 109, "name": "levels", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

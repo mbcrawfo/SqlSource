@@ -70,3 +70,7 @@ INSERT INTO all_types (
 );
 
 INSERT INTO all_types (id) VALUES (2);
+
+INSERT INTO readings (id, span, spans) VALUES
+(1, '[1.5,2.5)', '{[1,2),(3,4]}'),
+(2, '(10,20]', NULL);
