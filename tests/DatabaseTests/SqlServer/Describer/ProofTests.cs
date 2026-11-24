@@ -428,6 +428,19 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             { 0, "SELECT b AS c FROM dbo.proof_rows INTERSECT SELECT b FROM dbo.proof_rows" },
             { 0, "SELECT COUNT(*) AS c FROM dbo.proof_rows UNION ALL SELECT MAX(a) FROM dbo.proof_rows WHERE 1 = 0" },
             { 0, "SELECT shape AS c FROM dbo.proof_shapes WHERE shape IS NOT NULL UNION ALL SELECT 'NULL'" },
+            // A proved first branch, then one that can be NULL, each kind of proof reading its own branch's answers.
+            { 0, "SELECT a + 1 AS c FROM dbo.proof_rows UNION ALL SELECT COALESCE(g, b) FROM dbo.proof_rows" },
+            { 0, "SELECT a + id AS c FROM dbo.proof_rows UNION ALL SELECT g + b FROM dbo.proof_rows" },
+            {
+                0,
+                "SELECT a AS c FROM dbo.proof_rows UNION ALL SELECT solid.id FROM dbo.proof_shapes AS p "
+                    + "LEFT JOIN dbo.proof_other AS solid ON solid.id = p.id + 100 WHERE solid.STSrid = 0"
+            },
+            {
+                0,
+                "SELECT CAST(a AS varbinary(max)) AS c FROM dbo.proof_rows "
+                    + "UNION ALL SELECT CAST(COALESCE(shape, 'NULL') AS varbinary(max)) FROM dbo.proof_shapes"
+            },
         };
 
     // A form that reads a value twice proves nothing unless the value gives one value in a row.  Each of these can
@@ -605,6 +618,11 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
         "SELECT q.b AS c FROM q LEFT JOIN dbo.proof_other AS o ON o.rows_id = q.id"
     )]
+    // The filter of the outer query makes the LEFT JOIN of the CTE inner, so the CTE's own filter holds of its rows.
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT q.b AS c FROM dbo.proof_other AS p LEFT JOIN q ON q.id = p.id WHERE q.id > 0"
+    )]
     public Task DescribeAsync_FilterOfACte_NotNullAndNoNullRow(string with, string select) =>
         WithRowsAsync(async () =>
         {
@@ -642,6 +660,11 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     [InlineData(
         "WITH q AS (SELECT b FROM proof_rows), proof_rows AS (SELECT b FROM dbo.proof_rows WHERE b > 0)",
         "SELECT b AS c FROM q"
+    )]
+    // A name of three parts is the table's column, though the CTE's alias is its schema's name.
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT dbo.proof_rows.b AS c FROM q AS dbo JOIN dbo.proof_rows ON proof_rows.id = dbo.id + 1"
     )]
     // A name under the alias of a LEFT JOIN of a CTE that is a property of a CLR column of the other source.
     [InlineData(

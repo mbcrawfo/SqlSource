@@ -169,6 +169,20 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 
 **What to do.**  Leave `ANSI_WARNINGS` on, as Microsoft.Data.SqlClient turns it on when it connects.  Run no `SET ANSI_WARNINGS OFF` on a connection that runs your queries.
 
+<a id="limit-clr-set-operator"></a>
+
+### Null from a spatial column of a `UNION ALL` whose property cannot be null
+
+**What you see.**  A `geometry` or `geography` column gets a property that cannot be null, and the query returns a null in it.  The column combines a spatial value with a string, in a `UNION ALL` or a `VALUES` list.  The combination can be in the query, a subquery, a `WITH` query or a view.
+
+**Why.**  SQL Server converts the string to the spatial type, and converts the text `NULL`, in any case, to null.  SQL Server still says that the column is never null.
+
+**What to do.**  Do one of these:
+
+- Give the column a `-- column: name null` marker, which says that it can be null.
+- End the alias of the column with `?`.
+- Keep strings that hold `NULL` out of the column.
+
 <a id="limit-ansi-nulls-off"></a>
 
 ### Null from a filtered column whose property cannot be null, with `ANSI_NULLS` off

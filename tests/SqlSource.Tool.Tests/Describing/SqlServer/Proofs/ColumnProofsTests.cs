@@ -199,6 +199,11 @@ public sealed class ColumnProofsTests
     [InlineData("SET ANSI_NULLS OFF SELECT nickname FROM dbo.users WHERE nickname = @p")]
     [InlineData("SELECT nickname FROM dbo.users WHERE nickname = @p; SET ANSI_NULLS OFF")]
     [InlineData("SELECT nickname FROM dbo.users WHERE nickname = @p SET ANSI_NULLS OFF")]
+    // A name of three parts is the table's column, though the CTE's alias is its schema's name.
+    [InlineData(
+        "WITH q AS (SELECT id, nickname FROM dbo.users WHERE nickname > 'a') "
+            + "SELECT dbo.users.nickname FROM q AS dbo JOIN dbo.users ON users.id = dbo.id + 1"
+    )]
     // Inside q, p is a table: a CTE sees only the CTEs before it.
     [InlineData(
         "WITH q AS (SELECT nickname FROM p), p AS (SELECT nickname FROM t WHERE nickname > 'a') "
