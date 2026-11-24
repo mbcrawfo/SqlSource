@@ -72,6 +72,89 @@ public sealed class PostgresTypeMapTests
             "public.floatmultirange"
         ),
         ["composite"] = new(User("users", SidecarValues.Kind.Composite), "!Unreadable", false, "public.users"),
+        ["composite of pg_catalog named as the array of a known type"] = new(
+            ModelRuns.Catalog("_int4", SidecarValues.Kind.Composite),
+            "!NamedAsAnArray",
+            false,
+            "_int4"
+        ),
+        ["composite of pg_catalog named as the array of another type"] = new(
+            ModelRuns.Catalog("_foo", SidecarValues.Kind.Composite),
+            "!NamedAsAnArray",
+            false,
+            "_foo"
+        ),
+        ["composite of pg_catalog named as an array, with a capital"] = new(
+            ModelRuns.Catalog("_Foo", SidecarValues.Kind.Composite),
+            "!NamedAsAnArray",
+            false,
+            "\"_Foo\""
+        ),
+        ["range of pg_catalog named as an array"] = new(
+            ModelRuns.Catalog("_foo", SidecarValues.Kind.Range, subtype: ModelRuns.Catalog("float8")),
+            "!NamedAsAnArray",
+            false,
+            "_foo"
+        ),
+        ["multirange of pg_catalog named as an array"] = new(
+            ModelRuns.Catalog("_foo", SidecarValues.Kind.Multirange, subtype: ModelRuns.Catalog("float8")),
+            "!NamedAsAnArray",
+            false,
+            "_foo"
+        ),
+        // An array of such a type or a domain over one has a key of its own, which an entry can name.
+        ["array of a composite of pg_catalog named as an array"] = new(
+            ArrayOf(ModelRuns.Catalog("_foo", SidecarValues.Kind.Composite)),
+            "!Unreadable",
+            false,
+            "_foo[]"
+        ),
+        ["domain over a composite of pg_catalog named as an array"] = new(
+            DomainOf("label", ModelRuns.Catalog("_foo", SidecarValues.Kind.Composite)),
+            "!Unreadable",
+            false,
+            "public.label"
+        ),
+        ["domain over an array of such a composite"] = new(
+            DomainOf("label", ArrayOf(ModelRuns.Catalog("_foo", SidecarValues.Kind.Composite))),
+            "!Unreadable",
+            false,
+            "_foo[]"
+        ),
+        ["array of a domain over such a composite"] = new(
+            ArrayOf(DomainOf("label", ModelRuns.Catalog("_foo", SidecarValues.Kind.Composite))),
+            "!Unreadable",
+            false,
+            "public.label"
+        ),
+        // A name of _ alone is no array's, so pg_catalog._ names this type.
+        ["composite of pg_catalog named _"] = new(
+            ModelRuns.Catalog("_", SidecarValues.Kind.Composite),
+            "!Unreadable",
+            false,
+            "_"
+        ),
+        // Outside pg_catalog, a name with a _ is no array's.
+        ["composite of public named with a _"] = new(
+            User("_foo", SidecarValues.Kind.Composite),
+            "!Unreadable",
+            false,
+            "public._foo"
+        ),
+        ["range of public named with a _"] = new(
+            User("_foo", SidecarValues.Kind.Range, subtype: ModelRuns.Catalog("float8")),
+            "!UserDefinedRange",
+            false,
+            "public._foo"
+        ),
+        // Only a composite or a range is refused: _record, the one such name of a server, keeps its answer.
+        ["base type _record of pg_catalog"] = new(ModelRuns.Catalog("_record"), "!CastToText", false, "_record"),
+        ["pseudo-type _record of pg_catalog"] = new(
+            ModelRuns.Catalog("_record", "pseudo"),
+            "!NotWrittenByTheTool",
+            false,
+            "_record"
+        ),
         ["kind this version does not know"] = new(
             User("users", "table"),
             "!NotWrittenByTheTool",

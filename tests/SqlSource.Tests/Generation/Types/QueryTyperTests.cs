@@ -11,6 +11,7 @@ using SqlSource.Generation.Types.MappedTypes;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
@@ -261,6 +262,78 @@ public sealed class QueryTyperTests
             "Map it with the type override, as dbo.\"Money\"=<a C# type>"
         );
 
+    // The help for a type of a user's schema is its key as it is, whatever the schema is called: a schema named
+    // pg_catalog is no system schema of SQL Server's, so the key does not gain sys.
+    [Fact]
+    public void Type_SqlServerUserTypeInASchemaNamedPgCatalog_GivesItsKeyAsItIs() =>
+        ShouldGiveTheHelp(
+            Entry(
+                SidecarValues.Engine.SqlServer,
+                columns:
+                [
+                    TestSidecars.SqlServer(
+                        "Money",
+                        maxLength: 8,
+                        precision: 0,
+                        userType: new SqlServerUserType("pg_catalog", "Money", Assembly)
+                    ),
+                ]
+            ),
+            "column 'c0'",
+            "Money",
+            "Map it with the type override, as pg_catalog.\"Money\"=<a C# type>"
+        );
+
+    // A CLR type of sys that is named as a type the map reads without a CLR type, which only a sidecar edited by hand
+    // has, is no row of the map, and its bare name is a key that names that type: it is not given sys.
+    [Fact]
+    public void Type_SqlServerClrTypeOfSysNamedAsAKnownType_GivesItsBareKey() =>
+        ShouldGiveTheHelp(
+            Entry(
+                SidecarValues.Engine.SqlServer,
+                columns:
+                [
+                    TestSidecars.SqlServer(
+                        "int",
+                        maxLength: 4,
+                        precision: 10,
+                        userType: new SqlServerUserType("sys", "int", Assembly)
+                    ),
+                ]
+            ),
+            "column 'c0'",
+            "int",
+            "Map it with the type override, as int=<a C# type>"
+        );
+
+    // A type override of a SQL Server type named json: the system type and an alias type of it hold JSON, and a CLR
+    // type that happens to be named json, which has an assembly, holds none.
+    [Theory]
+    [InlineData("json", null, null, "json", true)]
+    [InlineData("json", "doc", null, "dbo.doc", true)]
+    [InlineData("json", "json", Assembly, "dbo.json", false)]
+    public void Type_SqlServerTypeNamedJsonWithAnOverride_HoldsJsonUnlessItIsAClrType(
+        string name,
+        string? userTypeName,
+        string? assembly,
+        string key,
+        bool holdsJson
+    )
+    {
+        var user = userTypeName is null ? null : new SqlServerUserType("dbo", userTypeName, assembly);
+        var entry = Entry(
+            SidecarValues.Engine.SqlServer,
+            columns: [TestSidecars.SqlServer(name, maxLength: -1, precision: 0, userType: user)]
+        );
+
+        var types = QueryTyper.Type(InputOf(SqlDialect.SqlServer, entry, SettingsFileLevelOf(key, "MyApp.Email")));
+
+        types.Diagnostics.ShouldBeEmpty();
+        var column = types.Queries.ShouldHaveSingleItem().Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+        column.Text.ShouldBe(Email);
+        column.Database.ShouldNotBeNull().HoldsJson.ShouldBe(holdsJson);
+    }
+
     // An object of a settings file serves both engines: a name both have reaches each engine's own type of that name,
     // and a name one engine alone reads reaches that engine's files alone, so timestamp, which both engines have, is
     // mapped only in the file of the engine whose key it is.
@@ -359,6 +432,97 @@ public sealed class QueryTyperTests
         var diagnostic = types.Diagnostics.ShouldHaveSingleItem();
         diagnostic.Descriptor.ShouldBe(SqlDiagnostics.MappedTypeNotFound);
         diagnostic.Arguments[3].ShouldBe("the columnTypes of the settings file /app/sqlsource.json");
+    }
+
+    // An entry of a bare name reaches a type of a user's schema only when the type is an extension's base type, whose
+    // bare name is its own wherever the extension was created.  An enum or a composite of such a schema that is named
+    // as a type of the map is no more named by the bare key than a type of any other name is.
+    [Theory]
+    [InlineData(SidecarValues.Kind.Enum, "int4", "int4")]
+    [InlineData(SidecarValues.Kind.Enum, "cube", "cube")]
+    [InlineData(SidecarValues.Kind.Composite, "cube", "cube")]
+    [InlineData(SidecarValues.Kind.Composite, "hstore", "hstore")]
+    public void Type_BareKeyOfAKnownName_DoesNotMapANonExtensionTypeOfAUserSchema(
+        string kind,
+        string internalName,
+        string key
+    )
+    {
+        var type = TestSidecars.Postgres(
+            name: internalName,
+            kind: kind,
+            schema: "public",
+            internalName: internalName,
+            labels: kind == SidecarValues.Kind.Enum ? ["a"] : null
+        );
+
+        var types = QueryTyper.Type(
+            InputOf(
+                SqlDialect.PostgreSql,
+                Entry(SidecarValues.Engine.Postgres, columns: [type]),
+                SettingsFileLevelOf(key, "long")
+            )
+        );
+
+        if (kind == SidecarValues.Kind.Enum)
+        {
+            types.Diagnostics.ShouldBeEmpty();
+            ColumnTexts(types).ShouldBe(["string"]);
+        }
+        else
+        {
+            types.Queries.ShouldBeEmpty();
+            types
+                .Diagnostics.ShouldHaveSingleItem()
+                .Arguments.ShouldBe([
+                    "column 'c0'",
+                    internalName,
+                    "Map it with the type override, as public." + internalName + "=<a C# type>",
+                ]);
+        }
+    }
+
+    // The control: the base type of an extension is found by its bare name, wherever its schema is.
+    [Fact]
+    public void Type_BareKeyOfAnExtensionsBaseType_MapsItInAUserSchema()
+    {
+        var citext = TestSidecars.Postgres(name: "citext", schema: "public", internalName: "citext");
+
+        var types = QueryTyper.Type(
+            InputOf(
+                SqlDialect.PostgreSql,
+                Entry(SidecarValues.Engine.Postgres, columns: [citext]),
+                SettingsFileLevelOf("citext", "MyApp.Email")
+            )
+        );
+
+        types.Diagnostics.ShouldBeEmpty();
+        ColumnTexts(types).ShouldBe([Email]);
+    }
+
+    // Every library that is on and that the project cannot use is recorded on the query, in the order of the libraries,
+    // each with the entry that turned it on.
+    [Fact]
+    public void Type_EveryLibraryOnWithoutItsAssemblies_IsRecordedOnTheQuery()
+    {
+        var place = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
+        var settings = new[]
+        {
+            new LibrarySetting(SqlLibrary.NodaTime, LibraryState.On, place),
+            new LibrarySetting(SqlLibrary.NetTopologySuite, LibraryState.On, place),
+            new LibrarySetting(SqlLibrary.Json, LibraryState.On, place),
+        };
+
+        var types = QueryTyper.Type(
+            InputOf(
+                SqlDialect.PostgreSql,
+                Entry(SidecarValues.Engine.Postgres, columns: [TestSidecars.Postgres()]),
+                new SettingsLevel { LibraryTypes = TestSidecars.Of(settings) }
+            )
+        );
+
+        types.Diagnostics.ShouldBeEmpty();
+        types.Queries.ShouldHaveSingleItem().UnavailableLibraries.ShouldBe(settings);
     }
 
     // The entry under mssql, with no type override, gives no query and SQLSRC246 with the subject, the type's name and

@@ -68,6 +68,15 @@ internal static class TypeDiagnostics
                 typeName,
                 Describe
             ),
+            TypeMappingKind.NamedAsAnArray => DiagnosticInfo.Create(
+                SqlDiagnostics.TypeHasNoCSharpType,
+                at,
+                subject,
+                typeName,
+                "No type override can name it, since its key would mean an array.  Give a column a C# type with a "
+                    + "-- column: marker.  Declare a parameter as text with a -- param: marker, and cast it in the "
+                    + "query"
+            ),
             // NpgsqlRange<T> is a type of the driver, which a project without it cannot name.
             TypeMappingKind.UserDefinedRange => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
@@ -76,7 +85,7 @@ internal static class TypeDiagnostics
                 typeName,
                 (column == NpgsqlColumn.None ? "Reference Npgsql, then map" : "Map")
                     + " it with the type override, as "
-                    + key
+                    + AsAKey(key, engine)
                     + "=NpgsqlTypes.NpgsqlRange<T> with the data source's EnableUnmappedTypes()"
             ),
             TypeMappingKind.NeedsDriver => engine switch
@@ -194,8 +203,8 @@ internal static class TypeDiagnostics
 
     // The key as an entry names it: the key of a type of the engine's system schema, pg_catalog or sys, is its bare
     // name, which a key may be only for a name the engine's map knows, so a catalog table's row type, pg_class, is
-    // written pg_catalog.pg_class, and a type of a newer server, sys.newtype, as is one of SQL Server whose bare name
-    // is an alias of another, sys.rowversion.  The key of any other type has its
+    // written pg_catalog.pg_class, and a type of a newer server, sys.newtype, as is one whose bare name is an alias of
+    // another, pg_catalog.integer or sys.rowversion.  The key of any other type has its
     // schema already, which is found by splitting the key, as a dot inside quotes is no schema's.
     private static string AsAKey(string key, DatabaseEngine engine)
     {
@@ -204,13 +213,14 @@ internal static class TypeDiagnostics
             return key;
         }
 
+        // A bare key that the engine reads as another name, as integer is read as int4 and rowversion as timestamp,
+        // names that type and not this one, which the system schema names as it is.
         return engine switch
         {
-            DatabaseEngine.PostgreSql => TypeKeys.TryNormalizePostgres(key.AsSpan(), out _)
+            DatabaseEngine.PostgreSql => TypeKeys.TryNormalizePostgres(key.AsSpan(), out var normalized)
+            && string.Equals(normalized, key, StringComparison.Ordinal)
                 ? key
                 : SystemSchemas.Postgres + "." + key,
-            // A bare key that SQL Server reads as another name, as rowversion is read as timestamp, names that type
-            // and not this one, which sys. names as it is.
             DatabaseEngine.SqlServer => TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var normalized)
             && string.Equals(normalized, key, StringComparison.Ordinal)
                 ? key

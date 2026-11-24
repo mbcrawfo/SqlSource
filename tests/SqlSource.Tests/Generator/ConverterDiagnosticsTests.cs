@@ -163,6 +163,13 @@ public sealed class ConverterDiagnosticsTests
         "it is a local function"
     )]
     [InlineData(
+        "public static class Conversions",
+        "public static void Outer() { static void Inner() "
+            + "{ [SqlSourceConverter] static Email ToEmail(string value) => new(value); } }",
+        "App.Conversions.Outer.Inner.ToEmail(string)",
+        "it is a local function"
+    )]
+    [InlineData(
         "public readonly struct Wrapper",
         "[SqlSourceConverter] public static implicit operator Wrapper(string value) => default;",
         "App.Wrapper.implicit operator App.Wrapper(string)",
@@ -196,6 +203,13 @@ public sealed class ConverterDiagnosticsTests
         "public static class Conversions<T>",
         "[SqlSourceConverter] public static Email ToEmail(string value) => new(value);",
         "App.Conversions<T>.ToEmail(string)",
+        "it is in a generic type"
+    )]
+    [InlineData(
+        "public static class Conversions<T>",
+        "public static class Inner<U> "
+            + "{ [SqlSourceConverter] public static Email ToEmail(string value) => new(value); }",
+        "App.Conversions<T>.Inner<U>.ToEmail(string)",
         "it is in a generic type"
     )]
     [InlineData(
@@ -391,6 +405,25 @@ public sealed class ConverterDiagnosticsTests
         ConvertersOf(run)
             .Select(converter => (converter.DisplayName, converter.Fault))
             .ShouldBe([("App.Conversions.From(string)", null), (displayName, fault)], ignoreOrder: true);
+    }
+
+    // A method without an argument is read with no argument type, which is no value type, whatever else is wrong with
+    // it.
+    [Fact]
+    public void Run_ConverterWithoutAnArgument_HasNoArgumentType()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            FaultySource(
+                "public static class Conversions",
+                "[SqlSourceConverter] public static Email Empty() => new(string.Empty);"
+            )
+        );
+
+        var converter = ConvertersOf(run).ShouldHaveSingleItem();
+        converter.DisplayName.ShouldBe("App.Conversions.Empty()");
+        converter.ArgumentText.ShouldBeEmpty();
+        converter.ArgumentIsValueType.ShouldBeFalse();
     }
 
     // Two local functions of one name in two blocks of one method are two functions, each reported.
