@@ -54,10 +54,11 @@ The `.sql` file of a bundle leaves out each marker that changes no description, 
   - its other names, such as the system databases `master` and `tempdb` of SQL Server, and the system columns `ctid` and `xmin` of PostgreSQL.
 - **A logical database that is named for its dialect is kept**: `postgres` or `mssql`.
 
-Before `diagnose` writes the bundle, it checks two things:
+Before `diagnose` writes the bundle, it checks three things:
 
 - Every word in the bundle is a new name, a word of the database, a number or punctuation.
 - The query, run from the renamed bundle as `replay` runs it, gives the answer that your database gave.
+- The bundle holds no connection string or password of yours.  If it would, `diagnose` writes no bundle and reports [SQLSRC200](../diagnostics.md#sqlsrc200).
 
 So a bundle that `diagnose` writes holds no name, literal or value of yours but the ones that the rules above keep.  And it shows the problem as you saw it.  If a number in your query is a value that you cannot share, such as an account number written into its SQL, take the [private route](../guides/report-a-bug.md#raw-bundle) instead.
 
