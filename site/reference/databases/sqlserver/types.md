@@ -90,7 +90,7 @@ A type that the table does not name gets its C# type by what it is:
 
 A CLR type of your own assembly, made by `CREATE TYPE ... EXTERNAL NAME`, has no C# type until you map it.  A query that returns or takes one is described, and its build reports [SQLSRC246](../../../diagnostics.md#sqlsrc246), which names the key to map.  To read and send the type:
 
-1. Build the type's source for .NET too, with the same type name, in an assembly of the same name as the one on the server.  On .NET, the type takes its `SqlUserDefinedType` attribute from the package `Microsoft.SqlServer.Server`.
+1. Build the type's source for .NET too, with the same type name.  Give the assembly the name of the one on the server.  On .NET, the type takes its `SqlUserDefinedType` attribute from the package `Microsoft.SqlServer.Server`.
 2. Reference that build from the project of your queries.
 3. Map the type with the [type override](../../type-mapping.md#setting-type-overrides) by its schema and name, to the type of that build.
 
@@ -114,7 +114,7 @@ The application references a .NET build of `MyApp.Grade` in an assembly named `G
 
 A query method then reads a column of the type as a `MyApp.Grade`, and sends a parameter of it as a `dbo.Grade`.  Microsoft.Data.SqlClient finds the C# type by its name and its assembly's name, as SQL Server gives them.
 
-SqlSource treats a column of such a type as one that can be null in some queries where SQL Server says it is never null, as it treats `geometry`: see [which columns can be null](nullability.md#nullability).
+SQL Server can say that a column of such a type is never null where SqlSource treats it as one that can be null.  SqlSource treats `geometry` the same way: see [which columns can be null](nullability.md#nullability).
 
 <a id="limits"></a>
 
