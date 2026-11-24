@@ -107,7 +107,7 @@ A type that the table does not name gets its C# type by its kind:
 | An array | Its element's C# type with `[]`: `int[]` for `int4[]`, `string[]` for `text[]`, `string[]` for an array of an enum.  A parameter in a query method is an `IEnumerable<T>` of that element: see [array parameters](query-methods.md#array-parameters) |
 | A domain | Its base type's C# type: a domain over `text` is a `string` |
 | An enum | `string`.  Npgsql reads an enum as its label.  To read it as a C# enum, map it with the type override, `public.user_status=MyApp.UserStatus`, and call `MapEnum<MyApp.UserStatus>()` on the application's data source builder |
-| A range or a multirange that the table does not name, a range of your own over `int4` included | None: SQLSRC246.  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.  A project without Npgsql references it first, since that type is Npgsql's.  [A column of a range of your own stops `sqlsource describe`](#limit-user-defined-range) |
+| A range or a multirange that the table does not name, a range of your own over `int4` included | None: SQLSRC246.  Map a range with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, and a multirange to an array of it, `NpgsqlTypes.NpgsqlRange<T>[]`.  Call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read or send it.  A project without Npgsql references it first, since that type is Npgsql's |
 | A composite type, which includes a table's row type | None: SQLSRC246.  Map it with the type override to the type the application's data source maps it to, or select its fields as columns of their own |
 | A base type of `pg_catalog` that the table does not name, such as `aclitem` | None: SQLSRC246.  No version of Npgsql reads it: cast the column to `text` in the query |
 | Any other base type that the table does not name, such as one of an extension SqlSource does not know | None: SQLSRC246.  Map it with the type override to the type the application reads it as |
@@ -133,23 +133,13 @@ A type that the table does not name gets its C# type by its kind:
 
 ## Limits
 
-<a id="limit-user-defined-range"></a>
-
-### A column of a range of your own stops `sqlsource describe`
-
-**What you see.**  `sqlsource describe` stops with [SQLSRC200](../../../diagnostics.md#sqlsrc200), and the message says that reading an unmapped range needs `EnableUnmappedTypes`.  The file of that query gets no sidecar.
-
-**Why.**  Npgsql reads a range of your own only after an opt-in, and `sqlsource describe` does not make it.
-
-**What to do.**  Select a value that Npgsql can read.  Cast the column to `text`, as in `SELECT span::text AS span`, or select its bounds as columns of their own, with `lower(span)` and `upper(span)`.
-
 <a id="limit-array-parameter-underscore"></a>
 
-### An array parameter of a type named with `_` crashes `sqlsource describe`
+### An array parameter of an enum named with `_` cannot be sent
 
-**What you see.**  `sqlsource describe` prints `Stack overflow.` and stops with the exit code 134.  It reports no SQLSRC error and does not name the query.
+**What you see.**  [SQLSRC232](../../../diagnostics.md#sqlsrc232) for a parameter whose type is an array of an enum whose own name starts with `_`, such as `public._mood[]`, and the `server:` line says that writing is not supported.  A column of that type is described, and so is an array parameter of a domain named with `_`.
 
-**Why.**  Npgsql fails on an array of a type whose own name starts with `_`, such as `public._mood[]`, when it is the type of a parameter.  A column of that type is not affected.
+**Why.**  Npgsql reads a `_` at the start of a type's name as the mark of an array.  It cannot name the array of such a type, so it cannot send it.
 
 **What to do.**  Declare the parameter as `text` with a [`-- param:` marker](../../parameters.md#param-marker), and cast it in the query:
 
@@ -158,3 +148,13 @@ A type that the table does not name gets its C# type by its kind:
 -- param: @moods text
 SELECT id FROM people WHERE moods = @moods::public._mood[];
 ```
+
+<a id="limit-array-of-a-renamed-type"></a>
+
+### An array parameter of a type created after a type named `_` and its name
+
+**What you see.**  [SQLSRC231](../../../diagnostics.md#sqlsrc231) for a parameter whose type is an array of a type `x`, and the `server:` line says that an operator does not exist, with `x[]` on one side and `_x` on the other.
+
+**Why.**  PostgreSQL names the array of a type `x` as `_x`.  When a type named `_x` already exists in the schema, it gives the array another name, such as `_x_1`.  Npgsql still reads `x[]` as the type named `_x`, so it sends the parameter as that other type.
+
+**What to do.**  Declare the parameter as `text` with a `-- param:` marker, and cast it in the query, `@p::public.x[]`.  Or rename the type `_x`, then drop and create `x` again, so that its array takes the name `_x`.

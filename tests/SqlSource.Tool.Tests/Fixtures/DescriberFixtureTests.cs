@@ -101,6 +101,7 @@ public sealed class DescriberFixtureTests : IDisposable
                     "postgres/select-range-intersection",
                     "postgres/select-scalar-subquery",
                     "postgres/select-suffix-names",
+                    "postgres/select-user-range",
                     "postgres/select-values-list",
                     "postgres/select-view",
                     "postgres/update-array-and-range",

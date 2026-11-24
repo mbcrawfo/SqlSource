@@ -97,3 +97,12 @@ CREATE VIEW user_orders AS
 SELECT u.id AS user_id, u.name, o.id AS order_id, o.total
 FROM users AS u
 LEFT JOIN orders AS o ON o.user_id = u.id;
+
+-- A range of a user's own and its multirange, floatmultirange, which Npgsql reads only after EnableUnmappedTypes.
+CREATE TYPE floatrange AS RANGE (subtype = float8);
+
+CREATE TABLE readings (
+    id integer PRIMARY KEY,
+    span floatrange NOT NULL,
+    spans floatmultirange
+);
