@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DotNet.Testcontainers.Containers;
 using Shouldly;
 using SqlSource.DatabaseTests.TestHarness;
+using SqlSource.Repository;
 using Xunit;
 
 namespace SqlSource.Tests.TestHarness;
@@ -122,12 +123,38 @@ public sealed class SqlServerStartTests : IDisposable
 
         started.ShouldBeSameAs(second);
         first.Disposals.ShouldBe(1);
+        var folder = Path.Combine(_crashes, "1234-abcd");
+        Directory.GetFiles(folder).ShouldBe([Path.Combine(folder, SqlServerStart.ConsoleFile)]);
         var report = _reports.ShouldHaveSingleItem();
         report.ShouldContain(
-            $"Its console log and /var/opt/mssql/log could not be saved in {Path.Combine(_crashes, "1234-abcd")}: "
+            $"Its console log is saved in {folder}, but the archive of /var/opt/mssql/log could not be: "
                 + "No space left on device."
         );
         report.ShouldContain(SqlServerStart.FatalError);
+    }
+
+    [Fact]
+    public async Task StartAsync_ConsoleCannotBeSaved_ReportsItAndStartsAnother()
+    {
+        var token = TestContext.Current.CancellationToken;
+        _ = Directory.CreateDirectory(_crashes);
+        var notAFolder = Path.Combine(_crashes, "file");
+        await File.WriteAllTextAsync(notAFolder, "", token);
+        var first = Crashed((CrashLog, ""));
+        var second = new FakeStartingContainer { Image = ImageName };
+        var builds = new Builds(first, second);
+
+        var started = await SqlServerStart.StartAsync(builds.Next, Report, notAFolder, token);
+
+        started.ShouldBeSameAs(second);
+        first.ArchivedFolders.ShouldBeEmpty();
+        first.Disposals.ShouldBe(1);
+        _reports
+            .ShouldHaveSingleItem()
+            .ShouldContain(
+                "Neither its console log nor the archive of /var/opt/mssql/log could be saved in "
+                    + $"{Path.Combine(notAFolder, "1234-abcd")}: "
+            );
     }
 
     // Testcontainers reads the state, then runs its wait, which finds the container gone: its exception says the
@@ -287,6 +314,36 @@ public sealed class SqlServerStartTests : IDisposable
     }
 
     [Fact]
+    public void CrashFolder_VariableSet_IsTheFolderItNames()
+    {
+        var was = Environment.GetEnvironmentVariable(SqlServerStart.CrashesVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(SqlServerStart.CrashesVariable, _crashes);
+            SqlServerStart.CrashFolder.ShouldBe(_crashes);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(SqlServerStart.CrashesVariable, was);
+        }
+    }
+
+    // CI uploads the folder that the workflow's variable names, so a variable the harness does not read keeps nothing.
+    [Theory]
+    [InlineData("build.yml", 2)]
+    [InlineData("nightly.yml", 3)]
+    public void Workflow_SqlServerCrashes_SetsTheVariableAndUploadsItsFolder(string workflow, int uploads)
+    {
+        var text = File.ReadAllText(RepositoryRoot.Path(".github", "workflows", workflow));
+
+        text.ShouldContain(
+            $"\n  {SqlServerStart.CrashesVariable}: ${{{{ github.workspace }}}}/artifacts/sqlserver-crashes\n"
+        );
+        Occurrences(text, $"\n          path: ${{{{ env.{SqlServerStart.CrashesVariable} }}}}\n").ShouldBe(uploads);
+        Occurrences(text, "\n      - name: Upload SQL Server crashes\n").ShouldBe(uploads);
+    }
+
+    [Fact]
     public void CrashFolderOf_Variable_IsItsFullPath() =>
         SqlServerStart.CrashFolderOf("crashes").ShouldBe(Path.GetFullPath("crashes"));
 
@@ -304,6 +361,8 @@ public sealed class SqlServerStartTests : IDisposable
 
     private Task<FakeStartingContainer> StartAsync(Builds builds) =>
         SqlServerStart.StartAsync(builds.Next, Report, _crashes, TestContext.Current.CancellationToken);
+
+    private static int Occurrences(string text, string part) => text.Split(part).Length - 1;
 
     private Task Report(string message)
     {

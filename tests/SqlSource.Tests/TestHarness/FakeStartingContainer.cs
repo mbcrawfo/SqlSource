@@ -18,7 +18,7 @@ internal sealed class FakeStartingContainer(Exception? failure = null) : IStarti
     // Thrown by the read of the log, which succeeds when it is null.
     public Exception? LogFailure { get; set; }
 
-    // Thrown by the save of an archive, which writes Archive when it is null.
+    // Thrown by the save of an archive after it has written Archive, as a copy cut off partway is.
     public Exception? ArchiveFailure { get; set; }
 
     public (string Stdout, string Stderr) Logs { get; init; } = ("", "");
@@ -60,12 +60,11 @@ internal sealed class FakeStartingContainer(Exception? failure = null) : IStarti
     {
         ArchivedFolders.Add(path);
         DisposalsWhenArchived = Disposals;
+        await destination.WriteAsync(Archive, token);
         if (ArchiveFailure is not null)
         {
             throw ArchiveFailure;
         }
-
-        await destination.WriteAsync(Archive, token);
     }
 
     public ValueTask DisposeAsync()

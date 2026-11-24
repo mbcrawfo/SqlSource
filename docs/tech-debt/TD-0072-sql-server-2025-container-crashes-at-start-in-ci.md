@@ -27,7 +27,7 @@ A crashed start costs the time of a second start, about half a minute.  The retr
 `SqlServerStart` saves each crash in a folder of its own, named by its `Crash Id` (or by the container's id when the log has none), under the folder that `SQLSOURCE_TESTS_SQLSERVER_CRASHES` names, or `sqlsource-sqlserver-crashes` in the system's temporary folder without it.  The folder holds `console.log`, the container's whole stdout and stderr, and `mssql-log.tar`, the archive of the container's `/var/opt/mssql/log`.  CI sets the variable to `artifacts/sqlserver-crashes` of the workspace, and each job that starts SQL Server containers uploads that folder, when it holds anything, as the artifact `sqlserver-crash-<job>`, kept 30 days.
 
 ```bash
-gh api 'repos/mbcrawfo/SqlSource/actions/artifacts?name=sqlserver-crash-sqlserver' --jq '.artifacts[] | [.workflow_run.id, .created_at] | @tsv'
+gh api --paginate 'repos/mbcrawfo/SqlSource/actions/artifacts?name=sqlserver-crash-sqlserver&per_page=100' --jq '.artifacts[] | [.workflow_run.id, .created_at] | @tsv'
 ```
 
 ```bash

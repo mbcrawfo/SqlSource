@@ -43,11 +43,14 @@ internal static partial class SqlServerStart
         var started = await StartAsync(
             () => new Testcontainer<TContainer>(build()),
             message => ReportAsync(message, Environment.GetEnvironmentVariable("GITHUB_STEP_SUMMARY")),
-            CrashFolderOf(Environment.GetEnvironmentVariable(CrashesVariable)),
+            CrashFolder,
             token
         );
         return started.Container;
     }
+
+    // The folder that crashes are saved under, read each time since a test of the variable sets it.
+    internal static string CrashFolder => CrashFolderOf(Environment.GetEnvironmentVariable(CrashesVariable));
 
     // The folder that the variable names, or one in the system's temporary folder when it names none.
     internal static string CrashFolderOf(string? variable) =>
@@ -168,8 +171,9 @@ internal static partial class SqlServerStart
         return $"Crash Id: {crashId ?? "none in its log"}.  {saved}  Its log from the error on:\n{excerpt}";
     }
 
-    // Saves the container's console and the archive of LogFolder in the folder, and says where, or why it could not:
-    // a crash that cannot be saved is still started again.
+    // Saves the container's console and the archive of LogFolder in the folder, and says what it saved where, and why
+    // it could not save the rest: a crash that cannot be saved is still started again.  The archive is written under a
+    // name of its own and renamed once whole, so that ArchiveFile is never a part of one.
     private static async Task<string> SaveAsync(
         IStartingContainer container,
         string folder,
@@ -186,16 +190,44 @@ internal static partial class SqlServerStart
                 $"stdout:\n{stdout}\nstderr:\n{stderr}",
                 token
             );
-            await using var archive = File.Create(Path.Combine(folder, ArchiveFile));
-            await container.SaveArchiveAsync(LogFolder, archive, token);
+        }
+        catch (Exception exception) when (IsSaveFailure(exception))
+        {
+            return $"Neither its console log nor the archive of {LogFolder} could be saved in {folder}: "
+                + exception.Message;
+        }
+
+        var archive = Path.Combine(folder, ArchiveFile);
+        var part = archive + ".part";
+        try
+        {
+            await using (var file = File.Create(part))
+            {
+                await container.SaveArchiveAsync(LogFolder, file, token);
+            }
+
+            File.Move(part, archive, overwrite: true);
             return $"Its console log and the archive of {LogFolder}, with the dump, are saved in {folder}.";
         }
-        catch (Exception exception)
-            when (exception is IOException or UnauthorizedAccessException or HttpRequestException or DockerApiException)
+        catch (Exception exception) when (IsSaveFailure(exception))
         {
-            return $"Its console log and {LogFolder} could not be saved in {folder}: {exception.Message}";
+            try
+            {
+                File.Delete(part);
+            }
+            catch (Exception deletion) when (deletion is IOException or UnauthorizedAccessException)
+            {
+                // A part left behind is not named ArchiveFile, so no reader takes it for the archive.
+            }
+
+            return $"Its console log is saved in {folder}, but the archive of {LogFolder} could not be: "
+                + exception.Message;
         }
     }
+
+    // What a save of a crash can fail with: the file system's errors, and the Docker client's.
+    private static bool IsSaveFailure(Exception exception) =>
+        exception is IOException or UnauthorizedAccessException or HttpRequestException or DockerApiException;
 
     // sqlservr's "Crash Id: <guid>" line.  Only a guid's characters are taken, since the id names a folder.
     [GeneratedRegex(@"Crash Id:[ \t]*([0-9A-Fa-f-]{1,64})")]
