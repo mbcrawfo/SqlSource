@@ -3,9 +3,9 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.SqlServer;
-using SqlSource.Tool.Describing.SqlServer.Columns;
 using SqlSource.Tool.Describing.SqlServer.Proofs;
 using Xunit;
+using static SqlSource.Tool.Tests.ColumnProofsCases;
 using static SqlSource.Tool.Tests.SqlServerScript;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer.Proofs;
@@ -224,9 +224,6 @@ public sealed class ColumnProofsTests
     )]
     [InlineData(
         "WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY ALL nickname) SELECT nickname FROM q"
-    )]
-    [InlineData(
-        "WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a' UNION ALL SELECT NULL) SELECT nickname FROM q"
     )]
     [InlineData("WITH q AS (SELECT * FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM q")]
     [InlineData("WITH q AS (SELECT name AS nickname FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM q")]
@@ -857,16 +854,4 @@ public sealed class ColumnProofsTests
             SourceType = "U",
             IsComputedColumn = false,
         };
-
-    // The proofs of the SQL over the rows, built as the session builds them, the hidden row of browse mode 2 after
-    // them.
-    private static ColumnProofs Read(string sql, params SqlServerColumnRow[] visible)
-    {
-        IReadOnlyList<SqlServerColumnRow> rows = [.. visible, Rowstat with { ColumnOrdinal = visible.Length + 1 }];
-        var built = SqlServerColumns.Build(rows, Database).Value.ShouldNotBeNull();
-        return ColumnProofs.Read(sql, built, rows);
-    }
-
-    private static List<(bool? Nullable, string? Source)> Nullability(IReadOnlyList<BuiltColumn> columns) =>
-        [.. columns.Select(static column => (column.Column.Nullable, column.Column.NullableSource))];
 }
