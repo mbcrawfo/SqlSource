@@ -159,9 +159,9 @@ internal static class PlanSteps
         }
 
         var result = RunPlanner.Plan(manifests, filters, context.CancellationToken);
-        for (var index = 0; index < manifests.Length; index++)
+        foreach (var (projectPath, files) in result.Unclaimed)
         {
-            RunEvents.Unclaimed(reporter.Trace, manifests[index].ProjectPath, result.Unclaimed[index]);
+            RunEvents.Unclaimed(reporter.Trace, projectPath, files);
         }
 
         foreach (var file in result.Plan.Files)
