@@ -2196,11 +2196,14 @@ sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.IO.FileNotFou
 
 Here the current folder was deleted while a terminal was still in it.
 
+`sqlsource diagnose` reports it with the message `The capture holds the connection's value or a password of it.` when what it would put in the bundle holds your connection string or one of its passwords, and then writes no bundle.  A short password, or one that is the name of the database or of its dialect, counts where it is written as a password's value, as the query `UPDATE users SET password = 'pg'` does for the password `pg`.
+
 **Fix:**
 
-1. If the message names such a condition of your machine, mend that.
-2. If it does not, the error is a bug in the tool.  Set the environment variable `SQLSOURCE_DEBUG` to any value, and run the command again.
-3. [Report the bug](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
+1. If the message is the one of `diagnose` above and your query holds your connection's password, run `diagnose` with a connection whose password the query does not hold.
+2. If the message names such a condition of your machine, mend that.
+3. If it does neither, the error is a bug in the tool.  Set the environment variable `SQLSOURCE_DEBUG` to any value, and run the command again.
+4. [Report the bug](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
 
 See: [Environment variables](reference/cli.md#environment-variables)
 
