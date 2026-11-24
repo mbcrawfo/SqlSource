@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Bundles.Renaming.Postgres;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Statements;
 using Xunit;
@@ -27,7 +29,7 @@ public sealed class PostgresDerivationsTests
             RelationsCall(("s_b", "t_a"), ("s_a", "t_z"))
         );
 
-        PostgresDerivations.Derive(call, new FakeRenamingScope());
+        PostgresDerivations.Derive(call, [call], new FakeRenamingScope());
 
         call.Renamed["request"]!
             .ToJsonString()
@@ -46,7 +48,7 @@ public sealed class PostgresDerivationsTests
             RelationsCall(("s_app", "t_zeta"), ("s_app", "t_eta"))
         );
 
-        PostgresDerivations.Derive(call, new FakeRenamingScope());
+        PostgresDerivations.Derive(call, [call], new FakeRenamingScope());
 
         call.Renamed["request"]!
             .ToJsonString()
@@ -65,7 +67,7 @@ public sealed class PostgresDerivationsTests
 
         // At the "d" of "id", after "total" and "orders", each renamed longer.
         var call = PrepareCall(sql, types, head + 33, scope);
-        PostgresDerivations.Derive(call, scope);
+        PostgresDerivations.Derive(call, [call], scope);
 
         var renamed = RenamedRequest(call);
         var position = PositionOf(call);
@@ -85,7 +87,7 @@ public sealed class PostgresDerivationsTests
         // At the first character of "othertype", after "PREPARE sqlsource_1 (", "mytype" and ", ": unmapped, it would
         // be at the separator after "y_mytype", in the first item.
         var call = PrepareCall("SELECT $1, $2", types, 30, scope);
-        PostgresDerivations.Derive(call, scope);
+        PostgresDerivations.Derive(call, [call], scope);
 
         var renamed = RenamedRequest(call);
         var position = PositionOf(call);
@@ -109,7 +111,7 @@ public sealed class PostgresDerivationsTests
         var scope = Scope();
 
         var call = PrepareCall("SELECT $1, $2", types, at, scope);
-        PostgresDerivations.Derive(call, scope);
+        PostgresDerivations.Derive(call, [call], scope);
 
         var renamed = RenamedRequest(call);
         var position = PositionOf(call);
@@ -133,7 +135,7 @@ public sealed class PostgresDerivationsTests
         var head = ParameterPlaceholders.HeadLength(Statement, types);
 
         var call = PrepareCall("SELECT $1, $2", types, head - beforeTheSql, scope);
-        PostgresDerivations.Derive(call, scope);
+        PostgresDerivations.Derive(call, [call], scope);
 
         var renamed = RenamedRequest(call);
         var position = PositionOf(call);
@@ -154,7 +156,7 @@ public sealed class PostgresDerivationsTests
         var at = ParameterPlaceholders.Characters(ParameterPlaceholders.Opening(Statement)) - beforeTheList;
         var call = PrepareCall("SELECT $1", ["mytype"], at, scope);
 
-        PostgresDerivations.Derive(call, scope);
+        PostgresDerivations.Derive(call, [call], scope);
 
         PositionOf(call).ShouldBe(at);
         scope.Refusals.ShouldBeEmpty();
@@ -167,7 +169,7 @@ public sealed class PostgresDerivationsTests
         var call = PrepareCall("SELECT $1", ["mytype"], null, scope);
         var before = call.Renamed.ToJsonString();
 
-        PostgresDerivations.Derive(call, scope);
+        PostgresDerivations.Derive(call, [call], scope);
 
         call.Renamed.ToJsonString().ShouldBe(before);
         scope.Refusals.ShouldBeEmpty();
@@ -186,10 +188,154 @@ public sealed class PostgresDerivationsTests
         );
         call.Renamed["request"]!["sql"] = "SELECT a_other FROM a_orders";
 
-        PostgresDerivations.Derive(call, scope);
+        PostgresDerivations.Derive(call, [call], scope);
 
         scope.Refusals.ShouldBe([new RenamingRefusal(RefusalStep.Token, PositionPlace, null)]);
     }
+
+    // An enum named with "_" and its array, as captured, and renamed token by token, which loses the relation of the
+    // array's name to its element's: the bind name is made again from the renamed rows, the element's name and [].
+    private static readonly PostgresTypeRow Feel = PostgresRows.EnumOf(16700, "_feel", "a");
+
+    private static readonly PostgresTypeRow Feels = PostgresRows.ArrayOf(16701, "__feel", Feel);
+
+    private static readonly PostgresTypeRow RenamedFeel = PostgresRows.EnumIn(16700, "s_a", "t_feel", "a");
+
+    private static readonly PostgresTypeRow RenamedFeels = PostgresRows.ArrayOf(16701, "t_feels", RenamedFeel);
+
+    [Fact]
+    public void Derive_CheckOfAnArrayBoundByItsOwnName_IsTheBindNameOfTheRenamedRows()
+    {
+        var calls = BindCalls([Feels.Oid], [Feel, Feels], [RenamedFeel, RenamedFeels], "public.__feel", "s_a.t_feels");
+
+        PostgresDerivations.Derive(calls[^1], calls, new FakeRenamingScope());
+
+        CheckTypeOf(calls[^1]).ShouldBe("s_a.t_feel[]");
+    }
+
+    // A name the original rows do not give is not one the pipeline made, so it keeps its renaming token by token.
+    [Fact]
+    public void Derive_CheckWhoseOriginalNameTheRowsDoNotGive_KeepsItsRenamedName()
+    {
+        var calls = BindCalls([Feels.Oid], [Feel, Feels], [RenamedFeel, RenamedFeels], "public.other", "s_a.t_other");
+
+        PostgresDerivations.Derive(calls[^1], calls, new FakeRenamingScope());
+
+        CheckTypeOf(calls[^1]).ShouldBe("s_a.t_other");
+    }
+
+    [Fact]
+    public void Derive_CheckWithNoPrepareBefore_IsLeftAlone()
+    {
+        var calls = BindCalls([Feels.Oid], [Feel, Feels], [RenamedFeel, RenamedFeels], "public.__feel", "s_a.t_feels");
+        RenamingCall[] withoutPrepare = [calls[1], calls[2]];
+
+        PostgresDerivations.Derive(calls[2], withoutPrepare, new FakeRenamingScope());
+
+        CheckTypeOf(calls[2]).ShouldBe("s_a.t_feels");
+    }
+
+    // A parameter past the OIDs prepare answered has no type to make its name from.
+    [Fact]
+    public void Derive_CheckOfMoreParametersThanPrepareAnswered_KeepsTheirRenamedNames()
+    {
+        var calls = BindCalls([], [Feel, Feels], [RenamedFeel, RenamedFeels], "public.__feel", "s_a.t_feels");
+
+        PostgresDerivations.Derive(calls[^1], calls, new FakeRenamingScope());
+
+        CheckTypeOf(calls[^1]).ShouldBe("s_a.t_feels");
+    }
+
+    // A renamed request whose parameters are not the original's, one for one, is not read as the original's.
+    [Fact]
+    public void Derive_CheckWhoseRenamedParametersAreOthers_IsLeftAlone()
+    {
+        var calls = BindCalls([Feels.Oid], [Feel, Feels], [RenamedFeel, RenamedFeels], "public.__feel", "s_a.t_feels");
+        calls[^1].Renamed["request"]!["parameters"]!
+            .AsArray()
+            .Add(new JsonObject { ["name"] = "q", ["dataTypeName"] = "s_a.t_feels" });
+
+        PostgresDerivations.Derive(calls[^1], calls, new FakeRenamingScope());
+
+        CheckTypeOf(calls[^1]).ShouldBe("s_a.t_feels");
+    }
+
+    // The renamed rows lack the element, which PostgresBindNames throws for: the name stays as renamed.
+    [Fact]
+    public void Derive_CheckWhoseRenamedRowsLackAType_KeepsItsRenamedName()
+    {
+        var calls = BindCalls([Feels.Oid], [Feel, Feels], [RenamedFeels], "public.__feel", "s_a.t_feels");
+
+        PostgresDerivations.Derive(calls[^1], calls, new FakeRenamingScope());
+
+        CheckTypeOf(calls[^1]).ShouldBe("s_a.t_feels");
+    }
+
+    // A parameter's bindName is the derived check's name at its place, and a type with none is given none.
+    [Fact]
+    public void DeriveEntry_ParameterWithABindName_TakesTheDerivedChecksName()
+    {
+        var calls = BindCalls([Feels.Oid], [Feel, Feels], [RenamedFeel, RenamedFeels], "public.__feel", "s_a.t_feels");
+        PostgresDerivations.Derive(calls[^1], calls, new FakeRenamingScope());
+        var entry = new JsonObject
+        {
+            ["parameters"] = new JsonArray(
+                new JsonObject
+                {
+                    ["type"] = new JsonObject { ["name"] = "s_a.t_feels", ["bindName"] = "s_a.t_feels" },
+                }
+            ),
+        };
+        var unbound = new JsonObject
+        {
+            ["parameters"] = new JsonArray(new JsonObject { ["type"] = new JsonObject { ["name"] = "s_a.t_feels" } }),
+        };
+
+        PostgresDerivations.DeriveEntry(entry, calls);
+        PostgresDerivations.DeriveEntry(unbound, calls);
+
+        entry["parameters"]![0]!["type"]!["bindName"]!.GetValue<string>().ShouldBe("s_a.t_feel[]");
+        unbound["parameters"]![0]!["type"]!.AsObject().ContainsKey("bindName").ShouldBeFalse();
+    }
+
+    // A prepare that answered the parameters' OIDs, a types call that answered the rows and a check of one parameter
+    // bound by the name given, each as captured and as renamed.
+    private static RenamingCall[] BindCalls(
+        long[] oids,
+        PostgresTypeRow[] rows,
+        PostgresTypeRow[] renamedRows,
+        string bindName,
+        string renamedBindName
+    )
+    {
+        var prepare = JsonSerializer.SerializeToNode(new PostgresPrepareAnswer(oids, null), CaptureJson.Options);
+        return
+        [
+            new RenamingCall(
+                0,
+                PostgresCallNames.Prepare,
+                new JsonObject { ["answer"] = prepare!.DeepClone() },
+                new JsonObject { ["answer"] = prepare }
+            ),
+            new RenamingCall(1, PostgresCallNames.Types, TypesCall(rows), TypesCall(renamedRows)),
+            new RenamingCall(2, PostgresCallNames.Check, CheckCall("p", bindName), CheckCall("p", renamedBindName)),
+        ];
+    }
+
+    private static JsonObject TypesCall(PostgresTypeRow[] rows) =>
+        new() { ["answer"] = JsonSerializer.SerializeToNode(new PostgresTypesAnswer(rows, null), CaptureJson.Options) };
+
+    private static JsonObject CheckCall(string name, string bindName) =>
+        new()
+        {
+            ["request"] = JsonSerializer.SerializeToNode(
+                new PostgresCheckRequest("SELECT 1", [new PostgresCheckParameter(name, bindName)]),
+                CaptureJson.Options
+            ),
+        };
+
+    private static string CheckTypeOf(RenamingCall call) =>
+        call.Renamed["request"]!["parameters"]![0]!["dataTypeName"]!.GetValue<string>();
 
     private static FakeRenamingScope Scope() => new((spelling, _) => Keywords.Contains(spelling));
 

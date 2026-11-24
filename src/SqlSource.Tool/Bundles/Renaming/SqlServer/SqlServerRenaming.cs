@@ -171,7 +171,9 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     public IEnumerable<string> WordsOf(RenamingField field) => SqlServerMessages.WordsOf(field.Value);
 
-    public void Derive(RenamingCall call, IRenamingScope scope) { }
+    public void Derive(RenamingCall call, IReadOnlyList<RenamingCall> calls, IRenamingScope scope) { }
+
+    public void DeriveEntry(JsonObject entry, IReadOnlyList<RenamingCall> calls) { }
 
     // A folded name of geometry, geography or hierarchyid, whose version is digits parted by dots.
     private static bool IsSystemClrType(string folded)

@@ -105,9 +105,14 @@ public sealed class NpgsqlCheckTests(PostgresDatabases postgres)
     [InlineData("check_d2", "character varying")]
     [InlineData("\"char\"", "char")]
     [InlineData(ScratchSchema.LongTypeName + "[]", "public." + LongArrayName)]
+    [InlineData("user_floatrange", "public.user_floatrange")]
+    [InlineData("user_floatmultirange", "public.user_floatmultirange")]
+    [InlineData("user_floatrange[]", "public.user_floatrange[]")]
+    [InlineData("user_floatrange_d", "public.user_floatrange_d")]
     public async Task DescribeAsync_ParameterOfEachKindOfType_IsBoundByItsBindName(string type, string bindName)
     {
         await postgres.ExecuteAsync(ScratchSchema.CheckTypes);
+        await postgres.ExecuteAsync(ScratchSchema.UserTypes);
 
         var described = await DescribeAsync("SELECT @p AS p", ("p", type));
 
@@ -145,6 +150,92 @@ public sealed class NpgsqlCheckTests(PostgresDatabases postgres)
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldHaveSingleItem().ShouldNotBeNullOrWhiteSpace();
         failure.Help.ShouldBe(PostgresErrors.BindHelp);
+    }
+
+    // An array of an enum, a composite or a range whose name starts with "_", inferred from a column or declared.
+    // Bound by the element's name and [], Npgsql recursed until the stack overflowed and the process ended; bound by
+    // the array's own name, it refuses the type as it does any it cannot send.
+    [Theory]
+    [InlineData("SELECT 1 AS one FROM user_types WHERE feels = @p", null, "public._user_feel[]")]
+    [InlineData("SELECT 1 AS one FROM user_types WHERE tags = @p", null, "public._user_tag[]")]
+    [InlineData("SELECT 1 AS one FROM user_types WHERE underscore_spans = @p", null, "public._user_span[]")]
+    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "_user_feel[]", "public._user_feel[]")]
+    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "_user_tag[]", "public._user_tag[]")]
+    public async Task DescribeAsync_ArrayOfATypeNamedWithAnUnderscore_IsSqlsrc232NamingIt(
+        string sql,
+        string? declared,
+        string name
+    )
+    {
+        await postgres.ExecuteAsync(ScratchSchema.UserTypes);
+
+        var described = declared is null ? await DescribeAsync(sql) : await DescribeAsync(sql, ("p", declared));
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC232");
+        failure.Arguments.ShouldBe([name, "@p", DescribeRequests.Query]);
+        failure.ServerLines.ShouldHaveSingleItem().ShouldContain("Writing is not supported");
+    }
+
+    // An array of a domain whose name starts with "_" is bound by its own name, which Npgsql sends as an array of the
+    // domain's base, as it does an array of any domain: where it is not returned, it binds.
+    [Fact]
+    public async Task DescribeAsync_ArrayOfADomainNamedWithAnUnderscore_IsBoundByItsOwnName()
+    {
+        await postgres.ExecuteAsync(ScratchSchema.UserTypes);
+
+        var described = await DescribeAsync("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", ("p", "_user_dom[]"));
+
+        described
+            .Value.ShouldNotBeNull()
+            .Parameters.ShouldHaveSingleItem()
+            .Type.ShouldNotBeNull()
+            .BindName.ShouldBe("public.__user_dom");
+    }
+
+    // The limit of the manual's types page: the array of user_clash and of user_later is not "_" and its name, which
+    // the enum _user_clash took first, and the enum _user_later took after, the server renaming user_later's array.
+    // Npgsql still reads x[] as the type _x, sends the parameter as that enum, and the server refuses the comparison:
+    // the describe fails, and the server's line names the other type.
+    [Theory]
+    [InlineData("clashes", "user_clash")]
+    [InlineData("laters", "user_later")]
+    public async Task DescribeAsync_ArrayWhoseNameTheServerChanged_IsSqlsrc231NamingTheTypeNpgsqlSent(
+        string column,
+        string type
+    )
+    {
+        await postgres.ExecuteAsync(ScratchSchema.UserTypes);
+
+        var described = await DescribeAsync($"SELECT 1 AS one FROM user_types WHERE {column} = @p");
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.ServerLines[0].ShouldBe($"42883: operator does not exist: {type}[] = _{type}");
+    }
+
+    // A parameter of a range of a user's own, inferred from a column of it, of its multirange, of an array of it and
+    // of a domain over it, for which the server infers the domain's base: Npgsql binds each only after
+    // EnableUnmappedTypes.  A parameter declared as the domain is a row of the theory above.
+    [Theory]
+    [InlineData("span", "public.user_floatrange")]
+    [InlineData("spans", "public.user_floatmultirange")]
+    [InlineData("span_list", "public.user_floatrange[]")]
+    [InlineData("span_d", "public.user_floatrange")]
+    public async Task DescribeAsync_ParameterOfAUsersRange_IsBound(string column, string bindName)
+    {
+        await postgres.ExecuteAsync(ScratchSchema.UserTypes);
+
+        var described = await DescribeAsync($"SELECT 1 AS one FROM user_types WHERE {column} = @p");
+
+        described.Failure.ShouldBeNull(
+            described.Failure is { } failure ? $"{failure.Descriptor.Id}: {string.Join("; ", failure.Arguments)}" : null
+        );
+        described
+            .Value.ShouldNotBeNull()
+            .Parameters.ShouldHaveSingleItem()
+            .Type.ShouldNotBeNull()
+            .BindName.ShouldBe(bindName);
     }
 
     // Npgsql resolves the type of a parameter it will not send.

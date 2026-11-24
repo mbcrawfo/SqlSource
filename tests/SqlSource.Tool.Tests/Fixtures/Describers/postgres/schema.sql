@@ -97,3 +97,19 @@ CREATE VIEW user_orders AS
 SELECT u.id AS user_id, u.name, o.id AS order_id, o.total
 FROM users AS u
 LEFT JOIN orders AS o ON o.user_id = u.id;
+
+-- A range of a user's own and its multirange, floatmultirange, which Npgsql reads only after EnableUnmappedTypes.
+CREATE TYPE floatrange AS RANGE (subtype = float8);
+
+CREATE TABLE readings (
+    id integer PRIMARY KEY,
+    span floatrange NOT NULL,
+    spans floatmultirange
+);
+
+-- A domain whose name starts with _, so that a parameter of its array, __reading_level, is bound by the array's own
+-- name, and an enum whose name is as long as a name can be, whose array's name the server cuts, so that a parameter of
+-- that array is bound by the array's own name too.
+CREATE DOMAIN _reading_level AS integer;
+
+CREATE TYPE reading_kind_with_a_name_of_exactly_sixty_three_characters_long AS ENUM ('a', 'b');

@@ -97,7 +97,7 @@ internal sealed class PostgresEngine(PostgresDatabases databases) : IEngine, IAs
     private static string DatabaseOf(string source) =>
         source switch
         {
-            "default" or "multiplexing" or "nodatime" => PostgresDatabases.AppDatabase,
+            "default" or "multiplexing" or "nodatime" or "unmapped" => PostgresDatabases.AppDatabase,
             "gis" => PostgresDatabases.GisDatabase,
             "billing" => PostgresDatabases.BillingDatabase,
             _ => throw new ArgumentException($"No data source is named '{source}'.", nameof(source)),
@@ -121,6 +121,10 @@ internal sealed class PostgresEngine(PostgresDatabases databases) : IEngine, IAs
             case "nodatime":
                 _ = builder.MapEnum<NoteKind>();
                 _ = builder.UseNodaTime();
+                break;
+            case "unmapped":
+                _ = builder.MapEnum<NoteKind>();
+                _ = builder.EnableUnmappedTypes();
                 break;
             case "gis":
                 _ = builder.UseNetTopologySuite();

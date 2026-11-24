@@ -43,8 +43,6 @@ Next id: `TD-0128`
 | [TD-0120](TD-0120-database-tests-do-not-run-on-windows.md) | Open | 2026-11-18 | Low | The tests against a real database do not run on Windows, where the drivers' network layer differs, since GitHub's Windows runners cannot start the pinned Linux images |
 | [TD-0121](TD-0121-repository-interface-of-a-repeated-type-parameter.md) | Open | 2026-11-22 | Low | A repository around which an inner type parameter or a nested type hides an outer type parameter implements another constructed type's interface, and a repeated parameter raises CS0693 in its generated interface |
 | [TD-0122](TD-0122-model-in-a-namespace-named-await.md) | Open | 2026-11-22 | Low | A model in a namespace with a part named `await` is written without its `@`, so an asynchronous method that names it fails with CS4003 |
-| [TD-0125](TD-0125-describing-a-user-defined-range-stops-the-run.md) | Open | 2026-11-23 | Medium | Describing a column of a user-defined PostgreSQL range ends the run with `SQLSRC200`, since Npgsql refuses an unmapped range and the tool neither opts in nor turns the exception into a failure |
-| [TD-0126](TD-0126-array-parameter-of-a-type-named-with-an-underscore.md) | Open | 2026-11-23 | Medium | An array parameter of a PostgreSQL type whose name starts with `_` crashes `sqlsource describe` with a stack overflow in Npgsql, with no `SQLSRC` error |
 | [TD-0127](TD-0127-sql-server-cannot-describe-a-users-clr-type.md) | Open | 2026-11-24 | Medium | A query that returns a column or takes a parameter of a CLR type of a user's own assembly ends the SQL Server describe run with `SQLSRC200`, since the server gives such a type no `system_type_name` |
 
 ## Columns
