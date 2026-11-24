@@ -58,7 +58,7 @@ Before `diagnose` writes the bundle, it checks three things:
 
 - Every word in the bundle is a new name, a word of the database, a number or punctuation.
 - The query, run from the renamed bundle as `replay` runs it, gives the answer that your database gave.
-- The bundle holds no connection string or password of yours.  If it would, `diagnose` writes no bundle and reports [SQLSRC200](../diagnostics.md#sqlsrc200).
+- The bundle holds no connection string or password of yours, as [SQLSRC200](../diagnostics.md#sqlsrc200) counts them.  If it would, `diagnose` writes no bundle and reports that error.
 
 So a bundle that `diagnose` writes holds no name, literal or value of yours but the ones that the rules above keep.  And it shows the problem as you saw it.  If a number in your query is a value that you cannot share, such as an account number written into its SQL, take the [private route](../guides/report-a-bug.md#raw-bundle) instead.
 
