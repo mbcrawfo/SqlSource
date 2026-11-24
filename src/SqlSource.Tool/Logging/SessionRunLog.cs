@@ -7,8 +7,9 @@ namespace SqlSource.Tool.Logging;
 
 /// <summary>
 /// A log over the run's that writes one database's connection secret as <c>***</c>: the whole value wherever it
-/// stands, and each secret part where it stands as a token, in the event's name and in every string of it at any
-/// depth, the names of members included, and in the strings of the event that make it together.
+/// stands, and each secret part where it stands as a token or, a short one, as a password key's value, in the event's
+/// name and in every string of it at any depth, the names of members included, and in the strings of the event that
+/// make it together.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,9 +19,10 @@ namespace SqlSource.Tool.Logging;
 /// </para>
 /// <para>
 /// Each string is searched alone, and then all of them joined (<see cref="JoinedRedaction" />), in the order they
-/// were written: the name, then each member's name and the strings of its value, depth first; and then the texts of
-/// the values joined without the names between them.  A describer can write a value half in one member and half in
-/// the next, or a value that holds a line break over the items of a list.
+/// were written: the name, then each member's name and the strings of its value, depth first; then the texts of the
+/// values joined without the names between them; and then every two strings joined, in both orders.  A describer can
+/// write a value half in one member and half in the next or an earlier one, or a value that holds a line break over
+/// the items of a list.
 /// </para>
 /// <para>
 /// The parts are those the describer said are secret (<see cref="ConnectionSecret" />): the tool does not read a
@@ -46,7 +48,7 @@ internal sealed class SessionRunLog(IRunLog inner, ConnectionSecret secret, stri
 
         // The names stand between the values in the order of the event but are no part of what a describer wrote of a
         // value in two members, so the values are searched joined without them too.
-        var cleaned = JoinedRedaction.Of(strings, secret, values);
+        var cleaned = JoinedRedaction.OfEveryPair(strings, secret, values);
         var rest = new Queue<string>(cleaned);
         var cleanedName = prefix + rest.Dequeue();
         inner.Write(cleanedName, [.. members.Select(member => Rebuild(member, rest))]);

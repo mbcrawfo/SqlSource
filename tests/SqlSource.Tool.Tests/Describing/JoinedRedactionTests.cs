@@ -78,6 +78,66 @@ public sealed class JoinedRedactionTests
     }
 
     [Fact]
+    public void Of_KeyedPartWhoseKeyIsInTheTextBefore_IsTheMark()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=pg", ["pg"]);
+
+        JoinedRedaction
+            .Of(["refused Password=", "pg", " here"], secret)
+            .ShouldBe(["refused Password=", "***", " here"]);
+    }
+
+    // Every pair: a whole or a part over two texts with another between them, or in the reverse order, is in neither
+    // joined search of Of.
+    [Theory]
+    [InlineData("Host=db;Pass|between|word=hunter22", "***|between|***")]
+    [InlineData("word=hunter22 b|a Host=db;Pass", "*** b|a ***")]
+    [InlineData("x hun|between|ter22", "x ***|between|***")]
+    [InlineData("ter22 x|hun", "*** x|***")]
+    [InlineData("unter22 b|a h", "*** b|a ***")]
+    [InlineData("2 b|a hunter2", "*** b|a ***")]
+    public void OfEveryPair_WholeOrPartOverTwoTextsOutOfOrder_IsTheMarkInBoth(string texts, string expected)
+    {
+        var split = texts.Split('|');
+
+        JoinedRedaction.OfEveryPair(split, Password).ShouldBe(expected.Split('|'));
+        JoinedRedaction.Of(split, Password).ShouldNotBe(expected.Split('|'));
+    }
+
+    // The halves of a part joined must stand as a token, and one text is no pair with itself.
+    [Theory]
+    [InlineData("xhun|ter22")]
+    [InlineData("ter22|hunx")]
+    [InlineData("hun|ter22x")]
+    [InlineData("ter22 hun")]
+    [InlineData("ter22hun")]
+    public void OfEveryPair_HalvesThatMakeNoTokenOrAreOneText_AreLeft(string texts) =>
+        JoinedRedaction.OfEveryPair(texts.Split('|'), Password).ShouldBe(texts.Split('|'));
+
+    // An end of a part that is no letter, digit or "_" is not judged against the text beside it.
+    [Fact]
+    public void OfEveryPair_PartThatStartsWithASymbolAfterALetter_IsTheMarkInBoth()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=!hunter22", ["!hunter22"]);
+
+        JoinedRedaction.OfEveryPair(["ter22 y", "x!hun"], secret).ShouldBe(["*** y", "x***"]);
+    }
+
+    // Every text that holds a half is marked, whichever other text holds the rest.
+    [Fact]
+    public void OfEveryPair_HalfInSeveralTexts_IsTheMarkInEach() =>
+        JoinedRedaction.OfEveryPair(["a hun", "b hun", "ter22 c"], Password).ShouldBe(["a ***", "b ***", "*** c"]);
+
+    // A form that holds a line break is cut there, as the lines of a list hold it.
+    [Fact]
+    public void OfEveryPair_FormWithABreakOverTwoLinesInReverse_IsTheMarkInBoth()
+    {
+        var secret = new ConnectionSecret("Host=db;\nPassword=pw");
+
+        JoinedRedaction.OfEveryPair(["Password=pw b", "a Host=db;"], secret).ShouldBe(["*** b", "a ***"]);
+    }
+
+    [Fact]
     public void Of_BreakInTheFormAsItIs_IsFoundOverTexts()
     {
         var secret = new ConnectionSecret("host=db;password=pw", forms: ["Host=db;\r\nPassword=pw"]);
