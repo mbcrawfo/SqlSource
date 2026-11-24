@@ -74,31 +74,31 @@ public sealed class PostgresTypeMapTests
         ["composite"] = new(User("users", SidecarValues.Kind.Composite), "!Unreadable", false, "public.users"),
         ["composite of pg_catalog named as the array of a known type"] = new(
             ModelRuns.Catalog("_int4", SidecarValues.Kind.Composite),
-            "!NotWrittenByTheTool",
+            "!NamedAsAnArray",
             false,
             "_int4"
         ),
         ["composite of pg_catalog named as the array of another type"] = new(
             ModelRuns.Catalog("_foo", SidecarValues.Kind.Composite),
-            "!NotWrittenByTheTool",
+            "!NamedAsAnArray",
             false,
             "_foo"
         ),
         ["composite of pg_catalog named as an array, with a capital"] = new(
             ModelRuns.Catalog("_Foo", SidecarValues.Kind.Composite),
-            "!NotWrittenByTheTool",
+            "!NamedAsAnArray",
             false,
             "\"_Foo\""
         ),
         ["range of pg_catalog named as an array"] = new(
             ModelRuns.Catalog("_foo", SidecarValues.Kind.Range, subtype: ModelRuns.Catalog("float8")),
-            "!NotWrittenByTheTool",
+            "!NamedAsAnArray",
             false,
             "_foo"
         ),
         ["multirange of pg_catalog named as an array"] = new(
             ModelRuns.Catalog("_foo", SidecarValues.Kind.Multirange, subtype: ModelRuns.Catalog("float8")),
-            "!NotWrittenByTheTool",
+            "!NamedAsAnArray",
             false,
             "_foo"
         ),

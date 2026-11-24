@@ -68,6 +68,14 @@ internal static class TypeDiagnostics
                 typeName,
                 Describe
             ),
+            TypeMappingKind.NamedAsAnArray => DiagnosticInfo.Create(
+                SqlDiagnostics.TypeHasNoCSharpType,
+                at,
+                subject,
+                typeName,
+                "No type override can name it, since its key would mean an array.  Give it a C# type with a -- column: "
+                    + "marker, or a -- param: marker for a parameter"
+            ),
             // NpgsqlRange<T> is a type of the driver, which a project without it cannot name.
             TypeMappingKind.UserDefinedRange => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,

@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0124`
+Next id: `TD-0125`
 
 ## Active items
 
@@ -44,6 +44,7 @@ Next id: `TD-0124`
 | [TD-0120](TD-0120-database-tests-do-not-run-on-windows.md) | Open | 2026-11-18 | Low | The tests against a real database do not run on Windows, where the drivers' network layer differs, since GitHub's Windows runners cannot start the pinned Linux images |
 | [TD-0121](TD-0121-repository-interface-of-a-repeated-type-parameter.md) | Open | 2026-11-22 | Low | A repository around which an inner type parameter or a nested type hides an outer type parameter implements another constructed type's interface, and a repeated parameter raises CS0693 in its generated interface |
 | [TD-0122](TD-0122-model-in-a-namespace-named-await.md) | Open | 2026-11-22 | Low | A model in a namespace with a part named `await` is written without its `@`, so an asynchronous method that names it fails with CS4003 |
+| [TD-0124](TD-0124-describing-a-user-defined-range-stops-the-run.md) | Open | 2026-11-23 | Medium | Describing a column of a user-defined PostgreSQL range ends the run with `SQLSRC200`, since Npgsql refuses an unmapped range and the tool neither opts in nor turns the exception into a failure |
 
 ## Columns
 

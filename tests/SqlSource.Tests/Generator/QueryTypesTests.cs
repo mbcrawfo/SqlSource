@@ -333,27 +333,56 @@ public sealed class QueryTypesTests
         ]);
     }
 
-    // A composite or a range of the catalog named as an array, which only a sidecar edited by hand has: its key would
-    // be read as the array, so the help offers none and says to describe the query again.
+    // A composite or a range of the catalog named as an array, which a superuser can move there: its key would be read
+    // as the array, so the help names the markers, and a -- column: marker gives it a C# type.
     [Theory]
     [InlineData("_int4", SidecarValues.Kind.Composite)]
     [InlineData("_foo", SidecarValues.Kind.Composite)]
     [InlineData("_foo", SidecarValues.Kind.Range)]
     [InlineData("_foo", SidecarValues.Kind.Multirange)]
-    public void Run_CatalogTypeNamedAsAnArray_IsSqlsrc246ToDescribeAgain(string name, string kind)
+    public void Run_CatalogTypeNamedAsAnArray_IsSqlsrc246NamingTheMarkers(string name, string kind)
     {
         var type = TestSidecars.Postgres(name: name, kind: kind, internalName: name, subtype: Catalog("float8"));
+        var marked = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- column: value -> string\nSELECT 1;\n"
+        );
 
         var run = Run(
             [NpgsqlReferences.Npgsql10],
             GeneratorHarness.UsersFile,
             Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("value", type)])
         );
+        var markedRun = Run([NpgsqlReferences.Npgsql10], marked, Entry(marked, "GetUser", [], [Column("value", type)]));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'value' has the type '{name}', which SqlSource cannot give a C# "
-                + "type.  Run 'sqlsource describe'.",
+                + "type.  No type override can name it, since its key would mean an array.  Give it a C# type with a "
+                + "-- column: marker, or a -- param: marker for a parameter.",
         ]);
+        markedRun.Diagnostics.ShouldBeEmpty();
+        StepOutputs.ColumnsOf(markedRun).ShouldHaveSingleItem().Text.ShouldBe("string");
+    }
+
+    // The help's other marker: a -- param: marker gives a parameter of such a type its C# type.
+    [Fact]
+    public void Run_ParameterOfACatalogTypeNamedAsAnArray_TakesItsTypeFromItsMarker()
+    {
+        var type = TestSidecars.Postgres(name: "_foo", kind: SidecarValues.Kind.Composite, internalName: "_foo");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- param: @id -> string\nSELECT @id;\n");
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            file,
+            Entry(file, "GetUser", [Parameter("id", type)], [Column("id", Catalog("int4"))])
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        StepOutputs
+            .Single<FileTypes>(run, TrackingNames.FileTypes)
+            .Queries.ShouldHaveSingleItem()
+            .Parameters.ShouldHaveSingleItem()
+            .Text.ShouldBe("string");
     }
 
     // A range of the catalog that the map lacks, which only a sidecar edited by hand has: its bare name is no key, or

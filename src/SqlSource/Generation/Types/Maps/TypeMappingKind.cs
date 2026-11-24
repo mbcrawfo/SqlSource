@@ -35,6 +35,13 @@ internal enum TypeMappingKind
     /// </summary>
     NotWrittenByTheTool,
 
+    /// <summary>
+    /// A composite, range or multirange of <c>pg_catalog</c> whose name is <c>_</c> and at least one more character,
+    /// which a superuser can move there.  The key <c>pg_catalog._x</c> means the array <c>x[]</c>, so no type override
+    /// names it, and a marker of the query gives it a C# type.
+    /// </summary>
+    NamedAsAnArray,
+
     /// <summary>A range of a subtype the map does not list, or a multirange of such a range.</summary>
     UserDefinedRange,
 
