@@ -15,9 +15,10 @@ namespace SqlSource.DatabaseTests.SqlServer.Renaming;
 
 // A column and a parameter of a CLR type of a user's own assembly, captured on the server as diagnose captures them,
 // then renamed by SQL Server's part.  The entry names such a type schema.name by its user type, which the renaming
-// makes again from the renamed schema and name, so the proof replays the renamed bundle to its renamed entry whatever
-// the names hold: a space, a ] or a dot.  Each type is in a database of its own, from the assembly of user_clr, since
-// the server registers a CLR class once in a database.  Run on the floor image and on the default one.
+// makes again from the renamed schema and name, and never lexes as SQL, so the proof replays the renamed bundle to its
+// renamed entry whatever the names hold: a space, a ], a dot, a quote, a comment's opening, a [ or a leading digit.
+// Each type is in a database of its own, from the assembly of user_clr, since the server registers a CLR class once in
+// a database.  Run on the floor image and on the default one.
 [Collection(UsesSqlServer.Name)]
 public sealed class UserClrRenamingTests(SqlServerDatabases sqlServer)
 {
@@ -29,6 +30,11 @@ public sealed class UserClrRenamingTests(SqlServerDatabases sqlServer)
     [InlineData("dbo", "Grade")]
     [InlineData("odd schema", "Odd ]Grade")]
     [InlineData("dbo", "a.Grade")]
+    [InlineData("dbo", "a'Grade")]
+    [InlineData("dbo", "a\"Grade")]
+    [InlineData("dbo", "a/*Grade")]
+    [InlineData("dbo", "[Grade")]
+    [InlineData("dbo", "1Grade")]
     public async Task RenameAsync_UserClrType_ReplaysToItsRenamedEntry(string schema, string name)
     {
         var type = Bracketed(schema) + "." + Bracketed(name);

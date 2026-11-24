@@ -484,6 +484,75 @@ public sealed class SqlServerRenamingTests
             ["answer"] = new JsonObject(),
         };
 
+    // The entry's type name is checked word by word, and each punctuation character alone, so that a user's name in a
+    // type that DeriveEntry missed is refused.
+    [Theory]
+    [InlineData("nvarchar(50)", new[] { "nvarchar", "(", "50", ")" })]
+    [InlineData("decimal(18,4)", new[] { "decimal", "(", "18", ",", "4", ")" })]
+    [InlineData("dbo.y_1a2b", new[] { "dbo", ".", "y_1a2b" })]
+    [InlineData("odd schema.a'b", new[] { "odd", "schema", ".", "a", "'", "b" })]
+    public void WordsOf_EntryTypeName_IsEachWordAndPunctuation(string name, string[] words) =>
+        Engine.WordsOf(EntryTypeName(name, null)).ShouldBe(words);
+
+    // A system type's spelling is renamed as SQL whose new words are types; a user CLR type's name is left for
+    // DeriveEntry, though the lexer cannot read it.
+    [Fact]
+    public void RenameOwn_EntryTypeName_RenamesASpellingAndLeavesAUserClrName()
+    {
+        var mapping = new NameMapping(BundleRenamings.Key(1), Engine.Fold, Engine.Spelled);
+        var scope = RenamingRun.For(Engine, mapping, "SELECT 1", RenamingCopies.None).At("expected.json");
+
+        Engine.RenameOwn(EntryTypeName("nvarchar(50)", null), scope).ShouldBe("nvarchar(50)");
+        Engine
+            .RenameOwn(EntryTypeName("dbo.a'Grade", UserType("dbo", "a'Grade", "Grade, Grades")), scope)
+            .ShouldBe("dbo.a'Grade");
+    }
+
+    // A user CLR type's name is made again from its renamed user type; a CLR type of sys and an alias type keep
+    // theirs.
+    [Fact]
+    public void DeriveEntry_TypesOfTheEntry_MakesOnlyAUserClrNameAgain()
+    {
+        var entry = new JsonObject
+        {
+            ["parameters"] = new JsonArray(Typed("x", UserType("s_1", "y_2", "z_3"))),
+            ["columns"] = new JsonArray(
+                Typed("x", UserType("s_4", "y_5", "z_6")),
+                Typed("hierarchyid", UserType("sys", "hierarchyid", HierarchyIdOfVersion10)),
+                Typed("nvarchar(320)", UserType("dbo", "y_7", null))
+            ),
+        };
+
+        Engine.DeriveEntry(entry, []);
+
+        entry["parameters"]![0]!["type"]!["name"]!.GetValue<string>().ShouldBe("s_1.y_2");
+        var columns = entry["columns"]!.AsArray().Select(static column => (string)column!["type"]!["name"]!);
+        columns.ShouldBe(["s_4.y_5", "hierarchyid", "nvarchar(320)"]);
+    }
+
+    private static RenamingField EntryTypeName(string name, JsonObject? userType) =>
+        new(
+            RenamingField.NoCall,
+            "expected.json",
+            "columns[].type.name",
+            name,
+            new JsonObject { ["name"] = name, ["userType"] = userType }
+        );
+
+    private static JsonObject UserType(string schema, string name, string? assemblyQualifiedName) =>
+        new()
+        {
+            ["schema"] = schema,
+            ["name"] = name,
+            ["assemblyQualifiedName"] = assemblyQualifiedName,
+        };
+
+    private static JsonObject Typed(string name, JsonObject userType) =>
+        new()
+        {
+            ["type"] = new JsonObject { ["name"] = name, ["userType"] = userType },
+        };
+
     // The SQL renamed as query.sql's body, its mapping and the run's refusal.
     private static (string Renamed, NameMapping Mapping, RenamingRefusal? Refusal) RenameQuery(string sql)
     {
