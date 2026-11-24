@@ -183,6 +183,10 @@ public sealed partial class CteProofsTests
     [InlineData(
         "WITH t (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 5) SELECT n FROM t GROUP BY ROLLUP (n)"
     )]
+    // An earlier CTE of several branches that lets a NULL through, read by a later one.
+    [InlineData(
+        "WITH t (n) AS (SELECT 1 UNION ALL SELECT NULL), u (n) AS (SELECT n FROM t UNION ALL SELECT 2) SELECT n FROM u"
+    )]
     // A CTE that a later one names again hides it, and inside a CTE a later one is a table.
     [InlineData(
         "WITH t (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 5), u (n) AS (SELECT n FROM v "

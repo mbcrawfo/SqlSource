@@ -756,6 +756,11 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         "WITH q (x) AS (SELECT a FROM dbo.proof_rows UNION ALL SELECT b FROM dbo.proof_rows)",
         "SELECT q.x AS c FROM q"
     )]
+    // An earlier CTE of several branches that lets a NULL through, read by a later one.
+    [InlineData(
+        "WITH t (n) AS (SELECT 1 UNION ALL SELECT NULL), u (n) AS (SELECT n FROM t UNION ALL SELECT 2)",
+        "SELECT n AS c FROM u"
+    )]
     public Task DescribeAsync_CteOfSeveralBranchesThatLetsANullThrough_NullableAndNullRow(string with, string select) =>
         WithRowsAsync(async () =>
         {

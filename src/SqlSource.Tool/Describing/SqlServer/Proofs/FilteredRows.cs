@@ -11,7 +11,8 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// <para>
 /// A column is kept from <c>NULL</c> when a conjunct of the <c>WHERE</c> rejects it (<see cref="RowFilter" />), or when
 /// it is read from a CTE that no join here can make <c>NULL</c>, and that CTE's own <c>WHERE</c> keeps the column it
-/// returns from <c>NULL</c>, through earlier CTEs too.  A CTE of several branches is not read.
+/// returns from <c>NULL</c>, through earlier CTEs too.  A CTE of several branches keeps nothing from <c>NULL</c> this
+/// way: <see cref="CteColumnOf" /> names its column, which <see cref="CteProofs" /> proves by its branches.
 /// </para>
 /// <para>
 /// A <c>LEFT JOIN</c> whose source a conjunct rejects, by a column qualified with that source's name, returns only rows
