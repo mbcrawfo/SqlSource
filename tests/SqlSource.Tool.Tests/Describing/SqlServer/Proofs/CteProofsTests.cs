@@ -7,7 +7,7 @@ using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Describing.SqlServer.Proofs;
 using Xunit;
-using static SqlSource.Tool.Tests.Describing.SqlServer.Proofs.ColumnProofsTests;
+using static SqlSource.Tool.Tests.ColumnProofsCases;
 using static SqlSource.Tool.Tests.SqlServerScript;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer.Proofs;

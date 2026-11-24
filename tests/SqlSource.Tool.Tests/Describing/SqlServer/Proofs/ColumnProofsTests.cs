@@ -3,9 +3,9 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.SqlServer;
-using SqlSource.Tool.Describing.SqlServer.Columns;
 using SqlSource.Tool.Describing.SqlServer.Proofs;
 using Xunit;
+using static SqlSource.Tool.Tests.ColumnProofsCases;
 using static SqlSource.Tool.Tests.SqlServerScript;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer.Proofs;
@@ -854,16 +854,4 @@ public sealed class ColumnProofsTests
             SourceType = "U",
             IsComputedColumn = false,
         };
-
-    // The proofs of the SQL over the rows, built as the session builds them, the hidden row of browse mode 2 after
-    // them.
-    internal static ColumnProofs Read(string sql, params SqlServerColumnRow[] visible)
-    {
-        IReadOnlyList<SqlServerColumnRow> rows = [.. visible, Rowstat with { ColumnOrdinal = visible.Length + 1 }];
-        var built = SqlServerColumns.Build(rows, Database).Value.ShouldNotBeNull();
-        return ColumnProofs.Read(sql, built, rows);
-    }
-
-    internal static List<(bool? Nullable, string? Source)> Nullability(IReadOnlyList<BuiltColumn> columns) =>
-        [.. columns.Select(static column => (column.Column.Nullable, column.Column.NullableSource))];
 }
