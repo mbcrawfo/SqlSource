@@ -20,8 +20,16 @@ public sealed partial class BuildFileTests
     // The target that runs the tool and gives the compiler the sidecars it left, which the hash depends on.
     private const string DescribeOnlineTarget = "SqlSourceDescribeOnline";
 
-    // The target that runs the tool, once, for the first framework.
+    // The target that runs the tool, once, on the manifest of every framework.
     private const string RunOnlineTarget = "SqlSourceRunOnline";
+
+    // The target that answers the framework of a configuration that imports the package, and that a configuration
+    // that does not has none of.
+    private const string OnlineFrameworkTarget = "SqlSourceOnlineFramework";
+
+    // The target that gives the run every other framework's manifest and inputs, and the one it calls in each.
+    private const string FrameworkManifestsTarget = "SqlSourceWriteFrameworkManifests";
+    private const string FrameworkInputsTarget = "SqlSourceFrameworkOnlineInputs";
 
     // The target that writes the files the run compares and gathers its inputs.
     private const string ListSidecarsTarget = "SqlSourceListSidecars";
@@ -32,9 +40,14 @@ public sealed partial class BuildFileTests
     // The outer build's target, in buildMultiTargeting/SqlSource.targets.
     private const string OuterTarget = "SqlSourceRunOnlineBeforeDispatch";
 
-    // The configuration of its own that the run is called in: the first framework's, and a property that no build
-    // of a framework has, so that no target of a framework's own build runs early in it.
-    private const string OnlineRunConfiguration = "TargetFramework=$(SqlSourceFirstFramework);SqlSourceOnlineRun=true";
+    // The configuration of its own that the run is called in: the first framework's that has SqlSource, and a property
+    // that no build of a framework has, so that no target of a framework's own build runs early in it.
+    private const string OnlineRunConfiguration =
+        "TargetFramework=$(SqlSourceOnlineRunFramework);SqlSourceOnlineRun=true";
+
+    // The configuration of its own of each framework, which the build asks whether it has SqlSource.
+    private const string AskedConfiguration =
+        "TargetFramework=%(SqlSourceOnlineFrameworkAsked.Identity);SqlSourceOnlineRun=true";
 
     // The run's condition: not a design-time build, and the build goes online.  BuildingProject is left out: a
     // configuration that another build calls by name starts with it false.
@@ -48,6 +61,18 @@ public sealed partial class BuildFileTests
 
     private static readonly XDocument Outer = Load("buildMultiTargeting", "SqlSource.targets");
 
+    // The targets of the online build in build/SqlSource.targets.
+    private static readonly string[] OnlineTargets =
+    [
+        DescribeOnlineTarget,
+        RunOnlineTarget,
+        ListSidecarsTarget,
+        CreatedSidecarsTarget,
+        OnlineFrameworkTarget,
+        FrameworkManifestsTarget,
+        FrameworkInputsTarget,
+    ];
+
     // The properties that the outer build's file defines, which build/SqlSource.targets defines too.
     private static readonly string[] SharedOnlineProperties =
     [
@@ -57,7 +82,6 @@ public sealed partial class BuildFileTests
         "SqlSourceEnvFileValue",
         "SqlSourceEnvFilePath",
         "SqlSourceHasEnvFile",
-        "SqlSourceFirstFramework",
         "SqlSourceGoesOnline",
         "MSBuildWarningsNotAsErrors",
     ];
@@ -67,9 +91,10 @@ public sealed partial class BuildFileTests
     // as booleans and would take yes for true; CI by the variables its services set; the connection source by its
     // answer alone; the .env file, the one SqlSourceEnvFile names from the project's folder, trimmed, or the project
     // folder's own, or none under none, which a condition matches ignoring case, and whether a file, not a folder, is
-    // at its path, which the build never reads; the first framework as ProjectEvaluator.FirstFramework of the tool
-    // reads it; and the run only outside CI, under true, or under auto with a connection source.  The package's
-    // warning of a tool that cannot start stays a warning under -warnaserror.  The tool's command is the tests' seam.
+    // at its path, which the build never reads; and the run only outside CI, under true, or under auto with a
+    // connection source.  The package's warning of a tool that cannot start stays a warning under -warnaserror.  The
+    // shell's characters and their escape, for every path of the run's command, the other frameworks' manifests
+    // among them, which those frameworks escape.  The tool's command is the tests' seam.
     [Fact]
     public void Targets_OnlineProperties_AreTheDesignsExpressions() =>
         OnlineProperties(Targets)
@@ -108,11 +133,6 @@ public sealed partial class BuildFileTests
                     "'$(SqlSourceEnvFilePath)' != '' and $([System.IO.File]::Exists($(SqlSourceEnvFilePath)))",
                     "true"
                 ),
-                (
-                    "SqlSourceFirstFramework",
-                    null,
-                    @"$([System.Text.RegularExpressions.Regex]::Match($(TargetFrameworks), '[^;\s]+'))"
-                ),
                 ("SqlSourceGoesOnline", null, "false"),
                 (
                     "SqlSourceGoesOnline",
@@ -127,6 +147,10 @@ public sealed partial class BuildFileTests
                     null,
                     "$(MSBuildWarningsNotAsErrors);" + SqlDiagnostics.OnlineToolCannotRunOffline.Id
                 ),
+                ("SqlSourceShellSpecial", null, "[$`\"\\\\]"),
+                ("SqlSourceShellEscape", null, "\"'$0'\""),
+                ("SqlSourceShellSpecial", "'$(OS)' == 'Windows_NT'", "%"),
+                ("SqlSourceShellEscape", "'$(OS)' == 'Windows_NT'", "%$0"),
                 ("SqlSourceDescribeOnlineDependsOn", null, ""),
                 ("SqlSourceDescribeOnlineDependsOn", "'$(TargetFrameworks)' == ''", RunOnlineTarget),
             ]);
@@ -179,12 +203,12 @@ public sealed partial class BuildFileTests
             .ShouldBe(["'$(SqlSourceOnlineValue)' == ''", "'$(SqlSourceOnlineValue)' == ''"]);
 
     // The online targets hook nothing: SqlSourceTrackAdditionalFiles depends on SqlSourceDescribeOnline after the
-    // search, so it runs in both places the search runs, and SqlSourceDescribeOnline runs the others.  The outer
-    // build's target hooks the dispatch of the inner builds alone.
+    // search, so it runs in both places the search runs, and SqlSourceDescribeOnline runs the others, or calls them.
+    // The outer build's target hooks the dispatch of the inner builds alone.
     [Fact]
     public void Targets_OnlineTargets_HookNothing()
     {
-        foreach (var name in new[] { DescribeOnlineTarget, RunOnlineTarget, ListSidecarsTarget, CreatedSidecarsTarget })
+        foreach (var name in OnlineTargets)
         {
             Target(name).Attribute("BeforeTargets").ShouldBeNull(name);
             Target(name).Attribute("AfterTargets").ShouldBeNull(name);
@@ -198,10 +222,11 @@ public sealed partial class BuildFileTests
 
     // The online build is no part of a design-time build, which an IDE runs on every edit, nor of a compile by
     // -t:Compile, which leaves BuildingProject false.  It runs the tool itself in a project with no TargetFrameworks,
-    // and every framework of a multi-targeted project, the first among them, calls the run in a configuration of its
-    // own, adds the files the run wrote to FileWrites, and calls it again for the sidecars the run created.  Then it
-    // takes away the sidecars the run deleted, and gives the compiler each sidecar the run created that no item names,
-    // compared by full path, once, by the path of its first .sql item with .json after it.
+    // and every framework of a multi-targeted project finds the first framework that has SqlSource, calls the run in
+    // that framework's configuration of its own, adds the files the run wrote to FileWrites, and calls it again for the
+    // sidecars the run created; it calls nothing when no framework has SqlSource.  Then it takes away the sidecars the
+    // run deleted, and gives the compiler each sidecar the run created that no item names, compared by full path,
+    // once, by the path of its first .sql item with .json after it.
     [Fact]
     public void Targets_DescribeOnline_RunsTheToolInABuildAndGivesTheCompilerItsSidecars()
     {
@@ -221,8 +246,19 @@ public sealed partial class BuildFileTests
         target
             .Elements()
             .Select(element => element.Name.LocalName)
-            .ShouldBe(["Error", "MSBuild", "MSBuild", "ItemGroup", "ItemGroup", "ItemGroup"]);
-        var calls = target.Elements("MSBuild").ToList();
+            .ShouldBe([
+                "Error",
+                "ItemGroup",
+                "MSBuild",
+                "PropertyGroup",
+                "MSBuild",
+                "MSBuild",
+                "ItemGroup",
+                "ItemGroup",
+                "ItemGroup",
+            ]);
+        ShouldFindTheRunsFramework(target, "'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != ''");
+        var calls = target.Elements("MSBuild").Skip(1).ToList();
         foreach (
             var (call, targetName, itemName) in new[]
             {
@@ -238,7 +274,7 @@ public sealed partial class BuildFileTests
                         ["Projects"] = "$(MSBuildProjectFullPath)",
                         ["Targets"] = targetName,
                         ["Properties"] = OnlineRunConfiguration,
-                        ["Condition"] = "'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != ''",
+                        ["Condition"] = "'$(SqlSourceOnlineRunFramework)' != ''",
                     }
                 );
             AttributesOf(call.Elements().ShouldHaveSingleItem())
@@ -247,7 +283,7 @@ public sealed partial class BuildFileTests
                 );
         }
 
-        var groups = target.Elements("ItemGroup").ToList();
+        var groups = target.Elements("ItemGroup").Skip(1).ToList();
         groups[0].Attributes().ShouldBeEmpty();
         groups[0].Elements().Select(Item).ShouldBe([("FileWrites", "Include=@(SqlSourceOnlineFile)")]);
         groups.RemoveAt(0);
@@ -309,10 +345,114 @@ public sealed partial class BuildFileTests
         target.Elements().ShouldBeEmpty();
     }
 
+    // A configuration of a framework that imports the package answers its framework, and one that does not has no
+    // such target, which a call with SkipNonexistentTargets passes over.
+    [Fact]
+    public void Targets_OnlineFramework_AnswersTheFrameworkOfAConfigurationThatHasSqlSource()
+    {
+        var target = Target(OnlineFrameworkTarget);
+
+        AttributesOf(target)
+            .ShouldBe(
+                new Dictionary<string, string> { ["Name"] = OnlineFrameworkTarget, ["Returns"] = "$(TargetFramework)" }
+            );
+        target.Elements().ShouldBeEmpty();
+    }
+
+    // In a multi-targeted project the run asks each other framework of TargetFrameworks, in their order, in that
+    // framework's configuration of its own, for its manifest and inputs, and a framework without SqlSource gives
+    // nothing.  A manifest's name given as a global property is the run's alone, so each other framework writes its
+    // own.  A project with no TargetFrameworks skips it.
+    [Fact]
+    public void Targets_WriteFrameworkManifests_AsksEveryOtherFrameworkForItsManifest()
+    {
+        var target = Target(FrameworkManifestsTarget);
+
+        AttributesOf(target)
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["Name"] = FrameworkManifestsTarget,
+                    ["Condition"] = "'$(TargetFrameworks)' != ''",
+                }
+            );
+        target.Elements().Select(element => element.Name.LocalName).ShouldBe(["ItemGroup", "MSBuild"]);
+        target
+            .Element("ItemGroup")!
+            .Elements()
+            .Select(Item)
+            .ShouldBe([("SqlSourceOtherFramework", "Include=$(TargetFrameworks) Exclude=$(TargetFramework)")]);
+        var call = target.Element("MSBuild")!;
+        AttributesOf(call)
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["Projects"] = "$(MSBuildProjectFullPath)",
+                    ["Targets"] = FrameworkInputsTarget,
+                    ["Properties"] = "TargetFramework=%(SqlSourceOtherFramework.Identity);SqlSourceOnlineRun=true",
+                    ["RemoveProperties"] = "SqlSourceManifestFile",
+                    ["SkipNonexistentTargets"] = "true",
+                }
+            );
+        AttributesOf(call.Elements().ShouldHaveSingleItem())
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["TaskParameter"] = "TargetOutputs",
+                    ["ItemName"] = "SqlSourceFrameworkInput",
+                }
+            );
+    }
+
+    // A framework writes its manifest and gives it with the option that names it to the tool, its path escaped for
+    // the shell as the run escapes its own; its .sql files by their full paths, whose sidecars the run lists; and its
+    // settings files and Compile items, which are inputs of the run.
+    [Fact]
+    public void Targets_FrameworkOnlineInputs_GivesTheManifestItsSqlFilesAndItsInputs()
+    {
+        var target = Target(FrameworkInputsTarget);
+
+        AttributesOf(target)
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["Name"] = FrameworkInputsTarget,
+                    ["DependsOnTargets"] = ManifestTarget,
+                    ["Returns"] = "@(SqlSourceFrameworkOnlineInput)",
+                }
+            );
+        target
+            .Elements()
+            .ShouldHaveSingleItem()
+            .Elements()
+            .Select(Item)
+            .ShouldBe([
+                (
+                    "SqlSourceFrameworkOnlineInput",
+                    "Include=$(SqlSourceManifestFile) SqlSourceOnlineKind=Manifest"
+                        + " SqlSourceManifestIsDefault=$(SqlSourceManifestIsDefault)"
+                        + " SqlSourceToolArgument= --manifest \""
+                        + ShellEscaped("$(SqlSourceManifestFile)")
+                        + "\""
+                ),
+                (
+                    "SqlSourceFrameworkOnlineInput",
+                    "Include=@(AdditionalFiles->'%(FullPath)') Condition='%(Extension)' == '.sql'"
+                        + " SqlSourceOnlineKind=Sql"
+                ),
+                (
+                    "SqlSourceFrameworkOnlineInput",
+                    "Include=@(AdditionalFiles) Condition='%(Filename)%(Extension)' == 'sqlsource.json'"
+                        + " SqlSourceOnlineKind=Input"
+                ),
+                ("SqlSourceFrameworkOnlineInput", "Include=@(Compile) SqlSourceOnlineKind=Input"),
+            ]);
+    }
+
     // The run's condition leaves BuildingProject out, which a configuration that another build calls by name starts
-    // with false.  It depends on the manifest and on the target that writes the files it compares, so that they are
-    // written in the configuration that runs it, wherever it is called from.  It is up to date when every input is
-    // older than the stamp.
+    // with false.  It depends on the manifest, on the target that gives it the other frameworks' manifests and on the
+    // target that writes the files it compares, so that they are written in the configuration that runs it, wherever
+    // it is called from.  It is up to date when every input is older than the stamp.
     [Fact]
     public void Targets_RunOnline_RunsWhenAnInputIsNewerThanTheStamp()
     {
@@ -326,7 +466,7 @@ public sealed partial class BuildFileTests
                 {
                     ["Name"] = RunOnlineTarget,
                     ["Condition"] = RunCondition,
-                    ["DependsOnTargets"] = ManifestTarget + ";" + ListSidecarsTarget,
+                    ["DependsOnTargets"] = ManifestTarget + ";" + FrameworkManifestsTarget + ";" + ListSidecarsTarget,
                     ["Inputs"] = "@(SqlSourceOnlineInput);@(Compile)",
                     ["Outputs"] = "$(SqlSourceOnlineStamp)",
                     ["Returns"] = "@(SqlSourceOnlineFile)",
@@ -337,9 +477,10 @@ public sealed partial class BuildFileTests
     // The inputs of the run: the manifest; the .sql files and the settings files among the AdditionalFiles items; the
     // sidecars of the .sql files that exist; the list of them, which a deleted sidecar changes; the file of the value,
     // the package's folder and the .env file's path, none under none, which a change of SqlSourceEnvFile changes when
-    // the file it names is older than the stamp; the .env file, when a file is at its path; and the tool manifests
-    // above the project.  Each file the target writes, it writes only when its text changes, under obj, and adds to
-    // FileWrites.
+    // the file it names is older than the stamp; the .env file, when a file is at its path; the tool manifests above
+    // the project; and what the other frameworks gave.  The sidecars are those of every framework's .sql files, each
+    // once by its full path, and the other frameworks' manifests are kept for the command.  Each file the target
+    // writes, it writes only when its text changes, under obj, and adds to FileWrites.
     [Fact]
     public void Targets_ListSidecars_WritesTheFilesTheRunComparesAndGathersItsInputs()
     {
@@ -374,6 +515,21 @@ public sealed partial class BuildFileTests
                 (
                     "SqlSourceSidecarOfSqlFile",
                     "Include=@(AdditionalFiles->'%(FullPath).json') Condition='%(Extension)' == '.sql'"
+                ),
+                (
+                    "SqlSourceFrameworkSqlFile",
+                    "Include=@(SqlSourceFrameworkInput)"
+                        + " Condition='%(SqlSourceFrameworkInput.SqlSourceOnlineKind)' == 'Sql'"
+                ),
+                (
+                    "SqlSourceSidecarOfSqlFile",
+                    "Include=@(SqlSourceFrameworkSqlFile->'%(FullPath).json'->Distinct())"
+                        + " Exclude=@(SqlSourceSidecarOfSqlFile)"
+                ),
+                (
+                    "SqlSourceFrameworkManifest",
+                    "Include=@(SqlSourceFrameworkInput)"
+                        + " Condition='%(SqlSourceFrameworkInput.SqlSourceOnlineKind)' == 'Manifest'"
                 ),
                 ("SqlSourceSidecarListed", "Include=@(SqlSourceSidecarOfSqlFile->Exists())"),
                 ("SqlSourceOnlineValueLine", "Include=$(SqlSourceOnlineValue)"),
@@ -417,10 +573,12 @@ public sealed partial class BuildFileTests
                     "Include=$([MSBuild]::Escape($([MSBuild]::NormalizePath($(SqlSourceRootToolManifestFolder),"
                         + " 'dotnet-tools.json')))) Condition='$(SqlSourceRootToolManifestFolder)' != ''"
                 ),
+                ("SqlSourceOnlineInput", "Include=@(SqlSourceFrameworkInput)"),
             ]);
     }
 
-    // The tool is run on the manifest this build wrote, from the project's folder, with the value of SqlSourceOnline,
+    // The tool is run on the manifest this build wrote and then on each other framework's, each with an option of its
+    // own, from the project's folder, with the value of SqlSourceOnline,
     // with the .env file's full path, or none, when SqlSourceEnvFile is set, so that a default build's command is
     // unchanged, and with a log of this project and framework when SQLSOURCE_LOG is set.  Exec reads its errors as a
     // compiler's, ignores the exit code, which would add an error of Exec's own to the tool's, and keeps every line
@@ -440,6 +598,7 @@ public sealed partial class BuildFileTests
                 {
                     ["Command"] =
                         "$(SqlSourceToolCommand) describe --manifest \"$(SqlSourceToolManifestArgument)\""
+                        + "@(SqlSourceFrameworkManifest->'%(SqlSourceToolArgument)', '')"
                         + " --online $(SqlSourceOnlineValue)$(SqlSourceToolEnvFile)$(SqlSourceToolLog)",
                     ["WorkingDirectory"] = "$(MSBuildProjectDirectory)",
                     ["IgnoreExitCode"] = "true",
@@ -467,10 +626,6 @@ public sealed partial class BuildFileTests
             .Elements()
             .Select(Line)
             .ShouldBe([
-                ("SqlSourceShellSpecial", null, "[$`\"\\\\]"),
-                ("SqlSourceShellEscape", null, "\"'$0'\""),
-                ("SqlSourceShellSpecial", "'$(OS)' == 'Windows_NT'", "%"),
-                ("SqlSourceShellEscape", "'$(OS)' == 'Windows_NT'", "%$0"),
                 ("SqlSourceToolManifestArgument", null, ShellEscaped("$(SqlSourceManifestFile)")),
                 ("SqlSourceToolEnvFileArgument", null, ShellEscaped("$(SqlSourceEnvFilePath)")),
                 (
@@ -615,8 +770,9 @@ public sealed partial class BuildFileTests
                 }
             );
         // In FileWrites whatever the run did, as when it is skipped, or IncrementalClean would delete the stamp of an
-        // earlier build.  The files it writes under obj, the manifest only when it is the build's own, are what it
-        // returns, for a framework's build that called it in a configuration of its own to add to FileWrites.
+        // earlier build.  The files it writes under obj, the manifests, the other frameworks' among them, only when
+        // they are the build's own, are what it returns, for a framework's build that called it in a configuration of
+        // its own to add to FileWrites.
         var written = target.Elements("ItemGroup").Last();
         written.Attributes().ShouldBeEmpty();
         written
@@ -631,6 +787,11 @@ public sealed partial class BuildFileTests
                 (
                     "SqlSourceOnlineFile",
                     "Include=$(SqlSourceManifestFile) Condition='$(SqlSourceManifestIsDefault)' == 'true'"
+                ),
+                (
+                    "SqlSourceOnlineFile",
+                    "Include=@(SqlSourceFrameworkManifest)"
+                        + " Condition='%(SqlSourceFrameworkManifest.SqlSourceManifestIsDefault)' == 'true'"
                 ),
             ]);
     }
@@ -697,11 +858,11 @@ public sealed partial class BuildFileTests
         ConditionsAround(line).ShouldBeEmpty();
     }
 
-    // The outer build of a multi-targeted project runs the tool for the first framework before it dispatches the inner
-    // builds, under the run's condition, in the configuration of its own that every inner build's call names, so
-    // that those calls are answered at once.
+    // The outer build of a multi-targeted project runs the tool before it dispatches the inner builds, under the run's
+    // condition, in the configuration of its own of the first framework that has SqlSource, which it finds as every
+    // inner build does, so that their calls are answered at once.  It calls nothing when no framework has SqlSource.
     [Fact]
-    public void Outer_Target_RunsTheToolForTheFirstFrameworkBeforeTheDispatch()
+    public void Outer_Target_RunsTheToolForTheFirstFrameworkWithSqlSourceBeforeTheDispatch()
     {
         var target = Outer.Root!.Elements("Target").ShouldHaveSingleItem();
 
@@ -716,16 +877,68 @@ public sealed partial class BuildFileTests
                     ["Condition"] = "'$(TargetFramework)' == '' and '$(TargetFrameworks)' != '' and " + RunCondition,
                 }
             );
-        AttributesOf(target.Elements().ShouldHaveSingleItem())
+        target
+            .Elements()
+            .Select(element => element.Name.LocalName)
+            .ShouldBe(["ItemGroup", "MSBuild", "PropertyGroup", "MSBuild"]);
+        ShouldFindTheRunsFramework(target, null);
+        AttributesOf(target.Elements("MSBuild").Last())
             .ShouldBe(
                 new Dictionary<string, string>
                 {
                     ["Projects"] = "$(MSBuildProjectFullPath)",
                     ["Targets"] = RunOnlineTarget,
                     ["Properties"] = OnlineRunConfiguration,
+                    ["Condition"] = "'$(SqlSourceOnlineRunFramework)' != ''",
                 }
             );
-        target.Elements().Single().Name.LocalName.ShouldBe("MSBuild");
+        target.Elements("MSBuild").Last().HasElements.ShouldBeFalse();
+    }
+
+    // The run's framework is the first of TargetFrameworks whose configuration of its own answers
+    // SqlSourceOnlineFramework: the call is batched over the frameworks, which MSBuild runs in the order of the items,
+    // and passes over one without the target.  The groups and the call have the condition given, and the property is
+    // empty when none answers.
+    private static void ShouldFindTheRunsFramework(XElement target, string? condition)
+    {
+        var asked = target.Element("ItemGroup")!;
+        (asked.Attribute("Condition")?.Value).ShouldBe(condition);
+        asked.Elements().Select(Item).ShouldBe([("SqlSourceOnlineFrameworkAsked", "Include=$(TargetFrameworks)")]);
+        var call = target.Element("MSBuild")!;
+        var attributes = new Dictionary<string, string>
+        {
+            ["Projects"] = "$(MSBuildProjectFullPath)",
+            ["Targets"] = OnlineFrameworkTarget,
+            ["Properties"] = AskedConfiguration,
+            ["SkipNonexistentTargets"] = "true",
+        };
+        if (condition is not null)
+        {
+            attributes["Condition"] = condition;
+        }
+
+        AttributesOf(call).ShouldBe(attributes);
+        AttributesOf(call.Elements().ShouldHaveSingleItem())
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["TaskParameter"] = "TargetOutputs",
+                    ["ItemName"] = "SqlSourceOnlineFrameworkFound",
+                }
+            );
+        var found = target.Element("PropertyGroup")!;
+        (found.Attribute("Condition")?.Value).ShouldBe(condition);
+        found
+            .Elements()
+            .Select(Line)
+            .ShouldBe([
+                ("SqlSourceOnlineFrameworksFound", null, "@(SqlSourceOnlineFrameworkFound)"),
+                (
+                    "SqlSourceOnlineRunFramework",
+                    null,
+                    "$([System.Text.RegularExpressions.Regex]::Match($(SqlSourceOnlineFrameworksFound), '[^;]+'))"
+                ),
+            ]);
     }
 
     // The code, the help link and the text of a targets diagnostic are its descriptor's, the text with {0}, {1} and

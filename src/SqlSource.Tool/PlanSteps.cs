@@ -40,19 +40,34 @@ internal static class PlanSteps
     {
         RunUnit unit;
         ImmutableArray<ProjectManifest> manifests;
-        if (SharedOptions.ValuesOf(usage, DescribeCommand.ManifestOption) is [{ } manifestValue])
+        if (SharedOptions.ValuesOf(usage, DescribeCommand.ManifestOption) is { Length: > 0 } given)
         {
-            // The build has evaluated the project, so MSBuild is not asked again, and the project is the unit.
-            manifests = await RunProjects.FromManifestAsync(
-                Path.GetFullPath(manifestValue.Text, context.Host.WorkingDirectory),
-                manifestValue,
-                context
-            );
-            if (manifests.IsEmpty)
+            // The build has evaluated the project, so MSBuild is not asked again.  Each manifest is one of its
+            // frameworks, and the first one's project is the unit.
+            var read = ImmutableArray.CreateBuilder<ProjectManifest>(given.Length);
+            foreach (var manifestValue in given)
             {
-                return null;
+                var one = await RunProjects.FromManifestAsync(
+                    Path.GetFullPath(manifestValue.Text, context.Host.WorkingDirectory),
+                    manifestValue,
+                    context,
+                    read.Count > 0 ? read[0].ProjectPath : null
+                );
+                if (one.IsEmpty)
+                {
+                    // A manifest that is not read, or is of another project, is reported, and the run plans nothing.
+                    return null;
+                }
+
+                read.AddRange(one);
             }
 
+            manifests = read.ToImmutable();
+            RunEvents.Project(
+                context.Reporter.Trace,
+                manifests[0].ProjectPath,
+                new ProjectEvaluation(manifests[0].ProjectPath, ProjectState.UsesSqlSource, manifests)
+            );
             unit = new RunUnit(RunUnitKind.Project, manifests[0].ProjectPath);
             RunEvents.Unit(context.Reporter.Trace, unit, wasGiven: true);
         }

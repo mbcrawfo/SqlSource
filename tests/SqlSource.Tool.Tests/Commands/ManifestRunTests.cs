@@ -248,4 +248,91 @@ public sealed class ManifestRunTests : IDisposable
             $"{manifest} : error SQLSRC206: The project manifest '{manifest}' cannot be read: '{manifest}' is gone"
         );
     }
+
+    // The frameworks of one project are given one manifest each, and the run plans their files as one.
+    [Fact]
+    public async Task Describe_TwoManifestsOfOneProject_PlansBoth()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Secrets.Connection;
+        var second = Plans.Postgres(_scene.Run.Folder, directory: "");
+        second.TargetFramework = "net9.0";
+        var onlyInSecond = second.AddSql("Second.sql", SqlTexts.GetInvoice);
+        var first = _scene.WriteManifest();
+        var other = _scene.Run.Folder.WriteFile("obj/App.net9.0.manifest", second.ManifestText());
+
+        var result = await _scene.DescribeAsync("--manifest", first, "--manifest", other);
+
+        result.Error.ShouldBe("");
+        result.ExitCode.ShouldBe(0);
+        File.Exists(SidecarFormat.PathFor(_invoices)).ShouldBeTrue();
+        File.Exists(SidecarFormat.PathFor(onlyInSecond)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Describe_ManifestsOfTwoProjects_IsSQLSRC206()
+    {
+        var project = new TestProject(_scene.Run.Folder, "Other", "other");
+        _ = project.AddSql("Plain.sql", SqlTexts.Plain);
+        var first = _scene.WriteManifest();
+        var other = _scene.Run.Folder.WriteFile("obj/Other.manifest", project.ManifestText());
+
+        var result = await _scene.DescribeAsync("--manifest", first, "--manifest", other);
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBe("");
+        result.Error.ShouldStartWith(
+            $"{other} : error SQLSRC206: The project manifest '{other}' cannot be read: "
+                + $"it is of '{project.ProjectPath}', and the first manifest is of '{_scene.Project.ProjectPath}'"
+        );
+        _scene.Describer.Opened.ShouldBeEmpty();
+        File.Exists(SidecarFormat.PathFor(_invoices)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Describe_OneOfTwoManifestsCannotBeRead_PlansNothing()
+    {
+        var first = _scene.WriteManifest();
+        var missing = _scene.Run.Folder.PathOf("obj/missing.manifest");
+
+        var result = await _scene.DescribeAsync("--manifest", first, "--manifest", missing);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith(
+            $"{missing} : error SQLSRC206: The project manifest '{missing}' cannot be read: there is no such file"
+        );
+        _scene.Describer.Opened.ShouldBeEmpty();
+        File.Exists(SidecarFormat.PathFor(_invoices)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Describe_TwoManifestsOfOneProject_LogsTheProjectOnce()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Secrets.Connection;
+        var first = _scene.Run.Folder.WriteFile(
+            "obj/App.manifest",
+            _scene
+                .Project.ManifestText()
+                .Replace("TargetFramework=net10.0", "TargetFramework=net8.0", StringComparison.Ordinal)
+        );
+        var other = _scene.Run.Folder.WriteFile("obj/App.net10.0.manifest", _scene.Project.ManifestText());
+        var log = _scene.Run.Folder.PathOf("run.log");
+
+        _ = await _scene.DescribeAsync("--manifest", first, "--manifest", other, "--log", log);
+
+        var project = LogReader.Events(log, "project").ShouldHaveSingleItem();
+        project.GetProperty("targetFramework").GetString().ShouldBe("net8.0;net10.0");
+    }
+
+    [Fact]
+    public async Task Describe_ManifestOfAnotherProject_LogsNoProject()
+    {
+        var project = new TestProject(_scene.Run.Folder, "Other", "other");
+        var first = _scene.WriteManifest();
+        var other = _scene.Run.Folder.WriteFile("obj/Other.manifest", project.ManifestText());
+        var log = _scene.Run.Folder.PathOf("run.log");
+
+        _ = await _scene.DescribeAsync("--manifest", first, "--manifest", other, "--log", log);
+
+        LogReader.Events(log, "project").ShouldBeEmpty();
+    }
 }

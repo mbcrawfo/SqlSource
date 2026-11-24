@@ -23,6 +23,7 @@ The [output](settings.md#setting-output) of a query decides whether it is descri
 
 - **The tool reads the `.sql` files that a type with `[SqlSourceGenerate]` claims**, in the projects that it runs on.
 - **The tool reads `[SqlSourceGenerate]` from your C# source without compiling it.**  This limits how you can write `Source` there: see [a limit](attributes.md#limit-source-written-as-text).
+- **In a project with several target frameworks, the tool reads each framework that uses SqlSource.**  It describes a query that any of them needs.  This includes a `.sql` file or a C# file that one framework alone includes, and a `[SqlSourceGenerate]` inside an `#if` of one framework.
 - **The tool describes the queries of the dialects `postgres` and `mssql`.**  The tool describes a query through its [dialect](settings.md#setting-dialect).  It asks PostgreSQL about a query of `postgres`, and SQL Server about a query of `mssql`.  The [database support table](databases/index.md#database-support) lists every dialect.
 - **A query that must be described, and whose dialect cannot be described, is [SQLSRC209](../diagnostics.md#sqlsrc209).**  The dialects that cannot be described are those marked No in [database support](databases/index.md#database-support), such as `ansi`, `mysql` or `sqlite`.  The tool reports the error, and so does the build.
 - **A project that sets neither the dialect nor the output gets SQLSRC209 for each file that a type claims.**  The default output is `repository`, and the default dialect is `ansi`.
@@ -196,19 +197,6 @@ billing (postgres): 15 same, 1 differ, 0 failed
 <a id="limits"></a>
 
 ## Limits
-
-<a id="limit-several-target-frameworks"></a>
-
-### SQLSRC241 for a query that only another target framework includes
-
-**What you see.**  The build for a target framework other than the first reports [SQLSRC241](../diagnostics.md#sqlsrc241) for a query that must be described, after you ran `describe`.  The first framework does not include the query.  A project that references SqlSource for a later framework only is left out of a solution's run, and the tool says nothing.  If you name that project, the tool reports [SQLSRC204](../diagnostics.md#sqlsrc204).  The build of that project reports SQLSRC241 in the same way.
-
-**Why.**  `describe`, and a build that runs the tool, read a project with several target frameworks for its first framework alone.  So they do not see these, and do not describe their queries:
-
-- a `.sql` file or a C# file that the project includes only for another framework;
-- a `[SqlSourceGenerate]` under an `#if` that only another framework defines.
-
-**What to do.**  Include the `.sql` files and the attributed types for every framework, or for the first one listed.
 
 <a id="limit-saves-not-seen"></a>
 
