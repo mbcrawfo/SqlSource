@@ -163,6 +163,12 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
                 "SELECT q.id AS c FROM dbo.proof_rows AS r "
                     + "LEFT JOIN (SELECT id, rows_id FROM dbo.proof_other) AS q ON q.rows_id = r.id WHERE q.rows_id > 0"
             },
+            // An alias that is also the name of a CLR column, with a real column of the joined table in the filter.
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id WHERE solid.id > 0"
+            },
             // A set operator whose every branch proves the column, each over its own rows.
             { 0, "SELECT a AS c FROM dbo.proof_rows UNION SELECT b FROM dbo.proof_rows WHERE b > 0" },
             { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > 0 UNION ALL SELECT a FROM dbo.proof_rows" },
@@ -373,6 +379,44 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
                 0,
                 "SELECT q.x AS c FROM dbo.proof_rows AS r OUTER APPLY "
                     + "(SELECT TOP (1) o.id AS x FROM dbo.proof_other AS o WHERE o.rows_id = r.id) AS q WHERE r.a >= 0"
+            },
+            // A name under a join's alias that SQL Server reads as a property of a CLR column of another source: the
+            // filter holds of the rows with no match, so it does not make the join inner.
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE solid.STSrid = 0"
+            },
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE solid.STX >= 0"
+            },
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE solid.STSrid IS NOT NULL"
+            },
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE [solid].[STSrid] = 0"
+            },
+            {
+                0,
+                "SELECT solid.id + 1 AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE solid.STSrid = 0"
+            },
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE solid.STSrid = 0 UNION ALL SELECT a FROM dbo.proof_rows"
+            },
+            // A name of three parts names a table's column, here of the preserved side, and no column of the alias.
+            {
+                0,
+                "SELECT dbo.id AS c FROM dbo.proof_rows LEFT JOIN dbo.proof_other AS dbo "
+                    + "ON dbo.id = proof_rows.id + 100 WHERE dbo.proof_rows.a > 0"
             },
             // A set operator with a branch that can be NULL, wherever it stands.  A CLR type in one branch is the
             // column's, and the string of another converts to its Null.
@@ -594,6 +638,23 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         "WITH q AS (SELECT CAST(NULL AS int) AS b, 1 AS n UNION ALL SELECT b, n + 1 FROM q WHERE n < 2)",
         "SELECT b AS c FROM q"
     )]
+    // Inside q, proof_rows is the table: a CTE sees only the CTEs before it.
+    [InlineData(
+        "WITH q AS (SELECT b FROM proof_rows), proof_rows AS (SELECT b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT b AS c FROM q"
+    )]
+    // A name under the alias of a LEFT JOIN of a CTE that is a property of a CLR column of the other source.
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT q.b AS c FROM (SELECT id, solid AS q FROM dbo.proof_shapes) AS p LEFT JOIN q ON q.id = p.id + 100 "
+            + "WHERE q.STSrid = 0"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0), r AS (SELECT q.b "
+            + "FROM (SELECT id, solid AS q FROM dbo.proof_shapes) AS p LEFT JOIN q ON q.id = p.id + 100 "
+            + "WHERE q.STSrid = 0)",
+        "SELECT b AS c FROM r"
+    )]
     public Task DescribeAsync_CteThatLetsANullThrough_NullableAndNullRow(string with, string select) =>
         WithRowsAsync(async () =>
         {
@@ -758,6 +819,14 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         (await UnpooledScalarAsync($"SET ANSI_NULLS OFF; {batch}")).ShouldBe(keptWithItOff);
         (await UnpooledScalarAsync($"SET ANSI_NULLS ON; {batch}")).ShouldBe(0);
     }
+
+    // A text that turns ANSI_NULLS off is several statements, which the reader does not read, so its comparison proves
+    // nothing.
+    [Theory]
+    [InlineData("SET ANSI_NULLS OFF; SELECT b AS c FROM dbo.proof_rows WHERE b <> 5")]
+    [InlineData("SET ANSI_NULLS OFF SELECT b AS c FROM dbo.proof_rows WHERE b = 5")]
+    public Task DescribeAsync_TextThatTurnsAnsiNullsOff_StaysNullable(string sql) =>
+        WithRowsAsync(() => ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server));
 
     // The tables of the proofs and their rows, made for the body and dropped after it.  g and b are NULL in some rows
     // and a in none; proof_other and proof_computed find no row for the rows 3 to 5 of proof_rows.  dbo.COUNT is a

@@ -110,7 +110,7 @@ internal sealed class ColumnProofs
                 var asksLoneLeaf = !isOneSelect || filtered.Cuts.Count > 0;
                 return (
                     Body: branch,
-                    filtered.Cuts,
+                    Filtered: filtered,
                     Proofs: new ExpressionProofs(tokens, branch, filtered, asksLoneLeaf)
                 );
             })
@@ -130,6 +130,16 @@ internal sealed class ColumnProofs
             }
         }
 
+        // What the server answers of a branch whose text cuts a LEFT holds only when that cut does.  A proof of the
+        // text alone asks nothing of that text.
+        var guards = branches
+            .Select(static branch =>
+                branch.Filtered.Cuts.Count > 0 && branch.Proofs.Operands.Count > 0
+                    ? branch.Proofs.OfInnerJoins(branch.Filtered.CutGuards)
+                    : Proof.Yes
+            )
+            .ToList();
+
         // Each branch numbers its operands from 0, and the answers are one list, so a proof moves by the operands of
         // the branches before its own.
         var queries = new List<OperandQuery>();
@@ -143,7 +153,14 @@ internal sealed class ColumnProofs
             {
                 queries.Add(
                     new OperandQuery(
-                        OperandsQuery.Text(sql, tokens, statement.With, branches[at].Body, operands, branches[at].Cuts),
+                        OperandsQuery.Text(
+                            sql,
+                            tokens,
+                            statement.With,
+                            branches[at].Body,
+                            operands,
+                            branches[at].Filtered.Cuts
+                        ),
                         operands.Count
                     )
                 );
@@ -153,7 +170,9 @@ internal sealed class ColumnProofs
 
         var proofs = parts
             .Select(of =>
-                of is null ? null : ExpressionProofs.AllOf(of.Select((part, at) => part.Shifted(offsets[at])))
+                of is null
+                    ? null
+                    : ExpressionProofs.AllOf(of.Select((part, at) => WithGuard(part, guards[at]).Shifted(offsets[at])))
             )
             .ToList();
         return new ColumnProofs(columns, proofs, catalog, queries);
@@ -215,6 +234,9 @@ internal sealed class ColumnProofs
         {
             Column = column.Column with { Nullable = false, NullableSource = source },
         };
+
+    private static Proof WithGuard(Proof part, Proof guard) =>
+        part is Proof.Always or Proof.Never ? part : ExpressionProofs.AllOf([part, guard]);
 
     // True when every branch has an item for each column and none is a star, whose columns are not read.  The server
     // takes a set operator's names from its first branch alone.

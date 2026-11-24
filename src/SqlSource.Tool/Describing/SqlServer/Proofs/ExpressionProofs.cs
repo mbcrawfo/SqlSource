@@ -132,6 +132,17 @@ internal sealed partial class ExpressionProofs(
         };
     }
 
+    /// <summary>
+    /// The proof that the <c>LEFT JOIN</c>s the <c>WHERE</c> makes inner are so: for each, one of the columns that name
+    /// its source is stored.
+    /// </summary>
+    /// <param name="guards">The columns of each join, as <see cref="FilteredRows.CutGuards" /> gives them.</param>
+    public Proof OfInnerJoins(IReadOnlyList<IReadOnlyList<TokenRange>> guards)
+    {
+        _leaves.Clear();
+        return Numbered(AllOf(guards.Select(columns => AnyOf(columns.Select(Proof (column) => StoredLeaf(column))))));
+    }
+
     internal static Proof AllOf(IEnumerable<Proof> parts)
     {
         var kept = new List<Proof>();

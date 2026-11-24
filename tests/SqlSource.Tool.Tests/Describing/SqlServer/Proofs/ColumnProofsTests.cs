@@ -194,6 +194,21 @@ public sealed class ColumnProofsTests
     [InlineData("SELECT nickname FROM dbo.users WHERE NOT nickname > 'a'")]
     [InlineData("SELECT u.nickname FROM dbo.users AS u WHERE nickname > 'a'")]
     [InlineData("SELECT nickname FROM dbo.users WHERE NICKNAME > 'a'")]
+    // A text that turns ANSI_NULLS off is several statements, which the reader does not read.
+    [InlineData("SET ANSI_NULLS OFF; SELECT nickname FROM dbo.users WHERE nickname = @p")]
+    [InlineData("SET ANSI_NULLS OFF SELECT nickname FROM dbo.users WHERE nickname = @p")]
+    [InlineData("SELECT nickname FROM dbo.users WHERE nickname = @p; SET ANSI_NULLS OFF")]
+    [InlineData("SELECT nickname FROM dbo.users WHERE nickname = @p SET ANSI_NULLS OFF")]
+    // Inside q, p is a table: a CTE sees only the CTEs before it.
+    [InlineData(
+        "WITH q AS (SELECT nickname FROM p), p AS (SELECT nickname FROM t WHERE nickname > 'a') "
+            + "SELECT nickname FROM q"
+    )]
+    // A join in a CTE's body, which has no call of "operands" to show that its filter is of a stored column.
+    [InlineData(
+        "WITH q AS (SELECT id, nickname FROM dbo.users WHERE nickname > 'a'), r AS (SELECT q.nickname "
+            + "FROM dbo.orders AS o LEFT JOIN q ON q.id = o.user_id WHERE q.Lat > 0) SELECT nickname FROM r"
+    )]
     [InlineData("SELECT a.nickname FROM dbo.users AS a JOIN dbo.users AS b ON b.id = a.id WHERE b.nickname > 'a'")]
     [InlineData("WITH q AS (SELECT nickname FROM dbo.users) SELECT nickname FROM q")]
     [InlineData("WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM Q")]
@@ -261,11 +276,56 @@ public sealed class ColumnProofsTests
         proofs
             .OperandQueries.ShouldHaveSingleItem()
             .Sql.ShouldBe(
-                "SELECT o.total\nAS [1]\nFROM dbo.users AS u\nJOIN dbo.orders AS o ON o.user_id = u.id "
-                    + "WHERE o.status = 1"
+                "SELECT o.total\nAS [1],\no.status\nAS [2]\nFROM dbo.users AS u\nJOIN dbo.orders AS o "
+                    + "ON o.user_id = u.id WHERE o.status = 1"
             );
-        Nullability(proofs.Apply(Answers(true))).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
-        Nullability(proofs.Apply(Answers(false))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply([new OperandFacts(true, true), new OperandFacts(false, true, Stored: true)]))
+            .ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply([new OperandFacts(false, true), new OperandFacts(false, true, Stored: true)]))
+            .ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // A name under a join's alias can be a property of a CLR column of another source, which the server names no
+    // source for: the filter then holds of a row with no match, and what the text without the LEFT answers proves
+    // nothing.
+    [Fact]
+    public void Apply_FilterOfTheJoinIsNoStoredColumn_StaysNullable()
+    {
+        var proofs = Read(
+            "SELECT loc.total FROM dbo.users AS u LEFT JOIN dbo.orders AS loc ON loc.user_id = u.id WHERE loc.Lat > 0",
+            ExpressionRow(1, "total")
+        );
+
+        Nullability(proofs.Apply([new OperandFacts(true, true), new OperandFacts(false, true, Stored: false)]))
+            .ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // Each LEFT JOIN made inner needs its own stored column, and one of a join's columns is enough.
+    [Theory]
+    [InlineData(true, true, true, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, false, true)]
+    [InlineData(false, false, true, true)]
+    public void Apply_TwoJoinsMadeInner_EachNeedsAStoredColumn(bool first, bool alsoFirst, bool second, bool nullable)
+    {
+        var proofs = Read(
+            "SELECT b.total FROM dbo.users AS u LEFT JOIN dbo.orders AS a ON a.user_id = u.id "
+                + "LEFT JOIN dbo.orders AS b ON b.user_id = u.id WHERE a.x > 0 AND a.y > 0 AND b.z > 0",
+            ExpressionRow(1, "total")
+        );
+
+        Nullability(
+                proofs.Apply([
+                    new OperandFacts(true, true),
+                    new OperandFacts(false, true, Stored: first),
+                    new OperandFacts(false, true, Stored: alsoFirst),
+                    new OperandFacts(false, true, Stored: second),
+                ])
+            )
+            .ShouldBe([
+                (nullable, nullable ? SidecarValues.NullableSource.Server : SidecarValues.NullableSource.Expression),
+            ]);
     }
 
     // A filter of another source, or a chain the reader cannot follow, leaves every LEFT in place and asks no lone
@@ -277,6 +337,10 @@ public sealed class ColumnProofsTests
     [InlineData(
         "SELECT o.total FROM dbo.users AS u LEFT JOIN dbo.orders AS o ON o.user_id = u.id "
             + "WHERE o.status = 1 OR u.id = 1"
+    )]
+    // A name of three parts names a table's column, here of the preserved side, whatever the alias of the join.
+    [InlineData(
+        "SELECT dbo.total FROM dbo.users LEFT JOIN dbo.orders AS dbo ON dbo.user_id = users.id WHERE dbo.users.id > 0"
     )]
     [InlineData(
         "SELECT o.total FROM dbo.users AS u LEFT HASH JOIN dbo.orders AS o ON o.user_id = u.id WHERE o.status = 1"

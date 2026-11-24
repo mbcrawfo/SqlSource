@@ -25,12 +25,12 @@ internal sealed class RowFilter
 {
     private static readonly HashSet<string> Comparisons = ["=", "<", ">", "<=", ">=", "<>", "!=", "!<", "!>"];
 
-    private readonly List<string[]> _columns = [];
+    private readonly List<(string[] Parts, TokenRange Range)> _columns = [];
 
     private RowFilter() { }
 
     /// <summary>The names the filter keeps from being <c>NULL</c>, each as its parts.</summary>
-    public IReadOnlyList<string[]> Columns => _columns;
+    public IReadOnlyList<string[]> Columns => [.. _columns.Select(static column => column.Parts)];
 
     /// <summary>The filter of a <c>WHERE</c> clause, from the word <c>WHERE</c> to its end, or of none.</summary>
     public static RowFilter Read(IReadOnlyList<TsqlToken> tokens, TokenRange? where)
@@ -81,7 +81,19 @@ internal sealed class RowFilter
     }
 
     /// <summary>True when the filter keeps the column of these parts from being <c>NULL</c>.</summary>
-    public bool Keeps(string[] parts) => _columns.Any(column => column.SequenceEqual(parts, StringComparer.Ordinal));
+    public bool Keeps(string[] parts) =>
+        _columns.Any(column => column.Parts.SequenceEqual(parts, StringComparer.Ordinal));
+
+    /// <summary>The tokens of each column the filter names as <c>qualifier.column</c>, of two parts exactly.</summary>
+    /// <remarks>A name of three parts names a table's column, whatever an alias of its first part says.</remarks>
+    public IReadOnlyList<TokenRange> ColumnsOf(string qualifier) =>
+        [
+            .. _columns
+                .Where(column =>
+                    column.Parts.Length == 2 && string.Equals(column.Parts[0], qualifier, StringComparison.Ordinal)
+                )
+                .Select(static column => column.Range),
+        ];
 
     private static bool IsOneGroup(IReadOnlyList<TsqlToken> tokens, TokenRange range) =>
         range.Count >= 2
@@ -215,7 +227,7 @@ internal sealed class RowFilter
     {
         if (NameOf(tokens, side) is { } parts)
         {
-            _columns.Add(parts);
+            _columns.Add((parts, side));
         }
     }
 }

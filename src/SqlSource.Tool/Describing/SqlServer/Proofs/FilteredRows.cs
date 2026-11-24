@@ -16,7 +16,8 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// <para>
 /// A <c>LEFT JOIN</c> whose source a conjunct rejects, by a column qualified with that source's name, returns only rows
 /// that found a match.  So <see cref="Cuts" /> leaves its <c>LEFT</c> and <c>OUTER</c> out of the text of
-/// <c>operands</c>, and the server answers that source's columns as an inner join's over the same rows.
+/// <c>operands</c>, and the server answers that source's columns as an inner join's over the same rows, provided that
+/// it names one of those columns as stored (<see cref="CutGuards" />).
 /// </para>
 /// </remarks>
 internal sealed class FilteredRows
@@ -33,7 +34,8 @@ internal sealed class FilteredRows
         IReadOnlyList<JoinSource>? sources,
         IReadOnlyList<CommonTableExpression> ctes,
         HashSet<string> madeInner,
-        IReadOnlyList<int> cuts
+        IReadOnlyList<int> cuts,
+        IReadOnlyList<IReadOnlyList<TokenRange>> cutGuards
     )
     {
         _tokens = tokens;
@@ -42,41 +44,54 @@ internal sealed class FilteredRows
         _ctes = ctes;
         _madeInner = madeInner;
         Cuts = cuts;
+        CutGuards = cutGuards;
     }
 
     /// <summary>The tokens to leave out of the <c>FROM</c> in the text of <c>operands</c>, in order.</summary>
     public IReadOnlyList<int> Cuts { get; }
 
+    /// <summary>
+    /// For each <c>LEFT JOIN</c> of <see cref="Cuts" />, the columns of the filter that name its source.  One of them
+    /// must be a stored column for the cut to hold: a name under the alias can be a property of a CLR column of another
+    /// source, as <c>loc.Lat</c> of <c>p.loc</c>, which a row with no match does not make <c>NULL</c>.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<TokenRange>> CutGuards { get; }
+
     /// <summary>What the <c>FROM</c> and <c>WHERE</c> of a <c>SELECT</c> keep from being <c>NULL</c>.</summary>
     /// <param name="tokens">The query's tokens.</param>
     /// <param name="body">The <c>SELECT</c>.</param>
     /// <param name="ctes">The CTEs its <c>FROM</c> can read.</param>
+    /// <param name="makesJoinsInner">
+    /// False for a CTE's body, which has no call of <c>operands</c> to show a cut's <see cref="CutGuards" />.
+    /// </param>
     public static FilteredRows Read(
         IReadOnlyList<TsqlToken> tokens,
         SelectBody body,
-        IReadOnlyList<CommonTableExpression> ctes
+        IReadOnlyList<CommonTableExpression> ctes,
+        bool makesJoinsInner = true
     )
     {
         var filter = RowFilter.Read(tokens, body.Where);
         var sources = body.From is { } from ? JoinChain.Read(tokens, from) : null;
         var madeInner = new HashSet<string>(StringComparer.Ordinal);
         var cuts = new List<int>();
-        foreach (var source in sources ?? [])
+        var guards = new List<IReadOnlyList<TokenRange>>();
+        foreach (var source in makesJoinsInner ? sources ?? [] : [])
         {
+            var named = filter.ColumnsOf(source.Name);
             if (
                 source.Outer.Count > 0
+                && named.Count > 0
                 && sources!.Count(other => string.Equals(other.Name, source.Name, StringComparison.Ordinal)) == 1
-                && filter.Columns.Any(column =>
-                    column.Length == 2 && string.Equals(column[0], source.Name, StringComparison.Ordinal)
-                )
             )
             {
                 _ = madeInner.Add(source.Name);
                 cuts.AddRange(source.Outer);
+                guards.Add(named);
             }
         }
 
-        return new FilteredRows(tokens, filter, sources, ctes, madeInner, cuts);
+        return new FilteredRows(tokens, filter, sources, ctes, madeInner, cuts, guards);
     }
 
     /// <summary>True when the range is a column alone that these rows hold no <c>NULL</c> of.</summary>
@@ -153,6 +168,7 @@ internal sealed class FilteredRows
             return false;
         }
 
-        return Read(_tokens, body, [.. _ctes.Take(at)]).KeepsFromNull(body.Items[place].Expression);
+        return Read(_tokens, body, [.. _ctes.Take(at)], makesJoinsInner: false)
+            .KeepsFromNull(body.Items[place].Expression);
     }
 }

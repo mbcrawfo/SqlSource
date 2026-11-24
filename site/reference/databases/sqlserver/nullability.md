@@ -65,7 +65,7 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
   - the condition is `x IS NOT NULL`, `x LIKE p`, `x NOT LIKE p` or a comparison such as `x = @id` or `x > 0`, of `x` alone;
   - `AND` joins the condition to the rest of the `WHERE`, and no `OR` or `NOT` applies to it;
   - the query writes `x` the same way in the condition and where it reads it, with the same table alias.
-- **A `NOT NULL` column of the optional side of a `LEFT JOIN`, when the `WHERE` makes the join inner.**  The `WHERE` must hold such a condition on a column of that side, written with its table alias, as `o.status` in `WHERE o.status = @status`.  The joins of the `FROM` must be plain joins, one after the other.
+- **A `NOT NULL` column of the optional side of a `LEFT JOIN`, when the `WHERE` makes the join inner.**  The `WHERE` must hold such a condition on a stored column of that side, written with its table alias, as `o.status` in `WHERE o.status = @status`.  The joins of the `FROM` must be plain joins, one after the other.
 - **A column read from a `WITH` query whose own `WHERE` keeps it from being null**, when the `WITH` query is one `SELECT` that returns the column itself, and no outer join of the outer query can fill it with null.
 - **A column of `UNION`, `UNION ALL`, `INTERSECT` or `EXCEPT`, when each `SELECT` gives a value that is never null in that place.**  Each `SELECT` is read on its own, with its own `FROM` and `WHERE`.
 
@@ -173,7 +173,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 
 ### Null from a filtered column whose property cannot be null, with `ANSI_NULLS` off
 
-**What you see.**  A column whose property cannot be null holds a null when the query runs.  The `WHERE` compares the column with a query parameter, as in `WHERE x = @id` or `WHERE x <> @id`.
+**What you see.**  A column whose property cannot be null holds a null when the query runs.  The `WHERE` compares a column with a query parameter, as in `WHERE x = @id` or `WHERE x <> @id`.  The null can be in that column, in any column of the optional side of a `LEFT JOIN` that the condition names, or in a column read from a `WITH` query whose `WHERE` holds the condition.
 
 **Why.**  The connection turns `ANSI_NULLS` off.  With `ANSI_NULLS` off, `x = @id` keeps a row whose `x` is null when `@id` is null, and `x <> @id` keeps that row when `@id` is not null.
 

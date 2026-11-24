@@ -166,6 +166,28 @@ public sealed class SqlServerSessionProofTests
         Nullability(described).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
 
+    // A failed branch holds the places of its operands, so the next branch's answers are not read as its own: nickname
+    // of the second branch is nullable and name not null, and neither column is proved.
+    [Fact]
+    public async Task DescribeAsync_FirstBranchsOperandsFail_LaterAnswersKeepTheirPlaces()
+    {
+        const string Sql = "SELECT 1 AS x, nickname AS y FROM dbo.users UNION ALL SELECT nickname, name FROM dbo.users";
+        var script = Script(Sql, [ExpressionRow(1, "x"), ExpressionRow(2, "y")])
+            .Operands(
+                new SqlServerColumnsRequest("SELECT nickname\nAS [1]\nFROM dbo.users", null),
+                new SqlServerColumnsAnswer(null, null, Lost)
+            )
+            .Operands(
+                new SqlServerColumnsRequest("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users", null),
+                new SqlServerColumnsAnswer([OperandRow(1, true), OperandRow(2, false)], null, null)
+            );
+
+        var (described, _) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        Nullability(described)
+            .ShouldBe([(true, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
+    }
+
     // A script of a query with no parameter whose "columns" answers the rows.
     private static SqlServerScript Script(string sql, IReadOnlyList<SqlServerColumnRow> rows) =>
         new SqlServerScript().NoParametersThenColumns(sql, new SqlServerColumnsAnswer(rows, null, null));
