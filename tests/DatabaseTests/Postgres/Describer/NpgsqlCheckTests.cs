@@ -333,6 +333,25 @@ public sealed class NpgsqlCheckTests(PostgresDatabases postgres)
         sent.Parameters.ShouldBe(["id"]);
     }
 
+    // A type name longer than the server's names, which Npgsql refuses with an ArgumentException before it sends
+    // anything, is the driver's refusal of that parameter.
+    [Fact]
+    public async Task CheckAsync_TypeNameTooLong_AnswersTheDriversRefusal()
+    {
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
+        var live = new PostgresLive(session.Connection);
+
+        var answer = await live.CheckAsync(
+            new PostgresCheckRequest("SELECT @a", [new PostgresCheckParameter("a", $"public.{new string('x', 70)}[]")]),
+            TestContext.Current.CancellationToken
+        );
+
+        answer.Error.ShouldBeNull(answer.Error?.Message);
+        var refused = answer.DriverError.ShouldNotBeNull();
+        refused.Parameter.ShouldBe("a");
+        refused.Message.ShouldStartWith("Name is too long");
+    }
+
     // The live function itself, with a text no describe can bring it: ParameterPlaceholders.Rewrite refuses such a text
     // first, SQLSRC230, and sends nothing.  Npgsql and the server read two statements.  With a named parameter Npgsql
     // refuses and sends nothing; without one the server refuses the whole text.  Either way the answer is an error and
