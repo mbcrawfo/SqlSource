@@ -34,6 +34,15 @@ LEFT JOIN orders AS o ON u.id = o.user_id
 GROUP BY u.id
 ORDER BY u.id;
 
+-- name: ListShippedOrders
+-- summary: The orders that have shipped, with the day each one shipped.
+SELECT
+    id,
+    shipped_on
+FROM orders
+WHERE shipped_on IS NOT NULL
+ORDER BY shipped_on;
+
 -- name: ListOrderMonths
 -- summary: Each order with the first day of the month it was placed in.
 -- column: month_start not null

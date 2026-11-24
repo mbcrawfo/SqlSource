@@ -120,6 +120,63 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
                     + "LEFT JOIN dbo.proof_other AS o ON o.rows_id = r.id"
             },
             { 0, "SELECT CASE WHEN g IS NULL THEN -1 ELSE g END AS c FROM dbo.proof_rows GROUP BY ROLLUP (g)" },
+            // A conjunct of the WHERE that rejects NULL, of the column itself or of an expression over it.
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b IS NOT NULL" },
+            { 0, "SELECT r.b AS c FROM dbo.proof_rows AS r WHERE r.b = 5" },
+            { 0, "SELECT [b] AS c FROM dbo.proof_rows WHERE b > 0" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE 5 = b" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b <> 5" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b != 5" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b !< 1" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b = g + 4" },
+            { 0, "SELECT zone_or_null AS c FROM dbo.proof_dates WHERE zone_or_null LIKE N'U%'" },
+            { 0, "SELECT zone_or_null AS c FROM dbo.proof_dates WHERE zone_or_null NOT LIKE N'X%'" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE a >= 0 AND (b > 0)" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE id BETWEEN 1 AND 5 AND b > 0" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE (a > 100 OR id > 0) AND b > 0" },
+            { 0, "SELECT b + 1 AS c FROM dbo.proof_rows WHERE b > 0" },
+            { 0, "SELECT CAST(b AS bigint) AS c FROM dbo.proof_rows WHERE b IS NOT NULL" },
+            { 0, "SELECT COALESCE(b, g) AS c FROM dbo.proof_rows WHERE b > 0" },
+            { 0, "SELECT SUM(b) AS c FROM dbo.proof_rows WHERE b > 0 GROUP BY g" },
+            { 0, "SELECT MAX(b) AS c FROM dbo.proof_rows WHERE b > 0 GROUP BY ROLLUP (g)" },
+            { 0, "SELECT g AS c FROM dbo.proof_rows WHERE g > 0 GROUP BY g" },
+            { 0, "SELECT DISTINCT b AS c FROM dbo.proof_rows WHERE b > 0" },
+            { 0, "SELECT TOP (1) b AS c FROM dbo.proof_rows WHERE b > 0 ORDER BY b" },
+            // The optional side of a LEFT JOIN that such a conjunct makes inner, a NOT NULL column of it included.
+            {
+                0,
+                "SELECT o.id AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "WHERE o.rows_id > 0"
+            },
+            {
+                0,
+                "SELECT o.rows_id AS c FROM dbo.proof_rows AS r LEFT OUTER JOIN dbo.proof_other AS o "
+                    + "ON o.rows_id = r.id WHERE o.rows_id IS NOT NULL"
+            },
+            {
+                0,
+                "SELECT o.id AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "JOIN dbo.proof_computed AS p ON p.id = r.id WHERE o.rows_id = 1"
+            },
+            {
+                0,
+                "SELECT q.id AS c FROM dbo.proof_rows AS r "
+                    + "LEFT JOIN (SELECT id, rows_id FROM dbo.proof_other) AS q ON q.rows_id = r.id WHERE q.rows_id > 0"
+            },
+            // An alias that is also the name of a CLR column, with a real column of the joined table in the filter.
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id WHERE solid.id > 0"
+            },
+            // A set operator whose every branch proves the column, each over its own rows.
+            { 0, "SELECT a AS c FROM dbo.proof_rows UNION SELECT b FROM dbo.proof_rows WHERE b > 0" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > 0 UNION ALL SELECT a FROM dbo.proof_rows" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > 0 EXCEPT SELECT a FROM dbo.proof_rows" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > 0 INTERSECT SELECT b FROM dbo.proof_rows WHERE b = 5" },
+            { 0, "SELECT COUNT(*) AS c FROM dbo.proof_rows UNION ALL SELECT COUNT(b) FROM dbo.proof_rows" },
+            { 0, "(SELECT a AS c FROM dbo.proof_rows) UNION ALL (SELECT b FROM dbo.proof_rows WHERE b > 0)" },
+            { 0, "SELECT a + 1 AS c FROM dbo.proof_rows UNION ALL SELECT COALESCE(b, 0) FROM dbo.proof_rows" },
         };
 
     // The queries that try to break a proof, with the major they need, each NULL in some row: the list of that design's
@@ -251,6 +308,139 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             { 0, "SELECT CASE WHEN b IS NOT NULL THEN 0 ELSE b END AS c FROM dbo.proof_rows" },
             { 0, "SELECT CASE WHEN b IS NULL THEN 0 WHEN g = 1 THEN NULL ELSE b END AS c FROM dbo.proof_rows" },
             { 0, "SELECT CASE WHEN g IS NULL THEN b ELSE g END AS c FROM dbo.proof_rows GROUP BY ROLLUP (g, b)" },
+            // A WHERE that lets a NULL through: no conjunct, or one that does not reject it.
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b IS NULL" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > 0 OR a > 0" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE a > 0 OR b > 0" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > 0 AND a > 0 OR g = 1" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE NOT (b IS NOT NULL)" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE g > 0" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > ALL (SELECT id FROM dbo.proof_other WHERE 1 = 0)" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE ISNULL(b, 1) = 1" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE COALESCE(b, 0) = 0" },
+            {
+                0,
+                "SELECT o.rows_id AS c FROM dbo.proof_other AS o JOIN dbo.proof_other AS p ON p.id = o.id - 1 "
+                    + "WHERE p.rows_id > 0"
+            },
+            // A grouping set's total, and GROUP BY ALL's group that no row of the WHERE holds.
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > 0 GROUP BY ROLLUP (b)" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > 0 GROUP BY CUBE (b)" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > 0 GROUP BY GROUPING SETS ((b), ())" },
+            { 0, "SELECT CAST(b AS bigint) AS c FROM dbo.proof_rows WHERE b > 0 GROUP BY ROLLUP (b)" },
+            { 0, "SELECT g AS c FROM dbo.proof_rows WHERE g > 1 GROUP BY ALL g" },
+            // A join the WHERE does not make inner, or one the reader cannot follow.
+            {
+                0,
+                "SELECT o.id AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "WHERE r.a >= 0"
+            },
+            {
+                0,
+                "SELECT o.id AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "WHERE o.rows_id IS NULL"
+            },
+            {
+                0,
+                "SELECT o.id AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "WHERE o.rows_id > 0 OR r.a >= 0"
+            },
+            {
+                0,
+                "SELECT o.id AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "WHERE ISNULL(o.rows_id, 1) = 1"
+            },
+            {
+                0,
+                "SELECT r.a AS c FROM dbo.proof_rows AS r RIGHT JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "WHERE o.id > 0"
+            },
+            {
+                0,
+                "SELECT o.id AS c FROM dbo.proof_rows AS r FULL JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "WHERE r.a >= 0"
+            },
+            {
+                0,
+                "SELECT p.id AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "LEFT JOIN dbo.proof_computed AS p ON p.id = o.id WHERE o.rows_id > 0"
+            },
+            {
+                0,
+                "SELECT o.id AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_other AS o "
+                    + "JOIN dbo.proof_computed AS p ON p.id = o.id ON o.rows_id = r.id WHERE r.a >= 0"
+            },
+            {
+                0,
+                "SELECT o.id AS c FROM dbo.proof_rows AS r LEFT HASH JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "WHERE r.a >= 0"
+            },
+            {
+                0,
+                "SELECT q.x AS c FROM dbo.proof_rows AS r OUTER APPLY "
+                    + "(SELECT TOP (1) o.id AS x FROM dbo.proof_other AS o WHERE o.rows_id = r.id) AS q WHERE r.a >= 0"
+            },
+            // A name under a join's alias that SQL Server reads as a property of a CLR column of another source: the
+            // filter holds of the rows with no match, so it does not make the join inner.
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE solid.STSrid = 0"
+            },
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE solid.STX >= 0"
+            },
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE solid.STSrid IS NOT NULL"
+            },
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE [solid].[STSrid] = 0"
+            },
+            {
+                0,
+                "SELECT solid.id + 1 AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE solid.STSrid = 0"
+            },
+            {
+                0,
+                "SELECT solid.id AS c FROM dbo.proof_shapes AS p LEFT JOIN dbo.proof_other AS solid "
+                    + "ON solid.id = p.id + 100 WHERE solid.STSrid = 0 UNION ALL SELECT a FROM dbo.proof_rows"
+            },
+            // A name of three parts names a table's column, here of the preserved side, and no column of the alias.
+            {
+                0,
+                "SELECT dbo.id AS c FROM dbo.proof_rows LEFT JOIN dbo.proof_other AS dbo "
+                    + "ON dbo.id = proof_rows.id + 100 WHERE dbo.proof_rows.a > 0"
+            },
+            // A set operator with a branch that can be NULL, wherever it stands.  A CLR type in one branch is the
+            // column's, and the string of another converts to its Null.
+            { 0, "SELECT a AS c FROM dbo.proof_rows UNION ALL SELECT b FROM dbo.proof_rows" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows WHERE b > 0 UNION ALL SELECT b FROM dbo.proof_rows WHERE g > 0" },
+            { 0, "SELECT a AS c FROM dbo.proof_rows UNION SELECT NULL" },
+            { 0, "SELECT NULL AS c UNION SELECT a FROM dbo.proof_rows" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows EXCEPT SELECT a FROM dbo.proof_rows" },
+            { 0, "SELECT b AS c FROM dbo.proof_rows INTERSECT SELECT b FROM dbo.proof_rows" },
+            { 0, "SELECT COUNT(*) AS c FROM dbo.proof_rows UNION ALL SELECT MAX(a) FROM dbo.proof_rows WHERE 1 = 0" },
+            { 0, "SELECT shape AS c FROM dbo.proof_shapes WHERE shape IS NOT NULL UNION ALL SELECT 'NULL'" },
+            // A proved first branch, then one that can be NULL, each kind of proof reading its own branch's answers.
+            { 0, "SELECT a + 1 AS c FROM dbo.proof_rows UNION ALL SELECT COALESCE(g, b) FROM dbo.proof_rows" },
+            { 0, "SELECT a + id AS c FROM dbo.proof_rows UNION ALL SELECT g + b FROM dbo.proof_rows" },
+            {
+                0,
+                "SELECT a AS c FROM dbo.proof_rows UNION ALL SELECT solid.id FROM dbo.proof_shapes AS p "
+                    + "LEFT JOIN dbo.proof_other AS solid ON solid.id = p.id + 100 WHERE solid.STSrid = 0"
+            },
+            {
+                0,
+                "SELECT CAST(a AS varbinary(max)) AS c FROM dbo.proof_rows "
+                    + "UNION ALL SELECT CAST(COALESCE(shape, 'NULL') AS varbinary(max)) FROM dbo.proof_shapes"
+            },
         };
 
     // A form that reads a value twice proves nothing unless the value gives one value in a row.  Each of these can
@@ -292,6 +482,14 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             "SELECT COALESCE(DATEADD(DAY, 1, LAG(maybe) OVER (ORDER BY NEWID())), at_utc) AS c FROM dbo.proof_dates",
             "SELECT COALESCE(LAG(maybe) OVER (ORDER BY NEWID()) AT TIME ZONE 'UTC', SYSDATETIMEOFFSET()) AS c "
                 + "FROM dbo.proof_dates",
+            // A filter tests a value and the result reads it again, so it proves only a stored column.
+            "SELECT flip AS c FROM dbo.proof_volatile WHERE flip IS NOT NULL",
+            "SELECT flip AS c FROM dbo.proof_volatile_view WHERE flip = 1",
+            $"SELECT q.flip AS c FROM (SELECT {Flip} AS flip FROM dbo.proof_rows) AS q WHERE q.flip IS NOT NULL",
+            $"WITH q AS (SELECT {Flip} AS flip FROM dbo.proof_rows) SELECT flip AS c FROM q WHERE flip > 0",
+            $"WITH q AS (SELECT flip FROM (SELECT {Flip} AS flip FROM dbo.proof_rows) AS i WHERE flip = 1) "
+                + "SELECT flip AS c FROM q",
+            "SELECT flip AS c FROM dbo.proof_volatile WHERE flip IS NOT NULL UNION ALL SELECT a FROM dbo.proof_rows",
         ];
 
     // The queries in which SQL Server evaluates a value twice in one row and returns NULL, measured from 2017 to 2025:
@@ -404,6 +602,88 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             (await NullRowsAsync(sql)).ShouldBeGreaterThan(0, sql);
         });
     }
+
+    // A column read through a CTE whose own WHERE keeps it from NULL, where no join of the query can make it NULL.
+    [Theory]
+    [InlineData("WITH q AS (SELECT b FROM dbo.proof_rows WHERE b > 0)", "SELECT b AS c FROM q")]
+    [InlineData("WITH q AS (SELECT b FROM dbo.proof_rows WHERE b IS NOT NULL)", "SELECT x.b AS c FROM q AS x")]
+    [InlineData("WITH q (y) AS (SELECT b FROM dbo.proof_rows WHERE b > 0)", "SELECT y AS c FROM q")]
+    [InlineData("WITH p AS (SELECT b FROM dbo.proof_rows WHERE b > 0), q AS (SELECT b FROM p)", "SELECT b AS c FROM q")]
+    [InlineData("WITH q AS (SELECT b FROM dbo.proof_rows WHERE b > 0 GROUP BY b)", "SELECT b AS c FROM q")]
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT q.b AS c FROM q JOIN dbo.proof_rows AS r ON r.id = q.id"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT q.b AS c FROM q LEFT JOIN dbo.proof_other AS o ON o.rows_id = q.id"
+    )]
+    // The filter of the outer query makes the LEFT JOIN of the CTE inner, so the CTE's own filter holds of its rows.
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT q.b AS c FROM dbo.proof_other AS p LEFT JOIN q ON q.id = p.id WHERE q.id > 0"
+    )]
+    public Task DescribeAsync_FilterOfACte_NotNullAndNoNullRow(string with, string select) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync($"{with} {select}", false, SidecarValues.NullableSource.Expression);
+            (await RowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+            (await NullRowsAsync(select, with)).ShouldBe(0, select);
+        });
+
+    [Theory]
+    [InlineData("WITH q AS (SELECT b FROM dbo.proof_rows)", "SELECT b AS c FROM q")]
+    [InlineData("WITH q AS (SELECT b FROM dbo.proof_rows WHERE b > 0 OR a > 0)", "SELECT b AS c FROM q")]
+    [InlineData("WITH q AS (SELECT b FROM dbo.proof_rows WHERE b > 0 GROUP BY ROLLUP (b))", "SELECT b AS c FROM q")]
+    [InlineData("WITH q AS (SELECT g FROM dbo.proof_rows WHERE g > 1 GROUP BY ALL g)", "SELECT g AS c FROM q")]
+    [InlineData("WITH q AS (SELECT b FROM dbo.proof_rows WHERE b > 0 UNION ALL SELECT NULL)", "SELECT b AS c FROM q")]
+    [InlineData("WITH q AS (SELECT a AS x, b AS a FROM dbo.proof_rows WHERE a > 0)", "SELECT a AS c FROM q")]
+    [InlineData("WITH q (x, y) AS (SELECT a, b FROM dbo.proof_rows WHERE a > 0)", "SELECT y AS c FROM q")]
+    [InlineData("WITH p AS (SELECT b FROM dbo.proof_rows), q AS (SELECT b FROM p WHERE 1 = 1)", "SELECT b AS c FROM q")]
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT q.b AS c FROM dbo.proof_rows AS r LEFT JOIN q ON q.id = r.id"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT q.b AS c FROM q RIGHT JOIN dbo.proof_rows AS r ON q.id = r.id"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT q.b AS c FROM q FULL JOIN dbo.proof_rows AS r ON q.id = r.id"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT CAST(NULL AS int) AS b, 1 AS n UNION ALL SELECT b, n + 1 FROM q WHERE n < 2)",
+        "SELECT b AS c FROM q"
+    )]
+    // Inside q, proof_rows is the table: a CTE sees only the CTEs before it.
+    [InlineData(
+        "WITH q AS (SELECT b FROM proof_rows), proof_rows AS (SELECT b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT b AS c FROM q"
+    )]
+    // A name of three parts is the table's column, though the CTE's alias is its schema's name.
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT dbo.proof_rows.b AS c FROM q AS dbo JOIN dbo.proof_rows ON proof_rows.id = dbo.id + 1"
+    )]
+    // A name under the alias of a LEFT JOIN of a CTE that is a property of a CLR column of the other source.
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0)",
+        "SELECT q.b AS c FROM (SELECT id, solid AS q FROM dbo.proof_shapes) AS p LEFT JOIN q ON q.id = p.id + 100 "
+            + "WHERE q.STSrid = 0"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT id, b FROM dbo.proof_rows WHERE b > 0), r AS (SELECT q.b "
+            + "FROM (SELECT id, solid AS q FROM dbo.proof_shapes) AS p LEFT JOIN q ON q.id = p.id + 100 "
+            + "WHERE q.STSrid = 0)",
+        "SELECT b AS c FROM r"
+    )]
+    public Task DescribeAsync_CteThatLetsANullThrough_NullableAndNullRow(string with, string select) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync($"{with} {select}", true, SidecarValues.NullableSource.Server);
+            (await NullRowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+        });
 
     // Read from its one table, c is a row of that table, which the constraint keeps not null, though the server calls
     // its expression nullable (it answers "(1) PERSISTED NOT NULL" not null itself, design fact 5); through an outer
@@ -540,6 +820,37 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         (await Should.ThrowAsync<SqlException>(() => sqlServer.ScalarAsync(sql))).Number.ShouldBe(error);
     }
 
+    // The assumption of a comparison in a WHERE: with ANSI_NULLS off, = and <> against a variable keep a row whose
+    // column is NULL, and with it on, as SqlClient connects, neither does.  LIKE and an ordering comparison keep none
+    // either way.  The settings are made on a connection of the test's own, outside the pool.
+    [Theory]
+    [InlineData("x = @none", 1)]
+    [InlineData("@none = x", 1)]
+    [InlineData("x <> @some", 1)]
+    [InlineData("x != @some", 1)]
+    [InlineData("x > @some", 0)]
+    [InlineData("x >= @none", 0)]
+    [InlineData("x <> 'a'", 0)]
+    [InlineData("x LIKE @none", 0)]
+    [InlineData("x NOT LIKE @some", 0)]
+    public async Task Set_AnsiNulls_DecidesWhatAComparisonKeeps(string filter, int keptWithItOff)
+    {
+        var batch =
+            "DECLARE @none varchar(9) = NULL, @some varchar(9) = 'a'; "
+            + $"SELECT COUNT(*) FROM (VALUES (CAST(NULL AS varchar(9)))) AS v (x) WHERE {filter}";
+
+        (await UnpooledScalarAsync($"SET ANSI_NULLS OFF; {batch}")).ShouldBe(keptWithItOff);
+        (await UnpooledScalarAsync($"SET ANSI_NULLS ON; {batch}")).ShouldBe(0);
+    }
+
+    // A text that turns ANSI_NULLS off is several statements, which the reader does not read, so its comparison proves
+    // nothing.
+    [Theory]
+    [InlineData("SET ANSI_NULLS OFF; SELECT b AS c FROM dbo.proof_rows WHERE b <> 5")]
+    [InlineData("SET ANSI_NULLS OFF SELECT b AS c FROM dbo.proof_rows WHERE b = 5")]
+    public Task DescribeAsync_TextThatTurnsAnsiNullsOff_StaysNullable(string sql) =>
+        WithRowsAsync(() => ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server));
+
     // The tables of the proofs and their rows, made for the body and dropped after it.  g and b are NULL in some rows
     // and a in none; proof_other and proof_computed find no row for the rows 3 to 5 of proof_rows.  dbo.COUNT is a
     // user's function that is NULL for every row, which a bare COUNT never calls.  proof_shapes holds a point and
@@ -653,15 +964,16 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     }
 
     // The rows of the query in which c is NULL.
-    private Task<int> NullRowsAsync(string sql) => RowsAsync($"SELECT * FROM ({sql}) AS q WHERE q.c IS NULL");
+    private Task<int> NullRowsAsync(string sql, string with = "") =>
+        RowsAsync($"SELECT * FROM ({sql}) AS q WHERE q.c IS NULL", with);
 
     // The number of rows of the query, run through SqlClient's own connection, whose ANSI_WARNINGS are on, @style bound
     // to NULL where the query names it.
-    private async Task<int> RowsAsync(string sql)
+    private async Task<int> RowsAsync(string sql, string with = "")
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = sqlServer.SourceOf(SqlServerDatabases.Database);
-        await using var command = source.CreateCommand($"SELECT COUNT(*) FROM ({sql}) AS counted");
+        await using var command = source.CreateCommand($"{with} SELECT COUNT(*) FROM ({sql}) AS counted");
         if (sql.Contains("@style", StringComparison.Ordinal))
         {
             _ = command.Parameters.Add(new SqlParameter("@style", SqlDbType.Int) { Value = DBNull.Value });
