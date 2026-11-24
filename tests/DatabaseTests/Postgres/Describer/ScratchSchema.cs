@@ -644,10 +644,11 @@ internal static class ScratchSchema
     /// Types of a user's own that Npgsql reads only after <c>EnableUnmappedTypes</c>: the range
     /// <c>user_floatrange</c> over <c>float8</c>, its multirange <c>user_floatmultirange</c> and
     /// <c>user_floatrange_d</c>, a domain over it.  Types whose names start with <c>_</c>: the enum <c>_user_feel</c>,
-    /// the composite <c>_user_tag</c> and <c>_user_dom</c>, a domain over <c>int</c>.  The enum <c>user_clash</c>, made
-    /// after the enum <c>_user_clash</c> took the name its array would have, so the server names its array otherwise.
-    /// And <c>user_types</c>, an empty table with a column of each and of an array of each.  Made by ColumnTests and
-    /// NpgsqlCheckTests.
+    /// the composite <c>_user_tag</c>, the range <c>_user_span</c> and <c>_user_dom</c>, a domain over <c>int</c>.  The
+    /// enum <c>user_clash</c>, made after the enum <c>_user_clash</c> took the name its array would have, and the enum
+    /// <c>user_later</c>, made before the enum <c>_user_later</c>, which takes its array's name and makes the server
+    /// rename that array: the server names each array otherwise.  And <c>user_types</c>, an empty table with a column
+    /// of each and of an array of each.  Made by ColumnTests and NpgsqlCheckTests.
     /// </summary>
     public const string UserTypes = """
         DO $do$
@@ -676,6 +677,12 @@ internal static class ScratchSchema
         $do$;
         DO $do$
         BEGIN
+            CREATE TYPE _user_span AS RANGE (subtype = float8);
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END
+        $do$;
+        DO $do$
+        BEGIN
             CREATE DOMAIN _user_dom AS int;
         EXCEPTION WHEN duplicate_object THEN NULL;
         END
@@ -692,6 +699,18 @@ internal static class ScratchSchema
         EXCEPTION WHEN duplicate_object THEN NULL;
         END
         $do$;
+        DO $do$
+        BEGIN
+            CREATE TYPE user_later AS ENUM ('a');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END
+        $do$;
+        DO $do$
+        BEGIN
+            CREATE TYPE _user_later AS ENUM ('b');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END
+        $do$;
         CREATE TABLE IF NOT EXISTS user_types (
             span user_floatrange,
             spans user_floatmultirange,
@@ -700,7 +719,9 @@ internal static class ScratchSchema
             feels _user_feel[],
             tags _user_tag[],
             doms _user_dom[],
-            clashes user_clash[]
+            underscore_spans _user_span[],
+            clashes user_clash[],
+            laters user_later[]
         );
         """;
 

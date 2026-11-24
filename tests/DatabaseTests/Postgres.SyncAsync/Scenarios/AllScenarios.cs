@@ -18,6 +18,7 @@ internal static class AllScenarios
         .. CollectionsScenarios.All,
         .. LocationsScenarios.All,
         .. CubeScenarios.All,
+        .. RangesScenarios.All,
         .. ConstantsScenarios.All,
         .. RowBuffersScenarios.All,
         .. StreamingScenarios.All,

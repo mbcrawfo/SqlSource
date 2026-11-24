@@ -72,8 +72,8 @@ Find the message of the exception in this list.  Each entry gives the cause, wha
 
 ## A query is not described, or a file is not found
 
-- **SQLSRC232 says that writing is not supported for an array whose element's name starts with `_`, on PostgreSQL.**  Npgsql cannot send an array of an enum named with `_`.  See [an array parameter of an enum named with `_`](../reference/databases/postgresql/types.md#limit-array-parameter-underscore).
-- **SQLSRC231 says that an operator does not exist between `x[]` and `_x`, on PostgreSQL.**  Npgsql sends an array of `x` as the type named `_x`.  See [an array parameter of a type created after a type named `_` and its name](../reference/databases/postgresql/types.md#limit-array-of-a-renamed-type).
+- **SQLSRC232 says that writing is not supported for an array whose element's name starts with `_`, on PostgreSQL.**  Npgsql cannot send an array of an enum or a range named with `_`.  See [an array parameter of an enum or a range named with `_`](../reference/databases/postgresql/types.md#limit-array-parameter-underscore).
+- **SQLSRC231 says that an operator does not exist between `x[]` and `_x`, on PostgreSQL.**  Npgsql sends an array of `x` as the type named `_x`.  See [an array parameter of a type beside a type named `_` and its name](../reference/databases/postgresql/types.md#limit-array-of-a-renamed-type).
 - **Two projects include one `.sql` file, and entries are missing from its sidecar.**  A run of the tool on one project can remove the entries that the other project needs.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
 - **SQLSRC224 with `Npgsql cannot read the database's types`, on PostgreSQL.**  An operator `=` of your own on `oid` or `"char"`, in a schema before `pg_catalog` on the search path, stops Npgsql from reading the types.  See [an operator on `oid` or `"char"`](../reference/databases/postgresql/index.md#limit-operator-on-oid).
 - **Describing is slow on a table with thousands of partitions, on PostgreSQL.**  The tool looks at every partition of a partitioned table.  See [many partitions](../reference/databases/postgresql/index.md#limit-many-partitions).

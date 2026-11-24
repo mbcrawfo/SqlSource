@@ -152,12 +152,13 @@ public sealed class NpgsqlCheckTests(PostgresDatabases postgres)
         failure.Help.ShouldBe(PostgresErrors.BindHelp);
     }
 
-    // An array of an enum or of a composite whose name starts with "_", inferred from a column or declared.  Bound by
-    // the element's name and [], Npgsql recursed until the stack overflowed and the process ended; bound by the
-    // array's own name, it refuses the type as it does any it cannot send.
+    // An array of an enum, a composite or a range whose name starts with "_", inferred from a column or declared.
+    // Bound by the element's name and [], Npgsql recursed until the stack overflowed and the process ended; bound by
+    // the array's own name, it refuses the type as it does any it cannot send.
     [Theory]
     [InlineData("SELECT 1 AS one FROM user_types WHERE feels = @p", null, "public._user_feel[]")]
     [InlineData("SELECT 1 AS one FROM user_types WHERE tags = @p", null, "public._user_tag[]")]
+    [InlineData("SELECT 1 AS one FROM user_types WHERE underscore_spans = @p", null, "public._user_span[]")]
     [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "_user_feel[]", "public._user_feel[]")]
     [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "_user_tag[]", "public._user_tag[]")]
     public async Task DescribeAsync_ArrayOfATypeNamedWithAnUnderscore_IsSqlsrc232NamingIt(
@@ -192,19 +193,25 @@ public sealed class NpgsqlCheckTests(PostgresDatabases postgres)
             .BindName.ShouldBe("public.__user_dom");
     }
 
-    // The limit of the manual's types page: user_clash's array is not "_user_clash", which the enum of that name took
-    // first, but Npgsql reads user_clash[] as the type _user_clash, sends the parameter as that enum, and the server
-    // refuses the comparison.  The describe fails, and the server's line names the other type.
-    [Fact]
-    public async Task DescribeAsync_ArrayWhoseNameTheServerChanged_IsSqlsrc231NamingTheTypeNpgsqlSent()
+    // The limit of the manual's types page: the array of user_clash and of user_later is not "_" and its name, which
+    // the enum _user_clash took first, and the enum _user_later took after, the server renaming user_later's array.
+    // Npgsql still reads x[] as the type _x, sends the parameter as that enum, and the server refuses the comparison:
+    // the describe fails, and the server's line names the other type.
+    [Theory]
+    [InlineData("clashes", "user_clash")]
+    [InlineData("laters", "user_later")]
+    public async Task DescribeAsync_ArrayWhoseNameTheServerChanged_IsSqlsrc231NamingTheTypeNpgsqlSent(
+        string column,
+        string type
+    )
     {
         await postgres.ExecuteAsync(ScratchSchema.UserTypes);
 
-        var described = await DescribeAsync("SELECT 1 AS one FROM user_types WHERE clashes = @p");
+        var described = await DescribeAsync($"SELECT 1 AS one FROM user_types WHERE {column} = @p");
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
-        failure.ServerLines[0].ShouldBe("42883: operator does not exist: user_clash[] = _user_clash");
+        failure.ServerLines[0].ShouldBe($"42883: operator does not exist: {type}[] = _{type}");
     }
 
     // A parameter of a range of a user's own, inferred from a column of it, of its multirange, of an array of it and

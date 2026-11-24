@@ -333,6 +333,7 @@ public sealed class ColumnTests(PostgresDatabases postgres)
     [InlineData("active_users")]
     [InlineData("user_orders")]
     [InlineData("modifiers")]
+    [InlineData("readings")]
     [InlineData("column_types")]
     [InlineData("user_types")]
     public async Task DescribeAsync_EveryColumnOfATable_IsSpelledAsFormatTypeSpellsIt(string table)

@@ -135,9 +135,9 @@ A type that the table does not name gets its C# type by its kind:
 
 <a id="limit-array-parameter-underscore"></a>
 
-### An array parameter of an enum named with `_` cannot be sent
+### An array parameter of an enum or a range named with `_` cannot be sent
 
-**What you see.**  [SQLSRC232](../../../diagnostics.md#sqlsrc232) for a parameter whose type is an array of an enum whose own name starts with `_`, such as `public._mood[]`, and the `server:` line says that writing is not supported.  A column of that type is described, and so is an array parameter of a domain named with `_`.
+**What you see.**  [SQLSRC232](../../../diagnostics.md#sqlsrc232) for a parameter whose type is an array of an enum or a range whose own name starts with `_`, such as `public._mood[]`, and the `server:` line says that writing is not supported.  A column of that type is described, and so is an array parameter of a domain named with `_`.
 
 **Why.**  Npgsql reads a `_` at the start of a type's name as the mark of an array.  It cannot name the array of such a type, so it cannot send it.
 
@@ -151,10 +151,10 @@ SELECT id FROM people WHERE moods = @moods::public._mood[];
 
 <a id="limit-array-of-a-renamed-type"></a>
 
-### An array parameter of a type created after a type named `_` and its name
+### An array parameter of a type beside a type named `_` and its name
 
-**What you see.**  [SQLSRC231](../../../diagnostics.md#sqlsrc231) for a parameter whose type is an array of a type `x`, and the `server:` line says that an operator does not exist, with `x[]` on one side and `_x` on the other.
+**What you see.**  [SQLSRC231](../../../diagnostics.md#sqlsrc231) for a parameter whose type is an array of a type `x`, when the same schema has a type named `_x`, whichever was created first.  The `server:` line says that an operator does not exist, with `x[]` on one side and `_x` on the other.
 
-**Why.**  PostgreSQL names the array of a type `x` as `_x`.  When a type named `_x` already exists in the schema, it gives the array another name, such as `_x_1`.  Npgsql still reads `x[]` as the type named `_x`, so it sends the parameter as that other type.
+**Why.**  PostgreSQL names the array of a type `x` as `_x`.  A type named `_x` takes that name: when it is there first, PostgreSQL gives the array of `x` another name, such as `_x_1`, and when it comes later, PostgreSQL renames the array of `x`, such as to `__x`.  Npgsql still reads `x[]` as the type named `_x`, so it sends the parameter as that other type.
 
-**What to do.**  Declare the parameter as `text` with a `-- param:` marker, and cast it in the query, `@p::public.x[]`.  Or rename the type `_x`, then drop and create `x` again, so that its array takes the name `_x`.
+**What to do.**  Declare the parameter as `text` with a `-- param:` marker, and cast it in the query, `@p::public.x[]`.

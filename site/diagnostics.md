@@ -3294,7 +3294,7 @@ The query is `SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL`:
 
 **A parameter that is an array of a domain, and that the query returns as a column.**  This difference has no `@` in it.  An example is `-- param: @p email_t[]`.  Npgsql sends it as an array of the base type of the domain.  So the column is `character varying[]` for Npgsql, and `email_t[]` for SqlSource.  The help is then `Npgsql sends a parameter that is an array of a domain as an array of the domain's base type, so the column it is returned as has another type; cast the column, @p::varchar[] for an array of a domain over varchar` in place of the first example's help.
 
-**A parameter that is an array of a type `x`, when a type named `_x` was there first.**  PostgreSQL gave the array of `x` another name, and Npgsql sends `x[]` as the type `_x`.  The `server:` line is then `42883: operator does not exist`, with `x[]` and `_x`: see [the limit](reference/databases/postgresql/types.md#limit-array-of-a-renamed-type).
+**A parameter that is an array of a type `x`, when the schema also has a type named `_x`.**  Whichever was created first, PostgreSQL gave the array of `x` another name, and Npgsql sends `x[]` as the type `_x`.  The `server:` line is then `42883: operator does not exist`, with `x[]` and `_x`: see [the limit](reference/databases/postgresql/types.md#limit-array-of-a-renamed-type).
 
 - **An error of the check that says nothing of how Npgsql reads the SQL is [SQLSRC225](#sqlsrc225), at the same step.**  A lost connection is one.
 - **If the SQL is plain and the two readings still differ, report it.**
@@ -3356,7 +3356,7 @@ This is a known limit, and not a fault of the query.  Npgsql cannot send a value
 - `regclass`, which `WHERE c.oid = @t::regclass` gives a parameter, and the other types of the system catalogs that Npgsql does not load, such as `aclitem`, `txid_snapshot` and `pg_node_tree`;
 - a type whose schema or whose name holds a `.`, which cannot be written to Npgsql without ambiguity, since `a.b.c` could name more than one type;
 - a type of an extension that Npgsql cannot send, such as `seg`.
-- an array of an enum whose own name starts with `_`, such as `public._mood[]`, since Npgsql reads the `_` as the mark of an array: see [the limit](reference/databases/postgresql/types.md#limit-array-parameter-underscore).
+- an array of an enum or a range whose own name starts with `_`, such as `public._mood[]`, since Npgsql reads the `_` as the mark of an array: see [the limit](reference/databases/postgresql/types.md#limit-array-parameter-underscore).
 
 These are bound:
 
