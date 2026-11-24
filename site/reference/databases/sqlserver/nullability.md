@@ -13,7 +13,7 @@ LEFT JOIN dbo.customers AS c ON c.id = o.customer_id;
 
 For each column, the tool records whether it can be null, starting from what SQL Server says.  If `orders.id`, `orders.placed_at` and `customers.name` are all `NOT NULL`, then `id` and `placed_at` above are never null.  `name` can be null: the `LEFT JOIN` gives a null name to an order with no customer.
 
-SQL Server treats a column as one that can be null unless it can show that the column never is.  SqlSource keeps that answer unless it can show from your query that the column is never null.  A column that it treats as one that can be null, and that never is, costs a null check in your code.
+SQL Server treats a column as one that can be null unless it can show that the column never is.  SqlSource keeps that answer unless it can show from your query that the column is never null, but for a column of a spatial type, of `hierarchyid` or of another .NET type, which it can treat as one that can be null where SQL Server says it never is, as below.  A column that it treats as one that can be null, and that never is, costs a null check in your code.
 
 **SQL Server says that a column can be null wherever a null can come from:**
 
@@ -38,6 +38,13 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - `ISNULL` whose second argument is never null;
 - `CONCAT`;
 - a `CASE` or an `IIF` whose every result is never null.
+
+**SqlSource treats a column of a spatial type, of `hierarchyid` or of another .NET type as one that can be null, though SQL Server says it is never null**, unless the column is one of these:
+
+- a `NOT NULL` column of a table of the database the query runs in, read as the table stores it, from the table or through a subquery, a `WITH` query, a view or a function that is one `RETURN SELECT`, any of which passes it on;
+- a column of a `UNION`, `INTERSECT` or `EXCEPT` of the query itself, not of a subquery, a `WITH` query or a view, whose every `SELECT` gives such a column of a table at that place.
+
+`UNION ALL`, `UNION`, `INTERSECT`, `EXCEPT` and a `VALUES` list convert a string to the .NET type when another of their values has that type, and `geometry` and `geography` read the text `NULL`, in any case, as null.  SQL Server still says that such a column is never null, also when it is read through a subquery, a `WITH` query, a view or a function, or inside an expression.
 
 **SqlSource also treats these as never null, where SQL Server does not**, in a query that is one `SELECT`, or several joined by `UNION`, `INTERSECT` or `EXCEPT`, with or without a `WITH` clause:
 
@@ -109,10 +116,10 @@ These answers assume that the connection that runs the query leaves `ANSI_WARNIN
 - **A computed column, a view's column or a subquery's expression that the `WHERE` tests.**  SQL Server can compute such a value again for the result, and the second value can be null.
 - **The optional side of a `LEFT JOIN` whose condition in the `WHERE` names the column without its table alias**, or whose `FROM` also holds an `APPLY`, a comma, a join hint or a join in parentheses.
 - **A column of a `UNION`, `INTERSECT` or `EXCEPT` with a `SELECT` that can give null in that place**, or with `*` in its select list.
-- **A column of a query that is not a `SELECT`, or that the tool does not read.**  Such a query keeps the answer of SQL Server, so a count or a sum in it can be null.  This holds for the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, for `FOR XML` or `FOR JSON`, and for several statements in one query.
+- **A column of a query that is not a `SELECT`, or that the tool does not read.**  Such a query keeps the answer of SQL Server, so a count or a sum in it can be null, but for a column of a spatial type, of `hierarchyid` or of another .NET type that SqlSource treats as one that can be null, as [which columns can be null](#nullability) says.  This holds for the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, for `FOR XML` or `FOR JSON`, and for several statements in one query.
 - **A conversion to `geometry`, `geography`, `hierarchyid` or another .NET type**, since SQL Server can convert the text `'NULL'` to such a type as null: `CAST(N'NULL' AS geometry)` is null.
 - **`COALESCE`, `GREATEST` or `LEAST` over a value of such a type**, for the same reason: `COALESCE(shape, 'NULL')` is null.
-- **A column of a query that uses `window` as a name**, an alias or a column without brackets, as in `FROM dbo.panes window`.  Such a query keeps the answer of SQL Server.  Write `[window]`.
+- **A column of a query that uses `window` as a name**, an alias or a column without brackets, as in `FROM dbo.panes window`.  Such a query keeps the answer of SQL Server, but for a column of a spatial type, of `hierarchyid` or of another .NET type, as for the query above.  Write `[window]`.
 
 A column that can be null gets a nullable property in the query's [output model](index.md#models), `int?` or `string?`.  A column that is never null gets a property that cannot be null, `int` or `string`.  Where you know better, you decide instead: a `-- column:` marker says that a column is never null, or can be null, and leaves its name alone.  An alias that ends in `!` or `?` does the same.
 
@@ -140,7 +147,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 
 **What you see.**  A column that is never null gets a property that can be null, such as `int?` where `int` would do.  No value is wrong, but your code checks for a null that never comes.
 
-**Why.**  SQL Server treats a column as one that can be null when it cannot show that the column never is.  SqlSource keeps its answer where it cannot show otherwise from the query.  Among the columns that get such a property are:
+**Why.**  SQL Server treats a column as one that can be null when it cannot show that the column never is.  SqlSource keeps its answer where it cannot show otherwise from the query, and treats a column of a spatial type, of `hierarchyid` or of another .NET type as one that can be null, though SQL Server says it never is, unless it can show that no `UNION` or `VALUES` list converted a string to it.  Among the columns that get such a property are:
 
 - `DATEFROMPARTS`, `SWITCHOFFSET` and other functions of values that are never null;
 - the columns of a recursive `WITH` query;
@@ -151,7 +158,8 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - `COALESCE(AVG(x), 0)`;
 - a computed column that is not persisted;
 - a column that a filter keeps from being null in a form such as `x IN (1, 2)` or `x BETWEEN 1 AND 2`;
-- a count or a sum in an `OUTPUT` clause.
+- a count or a sum in an `OUTPUT` clause;
+- a column of a spatial type, of `hierarchyid` or of another .NET type that is read from a table variable, a table of another database or of a linked server, a function with a body of several statements or a view created `WITH VIEW_METADATA`, that a `VALUES` list or an expression gives, or that a `UNION`, `INTERSECT` or `EXCEPT` inside a subquery, a `WITH` query, a view or a function gives, as [which columns can be null](#nullability) says.
 
 **What to do.**  Do one of these:
 
@@ -168,20 +176,6 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 **Why.**  The connection turns `ANSI_WARNINGS` off.  With `ANSI_WARNINGS` and `ARITHABORT` both off, SQL Server returns null in place of some errors: an arithmetic overflow, a value too large for its type, or a division by zero.
 
 **What to do.**  Leave `ANSI_WARNINGS` on, as Microsoft.Data.SqlClient turns it on when it connects.  Run no `SET ANSI_WARNINGS OFF` on a connection that runs your queries.
-
-<a id="limit-clr-set-operator"></a>
-
-### Null from a spatial column of a `UNION ALL` whose property cannot be null
-
-**What you see.**  A `geometry` or `geography` column gets a property that cannot be null, and the query returns a null in it.  The column combines a spatial value with a string, in a `UNION ALL` or a `VALUES` list.  The combination can be in the query, a subquery, a `WITH` query or a view.
-
-**Why.**  SQL Server converts the string to the spatial type, and converts the text `NULL`, in any case, to null.  SQL Server still says that the column is never null.
-
-**What to do.**  Do one of these:
-
-- Give the column a `-- column: name null` marker, which says that it can be null.
-- End the alias of the column with `?`.
-- Keep strings that hold `NULL` out of the column.
 
 <a id="limit-ansi-nulls-off"></a>
 

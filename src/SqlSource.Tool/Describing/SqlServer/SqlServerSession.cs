@@ -310,8 +310,10 @@ internal sealed partial class SqlServerSession : DescriberSession
     }
 
     // The columns, each that a proof shows cannot be NULL answered not null, through "operands" when a proof needs the
-    // server.  What "operands" answers never fails the describe: an answer that proves nothing leaves the proofs of
-    // the text alone, and every other column keeps the server's answer.
+    // server, and each of a CLR type that may hold the type's Null nullable, unless "origins" shows that the view or
+    // the function it is read from passes a stored column on.  What "operands" and "origins" answer never fails the
+    // describe: an answer that proves nothing leaves the proofs of the text alone, and every other column keeps the
+    // server's answer.
     private async Task<IReadOnlyList<BuiltColumn>> ProvedAsync(
         DescribeRequest request,
         IReadOnlyList<BuiltColumn> built,
@@ -321,14 +323,10 @@ internal sealed partial class SqlServerSession : DescriberSession
     )
     {
         var proofs = ColumnProofs.Read(request.Sql, built, rows);
-        if (proofs.OperandQueries.Count == 0)
-        {
-            return proofs.Apply(null);
-        }
 
         // One call for each branch that asks.  A branch whose answer proves nothing leaves its operands unanswered, and
         // only the proofs that need them fail.
-        var answers = new List<OperandFacts>();
+        List<OperandFacts>? answers = null;
         foreach (var query in proofs.OperandQueries)
         {
             var answer = await OperandsAsync(
@@ -336,10 +334,24 @@ internal sealed partial class SqlServerSession : DescriberSession
                 new SqlServerColumnsRequest(query.Sql, declarations),
                 cancellationToken
             );
+            answers ??= [];
             answers.AddRange(OperandsQuery.AnswersOf(answer, query.Count) ?? new OperandFacts[query.Count]);
         }
 
-        return proofs.Apply(answers);
+        // The query's own text in browse mode 1, only when a column of a CLR type is read from a view or an inline
+        // function: an answer that shows nothing leaves that column nullable.
+        IReadOnlyList<bool>? origins = null;
+        if (proofs.AsksOrigins)
+        {
+            var answer = await OriginsAsync(
+                request.Name,
+                new SqlServerColumnsRequest(request.Sql, declarations),
+                cancellationToken
+            );
+            origins = proofs.OriginsOf(answer);
+        }
+
+        return proofs.Apply(answers, origins);
     }
 
     // The table whose column list the columns are, or the first check that failed.  "table" is asked only when every
@@ -362,7 +374,7 @@ internal sealed partial class SqlServerSession : DescriberSession
                 return Outcome<(SidecarTable?, string), DescribeFailure>.Failed(described.Failure);
             }
 
-            rows = ColumnProofs.TableRows(described.Value);
+            rows = ColumnProofs.TableRows(described.Value, columns);
         }
 
         var (table, tableMatch) = SqlServerTableMatcher.Match(columns, rows);

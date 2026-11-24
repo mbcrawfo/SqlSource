@@ -124,6 +124,19 @@ internal static class SqlServerEvents
     ) => Described(log, SqlServerCallNames.Operands, query, request, answer, durationMs);
 
     /// <summary>
+    /// <c>mssql.origins</c>: the SQL as written and the declarations of every parameter, and every row the server
+    /// described in browse mode 1, the hidden ones included, the error rows of the describe, or the error of the call,
+    /// as <c>mssql.columns</c> holds them.
+    /// </summary>
+    public static void Origins(
+        IRunLog log,
+        string query,
+        SqlServerColumnsRequest request,
+        SqlServerColumnsAnswer answer,
+        long durationMs
+    ) => Described(log, SqlServerCallNames.Origins, query, request, answer, durationMs);
+
+    /// <summary>
     /// <c>mssql.table</c>: the schema and the table of the one origin, and every row the server described of
     /// <c>SELECT *</c> from it, the error rows of the describe, or the error of the call.
     /// </summary>

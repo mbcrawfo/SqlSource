@@ -67,7 +67,8 @@ A type that the table does not name gets its C# type by what it is:
 | Kind | C# type |
 |----|----|
 | An alias type, `CREATE TYPE dbo.Email FROM nvarchar(320)` | Its base type's C# type: `dbo.Email` is a `string`.  To give it another, map it with the type override by its schema and name, `dbo.Email=MyApp.Email`.  `sysname` is a `string` |
-| A CLR type of your own assembly, or a type of a newer SQL Server | None: SQLSRC246.  Map it with the type override to the type the application reads it as; the message names the key to write |
+| A type of a newer SQL Server | None: SQLSRC246.  Map it with the type override to the type the application reads it as; the message names the key to write |
+| A CLR type of your own assembly | None: a query that returns or takes one cannot be described, as [a CLR type of your own](#limit-user-clr-type) says |
 
 <a id="type-notes"></a>
 
@@ -86,6 +87,20 @@ A type that the table does not name gets its C# type by what it is:
 <a id="limits"></a>
 
 ## Limits
+
+<a id="limit-user-clr-type"></a>
+
+### SQLSRC200 for a query of a CLR type of your own
+
+**What you see.**  `dotnet sqlsource describe` stops with [SQLSRC200](../../../diagnostics.md#sqlsrc200), `InvalidOperationException`, at a query that returns a column of a CLR type of your own assembly, made by `CREATE TYPE ... EXTERNAL NAME`, or takes a parameter of one.
+
+**Why.**  SQL Server names no system type for such a type when SqlSource describes the query, and SqlSource cannot read a type without one.  `hierarchyid`, `geography` and `geometry` are not affected.
+
+**What to do.**  Do one of these:
+
+- Return the column converted to a type SqlSource reads, such as `CAST(tag AS varbinary(max))` or `tag.ToString()`, and convert it in your code.
+- Declare the parameter as such a type with a [`-- param:` marker](../../parameters.md#param-marker), such as `nvarchar(100)`, and convert it in the query with `CAST(@tag AS dbo.Tag)`.
+- Move the query into a file of its own whose [output](../../settings.md#setting-output) is `sql`, which is not described.
 
 <a id="limit-ef-core-sqlclient"></a>
 

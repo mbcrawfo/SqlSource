@@ -10,8 +10,9 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// </summary>
 /// <remarks>
 /// A proof has no negation, so an operand answered not null, or of a type that is no CLR type, never makes one fail
-/// that held without it.  An operand the server was not asked about, or did not answer, is nullable and may be of a CLR
-/// type.
+/// that held without it.  An operand the server was not asked about, or did not answer, is nullable, may be of a CLR
+/// type and is not answered of one: <see cref="Clr" /> holds only of an answer, so that a set operator's column of a
+/// CLR type keeps the server's not null only when every branch is shown to give that type unconverted.
 /// </remarks>
 internal abstract record Proof
 {
@@ -82,6 +83,18 @@ internal abstract record Proof
         public override Proof Shifted(int offset) => new Stored(Index + offset);
 
         private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => answerOf(Index).Stored;
+    }
+
+    /// <summary>
+    /// Holds when the server answers the operand of a type that may be a CLR type, whatever its nullability: with
+    /// <see cref="Stored" />, a column of a CLR type that no set operator converted to it.
+    /// </summary>
+    /// <param name="Index">The operand's index in <see cref="ExpressionProofs.Operands" />.</param>
+    internal sealed record Clr(int Index) : Proof
+    {
+        public override Proof Shifted(int offset) => new Clr(Index + offset);
+
+        private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => answerOf(Index).Clr;
     }
 
     /// <summary>Holds when one of its parts holds.</summary>

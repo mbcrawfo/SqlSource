@@ -28,6 +28,12 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </remarks>
 internal sealed class SqlServerLive(SqlServerConnection connection)
 {
+    // The browse mode of "columns", "operands" and "table": a view is its columns' source.
+    private const byte ColumnsMode = 2;
+
+    // The browse mode of "origins": a view's or an inline function's column names the column it passes on.
+    private const byte OriginsMode = 1;
+
     // The server's version and edition, then the settings of the database and the session, in the order of the
     // settings of "open", then the database's name.
     private const string OpenSql = """
@@ -55,9 +61,11 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
         ORDER BY column_ordinal
         """;
 
-    // The columns of a first result set, or the errors of its describe as rows, for "columns", "operands" and
-    // "table".  Browse mode 2: a view is its columns' source, as on PostgreSQL, and the one hidden column it adds is
-    // ROWSTAT.  Mode 1 names a view's base table and adds hidden key columns of every table read.  source_type is the
+    // The columns of a first result set, or the errors of its describe as rows, for "columns", "operands", "table" and
+    // "origins", in the browse mode @browse.  Mode 2, of all but "origins": a view is its columns' source, as on
+    // PostgreSQL, and the one hidden column it adds is ROWSTAT.  Mode 1, of "origins": a column of a view or an inline
+    // function that passes a column on names that column's table, and it adds hidden key columns of every table read.
+    // source_type is the
     // tool's own: the BaseType of the source, U for a table, V for a view and IF or TF for a table-valued function,
     // whose columns the server names the function as the source of.  It is read only for a source of the session's
     // own server and database, the names compared by their code points as SqlServerColumns compares them:
@@ -88,7 +96,7 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                     ELSE 0
                 END AS bit
             ) AS persisted_not_null
-        FROM sys.dm_exec_describe_first_result_set(@tsql, @params, 2) AS d
+        FROM sys.dm_exec_describe_first_result_set(@tsql, @params, @browse) AS d
         CROSS APPLY (
             SELECT CASE
                 WHEN d.source_server IS NULL AND d.source_database = DB_NAME() COLLATE Latin1_General_BIN2
@@ -241,13 +249,21 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
     /// <c>operands</c>), a row each, or the error rows of the describe.
     /// </summary>
     public Task<SqlServerColumnsAnswer> ColumnsAsync(SqlServerColumnsRequest request, CancellationToken token) =>
-        DescribeColumnsAsync(request.Sql, request.Params, token);
+        DescribeColumnsAsync(request.Sql, request.Params, ColumnsMode, token);
+
+    /// <summary>
+    /// The first result set of the query's text under its declarations in browse mode 1, for <c>origins</c>: a column
+    /// of a view or an inline function that passes a column on names that column, a row each, the hidden key columns
+    /// of the tables read among them, or the error rows of the describe.
+    /// </summary>
+    public Task<SqlServerColumnsAnswer> OriginsAsync(SqlServerColumnsRequest request, CancellationToken token) =>
+        DescribeColumnsAsync(request.Sql, request.Params, OriginsMode, token);
 
     /// <summary>
     /// The columns of <c>SELECT *</c> from a table or view, a row each, or the error rows of the describe.
     /// </summary>
     public Task<SqlServerColumnsAnswer> TableAsync(SqlServerTableRequest request, CancellationToken token) =>
-        DescribeColumnsAsync(TableSelect(request.Schema, request.Table), null, token);
+        DescribeColumnsAsync(TableSelect(request.Schema, request.Table), null, ColumnsMode, token);
 
     /// <summary>
     /// The text of <c>table</c> for one table or view: <c>SELECT * FROM [schema].[table]</c>, each name a catalog
@@ -268,10 +284,12 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
     public static string Declarations(IEnumerable<(string Name, string Type)> declarations) =>
         string.Join(", ", declarations.Select(static declaration => "@" + declaration.Name + " " + declaration.Type));
 
-    // The rows of sys.dm_exec_describe_first_result_set of a text under its declarations, or its error rows.
+    // The rows of sys.dm_exec_describe_first_result_set of a text under its declarations in a browse mode, the tool's
+    // own constant, or its error rows.
     private Task<SqlServerColumnsAnswer> DescribeColumnsAsync(
         string sql,
         string? declarations,
+        byte mode,
         CancellationToken token
     ) =>
         AnswerAsync(
@@ -280,6 +298,7 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                 await using var command = await connection.CommandAsync(ColumnsSql, token);
                 _ = command.Parameters.Add(Text("@tsql", sql));
                 _ = command.Parameters.Add(Text("@params", declarations));
+                _ = command.Parameters.Add(new SqlParameter("@browse", SqlDbType.TinyInt) { Value = mode });
                 await using var reader = await command.ExecuteReaderAsync(token);
                 var rows = new List<SqlServerColumnRow>();
                 var errors = new List<SqlServerDescribeError>();
