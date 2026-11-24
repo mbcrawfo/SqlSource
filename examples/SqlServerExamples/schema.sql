@@ -34,6 +34,9 @@ CREATE TABLE order_lines (
     product nvarchar(100) NOT NULL,
     quantity int NOT NULL,
     unit_price decimal(10, 2) NOT NULL,
+    -- A computed column that is not persisted.  SQL Server says it can be null, though its columns are never null;
+    -- Models/Orders.sql reads it in ListOrderLineTotals.
+    line_total AS quantity * unit_price,
     PRIMARY KEY (order_id, line_number)
 );
 
