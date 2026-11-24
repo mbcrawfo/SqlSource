@@ -329,7 +329,7 @@ public sealed class DiagnoseTests : IDisposable
         );
     }
 
-    // A file that no type claims is describe's error for a .sql path.
+    // A file that no type claims is describe's error for a .sql path, and the run's only error.
     [Fact]
     public async Task Diagnose_AFileThatNoTypeClaims_IsSQLSRC212()
     {
@@ -337,11 +337,88 @@ public sealed class DiagnoseTests : IDisposable
 
         var result = await _scene.DiagnoseAsync("--query", "Other.sql:GetEverything", "--out", "report.zip");
 
-        result.ExitCode.ShouldBe(1);
-        result.Error.ShouldStartWith(
-            $"sqlsource : error SQLSRC212: '{_scene.PathOf("Other.sql")}' is not a .sql file that a type of the run "
-                + "claims\n"
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                $"sqlsource : error SQLSRC212: '{_scene.PathOf("Other.sql")}' is not a .sql file that a type of the "
+                    + "run claims\n"
+                    + Expected.See("SQLSRC212")
+            )
         );
+        File.Exists(_scene.PathOf("report.zip")).ShouldBeFalse();
+    }
+
+    // A file that cannot be parsed has no queries: its parse error is the run's only error, and no SQLSRC292 says the
+    // query is not in it.
+    [Fact]
+    public async Task Diagnose_AQueryOfAFileWithAParseError_IsTheParseErrorAlone()
+    {
+        var fixture = _scene.Case(Plain);
+        var path = _scene.AddCase(fixture, fixture.Query + "\n-- name: Other\nSELECT 'open\n");
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.zip");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldStartWith($"{path}(");
+        result.Error.ShouldContain(": error SQLSRC101: ");
+        result.Error.Split(" error ").Length.ShouldBe(2, result.Error);
+        File.Exists(_scene.PathOf("report.zip")).ShouldBeFalse();
+    }
+
+    // The query's file is found among the plan's files wherever it stands: here after another file of the project,
+    // whose query is left out.
+    [Fact]
+    public async Task Diagnose_AQueryInAFileAfterAnother_WritesItsBundle()
+    {
+        _ = _scene.AddCase(_scene.Case(Plain));
+        _ = _scene.Project.AddSql("Accounts.sql", "-- name: GetAccount\nSELECT 1;\n");
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", "raw.zip", "--no-obfuscate");
+
+        result.ShouldBe(new CliResult(0, _scene.WrittenRaw("raw.zip"), ""));
+        WrittenBundles.Read(_scene.PathOf("raw.zip")).Query.ShouldContain("-- name: GetEverything\n");
+    }
+
+    // The query is described whatever its hash, as under --force, and a sidecar of a newer tool stops it as it stops
+    // describe --force: the error is printed and no bundle is made.
+    [Fact]
+    public async Task Diagnose_AQueryWhoseSidecarIsOfANewerTool_IsSQLSRC221AndWritesNoBundle()
+    {
+        var path = _scene.AddCase(_scene.Case(Plain));
+        var sidecar = SidecarFormat.PathFor(path);
+        await File.WriteAllTextAsync(sidecar, SidecarFiles.Newer, TestContext.Current.CancellationToken);
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.zip");
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                $"{sidecar} : error SQLSRC221: '{sidecar}' has format {SidecarFormat.Version + 1}, and this tool "
+                    + $"writes format {SidecarFormat.Version}\n"
+                    + "    help: update the SqlSource.Tool package\n"
+                    + Expected.See("SQLSRC221")
+            )
+        );
+        File.Exists(_scene.PathOf("report.zip")).ShouldBeFalse();
+        ReadText(sidecar).ShouldBe(SidecarFiles.Newer);
+    }
+
+    // diagnose needs the database: a missing connection is describe's error, and never a run that passes offline.
+    [Fact]
+    public async Task Diagnose_NoConnection_IsSQLSRC213AndWritesNoBundle()
+    {
+        _ = _scene.AddCase(_scene.Case(Plain));
+        _ = _scene.Run.Environment.Remove("SQLSOURCE_CONNECTION_POSTGRES");
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.zip");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldContain("error SQLSRC213: No connection is given for the database 'postgres'");
+        File.Exists(_scene.PathOf("report.zip")).ShouldBeFalse();
     }
 
     [Theory]
