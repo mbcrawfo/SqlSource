@@ -57,6 +57,9 @@ internal static class EndToEndSources
 
     public static SqlConnection Realistic(SqlServerDatabases sqlServer) => new(sqlServer.RealisticConnectionString);
 
+    public static SqlConnection UserClr(SqlServerDatabases sqlServer) =>
+        new(sqlServer.ConnectionStringOf(UserClrDatabase.Name));
+
     // Opens the connection and runs the write in a transaction that is rolled back, so that the seed is as it was.  The
     // write gives the transaction to every call, since SqlClient refuses a command on a connection whose transaction it
     // is not given.  Disposing the transaction rolls it back, and SqlClient skips one that the server has already

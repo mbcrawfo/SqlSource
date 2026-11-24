@@ -4,11 +4,11 @@
 
 ## Sidecars and majors
 
-- **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/`, `EndToEnd/NetTopologySuite/Queries/` and `EndToEnd/Json/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
+- **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/`, `EndToEnd/NetTopologySuite/Queries/`, `EndToEnd/Json/Queries/` and `EndToEnd/UserClr/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
 - **`CheckTests` runs `--check` over the real project, never a copy, through `CliRun.Real`**, as `ErrorPathTests` does.
 - **No entry differs between the supported majors**, since `CheckTests` runs on each, 2017 and 2025 in CI and 2019 and 2022 every night: a parameter that two majors type differently declares its type with `-- param:`.
 - **A query of a type that 2017 lacks goes into `Queries/NewTypes.sql`, or `Json/Queries/JsonColumns.sql` for one of System.Text.Json on `json`**, which `CheckTests` leaves out below 17, and its test skips by `SkipBelow(17, ...)`.
-- **Every batch of `EndToEnd/app/schema.sql` and `EndToEnd/billing/schema.sql` runs on SQL Server 2017**; a type that 2017 lacks goes into `EndToEnd/app/new-types.sql`.
+- **Every batch of `EndToEnd/app/schema.sql`, `EndToEnd/billing/schema.sql` and `EndToEnd/user_clr/schema.sql` runs on SQL Server 2017**; a type that 2017 lacks goes into `EndToEnd/app/new-types.sql`.
 
 ## Queries and tests
 

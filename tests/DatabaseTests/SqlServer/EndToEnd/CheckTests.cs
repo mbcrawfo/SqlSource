@@ -31,13 +31,16 @@ public sealed class CheckTests(SqlServerDatabases sqlServer)
         var app = CommittedEntries.Count(sidecars, SqlServerDatabases.AppDatabase);
         var billing = CommittedEntries.Count(sidecars, SqlServerDatabases.BillingDatabase);
         var realistic = CommittedEntries.Count(sidecars, SqlServerDatabases.RealisticDatabase);
+        var userClr = CommittedEntries.Count(sidecars, UserClrDatabase.Name);
         app.ShouldBeGreaterThan(0);
         billing.ShouldBeGreaterThan(0);
         realistic.ShouldBeGreaterThan(0);
+        userClr.ShouldBeGreaterThan(0);
         string[] connections =
         [
             .. Connection(SqlServerDatabases.AppDatabase),
             .. Connection(SqlServerDatabases.BillingDatabase),
+            .. Connection(UserClrDatabase.Name),
             .. Connection(SqlServerDatabases.RealisticDatabase),
         ];
 
@@ -51,6 +54,7 @@ public sealed class CheckTests(SqlServerDatabases sqlServer)
             result.Out.ShouldBe(
                 $"app (mssql): {app} same, 0 differ, 0 failed\n"
                     + $"billing (mssql): {billing} same, 0 differ, 0 failed\n"
+                    + $"user_clr (mssql): {userClr} same, 0 differ, 0 failed\n"
                     + $"realistic (mssql): {realistic} same, 0 differ, 0 failed\n"
             );
             return;
@@ -59,8 +63,8 @@ public sealed class CheckTests(SqlServerDatabases sqlServer)
         // A server before major 17 cannot describe NewTypes.sql and JsonColumns.sql, whose tables are not made there,
         // and no server describes as their sidecars hold the realistic cases that a minimumMajor or a checkedFrom
         // leaves out on it.  A filtered check compares only what it names, so the run names every other query file of
-        // EndToEnd/Queries/, EndToEnd/NodaTime/Queries/, EndToEnd/NetTopologySuite/Queries/ and EndToEnd/Json/Queries/
-        // and the query.sql of each realistic case that it checks, by their paths.
+        // EndToEnd/Queries/, EndToEnd/NodaTime/Queries/, EndToEnd/NetTopologySuite/Queries/, EndToEnd/Json/Queries/ and
+        // EndToEnd/UserClr/Queries/ and the query.sql of each realistic case that it checks, by their paths.
         // A "--database" filter would take the files it leaves out in with the rest.  SQL Server 2017, which CI runs,
         // and 2019 and 2022, which the nightly run runs, take this path: a local run on the default image does not
         // exercise it.
@@ -80,6 +84,7 @@ public sealed class CheckTests(SqlServerDatabases sqlServer)
             RepositoryPaths.EndToEndNodaTimeQueries,
             RepositoryPaths.EndToEndNetTopologySuiteQueries,
             RepositoryPaths.EndToEndJsonQueries,
+            RepositoryPaths.EndToEndUserClrQueries,
         }
             .SelectMany(static folder => Directory.EnumerateFiles(folder, "*.sql", SearchOption.AllDirectories))
             .Where(path => !leavesOutNewTypes || !newTypesFiles.Contains(path))
@@ -90,8 +95,10 @@ public sealed class CheckTests(SqlServerDatabases sqlServer)
         var checkedApp = CommittedEntries.Count(namedSidecars, SqlServerDatabases.AppDatabase);
         var checkedBilling = CommittedEntries.Count(namedSidecars, SqlServerDatabases.BillingDatabase);
         var checkedRealistic = CommittedEntries.Count(namedSidecars, SqlServerDatabases.RealisticDatabase);
+        var checkedUserClr = CommittedEntries.Count(namedSidecars, UserClrDatabase.Name);
         checkedApp.ShouldBe(leavesOutNewTypes ? app - newTypes : app);
         checkedBilling.ShouldBe(billing);
+        checkedUserClr.ShouldBe(userClr);
         checkedRealistic.ShouldBe(checkedHere.Count);
         checkedRealistic.ShouldBeLessThan(realistic);
 
@@ -101,6 +108,7 @@ public sealed class CheckTests(SqlServerDatabases sqlServer)
         floor.Out.ShouldBe(
             $"app (mssql): {checkedApp} same, 0 differ, 0 failed\n"
                 + $"billing (mssql): {checkedBilling} same, 0 differ, 0 failed\n"
+                + $"user_clr (mssql): {checkedUserClr} same, 0 differ, 0 failed\n"
                 + $"realistic (mssql): {checkedRealistic} same, 0 differ, 0 failed\n"
         );
     }

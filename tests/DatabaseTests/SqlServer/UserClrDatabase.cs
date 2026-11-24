@@ -4,29 +4,21 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using SqlSource.DatabaseTests.TestHarness;
 
 namespace SqlSource.DatabaseTests.SqlServer;
 
 // The database "user_clr", which holds a CLR type of a user's own assembly: dbo.Grade, of the net48 build of
 // tests/DatabaseTests/SqlServer.ClrType, whose net10.0 build this project references.  Every image's server runs it
-// once CLR is enabled and the assembly is trusted by its hash, since clr strict security is on from 2017.
+// once CLR is enabled and the assembly is trusted by its hash, since clr strict security is on from 2017.  The
+// assembly is created here, from its bytes, and then EndToEnd/user_clr/schema.sql and seed.sql make the type, its table
+// and its view, in the order that tools/describe-end-to-end.sh, which keeps the same steps, applies them.
 internal static class UserClrDatabase
 {
     public const string Name = "user_clr";
 
     // The type's assembly, as CREATE ASSEMBLY names it: the name of its manifest.
     private const string Assembly = "SqlSource.DatabaseTests.SqlServer.ClrType";
-
-    // The type, then the table and the view the tests read, each a batch of its own, since a batch is compiled before
-    // it runs: grade is NOT NULL, maybe is NULL, and the view passes both through.
-    private static readonly string[] Schema =
-    [
-        "CREATE TYPE dbo.Grade EXTERNAL NAME [SqlSource.DatabaseTests.SqlServer.ClrType]"
-            + ".[SqlSource.DatabaseTests.SqlServer.ClrType.Grade];",
-        "CREATE TABLE dbo.grades (id int NOT NULL PRIMARY KEY, grade dbo.Grade NOT NULL, maybe dbo.Grade NULL);",
-        "INSERT INTO dbo.grades (id, grade, maybe) VALUES (1, N'5', NULL), (2, N'7', N'8');",
-        "CREATE VIEW dbo.grade_view AS SELECT id, grade, maybe FROM dbo.grades;",
-    ];
 
     // The net48 build, which the project embeds as the resource ServerClrType.dll.
     public static byte[] AssemblyBytes()
@@ -77,9 +69,9 @@ internal static class UserClrDatabase
             token,
             new SqlParameter("@bits", bits)
         );
-        foreach (var batch in Schema)
+        foreach (var path in EndToEndFiles.SchemaAndSeed(EndToEndEngine.SqlServer, Name))
         {
-            await ExecuteAsync(database, batch, token);
+            await EndToEndFiles.RunAsync(database, path, EndToEndEngine.SqlServer, token);
         }
     }
 
