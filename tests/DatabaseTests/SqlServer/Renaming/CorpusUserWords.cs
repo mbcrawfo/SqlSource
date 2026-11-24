@@ -21,6 +21,7 @@ internal static class CorpusUserWords
         "added_at",
         "address_line",
         "all_types",
+        "all_type_shapes",
         "amount",
         "attention",
         "attributes",

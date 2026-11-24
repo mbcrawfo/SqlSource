@@ -28,6 +28,7 @@ internal static class SqlServerFields
         SqlServerCallNames.Columns,
         SqlServerCallNames.Operands,
         SqlServerCallNames.Table,
+        SqlServerCallNames.Origins,
     ];
 
     // The methods whose request is SQL under declarations.
@@ -38,6 +39,7 @@ internal static class SqlServerFields
         SqlServerCallNames.Declared,
         SqlServerCallNames.Columns,
         SqlServerCallNames.Operands,
+        SqlServerCallNames.Origins,
     ];
 
     // The methods that ask sys.dm_exec_describe_first_result_set, whose rows give a type and whose error rows a
@@ -48,11 +50,12 @@ internal static class SqlServerFields
         SqlServerCallNames.Columns,
         SqlServerCallNames.Operands,
         SqlServerCallNames.Table,
+        SqlServerCallNames.Origins,
     ];
 
     /// <summary>The methods whose rows are the columns of a result set, with their sources.</summary>
     public static IReadOnlyList<string> ColumnMethods { get; } =
-    [SqlServerCallNames.Columns, SqlServerCallNames.Operands, SqlServerCallNames.Table];
+    [SqlServerCallNames.Columns, SqlServerCallNames.Operands, SqlServerCallNames.Table, SqlServerCallNames.Origins];
 
     /// <summary>The path of a row of an answer.</summary>
     public const string Rows = "answer.rows[]";

@@ -188,6 +188,126 @@ public sealed class SqlServerSessionProofTests
             .ShouldBe([(true, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
     }
 
+    // A set operator's column of a CLR type answered not null asks each branch's item, and keeps the server's answer
+    // when both are stored columns of a CLR type; a branch of a string makes it nullable.
+    [Theory]
+    [InlineData(true, false, SidecarValues.NullableSource.Server)]
+    [InlineData(false, true, SidecarValues.NullableSource.Heuristic)]
+    public async Task DescribeAsync_ClrSetOperator_AsksEachBranchsItem(bool secondIsClr, bool nullable, string source)
+    {
+        const string Sql = "SELECT solid AS g FROM dbo.shapes UNION ALL SELECT other FROM dbo.shapes";
+        var first = new SqlServerColumnsRequest("SELECT solid\nAS [1]\nFROM dbo.shapes", null);
+        var second = new SqlServerColumnsRequest("SELECT other\nAS [1]\nFROM dbo.shapes", null);
+        var script = Script(Sql, [GeometryRow(1, "g")])
+            .Operands(first, new SqlServerColumnsAnswer([StoredOperand(GeometryRow(1, "1"))], null, null))
+            .Operands(
+                second,
+                new SqlServerColumnsAnswer(
+                    [StoredOperand(secondIsClr ? GeometryRow(1, "1") : OperandRow(1, false))],
+                    null,
+                    null
+                )
+            );
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        asked.Skip(2).ShouldBe([Call(Calls.Operands, first), Call(Calls.Operands, second)]);
+        Nullability(described).ShouldBe([(nullable, source)]);
+    }
+
+    // A view's column of a CLR type asks "origins", the query's own text, after "columns" and before "table": kept not
+    // null when the view passes a stored column on, and nullable otherwise, in the query and in the rows of "table"
+    // alike, so the view matches either way.
+    [Theory]
+    [InlineData("U", false, SidecarValues.NullableSource.Server)]
+    [InlineData("V", true, SidecarValues.NullableSource.Heuristic)]
+    public async Task DescribeAsync_ClrColumnOfAView_AsksOriginsAndMatches(
+        string originType,
+        bool nullable,
+        string source
+    )
+    {
+        const string Sql = "SELECT * FROM dbo.shapes_view";
+        var shape = GeometryRow(1, "shape") with
+        {
+            SourceDatabase = Database,
+            SourceSchema = "dbo",
+            SourceTable = "shapes_view",
+            SourceColumn = "shape",
+            SourceType = "V",
+            IsComputedColumn = false,
+        };
+        var origins = new SqlServerColumnsRequest(Sql, null);
+        var table = new SqlServerTableRequest("dbo", "shapes_view");
+        var script = Script(Sql, [shape, Rowstat])
+            .Origins(
+                origins,
+                new SqlServerColumnsAnswer(
+                    [shape with { SourceTable = "shapes", SourceType = originType }, Rowstat],
+                    null,
+                    null
+                )
+            )
+            .Table(table, new SqlServerColumnsAnswer([shape, Rowstat], null, null));
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        asked
+            .Select(static call => call.Method)
+            .ShouldBe([Calls.Parameters, Calls.Columns, Calls.Origins, Calls.Table]);
+        asked[2].ShouldBe(Call(Calls.Origins, origins));
+        Nullability(described).ShouldBe([(nullable, source)]);
+        described.Value.ShouldNotBeNull().TableMatch.ShouldBe(SidecarValues.TableMatch.Matched);
+    }
+
+    // "origins" that fails, or whose rows are not the columns, leaves the column nullable, and the describe goes on.
+    [Fact]
+    public async Task DescribeAsync_OriginsFails_NullableAndGoesOn()
+    {
+        const string Sql = "SELECT shape FROM dbo.shapes_view";
+        var shape = GeometryRow(1, "shape") with
+        {
+            SourceDatabase = Database,
+            SourceSchema = "dbo",
+            SourceTable = "shapes_view",
+            SourceColumn = "shape",
+            SourceType = "V",
+            IsComputedColumn = false,
+        };
+        var script = Script(Sql, [shape, Rowstat])
+            .Origins(new SqlServerColumnsRequest(Sql, null), new SqlServerColumnsAnswer(null, null, Lost))
+            .Table(
+                new SqlServerTableRequest("dbo", "shapes_view"),
+                new SqlServerColumnsAnswer([shape, Rowstat], null, null)
+            );
+
+        var (described, _) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        Nullability(described).ShouldBe([(true, SidecarValues.NullableSource.Heuristic)]);
+    }
+
+    // A geometry row that the server answers not null and names no source for.
+    private static SqlServerColumnRow GeometryRow(int ordinal, string name) =>
+        ExpressionRow(ordinal, name) with
+        {
+            IsNullable = false,
+            SystemTypeName = "geometry",
+            MaxLength = -1,
+            Precision = 0,
+            UserTypeSchema = "sys",
+            UserTypeName = "geometry",
+            AssemblyQualifiedTypeName = "Microsoft.SqlServer.Types.SqlGeometry, Microsoft.SqlServer.Types",
+        };
+
+    // The row, answered as a stored column of a table.
+    private static SqlServerColumnRow StoredOperand(SqlServerColumnRow row) =>
+        row with
+        {
+            SourceType = "U",
+            SourceColumn = "x",
+            IsComputedColumn = false,
+        };
+
     // A script of a query with no parameter whose "columns" answers the rows.
     private static SqlServerScript Script(string sql, IReadOnlyList<SqlServerColumnRow> rows) =>
         new SqlServerScript().NoParametersThenColumns(sql, new SqlServerColumnsAnswer(rows, null, null));

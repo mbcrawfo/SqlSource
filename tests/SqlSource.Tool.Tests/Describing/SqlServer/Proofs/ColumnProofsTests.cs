@@ -591,10 +591,269 @@ public sealed class ColumnProofsTests
         ];
 
         ColumnProofs
-            .TableRows(rows)
+            .TableRows(rows, [])
             .Select(static row => row.IsNullable)
             .ShouldBe([false, true, false, true, true, true, false]);
     }
+
+    // A column of a CLR type answered not null whose row names no stored column may be a string that a set operator
+    // converted to the type's Null, which the server answers not null wherever the column is read: through a view, a
+    // derived table, an expression or a reader that gives up, it is nullable, and nothing is asked.
+    [Theory]
+    [InlineData("SELECT shape AS g FROM dbo.shapes_view", "V", "shape", false)]
+    [InlineData("SELECT shape AS g FROM dbo.shapes_function()", "IF", "shape", false)]
+    [InlineData(
+        "SELECT d.g FROM (SELECT solid AS g FROM dbo.shapes UNION ALL SELECT wkt FROM dbo.shapes) AS d",
+        null,
+        null,
+        null
+    )]
+    [InlineData("SELECT ISNULL(maybe, solid) AS g FROM dbo.shapes", null, null, true)]
+    [InlineData("SELECT v.g FROM dbo.shapes CROSS APPLY (VALUES (solid), (wkt)) AS v (g)", null, null, false)]
+    [InlineData("SELECT shape AS g FROM dbo.shapes WHERE", "V", "shape", false)]
+    [InlineData("SELECT * FROM dbo.shapes_view", "V", "shape", false)]
+    [InlineData("SELECT computed AS g FROM dbo.shapes", "U", "computed", true)]
+    public void Apply_ClrColumnNotStored_Heuristic(string sql, string? sourceType, string? column, bool? computed)
+    {
+        var proofs = Read(
+            sql,
+            ClrRow(1, "g") with
+            {
+                SourceType = sourceType,
+                SourceColumn = column,
+                IsComputedColumn = computed,
+            }
+        );
+
+        proofs.OperandQueries.ShouldBeEmpty();
+        proofs.AsksOrigins.ShouldBe(sourceType is "V" or "IF");
+        Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Heuristic)]);
+    }
+
+    // A column of a CLR type read from a view or an inline function keeps the server's not null when "origins", the
+    // query in browse mode 1, names a stored column that the view or the function passes on, by place and by name.  An
+    // origin that is no stored column, a view's included, and an answer that is not the columns one for one, or none,
+    // leave it nullable.
+    [Theory]
+    [InlineData("V")]
+    [InlineData("IF")]
+    public void Apply_ClrColumnOfAViewOrFunction_KeptOnlyWhenItsOriginIsStored(string sourceType)
+    {
+        var proofs = Read(
+            "SELECT g FROM dbo.shapes_view",
+            ClrRow(1, "g") with
+            {
+                SourceType = sourceType,
+                SourceColumn = "g",
+                IsComputedColumn = false,
+            }
+        );
+        var stored = StoredClrRow(1, "g");
+        var hidden = Rowstat with { ColumnOrdinal = 2 };
+        IReadOnlyList<bool>? Origins(params SqlServerColumnRow[] rows) =>
+            proofs.OriginsOf(new SqlServerColumnsAnswer([.. rows, hidden], null, null));
+
+        proofs.AsksOrigins.ShouldBeTrue();
+        proofs.OperandQueries.ShouldBeEmpty();
+        Nullability(proofs.Apply(null, Origins(stored))).ShouldBe([(false, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply(null, Origins(stored with { SourceType = "V" })))
+            .ShouldBe([(true, SidecarValues.NullableSource.Heuristic)]);
+        Nullability(proofs.Apply(null, Origins(stored with { IsComputedColumn = true })))
+            .ShouldBe([(true, SidecarValues.NullableSource.Heuristic)]);
+        Origins(stored with { Name = "other" }).ShouldBeNull();
+        Origins(stored, stored with { ColumnOrdinal = 2, Name = "h" }).ShouldBeNull();
+        proofs.OriginsOf(new SqlServerColumnsAnswer([stored], [], null)).ShouldBe([true]);
+        proofs
+            .OriginsOf(new SqlServerColumnsAnswer(null, [new SqlServerDescribeError(11501, 7, "refused")], null))
+            .ShouldBeNull();
+        Nullability(proofs.Apply(null, null)).ShouldBe([(true, SidecarValues.NullableSource.Heuristic)]);
+    }
+
+    // A stored column of a table holds the table's value, which no conversion made, through a derived table and a CTE
+    // too, and so does a PERSISTED NOT NULL one; a column the server answers nullable, and one of no CLR type, are not
+    // touched.
+    [Fact]
+    public void Apply_ClrColumnStoredOrNullable_AsTheServerAnswers()
+    {
+        var proofs = Read(
+            "SELECT d.solid, d.persisted, d.shape, d.id FROM (SELECT * FROM dbo.shapes) AS d",
+            StoredClrRow(1, "solid"),
+            ClrRow(2, "persisted") with
+            {
+                SourceType = "U",
+                SourceColumn = "persisted",
+                IsComputedColumn = true,
+                PersistedNotNull = true,
+            },
+            ClrRow(3, "shape") with
+            {
+                IsNullable = true,
+            },
+            IdColumn with
+            {
+                ColumnOrdinal = 4,
+                SourceType = null,
+                SourceColumn = null,
+            }
+        );
+
+        proofs.OperandQueries.ShouldBeEmpty();
+        Nullability(proofs.Apply(null))
+            .ShouldBe([
+                (false, SidecarValues.NullableSource.Server),
+                (false, SidecarValues.NullableSource.Server),
+                (true, SidecarValues.NullableSource.Server),
+                (false, SidecarValues.NullableSource.Server),
+            ]);
+    }
+
+    // A set operator keeps the server's not null only when every branch's item is answered a stored column of a CLR
+    // type, which no branch converts; a branch of a string, of a value no column holds, or not answered, makes it
+    // nullable.
+    [Fact]
+    public void Apply_ClrSetOperator_KeptOnlyWhenEveryBranchIsAStoredClrColumn()
+    {
+        var proofs = Read(
+            "SELECT solid AS g FROM dbo.shapes UNION ALL SELECT other FROM dbo.more_shapes",
+            ClrRow(1, "g")
+        );
+
+        proofs.OperandQueries.ShouldBe([
+            new ColumnProofs.OperandQuery("SELECT solid\nAS [1]\nFROM dbo.shapes", 1),
+            new ColumnProofs.OperandQuery("SELECT other\nAS [1]\nFROM dbo.more_shapes", 1),
+        ]);
+        var stored = new OperandFacts(NotNull: true, NotClr: false, Stored: true, Clr: true);
+        Nullability(proofs.Apply([stored, stored])).ShouldBe([(false, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply([stored, new OperandFacts(true, NotClr: true, Stored: true)]))
+            .ShouldBe([(true, SidecarValues.NullableSource.Heuristic)]);
+        Nullability(proofs.Apply([stored, stored with { Stored = false }]))
+            .ShouldBe([(true, SidecarValues.NullableSource.Heuristic)]);
+        Nullability(proofs.Apply([stored])).ShouldBe([(true, SidecarValues.NullableSource.Heuristic)]);
+        Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Heuristic)]);
+    }
+
+    // A branch whose item is a literal, NULL, a parameter or a call of a type's method has nothing to ask, and so the
+    // set operator's column is nullable; each branch's item is asked whole, its parentheses too.
+    [Theory]
+    [InlineData("SELECT solid AS g FROM dbo.shapes UNION ALL SELECT 'NULL'")]
+    [InlineData("SELECT solid AS g FROM dbo.shapes UNION ALL SELECT NULL")]
+    [InlineData("SELECT solid AS g FROM dbo.shapes UNION ALL SELECT @shape")]
+    [InlineData("SELECT solid AS g FROM dbo.shapes UNION ALL SELECT solid.STBuffer(1) FROM dbo.shapes")]
+    [InlineData("SELECT solid AS g FROM dbo.shapes UNION ALL SELECT geometry::Parse(wkt) FROM dbo.shapes")]
+    public void Apply_ClrSetOperatorOfABranchNotAsked_Heuristic(string sql)
+    {
+        var proofs = Read(sql, ClrRow(1, "g"));
+
+        var stored = new OperandFacts(NotNull: true, NotClr: false, Stored: true, Clr: true);
+        Nullability(proofs.Apply([stored, stored])).ShouldBe([(true, SidecarValues.NullableSource.Heuristic)]);
+    }
+
+    // The rows of "table" are widened by the same rule as a query's columns, so that a view's column of a CLR type
+    // matches the view.  A user's CLR type, whose row has no system type name, and a row of no type at all may be of a
+    // CLR type too.
+    [Fact]
+    public void TableRows_ClrColumnNotStored_Nullable()
+    {
+        var view = ClrRow(2, "shape") with { SourceType = "V", SourceColumn = "shape", IsComputedColumn = false };
+        IReadOnlyList<SqlServerColumnRow> rows =
+        [
+            StoredClrRow(1, "solid"),
+            view,
+            ClrRow(3, "nullable") with
+            {
+                IsNullable = true,
+            },
+            view with
+            {
+                ColumnOrdinal = 4,
+                SystemTypeName = null,
+                UserTypeSchema = "dbo",
+                UserTypeName = "Point",
+                AssemblyQualifiedTypeName = "Shapes.Point, Shapes",
+            },
+            view with
+            {
+                ColumnOrdinal = 5,
+                SystemTypeName = null,
+                UserTypeSchema = null,
+                UserTypeName = null,
+                AssemblyQualifiedTypeName = null,
+            },
+            Rowstat with
+            {
+                ColumnOrdinal = 6,
+                IsNullable = false,
+                SystemTypeName = null,
+            },
+        ];
+
+        ColumnProofs
+            .TableRows(rows, [])
+            .Select(static row => row.IsNullable)
+            .ShouldBe([false, true, true, true, true, false]);
+    }
+
+    // A view's row of a CLR type keeps the server's not null when the query's column of that very origin was kept not
+    // null, which "origins" showed of the same column of the view; a query's column that is nullable, or of another
+    // origin, leaves it nullable.
+    [Fact]
+    public void TableRows_ClrColumnTheQueryKept_KeepsTheServersAnswer()
+    {
+        var view = ClrRow(1, "shape") with
+        {
+            SourceSchema = "dbo",
+            SourceTable = "shapes_view",
+            SourceType = "V",
+            SourceColumn = "shape",
+            IsComputedColumn = false,
+        };
+        var kept = new SidecarColumn(
+            0,
+            "shape",
+            new SqlServerType("geometry", -1, 0, 0, null),
+            false,
+            SidecarValues.NullableSource.Server,
+            new SidecarOrigin("dbo", "shapes_view", "shape"),
+            false,
+            false
+        );
+
+        static bool? NullableOf(IReadOnlyList<SqlServerColumnRow> rows) => rows.ShouldHaveSingleItem().IsNullable;
+
+        NullableOf(ColumnProofs.TableRows([view], [kept])).ShouldBe(false);
+        NullableOf(ColumnProofs.TableRows([view], [kept with { Nullable = true }])).ShouldBe(true);
+        NullableOf(
+                ColumnProofs.TableRows([view], [kept with { Origin = new SidecarOrigin("dbo", "shapes_view", "x") }])
+            )
+            .ShouldBe(true);
+        NullableOf(ColumnProofs.TableRows([view], [kept with { Origin = new SidecarOrigin("dbo", "other", "shape") }]))
+            .ShouldBe(true);
+    }
+
+    // A geometry column that the server answers not null and names no source for.
+    private static SqlServerColumnRow ClrRow(int ordinal, string name) =>
+        ExpressionRow(ordinal, name) with
+        {
+            IsNullable = false,
+            SystemTypeName = "geometry",
+            MaxLength = -1,
+            Precision = 0,
+            UserTypeSchema = "sys",
+            UserTypeName = "geometry",
+            AssemblyQualifiedTypeName = "Microsoft.SqlServer.Types.SqlGeometry, Microsoft.SqlServer.Types",
+        };
+
+    // A geometry column that the server answers not null, a stored column of dbo.shapes.
+    private static SqlServerColumnRow StoredClrRow(int ordinal, string name) =>
+        ClrRow(ordinal, name) with
+        {
+            SourceDatabase = Database,
+            SourceSchema = "dbo",
+            SourceTable = "shapes",
+            SourceColumn = name,
+            SourceType = "U",
+            IsComputedColumn = false,
+        };
 
     // The proofs of the SQL over the rows, built as the session builds them, the hidden row of browse mode 2 after
     // them.

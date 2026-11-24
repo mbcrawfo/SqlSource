@@ -180,6 +180,7 @@ public sealed class DescriberFixtureTests : IDisposable
                     "mssql/select-table-star",
                     "mssql/select-temporal-all",
                     "mssql/select-view-star",
+                    "mssql/select-view-clr",
                     "mssql/update-copies-agree",
                     "mssql/update-copies-cut",
                     "mssql/update-copies-of-two-parameters",
@@ -212,6 +213,7 @@ public sealed class DescriberFixtureTests : IDisposable
     [InlineData("columns")]
     [InlineData("operands", "select-aggregates")]
     [InlineData("table", "select-table-star")]
+    [InlineData("origins", "select-view-clr")]
     public Task Replay_SqlServerCaptureWithACallRemoved_ThrowsACaptureMiss(
         string method,
         string from = "update-inferred"

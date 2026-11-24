@@ -108,6 +108,41 @@ internal sealed partial class ExpressionProofs(
             : Numbered(proof);
     }
 
+    /// <summary>
+    /// The proof that a branch's item gives the value of a column of a CLR type that no conversion made: the item, one
+    /// leaf whole, answered as a stored column (<see cref="Proof.Stored" />) of a type that may be a CLR type
+    /// (<see cref="Proof.Clr" />).  A set operator converts a branch of a string to a CLR type, and a string may parse
+    /// as the type's Null; two CLR types are never combined, so every branch shown so is of the column's type.
+    /// </summary>
+    /// <remarks>
+    /// A source and a type are the same in every context, so the leaf is asked under a grouping set too.  A literal, a
+    /// parameter, <c>NULL</c> and a leaf that holds what is never asked are no column, and prove nothing.
+    /// </remarks>
+    public Proof OfStoredClr(TokenRange expression)
+    {
+        _leaves.Clear();
+        if (
+            expression.IsEmpty
+            || (
+                expression.Count == 1
+                && (
+                    tokens[expression.Start].Kind
+                        is TsqlTokenKind.Parameter
+                            or TsqlTokenKind.String
+                            or TsqlTokenKind.Number
+                    || tokens[expression.Start].Is("NULL")
+                )
+            )
+            || HoldsWhatIsNeverAsked(expression)
+        )
+        {
+            return Proof.No;
+        }
+
+        _leaves.Add(expression);
+        return Numbered(new Proof.AllOf([new Proof.Stored(0), new Proof.Clr(0)]));
+    }
+
     private static Proof AnyOf(IEnumerable<Proof> parts)
     {
         var kept = new List<Proof>();
@@ -179,6 +214,7 @@ internal sealed partial class ExpressionProofs(
             Proof.Operand leaf => new Proof.Operand(OperandIndex(_leaves[leaf.Index])),
             Proof.NotClr leaf => new Proof.NotClr(OperandIndex(_leaves[leaf.Index])),
             Proof.Stored leaf => new Proof.Stored(OperandIndex(_leaves[leaf.Index])),
+            Proof.Clr leaf => new Proof.Clr(OperandIndex(_leaves[leaf.Index])),
             Proof.AnyOf any => new Proof.AnyOf([.. any.Parts.Select(Numbered)]),
             Proof.AllOf all => new Proof.AllOf([.. all.Parts.Select(Numbered)]),
             _ => proof,

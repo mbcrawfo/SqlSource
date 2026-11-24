@@ -19,9 +19,19 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// a <c>q.*</c>, which every visible column is.  Every other branch must have as many items, none a <c>*</c>, and a
 /// column is proved when its item is proved in every branch, over that branch's own <c>FROM</c> and <c>WHERE</c>.  One
 /// item that does not agree proves nothing for the whole query, since the reader has misread its select list.  A
-/// column the server answers not null keeps its answer and asks nothing, and so does a column whose row may be of a
-/// CLR type (<see cref="SqlServerTypes.MayBeClr" />), whose expression may convert a string to that type's Null: a set
-/// operator converts every branch to the type of highest precedence, so a CLR type in one branch is the column's.
+/// column the server answers nullable whose row may be of a CLR type (<see cref="SqlServerTypes.MayBeClr" />) gets no
+/// proof, since its expression may convert a string to that type's Null: a set operator converts every branch to the
+/// type of highest precedence, so a CLR type in one branch is the column's.
+/// </para>
+/// <para>
+/// The server answers such a conversion not null, through a derived table, a CTE, a view, a <c>VALUES</c> list and the
+/// expressions over it too, so a column it answers not null whose row may be of a CLR type is nullable, with the
+/// <c>nullableSource</c> <c>heuristic</c>, unless its row is a stored column (<see cref="SqlServerColumns.IsStored" />)
+/// or a <c>PERSISTED NOT NULL</c> one, which no conversion made; the query is a set operator whose every branch's item
+/// <c>operands</c> answers as a stored column of a CLR type (<see cref="ExpressionProofs.OfStoredClr" />), which
+/// nothing converts; or its row names a view's or an inline function's column that <c>origins</c>, the query
+/// described in browse mode 1, answers as a stored column, which the view or the function passes on.  Every other
+/// column the server answers not null keeps its answer and asks nothing.
 /// </para>
 /// <para>
 /// A column whose row says <see cref="SqlServerColumnRow.PersistedNotNull" /> is proved by the catalog, with the
@@ -47,6 +57,14 @@ internal sealed class ColumnProofs
     // Whether the catalog proves each column, by its place: a PERSISTED NOT NULL column read from its one table.
     private readonly IReadOnlyList<bool> _catalog;
 
+    // Whether each column, by its place, is answered not null and may hold a CLR type's Null, so that it is nullable
+    // unless its proof, which shows that nothing converts it, holds.
+    private readonly IReadOnlyList<bool> _clrNull;
+
+    // Whether each column, by its place, may hold a CLR type's Null and is read from a view or an inline function,
+    // whose column "origins" may show passes a stored column on.
+    private readonly IReadOnlyList<bool> _asksOrigin;
+
     // The CTE columns the proofs read.
     private readonly CteProofs _ctes;
 
@@ -54,6 +72,8 @@ internal sealed class ColumnProofs
         IReadOnlyList<BuiltColumn> columns,
         IReadOnlyList<Proof?> proofs,
         IReadOnlyList<bool> catalog,
+        IReadOnlyList<bool> clrNull,
+        IReadOnlyList<bool> asksOrigin,
         IReadOnlyList<OperandQuery> operandQueries,
         CteProofs? ctes = null
     )
@@ -61,6 +81,8 @@ internal sealed class ColumnProofs
         _columns = columns;
         _proofs = proofs;
         _catalog = catalog;
+        _clrNull = clrNull;
+        _asksOrigin = asksOrigin;
         _ctes = ctes ?? CteProofs.None;
         OperandQueries = operandQueries;
     }
@@ -71,6 +93,35 @@ internal sealed class ColumnProofs
     /// <see cref="Apply" /> reads.
     /// </summary>
     public IReadOnlyList<OperandQuery> OperandQueries { get; }
+
+    /// <summary>
+    /// Whether to ask <c>origins</c>, the query described in browse mode 1: a column that may hold a CLR type's Null
+    /// is read from a view or an inline function, which may pass a stored column on.
+    /// </summary>
+    public bool AsksOrigins => _asksOrigin.Any(static asks => asks);
+
+    /// <summary>
+    /// Whether each column, by its place, is a stored column of a table in the answer of <c>origins</c>, which names
+    /// the column a view's or an inline function's column passes on; or null when the answer shows none: it holds an
+    /// error or error rows, or its visible rows are not the columns one for one, by place and by name.
+    /// </summary>
+    /// <param name="answer">The answer of <c>origins</c>.</param>
+    public IReadOnlyList<bool>? OriginsOf(SqlServerColumnsAnswer answer)
+    {
+        if (answer is not { Error: null, Errors: null or { Count: 0 }, Rows: { } rows })
+        {
+            return null;
+        }
+
+        var visible = SqlServerColumns.Visible(rows).ToList();
+        return
+            visible.Count == _columns.Count
+            && visible
+                .Zip(_columns)
+                .All(static pair => string.Equals(pair.First.Name, pair.Second.Column.Name, StringComparison.Ordinal))
+            ? [.. visible.Select(SqlServerColumns.IsStored)]
+            : null;
+    }
 
     /// <summary>The proofs of a describe's columns.</summary>
     /// <param name="sql">The query's SQL, as <c>columns</c> was asked it.</param>
@@ -84,12 +135,21 @@ internal sealed class ColumnProofs
         IReadOnlyList<SqlServerColumnRow> rows
     )
     {
-        var none = new ColumnProofs(columns, [], [], []);
         var visible = SqlServerColumns.Visible(rows).ToList();
         if (visible.Count != columns.Count)
         {
-            return none;
+            return new ColumnProofs(columns, [], [], [], [], []);
         }
+
+        bool[] clrNull = [.. visible.Select(MayHoldClrNull)];
+        bool[] asksOrigin =
+        [
+            .. visible.Select(
+                (row, index) =>
+                    clrNull[index] && row.SourceType is SqlServerColumns.View or SqlServerColumns.InlineFunction
+            ),
+        ];
+        var none = new ColumnProofs(columns, [], [], clrNull, asksOrigin, []);
 
         var tokens = TsqlTokens.Read(sql);
         if (SelectStatement.Read(tokens) is not { } statement)
@@ -101,7 +161,14 @@ internal sealed class ColumnProofs
         var isOneSelect = statement.Branches.Count == 1;
         if (isOneSelect && body.Items is [{ IsStar: true }])
         {
-            return new ColumnProofs(columns, [], [.. visible.Select(row => IsProvedByTheCatalog(body, row))], []);
+            return new ColumnProofs(
+                columns,
+                [],
+                [.. visible.Select(row => IsProvedByTheCatalog(body, row))],
+                clrNull,
+                asksOrigin,
+                []
+            );
         }
 
         if (!AreTheColumns(body.Items, visible) || !AreOfTheSameShape(statement.Branches, visible.Count))
@@ -133,6 +200,13 @@ internal sealed class ColumnProofs
             else if (SqlServerColumns.NullableAsRecorded(visible[index]) && !SqlServerTypes.MayBeClr(visible[index]))
             {
                 parts[index] = [.. branches.Select(branch => branch.Proofs.Of(branch.Body.Items[index].Expression))];
+            }
+            else if (clrNull[index] && !isOneSelect)
+            {
+                parts[index] =
+                [
+                    .. branches.Select(branch => branch.Proofs.OfStoredClr(branch.Body.Items[index].Expression)),
+                ];
             }
         }
 
@@ -182,33 +256,85 @@ internal sealed class ColumnProofs
             )
             .ToList();
         var ctes = CteProofs.Read(sql, tokens, statement, proofs.OfType<Proof>(), asked);
-        return new ColumnProofs(columns, proofs, catalog, [.. queries, .. ctes.OperandQueries], ctes);
+        return new ColumnProofs(
+            columns,
+            proofs,
+            catalog,
+            clrNull,
+            asksOrigin,
+            [.. queries, .. ctes.OperandQueries],
+            ctes
+        );
     }
 
     /// <summary>
     /// The columns, each the catalog proves <c>nullable</c> false with the <c>nullableSource</c> <c>catalog</c>, each
-    /// whose proof holds <c>nullable</c> false with the <c>nullableSource</c> <c>expression</c>, and every other as it
-    /// came.
+    /// whose proof holds <c>nullable</c> false with the <c>nullableSource</c> <c>expression</c>, each that may hold a
+    /// CLR type's Null, whose proof does not hold and whose origin is not stored, <c>nullable</c> true with the
+    /// <c>nullableSource</c> <c>heuristic</c>, and every other as it came.
     /// </summary>
     /// <param name="answers">
     /// The answer of <c>operands</c> as <see cref="OperandsQuery.AnswersOf" /> reads it, or null when it was not asked
     /// or proves nothing: the proofs of the text alone still hold.
     /// </param>
-    public IReadOnlyList<BuiltColumn> Apply(IReadOnlyList<OperandFacts>? answers) =>
-        [
-            .. _columns.Select(
-                (column, index) => SourceOf(index, answers) is { } source ? NotNull(column, source) : column
-            ),
-        ];
+    /// <param name="origins">
+    /// The answer of <c>origins</c> as <see cref="OriginsOf" /> reads it, or null when it was not asked or shows none.
+    /// </param>
+    public IReadOnlyList<BuiltColumn> Apply(
+        IReadOnlyList<OperandFacts>? answers,
+        IReadOnlyList<bool>? origins = null
+    ) => [.. _columns.Select((column, index) => Applied(column, index, answers, origins))];
 
     /// <summary>
     /// The rows of <c>table</c>, each the catalog proves not nullable, as for the columns of a query whose one item is
-    /// <c>*</c> of the table alone, which is what <c>table</c> describes; every other row as it came.  So the table
-    /// match compares a corrected query with a corrected table.
+    /// <c>*</c> of the table alone, which is what <c>table</c> describes, and each that may hold a CLR type's Null
+    /// nullable, as for any column, unless the query's column of that origin is answered not null; every other row as
+    /// it came.  So the table match compares a corrected query with a corrected table.
     /// </summary>
+    /// <remarks>
+    /// <c>table</c> is asked only when every column has its origin in the one table or view.  A row that may hold a
+    /// CLR type's Null names a view's or a function's column, and a query's column whose row named that same column
+    /// was kept not null only when <c>origins</c> showed that column passes a stored one on, which holds of the row as
+    /// much.
+    /// </remarks>
     /// <param name="rows">The rows of <c>table</c>, the hidden ones included.</param>
-    public static IReadOnlyList<SqlServerColumnRow> TableRows(IReadOnlyList<SqlServerColumnRow> rows) =>
-        [.. rows.Select(static row => IsPersistedNotNull(row) ? row with { IsNullable = false } : row)];
+    /// <param name="columns">The query's columns as the proofs answered them.</param>
+    public static IReadOnlyList<SqlServerColumnRow> TableRows(
+        IReadOnlyList<SqlServerColumnRow> rows,
+        IReadOnlyList<SidecarColumn> columns
+    ) => [.. rows.Select(row => TableRow(row, columns))];
+
+    private static SqlServerColumnRow TableRow(SqlServerColumnRow row, IReadOnlyList<SidecarColumn> columns)
+    {
+        if (IsPersistedNotNull(row))
+        {
+            return row with { IsNullable = false };
+        }
+
+        return MayHoldClrNull(row) && !columns.Any(column => IsKeptOf(column, row))
+            ? row with
+            {
+                IsNullable = true,
+            }
+            : row;
+    }
+
+    // True when the query's column, whose origin is the row's column, is answered not null.
+    private static bool IsKeptOf(SidecarColumn column, SqlServerColumnRow row) =>
+        column is { Nullable: false, Origin: { } origin }
+        && string.Equals(origin.Schema, row.SourceSchema, StringComparison.Ordinal)
+        && string.Equals(origin.Table, row.SourceTable, StringComparison.Ordinal)
+        && string.Equals(origin.Column, row.SourceColumn, StringComparison.Ordinal);
+
+    // True when the server answers the row not null, its type may be a CLR type, and it is neither a stored column
+    // nor a PERSISTED NOT NULL one: a set operator may have converted a string, or a binary, to the type's Null, and
+    // the server answers that not null wherever the column is read.  A hidden row is never a column.
+    private static bool MayHoldClrNull(SqlServerColumnRow row) =>
+        !row.IsHidden
+        && !SqlServerColumns.NullableAsRecorded(row)
+        && SqlServerTypes.MayBeClr(row)
+        && !SqlServerColumns.IsStored(row)
+        && !IsPersistedNotNull(row);
 
     // True when the catalog proves the column of the row, whose item is a column alone or the one *, in the body: its
     // row says PERSISTED NOT NULL, the FROM is its one table, and no grouping set gives a total row.
@@ -234,6 +360,34 @@ internal sealed class ColumnProofs
         return index < _proofs.Count && _proofs[index] is { } proof && _ctes.Holds(proof, answers)
             ? SidecarValues.NullableSource.Expression
             : null;
+    }
+
+    // The column as the proofs answer it.
+    private BuiltColumn Applied(
+        BuiltColumn column,
+        int index,
+        IReadOnlyList<OperandFacts>? answers,
+        IReadOnlyList<bool>? origins
+    )
+    {
+        if (index < _clrNull.Count && _clrNull[index])
+        {
+            var isKept =
+                (index < _proofs.Count && _proofs[index] is { } proof && proof.Holds(answers))
+                || (_asksOrigin[index] && origins is not null && index < origins.Count && origins[index]);
+            return isKept
+                ? column
+                : column with
+                {
+                    Column = column.Column with
+                    {
+                        Nullable = true,
+                        NullableSource = SidecarValues.NullableSource.Heuristic,
+                    },
+                };
+        }
+
+        return SourceOf(index, answers) is { } source ? NotNull(column, source) : column;
     }
 
     private static BuiltColumn NotNull(BuiltColumn column, string source) =>

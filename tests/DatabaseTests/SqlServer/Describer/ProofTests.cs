@@ -27,6 +27,11 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     private const string NewFunctionsReason =
         "GREATEST, LEAST, JSON_OBJECT, JSON_ARRAY and WINDOW are new in SQL Server 2022";
 
+    // A UNION ALL of proof_shapes' solid, a geometry never NULL, and its wkt, a string, which geometry parses as its
+    // Null where it is 'NULL' or 'Null'.
+    private const string ShapesMix =
+        "(SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT wkt FROM dbo.proof_shapes)";
+
     // NULL or 1 at random, each time it is evaluated.
     private const string Flip = "CASE WHEN ABS(CHECKSUM(NEWID())) % 2 = 0 THEN 1 END";
 
@@ -831,6 +836,115 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             await ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server);
         });
 
+    // A set operator converts every branch to a CLR type that one branch has, and geometry and geography parse wkt's
+    // 'NULL' and 'Null' as their Null, but the server answers the column not null, through every shape that hides the
+    // set operator from the query's text and through the expressions over it (measured from 2017 to 2025).  Each is
+    // nullable with the nullableSource heuristic, and gives a NULL row.
+    public static TheoryData<string, string> ClrConversions =>
+        new()
+        {
+            { "", "SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT 'NULL'" },
+            { "", "SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT wkt FROM dbo.proof_shapes" },
+            { "", "SELECT wkt AS c FROM dbo.proof_shapes UNION ALL SELECT solid FROM dbo.proof_shapes" },
+            { "", "SELECT place AS c FROM dbo.proof_shapes UNION ALL SELECT wkt FROM dbo.proof_shapes" },
+            {
+                "",
+                "SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT solid2 FROM dbo.proof_shapes "
+                    + "UNION ALL SELECT wkt FROM dbo.proof_shapes"
+            },
+            {
+                "",
+                "(SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT solid2 FROM dbo.proof_shapes) "
+                    + "UNION ALL SELECT wkt FROM dbo.proof_shapes"
+            },
+            { "", $"SELECT d.c FROM {ShapesMix} AS d" },
+            { "", $"SELECT e.c FROM (SELECT d.c FROM {ShapesMix} AS d) AS e" },
+            { $"WITH d AS {ShapesMix}", "SELECT c FROM d" },
+            { $"WITH d AS {ShapesMix}, e AS (SELECT c FROM d)", "SELECT c FROM e" },
+            { "", "SELECT c FROM dbo.proof_shapes_mix" },
+            { "", "SELECT c FROM dbo.proof_shapes_mix_of" },
+            { "", "SELECT c FROM dbo.proof_shapes_mix_fn()" },
+            { "", "SELECT v.c FROM dbo.proof_shapes AS s CROSS APPLY (VALUES (s.solid), (s.wkt)) AS v (c)" },
+            { "", "SELECT v.c FROM dbo.proof_shapes AS s CROSS APPLY (VALUES (s.solid), ('NULL')) AS v (c)" },
+            { "", $"SELECT (d.c) AS c FROM {ShapesMix} AS d" },
+            { "", $"SELECT IIF(1 = 1, d.c, d.c) AS c FROM {ShapesMix} AS d" },
+            { "", $"SELECT COALESCE(d.c, d.c) AS c FROM {ShapesMix} AS d" },
+            { "", $"SELECT ISNULL(d.c, s.wkt) AS c FROM {ShapesMix} AS d CROSS JOIN dbo.proof_shapes AS s" },
+        };
+
+    // A column of a CLR type that the server names as a stored column of a table holds that column's values, through a
+    // derived table and a CTE too, and so does a set operator whose every branch is such a column, and a column of a
+    // view or an inline function that passes one on, which the server names in browse mode 1.
+    public static TheoryData<string, string> ClrColumnsUnconverted =>
+        new()
+        {
+            { "", "SELECT solid AS c FROM dbo.proof_shapes" },
+            { "", "SELECT c FROM dbo.proof_shapes_plain" },
+            { "", "SELECT * FROM dbo.proof_shapes_plain" },
+            { "", "SELECT c FROM dbo.proof_shapes_plain_of" },
+            { "", "SELECT c FROM dbo.proof_shapes_plain_fn()" },
+            { "", "SELECT d.c FROM (SELECT c FROM dbo.proof_shapes_plain) AS d" },
+            { "", "SELECT p.c FROM dbo.proof_shapes_plain AS p JOIN dbo.proof_shapes AS s ON s.id = 1" },
+            { "", "SELECT d.c FROM (SELECT solid AS c FROM dbo.proof_shapes) AS d" },
+            { "WITH d AS (SELECT solid AS c FROM dbo.proof_shapes)", "SELECT c FROM d" },
+            { "", "SELECT TOP (2) solid AS c FROM dbo.proof_shapes ORDER BY id" },
+            { "", "SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT solid FROM dbo.proof_shapes" },
+            { "", "SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT solid2 FROM dbo.proof_shapes" },
+            { "", "SELECT place AS c FROM dbo.proof_shapes UNION ALL SELECT place FROM dbo.proof_shapes" },
+            { "", "SELECT node AS c FROM dbo.proof_shapes UNION SELECT node FROM dbo.proof_shapes" },
+            {
+                "",
+                "SELECT s.solid AS c FROM dbo.proof_shapes AS s "
+                    + "UNION ALL SELECT d.c FROM (SELECT solid2 AS c FROM dbo.proof_shapes) AS d"
+            },
+        };
+
+    // What the rule cannot clear is nullable, though it holds no NULL: a set operator of one type that the query's text
+    // does not show, in a derived table or a view, a VALUES list, an expression, and hierarchyid, whose Parse gave no
+    // Null for any string tried.
+    public static TheoryData<string, string> ClrColumnsNotCleared =>
+        new()
+        {
+            { "", "SELECT c FROM dbo.proof_shapes_same" },
+            {
+                "",
+                "SELECT d.c FROM (SELECT solid AS c FROM dbo.proof_shapes UNION ALL "
+                    + "SELECT solid2 FROM dbo.proof_shapes) AS d"
+            },
+            { "", "SELECT v.c FROM dbo.proof_shapes AS s CROSS APPLY (VALUES (s.solid), (s.solid2)) AS v (c)" },
+            { "", "SELECT ISNULL(shape, solid) AS c FROM dbo.proof_shapes" },
+            { "", "SELECT node AS c FROM dbo.proof_shapes UNION ALL SELECT '/1/'" },
+        };
+
+    [Theory]
+    [MemberData(nameof(ClrConversions))]
+    public Task DescribeAsync_ClrConversion_NullableAndNullRow(string with, string select) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync($"{with} {select}".Trim(), true, SidecarValues.NullableSource.Heuristic);
+            (await NullRowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+        });
+
+    [Theory]
+    [MemberData(nameof(ClrColumnsUnconverted))]
+    public Task DescribeAsync_ClrColumnUnconverted_NotNullAndNoNullRow(string with, string select) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync($"{with} {select}".Trim(), false, SidecarValues.NullableSource.Server);
+            (await RowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+            (await NullRowsAsync(select, with)).ShouldBe(0, select);
+        });
+
+    [Theory]
+    [MemberData(nameof(ClrColumnsNotCleared))]
+    public Task DescribeAsync_ClrColumnNotCleared_NullableWithNoNullRow(string with, string select) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync($"{with} {select}".Trim(), true, SidecarValues.NullableSource.Heuristic);
+            (await RowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+            (await NullRowsAsync(select, with)).ShouldBe(0, select);
+        });
+
     // EOMONTH ignores an offset that is NULL, so no NULL row can be shown, and the form still does not rely on that.
     [Fact]
     public Task DescribeAsync_EndOfMonthOfANullableOffset_StaysNullable() =>
@@ -927,9 +1041,14 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     // The tables of the proofs and their rows, made for the body and dropped after it.  g and b are NULL in some rows
     // and a in none; proof_other and proof_computed find no row for the rows 3 to 5 of proof_rows.  dbo.COUNT is a
     // user's function that is NULL for every row, which a bare COUNT never calls.  proof_shapes holds a point and
-    // two rows whose wkt, never NULL, is the text that geometry and geography parse as their Null, beside solid, a
-    // geometry never NULL.  proof_dates holds dates and zones never NULL beside ones NULL in some rows.  flip, of
-    // proof_volatile and its view, is NULL or not at random each time it is evaluated.
+    // two rows whose wkt, never NULL, is the text that geometry and geography parse as their Null, beside solid and
+    // solid2, geometries never NULL, place, a geography never NULL, and node, a hierarchyid never NULL;
+    // proof_shapes_mix is a view of solid and wkt under UNION ALL, proof_shapes_mix_of a view of that view,
+    // proof_shapes_mix_fn an inline function of the same, proof_shapes_plain a view of solid alone,
+    // proof_shapes_plain_of a view of that view, proof_shapes_plain_fn an inline function of solid alone, and
+    // proof_shapes_same a view of solid and solid2 under UNION ALL.  proof_dates holds dates and zones never NULL
+    // beside ones NULL in some rows.  flip, of proof_volatile and its view, is NULL or not at random each time it is
+    // evaluated.
     private async Task WithRowsAsync(Func<Task> body)
     {
         await DropAsync();
@@ -954,13 +1073,37 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             await sqlServer.ExecuteAsync(
                 "CREATE TABLE dbo.proof_shapes "
                     + "(id int NOT NULL PRIMARY KEY, wkt nvarchar(100) NOT NULL, shape geometry NULL, "
-                    + "solid geometry NOT NULL)"
+                    + "solid geometry NOT NULL, solid2 geometry NOT NULL, place geography NOT NULL, "
+                    + "node hierarchyid NOT NULL)"
             );
             await sqlServer.ExecuteAsync(
-                "INSERT INTO dbo.proof_shapes (id, wkt, shape, solid) "
-                    + "VALUES (1, N'POINT (1 2)', geometry::Parse('POINT (1 2)'), geometry::Parse('POINT (0 0)')), "
-                    + "(2, N'NULL', NULL, geometry::Parse('POINT (0 0)')), "
-                    + "(3, N'Null', NULL, geometry::Parse('POINT (0 0)'))"
+                "INSERT INTO dbo.proof_shapes (id, wkt, shape, solid, solid2, place, node) "
+                    + "VALUES (1, N'POINT (1 2)', geometry::Parse('POINT (1 2)'), geometry::Parse('POINT (0 0)'), "
+                    + "geometry::Parse('POINT (1 1)'), geography::Parse('POINT (1 2)'), hierarchyid::Parse('/1/')), "
+                    + "(2, N'NULL', NULL, geometry::Parse('POINT (0 0)'), geometry::Parse('POINT (1 1)'), "
+                    + "geography::Parse('POINT (1 2)'), hierarchyid::Parse('/2/')), "
+                    + "(3, N'Null', NULL, geometry::Parse('POINT (0 0)'), geometry::Parse('POINT (1 1)'), "
+                    + "geography::Parse('POINT (1 2)'), hierarchyid::Parse('/3/'))"
+            );
+            await sqlServer.ExecuteAsync($"CREATE VIEW dbo.proof_shapes_mix AS SELECT c FROM {ShapesMix} AS d");
+            await sqlServer.ExecuteAsync("CREATE VIEW dbo.proof_shapes_mix_of AS SELECT c FROM dbo.proof_shapes_mix");
+            await sqlServer.ExecuteAsync(
+                "CREATE VIEW dbo.proof_shapes_plain AS SELECT solid AS c FROM dbo.proof_shapes"
+            );
+            await sqlServer.ExecuteAsync(
+                "CREATE VIEW dbo.proof_shapes_plain_of AS SELECT c FROM dbo.proof_shapes_plain"
+            );
+            await sqlServer.ExecuteAsync(
+                "CREATE FUNCTION dbo.proof_shapes_plain_fn () RETURNS TABLE AS RETURN "
+                    + "SELECT solid AS c FROM dbo.proof_shapes"
+            );
+            await sqlServer.ExecuteAsync(
+                "CREATE VIEW dbo.proof_shapes_same AS "
+                    + "SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT solid2 FROM dbo.proof_shapes"
+            );
+            await sqlServer.ExecuteAsync(
+                "CREATE FUNCTION dbo.proof_shapes_mix_fn () RETURNS TABLE AS RETURN "
+                    + "SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT wkt FROM dbo.proof_shapes"
             );
             await sqlServer.ExecuteAsync(
                 "CREATE TABLE dbo.proof_dates (id int NOT NULL PRIMARY KEY, at_utc datetime2(0) NOT NULL, "
@@ -1018,8 +1161,11 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
 
     private Task DropAsync() =>
         sqlServer.ExecuteAsync(
-            "DROP SYNONYM IF EXISTS dbo.proof_far; DROP FUNCTION IF EXISTS dbo.proof_flip, dbo.[COUNT]; "
-                + "DROP VIEW IF EXISTS dbo.proof_random, dbo.proof_volatile_view; "
+            "DROP SYNONYM IF EXISTS dbo.proof_far; "
+                + "DROP FUNCTION IF EXISTS dbo.proof_flip, dbo.[COUNT], dbo.proof_shapes_mix_fn, "
+                + "dbo.proof_shapes_plain_fn; "
+                + "DROP VIEW IF EXISTS dbo.proof_random, dbo.proof_volatile_view, dbo.proof_shapes_mix_of, "
+                + "dbo.proof_shapes_mix, dbo.proof_shapes_plain_of, dbo.proof_shapes_plain, dbo.proof_shapes_same; "
                 + "DROP TABLE IF EXISTS dbo.proof_many, dbo.proof_volatile, dbo.proof_dates, dbo.proof_shapes, "
                 + "dbo.proof_computed, dbo.proof_other, dbo.proof_rows"
         );

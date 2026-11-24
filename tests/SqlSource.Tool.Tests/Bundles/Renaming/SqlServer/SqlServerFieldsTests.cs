@@ -28,6 +28,7 @@ public sealed class SqlServerFieldsTests
         [SqlServerCallNames.Columns] = (typeof(SqlServerColumnsRequest), typeof(SqlServerColumnsAnswer)),
         [SqlServerCallNames.Operands] = (typeof(SqlServerColumnsRequest), typeof(SqlServerColumnsAnswer)),
         [SqlServerCallNames.Table] = (typeof(SqlServerTableRequest), typeof(SqlServerColumnsAnswer)),
+        [SqlServerCallNames.Origins] = (typeof(SqlServerColumnsRequest), typeof(SqlServerColumnsAnswer)),
     };
 
     private static readonly string[] Methods =
@@ -39,13 +40,14 @@ public sealed class SqlServerFieldsTests
         "columns",
         "operands",
         "table",
+        "origins",
     ];
 
-    private static readonly string[] SqlMethods = ["parameters", "probe", "declared", "columns", "operands"];
+    private static readonly string[] SqlMethods = ["parameters", "probe", "declared", "columns", "operands", "origins"];
 
-    private static readonly string[] DescribeMethods = ["declared", "columns", "operands", "table"];
+    private static readonly string[] DescribeMethods = ["declared", "columns", "operands", "table", "origins"];
 
-    private static readonly string[] ColumnMethods = ["columns", "operands", "table"];
+    private static readonly string[] ColumnMethods = ["columns", "operands", "table", "origins"];
 
     // The rule of each member, by "<method> <path>".
     private static readonly Dictionary<string, FieldRule> Table = Build();

@@ -139,3 +139,9 @@ CREATE TABLE dbo.all_types (
     sysname_value sysname NOT NULL,
     dbo_email_value dbo.Email NOT NULL
 );
+GO
+
+-- A view that passes the spatial columns of dbo.all_types on, which the server names in browse mode 1.
+CREATE VIEW dbo.all_type_shapes AS
+SELECT id, geography_value, geometry_value FROM dbo.all_types;
+GO
