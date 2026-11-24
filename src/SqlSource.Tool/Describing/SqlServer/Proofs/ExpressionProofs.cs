@@ -409,9 +409,19 @@ internal sealed partial class ExpressionProofs(
 
         // A filter tests the value and the result reads it again, so what it keeps from NULL holds only of a value
         // that gives one value in a row: a stored column.
-        return filtered?.KeepsFromNull(range) == true
-            ? new Proof.AnyOf([new Proof.Operand(index), new Proof.Stored(index)])
-            : new Proof.Operand(index);
+        Proof leaf =
+            filtered?.KeepsFromNull(range) == true
+                ? new Proof.AnyOf([new Proof.Operand(index), new Proof.Stored(index)])
+                : new Proof.Operand(index);
+
+        // A column of a CTE of several branches is not null when every branch proves it, which CteProofs decides.
+        // Its branches convert to the column's type, and a string converts to a CLR type's Null.
+        return filtered?.CteColumnOf(range) is { } column
+            ? new Proof.AnyOf([
+                leaf,
+                new Proof.AllOf([new Proof.NotClr(index), new Proof.CteColumn(column.Cte, column.Column)]),
+            ])
+            : leaf;
     }
 
     // OVER, an aggregate's name before "(", or a name after "." or "::" before "(", a call of a schema's name or a

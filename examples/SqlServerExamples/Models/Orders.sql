@@ -52,6 +52,33 @@ SELECT
 FROM orders
 ORDER BY id;
 
+-- name: ListShippingDays
+-- summary: Each day from an order's placing to its shipping, numbered from 1.
+WITH days AS (
+    SELECT
+        id AS order_id,
+        CAST(placed_at AS date) AS calendar_day,
+        1 AS day_number,
+        shipped_on
+    FROM orders
+    WHERE shipped_on IS NOT NULL
+    UNION ALL
+    SELECT
+        d.order_id,
+        DATEADD(DAY, 1, d.calendar_day) AS calendar_day,
+        d.day_number + 1 AS day_number,
+        d.shipped_on
+    FROM days AS d
+    WHERE d.calendar_day < d.shipped_on
+)
+
+SELECT
+    order_id,
+    calendar_day,
+    day_number
+FROM days
+ORDER BY order_id, day_number;
+
 -- name: AddOrder
 -- summary: Places a new order for a user, and returns what the database filled in.
 INSERT INTO orders (user_id)

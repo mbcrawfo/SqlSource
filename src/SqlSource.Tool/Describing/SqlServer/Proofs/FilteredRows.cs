@@ -98,23 +98,63 @@ internal sealed class FilteredRows
     public bool KeepsFromNull(TokenRange range) =>
         RowFilter.NameOf(_tokens, range) is { } parts && (_filter.Keeps(parts) || IsKeptByACte(parts));
 
-    private bool IsKeptByACte(string[] parts)
+    /// <summary>
+    /// The place of the CTE, among those these rows can read, and of its column, that the range reads: a column alone
+    /// of a source that names a CTE of several branches, which no join here can make <c>NULL</c>; or null.
+    /// </summary>
+    /// <remarks>
+    /// The CTE's columns are its column list, or else the names of its first branch's items, and each branch must have
+    /// as many items, none a <c>*</c>.  The column is the one place whose name is the range's last part, compared
+    /// ordinally.  A recursive member reads its own CTE so.
+    /// </remarks>
+    public (int Cte, int Column)? CteColumnOf(TokenRange range)
     {
-        if (SourceOf(parts) is not { OnePartName: { } name } source || IsOptional(source))
+        if (
+            RowFilter.NameOf(_tokens, range) is not { } parts
+            || SourceOf(parts) is not { OnePartName: { } name } source
+            || IsOptional(source)
+            || LastCteNamed(name) is not { } at
+            || _ctes[at] is not { Branches: { Count: > 1 } branches } cte
+        )
         {
-            return false;
+            return null;
         }
 
-        var at = -1;
-        for (var index = 0; index < _ctes.Count; index++)
+        var count = cte.Columns?.Count ?? branches[0].Items.Count;
+        if (branches.Any(branch => branch.Items.Count != count || branch.Items.Any(static item => item.IsStar)))
+        {
+            return null;
+        }
+
+        var places = Enumerable
+            .Range(0, count)
+            .Where(index =>
+                string.Equals(cte.Columns?[index] ?? branches[0].Items[index].Name, parts[^1], StringComparison.Ordinal)
+            )
+            .ToList();
+        return places is [var place] ? (at, place) : null;
+    }
+
+    private bool IsKeptByACte(string[] parts)
+    {
+        return SourceOf(parts) is { OnePartName: { } name } source
+            && !IsOptional(source)
+            && LastCteNamed(name) is { } at
+            && CteKeeps(at, parts[^1]);
+    }
+
+    // The place of the last CTE these rows can read of that name, compared ordinally, or null.
+    private int? LastCteNamed(string name)
+    {
+        for (var index = _ctes.Count - 1; index >= 0; index--)
         {
             if (string.Equals(_ctes[index].Name, name, StringComparison.Ordinal))
             {
-                at = index;
+                return index;
             }
         }
 
-        return at >= 0 && CteKeeps(at, parts[^1]);
+        return null;
     }
 
     // The one source a column's name reads: the one its qualifier names, or the only one for a bare name.

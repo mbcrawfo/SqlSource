@@ -68,6 +68,7 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - **A `NOT NULL` column of the optional side of a `LEFT JOIN`, when the `WHERE` makes the join inner.**  The `WHERE` must hold such a condition on a stored column of that side, written with its table alias, as `o.status` in `WHERE o.status = @status`.  The joins of the `FROM` must be plain joins, one after the other.
 - **A column read from a `WITH` query whose own `WHERE` keeps it from being null**, when the `WITH` query is one `SELECT` that returns the column itself, and no outer join of the outer query can fill it with null.
 - **A column of `UNION`, `UNION ALL`, `INTERSECT` or `EXCEPT`, when each `SELECT` gives a value that is never null in that place.**  Each `SELECT` is read on its own, with its own `FROM` and `WHERE`.
+- **A column of a `WITH` query made of several `SELECT`s, a recursive one included, when each `SELECT` gives a value that is never null in that place.**  In the recursive part, a column that the `WITH` query reads from itself counts as never null when that column is one of those SqlSource shows never null.  The outer query must read the column by its name, through the `WITH` query's own name or alias, and no outer join of the outer query may fill it with null.  The `FROM` of each `SELECT` must be plain joins, one after the other.
 
 **SqlSource treats none of these items as never null in two kinds of query:**
 
@@ -98,7 +99,7 @@ These answers assume that the connection that runs the query leaves `ANSI_WARNIN
 - **Other functions of values that are never null**, such as `DATEFROMPARTS`, `SWITCHOFFSET` and `NEWID()`.
 - **A computed column that is not persisted**, unless SQL Server can show from its expression that it is never null, as for `ISNULL(quantity, 0)`.
 - **A computed column declared `PERSISTED NOT NULL` and read through a join, a view, a subquery or a `WITH` query**, with the same exception.
-- **A column of a recursive `WITH` query.**
+- **A column of a `WITH` query made of several `SELECT`s, a recursive one included, that the outer query reads through an outer join**, even one that its `WHERE` makes inner, or that a `SELECT` of it reads from the `WITH` query itself through a comma, an `APPLY` or a subquery in the `FROM`.
 - **`COALESCE` over a column of each side of a `FULL JOIN`**, as in `COALESCE(i.id, p.invoice_id)`.
 - **`COALESCE` with an argument that can change before the one that is never null.**  This includes a `CASE`, a subquery, a window function, a date function, a computed column, a view's column and a column read `FOR SYSTEM_TIME`.  SQL Server can compute such a value again for the result, and the second value can be null.  Write `ISNULL(x, 0)`, which computes `x` once.
 - **`COALESCE` with a column of another database or of a linked server before the one that is never null.**  This holds when the query reads the table by its name, a synonym, a subquery in the `FROM` or a `WITH` query.  Write `ISNULL(x, 0)`.
@@ -143,7 +144,6 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 **Why.**  SQL Server treats a column as one that can be null when it cannot show that the column never is.  SqlSource keeps its answer where it cannot show otherwise from the query.  Among the columns that get such a property are:
 
 - `DATEFROMPARTS`, `SWITCHOFFSET` and other functions of values that are never null;
-- the columns of a recursive `WITH` query;
 - `COALESCE` over both sides of a `FULL JOIN`;
 - `COALESCE` over a value that can change, such as a `CASE` or a subquery;
 - `COALESCE` over a column of another database or of a linked server;

@@ -47,22 +47,28 @@ internal sealed class ColumnProofs
     // Whether the catalog proves each column, by its place: a PERSISTED NOT NULL column read from its one table.
     private readonly IReadOnlyList<bool> _catalog;
 
+    // The CTE columns the proofs read.
+    private readonly CteProofs _ctes;
+
     private ColumnProofs(
         IReadOnlyList<BuiltColumn> columns,
         IReadOnlyList<Proof?> proofs,
         IReadOnlyList<bool> catalog,
-        IReadOnlyList<OperandQuery> operandQueries
+        IReadOnlyList<OperandQuery> operandQueries,
+        CteProofs? ctes = null
     )
     {
         _columns = columns;
         _proofs = proofs;
         _catalog = catalog;
+        _ctes = ctes ?? CteProofs.None;
         OperandQueries = operandQueries;
     }
 
     /// <summary>
-    /// The <c>operands</c> calls to make, in order, one for each branch whose proofs need the server; none when no
-    /// proof does.  The answers, joined in this order, are what <see cref="Apply" /> reads.
+    /// The <c>operands</c> calls to make, in order, one for each branch whose proofs need the server, then those of
+    /// <see cref="CteProofs" />; none when no proof does.  The answers, joined in this order, are what
+    /// <see cref="Apply" /> reads.
     /// </summary>
     public IReadOnlyList<OperandQuery> OperandQueries { get; }
 
@@ -175,7 +181,8 @@ internal sealed class ColumnProofs
                     : ExpressionProofs.AllOf(of.Select((part, at) => WithGuard(part, guards[at]).Shifted(offsets[at])))
             )
             .ToList();
-        return new ColumnProofs(columns, proofs, catalog, queries);
+        var ctes = CteProofs.Read(sql, tokens, statement, proofs.OfType<Proof>(), asked);
+        return new ColumnProofs(columns, proofs, catalog, [.. queries, .. ctes.OperandQueries], ctes);
     }
 
     /// <summary>
@@ -224,7 +231,7 @@ internal sealed class ColumnProofs
             return SidecarValues.NullableSource.Catalog;
         }
 
-        return index < _proofs.Count && _proofs[index] is { } proof && proof.Holds(answers)
+        return index < _proofs.Count && _proofs[index] is { } proof && _ctes.Holds(proof, answers)
             ? SidecarValues.NullableSource.Expression
             : null;
     }

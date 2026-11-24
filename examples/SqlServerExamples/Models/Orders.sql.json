@@ -351,6 +351,65 @@
         }
       ]
     },
+    "ListShippingDays": {
+      "hash": "1638cdb10f3a454c3f8f11867550e45bf32e7098ca7a49d7a5277b635bcae897",
+      "toolVersion": "0.2.1",
+      "database": "mssql",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "order_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "calendar_day",
+          "type": {
+            "name": "date",
+            "maxLength": 3,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "day_number",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "AddOrder": {
       "hash": "e3cbc26f1505a1b55bc13475bf14db0571e91eb03708de573cdd70260ba2a12e",
       "toolVersion": "0.2.1",

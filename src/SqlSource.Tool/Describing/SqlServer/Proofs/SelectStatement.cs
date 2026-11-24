@@ -6,8 +6,19 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// <summary>One CTE of a <c>WITH</c> clause.</summary>
 /// <param name="Name">Its name, without quotes.</param>
 /// <param name="Columns">The names of its column list, or null when it has none.</param>
-/// <param name="Body">Its query when that is one <c>SELECT</c> the reader follows, or null.</param>
-internal sealed record CommonTableExpression(string Name, IReadOnlyList<string>? Columns, SelectBody? Body);
+/// <param name="Branches">
+/// Each <c>SELECT</c> of its query, in order, one or one for each side of its set operators, the anchor and recursive
+/// members of a recursive CTE among them; or null when the reader cannot follow one.
+/// </param>
+internal sealed record CommonTableExpression(
+    string Name,
+    IReadOnlyList<string>? Columns,
+    IReadOnlyList<SelectBody>? Branches
+)
+{
+    /// <summary>Its query when that is one <c>SELECT</c> the reader follows, or null.</summary>
+    public SelectBody? Body => Branches is [var one] ? one : null;
+}
 
 /// <summary>
 /// A query of one <c>SELECT</c>, or of several joined by set operators, with the <c>WITH</c> clause before it.
@@ -167,14 +178,10 @@ internal sealed record SelectStatement(
                 return -1;
             }
 
-            // A CTE of several branches, a recursive one among them, is left unread, so that it proves nothing.
+            // A recursive CTE's members read its own name.
             string[] visible = [.. ctes.Select(static cte => cte.Name), name];
             ctes.Add(
-                new CommonTableExpression(
-                    name,
-                    columns,
-                    SelectBody.Read(tokens, new TokenRange(at + 2, close), visible)
-                )
+                new CommonTableExpression(name, columns, ReadBranches(tokens, new TokenRange(at + 2, close), visible))
             );
 
             at = close + 1;

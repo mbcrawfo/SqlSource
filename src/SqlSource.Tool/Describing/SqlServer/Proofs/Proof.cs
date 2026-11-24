@@ -84,6 +84,19 @@ internal abstract record Proof
         private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => answerOf(Index).Stored;
     }
 
+    /// <summary>
+    /// Holds when every branch of a CTE of several branches proves its column at that place, as
+    /// <see cref="CteProofs" /> decides; never by itself.
+    /// </summary>
+    /// <param name="Cte">The CTE's place in the <c>WITH</c> clause.</param>
+    /// <param name="Column">The column's place among the CTE's columns.</param>
+    internal sealed record CteColumn(int Cte, int Column) : Proof
+    {
+        public override Proof Shifted(int offset) => this;
+
+        private protected override bool Evaluate(Func<int, OperandFacts> answerOf) => false;
+    }
+
     /// <summary>Holds when one of its parts holds.</summary>
     internal sealed record AnyOf(IReadOnlyList<Proof> Parts) : Proof
     {
