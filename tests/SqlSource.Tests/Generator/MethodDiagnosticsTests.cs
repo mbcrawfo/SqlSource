@@ -1,6 +1,8 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using Shouldly;
+using SqlSource.Generation;
+using SqlSource.Generation.Methods;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
@@ -20,6 +22,30 @@ public sealed class MethodDiagnosticsTests
 
     // The header of a file whose methods go on the type, public.
     private const string OnTheType = "-- member-location: class\n-- visibility: public\n\n";
+
+    // A type with a problem of its own, that it is not partial, plans no methods of its queries, and none of their
+    // problems.
+    [Fact]
+    public void Run_TypeThatIsNotPartialWithAMethodsQuery_PlansNoMethodAndNoProblemOfTheQuery()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public class Sample;
+            }
+            """;
+        var file = new SqlFile(Path, "-- name: SetName -> one\nUPDATE users SET name = 'x';\n");
+
+        var run = MethodRuns.Run(file, [Entry(file, "SetName", [], null)], Source);
+
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC001 ");
+        var methods = StepOutputs.Single<TypeMethods>(run, TrackingNames.TypeMethods);
+        methods.Methods.ShouldBeEmpty();
+        methods.Diagnostics.ShouldBeEmpty();
+    }
 
     [Theory]
     [InlineData("one")]
@@ -197,6 +223,7 @@ public sealed class MethodDiagnosticsTests
 
     // An instance member of the connection is found before an extension method of its name.
     [Theory]
+    [InlineData("BeginTransaction")]
     [InlineData("Open")]
     [InlineData("ToString")]
     public void Run_QueryNamedAsAMemberOfTheConnection_IsSqlsrc274(string name)
@@ -296,6 +323,31 @@ public sealed class MethodDiagnosticsTests
                     + "because 'App.Sample<TRow>' has a type parameter of that name.  Rename the query.",
             ]);
         run.Sources.Keys.ShouldNotContain("App.Sample-1-Methods.g.cs");
+    }
+
+    // A type parameter after the first is found too.
+    [Fact]
+    public void Run_QueryNamedAsASecondTypeParameterUnderClass_IsSqlsrc274()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample<TKey, TRow>;
+            }
+            """;
+        var file = new SqlFile(Path, OnTheType + "-- name: TRow\nSELECT id FROM users;\n");
+
+        var run = MethodRuns.Run(file, [Entry(file, "TRow", [], [Column("id")])], Source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(4,10)-(4,14): The method of the query 'TRow' cannot be named 'TRow', "
+                    + "because 'App.Sample<TKey, TRow>' has a type parameter of that name.  Rename the query.",
+            ]);
+        run.Sources.Keys.ShouldNotContain("App.Sample-2-Methods.g.cs");
     }
 
     // The nested class that holds the constant of a query whose output is sql is a member of the type, and the

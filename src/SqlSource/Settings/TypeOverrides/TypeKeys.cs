@@ -31,7 +31,7 @@ internal static class TypeKeys
     /// </para>
     /// <para>
     /// <c>pg_catalog.</c>, plain in any case or quoted in lower case, is taken off and what is left is not checked,
-    /// but that every name of <c>pg_catalog</c> that starts with <c>_</c> is an array's, so <c>pg_catalog.newtype</c>
+    /// but that a name of <c>pg_catalog</c> of <c>_</c> and more is read as an array's, so <c>pg_catalog.newtype</c>
     /// gives <c>newtype</c>, <c>pg_catalog._int4</c> gives <c>int4[]</c> and <c>pg_catalog._pg_class</c> gives
     /// <c>pg_class[]</c>.  A plain name there that the map knows, or with <c>[]</c> <c>_</c> and one, is given in
     /// lower case, as it is without the schema, so <c>pg_catalog.INT4</c> gives <c>int4</c>; any other plain name
@@ -151,7 +151,8 @@ internal static class TypeKeys
         }
         else if (!isArray && name.Length > 1 && name[0] == '_')
         {
-            // Every type of pg_catalog whose name starts with _ is an array, of the type named by the rest.
+            // A name of _ and more is read as the array of the type named by the rest.  A type of pg_catalog of such a
+            // name that is no array, which a superuser can move there, has no key.
             var ofElement = name.Slice(1).ToString();
             normalized =
                 (TypeKeyNames.PostgresNames.TryGetValue(ofElement, out var knownElement) ? knownElement : ofElement)

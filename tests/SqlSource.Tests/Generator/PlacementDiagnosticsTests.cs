@@ -462,6 +462,44 @@ public sealed class PlacementDiagnosticsTests
         run.Sources["App.Outer.Sample.g.cs"].ShouldContain("                public const string GetName = ");
     }
 
+    // The query that wrote the class's visibility is of the class itself: a query of another nested class that wrote
+    // one, and comes first, is not the one the error names.
+    [Fact]
+    public void Run_NestedClassMadePublicByAnotherFileAfterAnotherClassWroteOne_NamesTheQueryOfItsOwnClass()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- member-location: nested-class\n\n-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
+        );
+        var other = new SqlFile(
+            "/app/Repo/A.sql",
+            "-- visibility: private\n-- output: sql\n-- member-location: nested-class\n-- nested-class: Other\n\n"
+                + "-- name: Aside\nSELECT 0;\n"
+        );
+        var constants = new SqlFile(
+            "/app/Repo/B.sql",
+            "-- visibility: public\n-- output: sql\n\n-- name: GetName\nSELECT 1;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [UserEntry(file)],
+            GeneratorHarness.NestedSampleSource("public", "", "protected"),
+            otherFiles: [other, constants]
+        );
+
+        run.Problems()
+            .ShouldBe([
+                Sqlsrc123AsProtected(
+                    "(3,10)-(3,17)",
+                    "",
+                    "public",
+                    "the file header for the query 'GetName'",
+                    "nested-class"
+                ),
+            ]);
+    }
+
     // The same method with no parameters and no rows takes no models, so it is public in the public class Sql.
     [Fact]
     public void Run_NestedClassMadePublicByAnotherFileOfATypeReachableAsProtectedWithNoModels_Compiles()

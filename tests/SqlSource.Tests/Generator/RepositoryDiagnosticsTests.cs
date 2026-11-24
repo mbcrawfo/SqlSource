@@ -173,6 +173,25 @@ public sealed class RepositoryDiagnosticsTests
         run.Sources[MethodsFile].ShouldContain("var connection = await (parameters ?? ");
     }
 
+    // The same with several queries of the database: none takes parameters, so the database does not.
+    [Fact]
+    public void Run_ConnectionParameterNamedParametersWithSeveralParameterlessQueries_IsTheSource()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: CountUsers\nSELECT id FROM users;\n\n-- name: ListUsers\nSELECT id FROM users;\n"
+        );
+
+        var run = RepositoryRuns.Run(
+            file,
+            [Entry(file, "CountUsers", [], [Column("id")]), Entry(file, "ListUsers", [], [Column("id")])],
+            ParametersSource
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain("var connection = await (parameters ?? ");
+    }
+
     // The members come before the primary constructor's parameters, so the parameter that the type stores in a field
     // is not captured a second time, which the compiler would warn of.
     [Fact]

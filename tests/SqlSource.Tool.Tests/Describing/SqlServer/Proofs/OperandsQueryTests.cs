@@ -21,7 +21,7 @@ public sealed class OperandsQueryTests
         var (tokens, statement, operands) = Read(Sql);
 
         OperandsQuery
-            .Text(Sql, tokens, statement, operands)
+            .Text(Sql, tokens, statement.With, statement.Body, operands)
             .ShouldBe(
                 "WITH c AS (SELECT 1 AS a)\nSELECT t.x\nAS [1],\nt.y\nAS [2]\n"
                     + "FROM t JOIN c ON c.a = t.id WHERE t.id > @p"
@@ -36,7 +36,13 @@ public sealed class OperandsQueryTests
         var tokens = TsqlTokens.Read(Sql);
         var statement = SelectStatement.Read(tokens).ShouldNotBeNull();
 
-        var text = OperandsQuery.Text(Sql, tokens, statement, [statement.Body.Items[0].Expression]);
+        var text = OperandsQuery.Text(
+            Sql,
+            tokens,
+            statement.With,
+            statement.Body,
+            [statement.Body.Items[0].Expression]
+        );
 
         text.ShouldBe("SELECT COALESCE(t.a, -- x\n t.b)\nAS [1]\nFROM t");
         var read = SelectStatement.Read(TsqlTokens.Read(text)).ShouldNotBeNull();
@@ -50,7 +56,9 @@ public sealed class OperandsQueryTests
         const string Sql = "SELECT CAST(NEXT VALUE FOR dbo.s AS int) AS a";
         var (tokens, statement, operands) = Read(Sql);
 
-        OperandsQuery.Text(Sql, tokens, statement, operands).ShouldBe("SELECT NEXT VALUE FOR dbo.s\nAS [1]");
+        OperandsQuery
+            .Text(Sql, tokens, statement.With, statement.Body, operands)
+            .ShouldBe("SELECT NEXT VALUE FOR dbo.s\nAS [1]");
     }
 
     // The hidden row of browse mode 2 is no operand's.

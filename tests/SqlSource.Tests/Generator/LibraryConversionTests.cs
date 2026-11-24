@@ -147,6 +147,47 @@ public sealed class LibraryConversionTests
         without.Sources.Keys.ShouldNotContain(ClassFile);
     }
 
+    // A type with queries of both engines gets each query the converters of its own target: NodaTime's rows serve SQL
+    // Server alone, so the PostgreSQL query that is planned first leaves the SQL Server query's rows in place.
+    [Fact]
+    public void Run_PostgresQueryBeforeASqlServerQueryOfNodaTime_ConvertsTheSqlServerQuery()
+    {
+        var postgres = new SqlFile("/app/Repo/A.sql", "-- name: ListIds\nSELECT id FROM users;\n");
+        var sqlServer = new SqlFile("/app/Repo/B.sql", "-- dialect: mssql\n" + NodaTimeOn + FindDates);
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Methods,
+            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
+            [
+                postgres,
+                Sidecars.Of(postgres, Entry(postgres, "ListIds", [], [Column("id")])),
+                sqlServer,
+                Sidecars.Of(
+                    sqlServer,
+                    MethodRuns.SqlServerEntry(
+                        sqlServer,
+                        "FindDates",
+                        [TestSidecars.Parameter(0, "d", Date, false)],
+                        [TestSidecars.Column(0, "d", Date)]
+                    )
+                ),
+            ],
+            references:
+            [
+                NpgsqlReferences.Npgsql10,
+                SqlClientReferences.SqlClient7,
+                LibraryReferences.NodaTime("3.3.7"),
+            ],
+            dialect: "postgres"
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(" ListIds(\n");
+        methods.ShouldContain("(" + Conversions + "LocalDateFromDateTime(reader.GetFieldValue<" + DateTime + ">(0)))");
+        methods.ShouldContain("parameter.Value = " + Conversions + "DateTimeFromLocalDate(parameters.D);\n");
+    }
+
     // On PostgreSQL the plugin teaches Npgsql NodaTime's types, so its rows go to the driver and call nothing.
     [Fact]
     public void Run_PostgresPluginRow_EmitsNoClass()

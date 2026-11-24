@@ -561,8 +561,8 @@
             "precision": 8,
             "scale": 0
           },
-          "nullable": true,
-          "nullableSource": "server",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": {
             "schema": "dbo",
             "table": "notes",

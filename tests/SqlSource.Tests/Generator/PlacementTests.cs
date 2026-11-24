@@ -1,5 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
+using System;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
@@ -270,6 +271,49 @@ public sealed class PlacementTests
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain(ProtectedPragma);
         methods.ShouldContain("        protected static partial class Sql\n");
+    }
+
+    // The warning is turned off only for a sealed type with a protected method: a public method of a sealed type, and a
+    // protected one of a type that is not sealed, are the compiler's to warn of, and it has nothing to warn of.
+    [Theory]
+    [InlineData("public sealed partial class Sample;", "public")]
+    [InlineData("public partial class Sample;", "protected")]
+    public void Run_MethodOnTheTypeThatIsNotAProtectedMemberOfASealedType_LeavesTheWarningOn(
+        string declaration,
+        string visibility
+    )
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- member-location: class\n-- visibility: " + visibility + "\n\n" + Users.Text
+        );
+        var source = SealedSample.Replace("public sealed partial class Sample;", declaration, StringComparison.Ordinal);
+
+        var run = MethodRuns.Run(file, [UserEntry(file)], source);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldNotContain("#pragma warning disable CS0628");
+    }
+
+    // A sealed class whose nested classes that hold methods are one protected and one public: the protected one is
+    // enough, so the methods' file turns the warning off.
+    [Fact]
+    public void Run_ProtectedAndPublicNestedClassesOfMethodsOnASealedClass_CompilesWithoutWarnings()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- member-location: nested-class\n-- visibility: protected\n\n"
+                + Users.Text
+                + "-- name: ListUsers\n-- nested-class: Other\n-- visibility: public\nSELECT id FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(file, [UserEntry(file), Entry(file, "ListUsers", [], [Column("id")])], SealedSample);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(ProtectedPragma);
+        methods.ShouldContain("        protected static partial class Sql\n");
+        methods.ShouldContain("        public static partial class Other\n");
     }
 
     // Two methods of one name in two classes do not clash: the method of Get on the type, which async-method-suffix

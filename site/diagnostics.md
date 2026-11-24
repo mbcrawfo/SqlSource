@@ -3804,15 +3804,16 @@ Under the output `models`, the constant or token method of the query is still ge
   - Reference the package `Microsoft.SqlServer.Types`, which Microsoft.Data.SqlClient needs to read them.  Map the type with the type override to the type of that package for it, as the message says: `geography=Microsoft.SqlServer.Types.SqlGeography` or `geometry=Microsoft.SqlServer.Types.SqlGeometry`.
 - **`hierarchyid` of SQL Server.**  Microsoft.Data.SqlClient reads it only when the application references the package `Microsoft.SqlServer.Types`.  Reference the package, and map the type with the type override to the type of that package, as the message says: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`.
 - **A SQL Server type that this version of SqlSource does not know, and a CLR type of your own assembly.**  Map it with the type override to the C# type that your application reads it as, as the message says.  Write `sys.newtype=MyApp.NewType` for a type of a newer SQL Server, or `dbo."Money"=MyApp.Money` for a CLR type of the schema `dbo`.
+- **A composite, a range or a multirange of `pg_catalog` whose name is `_` and at least one more character.**  No type override can name it, because `pg_catalog._x` means the array `x[]`.  Give a column a C# type with a [`-- column:` marker](reference/model-properties.md#column-marker).  For a parameter, declare it as `text` with a [`-- param:` marker](reference/parameters.md#param-marker), `-- param: @p text`, and cast it in the query, `@p::pg_catalog._x`.
 - **A parameter with no type, `record`, `unknown`, `void`, a kind of type that this version of SqlSource does not know, or a SQL Server type with no name.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand, or written by a newer tool.  Run `dotnet sqlsource describe`.
 
 When the message says to map the type, it names the key of the type by these rules:
 
-- **The key has the schema of the type.**  It is `public.address`, `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server.  A key without a schema must be a type that SqlSource knows.
+- **The key has the schema of the type.**  It is `public.address`, `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server.  A key without a schema must be a type that SqlSource knows.  A type named as an alias of another type keeps its schema, as in `pg_catalog.integer` or `sys.rowversion`, because the bare name means the other type.
 - **A schema or a name that needs quotes is in them**, as in `"my schema"."Order Item"`.
 - **A schema or a name with a line break, a tab or any other control character is written with escapes**, as in `"my schema".U&"Order\000AItem"`.  So the key can be written in a marker, which is one line.
 - **A name with a capital letter is quoted too**, as in `public."Status"`.  So an entry for it maps that type alone, and not one whose name differs only by case.
-- **For an array or a domain, the key is of the element or base that has no C# type.**  An entry for it maps the array or domain too.
+- **For an array or a domain, the key is of the element or base that has no C# type.**  An entry for it maps the array or domain too.  If no key can name that element or base, because its name is `_` and more in `pg_catalog`, the key is the array's, `pg_catalog._x[]`, or the domain's.
 
 See: [PostgreSQL types](reference/databases/postgresql/types.md#type-map), [SQL Server types](reference/databases/sqlserver/types.md#types)
 

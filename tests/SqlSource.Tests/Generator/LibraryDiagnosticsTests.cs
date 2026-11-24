@@ -103,6 +103,35 @@ public sealed class LibraryDiagnosticsTests
         run.Problems().ShouldBe(["SQLSRC281 /app/Repo/Users.sql(1,1)-(1,30): " + OnForPostgres]);
     }
 
+    // System.Text.Json is a library of the runtime, which a project that does not reference it cannot turn on; the
+    // error names the assembly.
+    [Fact]
+    public void Run_JsonOnInAProjectWithoutSystemTextJson_NamesTheAssembly()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- library-types: json=on\n\n" + ListEvents);
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Methods,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [file, Sidecars.Of(file, EventsEntry(file, "ListEvents"))],
+            supportedFramework: false,
+            references:
+            [
+                .. LibraryReferences.Net8Framework.Where(reference =>
+                    !reference.Display!.EndsWith("System.Text.Json.dll", StringComparison.Ordinal)
+                ),
+                NpgsqlReferences.Npgsql10,
+            ],
+            dialect: "postgres"
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC281 /app/Repo/Users.sql(1,1)-(1,26): System.Text.Json is on for the PostgreSQL query methods it "
+                + "reaches here, but the project does not reference System.Text.Json.  Reference System.Text.Json, or "
+                + "turn System.Text.Json off for these queries.",
+        ]);
+    }
+
     // Two types claim two files, each of one query that the project's settings file reaches: one error.
     [Fact]
     public void Run_OnReachingTwoTypesAndFiles_IsReportedOnce()
