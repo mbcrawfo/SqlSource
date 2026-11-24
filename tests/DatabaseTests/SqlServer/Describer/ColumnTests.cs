@@ -361,6 +361,42 @@ public sealed class ColumnTests(SqlServerDatabases sqlServer)
         }
     }
 
+    // persisted_not_null is the source column's own: a PERSISTED column whose expression may be NULL is not, though a
+    // table of another name has a PERSISTED NOT NULL column of its name, and the table whose name holds a "." and a
+    // "]" is found by its quoted name.
+    [Theory]
+    [InlineData("SELECT c FROM dbo.[td.persisted]]not_null]", true)]
+    [InlineData("SELECT c FROM dbo.td_persisted_nullable", false)]
+    public async Task ColumnsAsync_PersistedColumnsOfOneName_AreEachTheirOwnTables(string sql, bool expected)
+    {
+        await sqlServer.ExecuteAsync(
+            "DROP TABLE IF EXISTS dbo.[td.persisted]]not_null], dbo.td_persisted_nullable; "
+                + "CREATE TABLE dbo.[td.persisted]]not_null] "
+                + "(id int NOT NULL PRIMARY KEY, c AS CAST(id * 2 AS int) PERSISTED NOT NULL); "
+                + "CREATE TABLE dbo.td_persisted_nullable (id int NOT NULL PRIMARY KEY, c AS NULLIF(id, 0) PERSISTED)"
+        );
+        try
+        {
+            var row = (await ColumnsAsync(sql)).Single(row => !row.IsHidden);
+
+            (row.SourceType, row.PersistedNotNull).ShouldBe(("U", expected));
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP TABLE dbo.[td.persisted]]not_null], dbo.td_persisted_nullable");
+        }
+    }
+
+    // The text reaches the server whole, however long: a query after a comment of 5,000 characters, which a text cut
+    // at 4,000 would leave open.
+    [Fact]
+    public async Task ColumnsAsync_TextLongerThan4000Characters_IsDescribedWhole()
+    {
+        var rows = await ColumnsAsync($"/* {new string('x', 5000)} */ SELECT id FROM dbo.users");
+
+        rows.Where(static row => !row.IsHidden).Select(static row => row.Name).ShouldBe(["id"]);
+    }
+
     // The server names the synonym's table as the source, and not the synonym.
     [Fact]
     public async Task ColumnsAsync_Synonym_IsItsTable()

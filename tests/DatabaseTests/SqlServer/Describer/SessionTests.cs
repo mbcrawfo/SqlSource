@@ -42,6 +42,19 @@ public sealed class SessionTests(SqlServerDatabases sqlServer)
         ]);
     }
 
+    // The edition is the server's, read so that an Azure SQL Database, 5, or Managed Instance, 8, is refused: the
+    // container's Developer edition is 3.
+    [Fact]
+    public async Task OpenAsync_Container_AnswersItsEdition()
+    {
+        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+
+        var opened = await new SqlServerLive(session.Connection).OpenAsync(TestContext.Current.CancellationToken);
+
+        opened.Error.ShouldBeNull();
+        opened.EngineEdition.ShouldBe(3);
+    }
+
     // The server's message names the login, and the client is told state 1 whatever the cause.
     [Fact]
     public async Task OpenAsync_WrongPassword_IsSqlsrc224WithNoPartOfTheValue()

@@ -406,6 +406,22 @@ public sealed class RunLogTests : IDisposable
             .ShouldBe(["GetUser described", "ListUsers failed"]);
     }
 
+    // A file that a filter left out had none of its queries described, so its sidecar was not checked: no event and no
+    // line says it is the same.
+    [Fact]
+    public async Task Run_CheckWithAFilter_HasNoSidecarEventForAFileItLeftOut()
+    {
+        var other = _scene.Project.AddSql("Zebras.sql", "-- name: GetZebra\nSELECT 5;\n");
+        (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
+
+        var result = await _scene.DescribeAsync("Users.sql", "--check", "--verbose", "--log", "run.log");
+
+        result.ExitCode.ShouldBe(0);
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("same");
+        LogReader.Events(Log, "sidecar").Select(line => Text(line, "path")).ShouldBe([SidecarFormat.PathFor(_users)]);
+        result.Out.ShouldNotContain($"sidecar '{SidecarFormat.PathFor(other)}'");
+    }
+
     // A difference is a difference whatever else failed in the file.
     [Fact]
     public async Task Run_CheckOfAFileWithADifferenceAndAQueryThatFails_HasTheSidecarEventDiffers()
