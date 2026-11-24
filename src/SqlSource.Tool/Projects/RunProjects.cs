@@ -82,11 +82,7 @@ internal static class RunProjects
             switch (evaluation.State)
             {
                 case ProjectState.UsesSqlSource:
-                    if (evaluation.Manifest is { } manifest)
-                    {
-                        manifests.Add(manifest);
-                    }
-
+                    manifests.AddRange(evaluation.Manifests);
                     break;
 
                 case ProjectState.DoesNotUseSqlSource:
@@ -169,7 +165,7 @@ internal static class RunProjects
         RunEvents.Project(
             reporter.Trace,
             read.Value.ProjectPath,
-            new ProjectEvaluation(read.Value.ProjectPath, ProjectState.UsesSqlSource, read.Value)
+            new ProjectEvaluation(read.Value.ProjectPath, ProjectState.UsesSqlSource, [read.Value])
         );
         return Task.FromResult<ImmutableArray<ProjectManifest>>([read.Value]);
     }
