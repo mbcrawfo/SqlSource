@@ -10,16 +10,45 @@ internal sealed partial class ExpressionProofs
     // evaluate each reference apart, so an argument that changes between its test and its result can make it NULL.  An
     // argument proved not null proves the COALESCE only when every argument before it gives one value in a row; those
     // after it are never reached.  Every argument is converted to the result's type, so none may be of a CLR type.
+    //
+    // Every row of a FULL JOIN has its left side or its right side, whatever its ON.  So a column of one side, an
+    // earlier argument, and a column of the other, a later one, prove the COALESCE together when each is not null over
+    // its side's rows alone and the server names each as a stored column, which an absent side makes NULL and not a
+    // property of another source's CLR column: in a row of the first's side the first is reached and not null, and in
+    // any other the second is.  The arguments before the second must give one value, and so must the second unless it
+    // is the last, which is read once.
     private Proof Coalesce(TokenRange arguments, bool rows)
     {
         var parts = Arguments(arguments);
+        var sides = parts.Select(part => filtered?.SideOf(part)).ToList();
         var before = new List<Proof>(parts.Count);
         var alternatives = new List<Proof>(parts.Count);
-        foreach (var part in parts)
+        for (var at = 0; at < parts.Count; at++)
         {
+            var part = parts[at];
             alternatives.Add(AllOf([.. before, Expression(part, rows)]));
 
             var oneValue = OneValue(part);
+            if (sides[at] is { } side)
+            {
+                var read = at == parts.Count - 1 ? Proof.Yes : oneValue;
+                for (var earlier = 0; earlier < at; earlier++)
+                {
+                    if (sides[earlier] is { } other && other != side)
+                    {
+                        alternatives.Add(
+                            AllOf([
+                                .. before,
+                                read,
+                                SideLeaf(parts[earlier], other, rows),
+                                SideLeaf(part, side, rows),
+                                StoredLeaf(part),
+                            ])
+                        );
+                    }
+                }
+            }
+
             if (oneValue is Proof.Never)
             {
                 break;

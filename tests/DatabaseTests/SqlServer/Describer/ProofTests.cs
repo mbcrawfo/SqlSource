@@ -32,6 +32,10 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     private const string ShapesMix =
         "(SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT wkt FROM dbo.proof_shapes)";
 
+    // A FULL JOIN of proof_rows and proof_other, each with rows that find a match and rows that find none.
+    private const string RowsFullJoinOther =
+        "FROM dbo.proof_rows AS r FULL JOIN dbo.proof_other AS o ON o.rows_id = r.id";
+
     // NULL or 1 at random, each time it is evaluated.
     private const string Flip = "CASE WHEN ABS(CHECKSUM(NEWID())) % 2 = 0 THEN 1 END";
 
@@ -780,6 +784,70 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         {
             await ShouldDescribeColumnAsync($"{with} {select}", true, SidecarValues.NullableSource.Server);
             (await NullRowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+        });
+
+    // COALESCE over a column of each side of a FULL JOIN of proof_rows and proof_other, whose rows 3 to 5 of proof_rows
+    // and row 4 of proof_other find no match, beside rows that do: every row has its left or its right side, each
+    // column is not null over its side's rows alone, which "operands" asks the server, and each is a stored column.
+    [Theory]
+    [InlineData("", $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther}")]
+    [InlineData(
+        "",
+        "SELECT COALESCE(o.id, r.id) AS c FROM dbo.proof_rows AS r "
+            + "FULL OUTER JOIN dbo.proof_other AS o ON o.rows_id = r.id"
+    )]
+    [InlineData("", $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} WHERE COALESCE(r.a, -1) <> 30")]
+    [InlineData("", $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} JOIN dbo.proof_computed AS p ON p.id = 1")]
+    [InlineData(
+        "",
+        $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} LEFT JOIN dbo.proof_computed AS p ON p.id = o.id"
+    )]
+    [InlineData(
+        "",
+        "SELECT COALESCE(d.id, o.id) AS c FROM dbo.proof_rows AS r JOIN dbo.proof_dates AS d ON d.id = r.id "
+            + "FULL JOIN dbo.proof_other AS o ON o.rows_id = r.id"
+    )]
+    [InlineData(
+        "",
+        "SELECT COALESCE(r.id, o.id) AS c FROM (SELECT id FROM dbo.proof_rows) AS r "
+            + "FULL JOIN (SELECT id, rows_id FROM dbo.proof_other) AS o ON o.rows_id = r.id"
+    )]
+    [InlineData(
+        "WITH l AS (SELECT id FROM dbo.proof_rows WHERE a > 0), m AS (SELECT id, rows_id FROM dbo.proof_other)",
+        "SELECT COALESCE(l.id, m.id) AS c FROM l FULL JOIN m ON m.rows_id = l.id"
+    )]
+    [InlineData("", $"SELECT SUM(COALESCE(r.id, o.id)) AS c {RowsFullJoinOther} GROUP BY ROLLUP (r.g)")]
+    public Task DescribeAsync_CoalesceOverAFullJoin_NotNullAndNoNullRow(string with, string select) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync($"{with} {select}".Trim(), false, SidecarValues.NullableSource.Expression);
+            (await RowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+            (await NullRowsAsync(select, with)).ShouldBe(0, select);
+        });
+
+    // A column that is NULL in a row of its side, a row that has neither column through a third source, a later FULL
+    // or RIGHT JOIN, a left side whose source a LEFT JOIN makes optional, and a grouping set's total.
+    [Theory]
+    [InlineData($"SELECT COALESCE(r.id, o.rows_id) AS c {RowsFullJoinOther}")]
+    [InlineData(
+        $"SELECT COALESCE(r.id, p.id) AS c {RowsFullJoinOther} FULL JOIN dbo.proof_computed AS p ON p.id = o.id"
+    )]
+    [InlineData(
+        $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} FULL JOIN dbo.proof_computed AS p ON p.id = o.id + 100"
+    )]
+    [InlineData(
+        $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} RIGHT JOIN dbo.proof_computed AS p ON p.id = o.id + 100"
+    )]
+    [InlineData(
+        "SELECT COALESCE(p.id, o.id) AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_computed AS p ON p.id = r.id "
+            + "FULL JOIN dbo.proof_other AS o ON o.id = r.id"
+    )]
+    [InlineData($"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} GROUP BY ROLLUP (COALESCE(r.id, o.id))")]
+    public Task DescribeAsync_CoalesceOverAFullJoinThatLetsANullThrough_NullableAndNullRow(string sql) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server);
+            (await NullRowsAsync(sql)).ShouldBeGreaterThan(0, sql);
         });
 
     // Read from its one table, c is a row of that table, which the constraint keeps not null, though the server calls

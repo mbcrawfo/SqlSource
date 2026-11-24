@@ -22,6 +22,7 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// <param name="JoinStart">The index of the first word of the join that adds it; -1 for the first source.</param>
 /// <param name="IsDerived">True when it is a derived table.</param>
 /// <param name="IsFull">True when its own join is <c>FULL</c>.</param>
+/// <param name="IsRight">True when its own join is <c>RIGHT</c>.</param>
 internal sealed record JoinSource(
     string Name,
     string? OnePartName,
@@ -31,7 +32,8 @@ internal sealed record JoinSource(
     TokenRange Reference,
     int JoinStart,
     bool IsDerived,
-    bool IsFull
+    bool IsFull,
+    bool IsRight
 );
 
 /// <summary>A <c>FROM</c> that is a chain of joins read left to right, each source a name or a derived table.</summary>
@@ -103,7 +105,8 @@ internal static class JoinChain
                         joined.Source.Range,
                         joined.JoinStart,
                         joined.Source.IsDerived,
-                        joined.Kind == JoinKind.Full
+                        joined.Kind == JoinKind.Full,
+                        joined.Kind == JoinKind.Right
                     );
                 }
             ),

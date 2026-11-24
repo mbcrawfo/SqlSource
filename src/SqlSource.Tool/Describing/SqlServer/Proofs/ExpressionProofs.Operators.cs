@@ -88,6 +88,19 @@ internal sealed partial class ExpressionProofs
         return new Proof.Stored(_leaves.Count - 1);
     }
 
+    // A column of one side of the last FULL JOIN, asked over that side's rows alone.  In the select's context a
+    // grouping set's total holds it NULL.
+    private Proof SideLeaf(TokenRange column, OperandScope side, bool rows)
+    {
+        if (!rows && body.Grouping == SelectGrouping.Sets)
+        {
+            return Proof.No;
+        }
+
+        _leaves.Add((column, side));
+        return new Proof.Operand(_leaves.Count - 1);
+    }
+
     private readonly record struct AtTimeZoneParts(TokenRange Value, TokenRange Zone);
 
     private readonly record struct GuardParts(TokenRange Column, TokenRange Fallback);

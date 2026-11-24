@@ -747,6 +747,167 @@ public sealed class ExpressionProofsTests
         first.Holds(Answers(false, true)).ShouldBeFalse();
     }
 
+    // COALESCE over a column of each side of a FULL JOIN: every row has its left or its right side, so the COALESCE is
+    // not null when each side's column is not null over that side's rows alone, each asked in a call of its own, and
+    // the server names each as a stored column, which a side that is absent makes NULL.
+    [Theory]
+    [InlineData(true, true, true, true, true, true)]
+    [InlineData(false, true, true, true, true, false)]
+    [InlineData(true, false, true, true, true, false)]
+    [InlineData(true, true, false, true, true, false)]
+    [InlineData(true, true, true, false, true, false)]
+    [InlineData(true, true, true, true, false, false)]
+    public void Of_CoalesceOfEachSideOfAFullJoin_AsksEachSideAlone(
+        bool leftNotNull,
+        bool rightNotNull,
+        bool firstStored,
+        bool secondStored,
+        bool notClr,
+        bool holds
+    )
+    {
+        var (proof, operands) = ProveOverItsRows(
+            "WITH issued AS (SELECT i.id FROM billing.invoices AS i), "
+                + "received AS (SELECT p.invoice_id FROM billing.payments AS p) "
+                + "SELECT COALESCE(iss.id, rec.invoice_id) AS invoice_id "
+                + "FROM issued AS iss FULL JOIN received AS rec ON rec.invoice_id = iss.id"
+        );
+
+        operands.ShouldBe([
+            ("iss.id", OperandScope.Rows),
+            ("rec.invoice_id", OperandScope.Rows),
+            ("iss.id", OperandScope.LeftSide),
+            ("rec.invoice_id", OperandScope.RightSide),
+        ]);
+        proof
+            .Holds([
+                new OperandFacts(false, notClr, firstStored),
+                new OperandFacts(false, notClr, secondStored),
+                new OperandFacts(leftNotNull, true),
+                new OperandFacts(rightNotNull, true),
+            ])
+            .ShouldBe(holds);
+    }
+
+    // Each holds with every operand of the rows answered nullable and every side's not null, every one stored and of no
+    // CLR type, and with every side's answered nullable holds no more.
+    [Theory]
+    [InlineData("COALESCE(a.x, b.y)", FullJoin)]
+    [InlineData("COALESCE(b.y, a.x)", FullJoin)]
+    [InlineData("COALESCE([a].[x], [b].[y])", FullJoin)]
+    [InlineData("COALESCE(a.x, @p, b.y)", FullJoin)]
+    [InlineData("COALESCE(a.x, b.y, a.z)", FullJoin)]
+    [InlineData("COALESCE(a.x, b.y)", "FROM dbo.a AS a FULL OUTER JOIN dbo.b AS b ON b.id = a.id")]
+    [InlineData("COALESCE(a.x, b.y)", FullJoin + " WHERE a.z > 0 OR b.z > 0")]
+    [InlineData("COALESCE(a.x, b.y)", FullJoin + " JOIN dbo.c AS c ON c.id = 1")]
+    [InlineData("COALESCE(a.x, b.y)", FullJoin + " LEFT JOIN dbo.c AS c ON c.id = b.id")]
+    [InlineData("COALESCE(a.x, b.y)", FullJoin + " CROSS JOIN dbo.c AS c")]
+    [InlineData("COALESCE(c.x, b.y)", "FROM dbo.a AS a JOIN dbo.c AS c ON c.id = a.id " + FullJoinOfB)]
+    [InlineData(
+        "COALESCE(a.x, b.y)",
+        "FROM (SELECT id, x FROM dbo.a) AS a FULL JOIN (SELECT id, y FROM dbo.b) AS b ON 1 = 1"
+    )]
+    [InlineData("COALESCE(a.x, b.y)", "FROM dbo.a FULL JOIN dbo.b WITH (NOLOCK) ON b.id = a.id")]
+    [InlineData("COALESCE(a.x, b.y)", FullJoin + " GROUP BY COALESCE(a.x, b.y)")]
+    [InlineData("SUM(COALESCE(a.x, b.y))", FullJoin + " GROUP BY ROLLUP (a.z)")]
+    public void Of_CoalesceOverAFullJoin_ProvedByEachSide(string item, string from)
+    {
+        var (proof, operands) = ProveOverItsRows($"SELECT {item} AS c {from}");
+
+        proof.Holds(SideFacts(operands, sidesNotNull: true)).ShouldBeTrue();
+        proof.Holds(SideFacts(operands, sidesNotNull: false)).ShouldBeFalse();
+    }
+
+    // Each must stay unproved with every operand of the rows answered nullable and every side's not null, every one
+    // stored and of no CLR type.
+    [Theory]
+    // Both arguments of one side, or a column of no side.
+    [InlineData("COALESCE(a.x, a.y)", FullJoin)]
+    [InlineData("COALESCE(x, b.y)", FullJoin)]
+    [InlineData("COALESCE(a.x, c.y)", FullJoin + " JOIN dbo.c AS c ON c.id = b.id")]
+    [InlineData("COALESCE(dbo.a.x, b.y)", "FROM dbo.a FULL JOIN dbo.b AS b ON b.id = a.id")]
+    [InlineData("COALESCE(A.x, b.y)", FullJoin)]
+    [InlineData("COALESCE(a.x + 0, b.y)", FullJoin)]
+    [InlineData("COALESCE(a.x, b.y + 0)", FullJoin)]
+    [InlineData("COALESCE(a.x, b.y)", "FROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id CROSS JOIN other.a")]
+    // A later FULL JOIN or RIGHT JOIN, whose rows may have neither, and no FULL JOIN.
+    [InlineData("COALESCE(a.x, b.y)", FullJoin + " FULL JOIN dbo.c AS c ON c.id = b.id")]
+    [InlineData("COALESCE(a.x, b.y)", FullJoin + " RIGHT JOIN dbo.c AS c ON c.id = b.id")]
+    [InlineData("COALESCE(a.x, b.y)", FullJoin + " RIGHT OUTER JOIN dbo.c AS c ON c.id = b.id")]
+    [InlineData("COALESCE(a.x, b.y)", "FROM dbo.a AS a LEFT JOIN dbo.b AS b ON b.id = a.id")]
+    [InlineData("COALESCE(a.x, b.y)", "FROM dbo.a AS a, dbo.b AS b")]
+    // A FROM the reader does not follow.
+    [InlineData("COALESCE(a.x, b.y)", "FROM dbo.a AS a FULL JOIN dbo.b AS b JOIN dbo.c AS c ON c.id = b.id ON 1 = 1")]
+    [InlineData("COALESCE(a.x, b.y)", "FROM dbo.a AS a FULL HASH JOIN dbo.b AS b ON b.id = a.id")]
+    // An argument before the pair that changes, and a grouping set's total, or GROUP BY ALL.
+    [InlineData("COALESCE(a.x, RAND(), b.y)", FullJoin)]
+    [InlineData("COALESCE(a.x, b.y)", FullJoin + " GROUP BY ROLLUP (COALESCE(a.x, b.y))")]
+    [InlineData("COALESCE(a.x, b.y)", FullJoin + " GROUP BY ALL COALESCE(a.x, b.y)")]
+    public void Of_CoalesceOverAFullJoin_StaysUnproved(string item, string from)
+    {
+        var (proof, operands) = ProveOverItsRows($"SELECT {item} AS c {from}");
+
+        proof.Holds(SideFacts(operands, sidesNotNull: true)).ShouldBeFalse();
+    }
+
+    // The left side of the last FULL JOIN is the whole chain before it, so a source an earlier FULL, LEFT or RIGHT JOIN
+    // makes optional is asked over the rows that make it so, which the server answers nullable.
+    [Theory]
+    [InlineData("COALESCE(a.x, c.y)", FullJoin + " FULL JOIN dbo.c AS c ON c.id = b.id", "a.x")]
+    [InlineData("COALESCE(l.x, b.y)", "FROM dbo.a AS a LEFT JOIN dbo.l AS l ON l.id = a.id " + FullJoinOfB, "l.x")]
+    [InlineData("COALESCE(a.x, b.y)", "FROM dbo.a AS a RIGHT JOIN dbo.c AS c ON c.id = a.id " + FullJoinOfB, "a.x")]
+    [InlineData("COALESCE(a.x, b.y)", "FROM dbo.c AS c FULL JOIN dbo.a AS a ON a.id = c.id " + FullJoinOfB, "a.x")]
+    public void Of_CoalesceOverAFullJoin_HoldsOnlyBySidesOwnAnswer(string item, string from, string left)
+    {
+        var (proof, operands) = ProveOverItsRows($"SELECT {item} AS c {from}");
+
+        operands.ShouldContain((left, OperandScope.LeftSide));
+        proof.Holds(SideFacts(operands, sidesNotNull: true)).ShouldBeTrue();
+        proof
+            .Holds([
+                .. operands.Select(operand =>
+                    operand.Scope == OperandScope.Rows
+                        ? new OperandFacts(false, true, Stored: true)
+                        : new OperandFacts(operand.Scope != OperandScope.LeftSide, true, Stored: true)
+                ),
+            ])
+            .ShouldBeFalse();
+    }
+
+    private const string FullJoinOfB = "FULL JOIN dbo.b AS b ON b.id = a.id";
+
+    private const string FullJoin = "FROM dbo.a AS a " + FullJoinOfB;
+
+    // The proof of the one item of a query, read with what its FROM and WHERE keep, and each operand's text and scope.
+    private static (Proof Proof, List<(string Text, OperandScope Scope)> Operands) ProveOverItsRows(string sql)
+    {
+        var tokens = TsqlTokens.Read(sql);
+        var statement = SelectStatement.Read(tokens).ShouldNotBeNull();
+        var body = statement.Body;
+        var proofs = new ExpressionProofs(tokens, body, FilteredRows.Read(tokens, body, statement.Ctes));
+
+        var proof = proofs.Of(body.Items.ShouldHaveSingleItem().Expression);
+
+        return (
+            proof,
+            [
+                .. proofs.Operands.Select(
+                    (range, index) => (sql[tokens[range.Start].Start..tokens[range.End - 1].End], proofs.Scopes[index])
+                ),
+            ]
+        );
+    }
+
+    // Every operand stored and of no CLR type, those of the rows answered nullable and those of a side as given.
+    private static List<OperandFacts> SideFacts(List<(string Text, OperandScope Scope)> operands, bool sidesNotNull) =>
+        [
+            .. operands.Select(operand => new OperandFacts(
+                operand.Scope != OperandScope.Rows && sidesNotNull,
+                true,
+                Stored: true
+            )),
+        ];
+
     private static (bool Proved, bool Unproved, string Operands) Prove(string item, string tail)
     {
         var (sql, tokens, proofs, body) = Read($"SELECT {item} AS c FROM t AS t {tail}");

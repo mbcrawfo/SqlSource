@@ -108,6 +108,15 @@ public sealed class JoinChainTests
         chain.Tokens[sources[1].JoinStart].Text.ShouldBe("JOIN");
     }
 
+    [Fact]
+    public void Read_RightJoin_MarksTheSourceItAdds()
+    {
+        var (_, sources) = Read("FROM a FULL JOIN b ON 1 = 1 RIGHT OUTER JOIN c ON 1 = 1 LEFT JOIN d ON 1 = 1");
+
+        sources.Select(static source => source.IsRight).ShouldBe([false, false, true, false]);
+        sources.Select(static source => source.IsFull).ShouldBe([false, true, false, false]);
+    }
+
     private static (Chain Chain, IReadOnlyList<JoinSource> Sources) Read(string from)
     {
         var sql = $"SELECT 1 AS n {from}";

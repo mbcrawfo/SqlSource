@@ -130,6 +130,45 @@ internal sealed class FilteredRows
         };
     }
 
+    /// <summary>
+    /// The side of the last <c>FULL JOIN</c> whose source the range reads: a column <c>q.c</c> of two parts whose
+    /// <c>q</c> names, ordinally, exactly one source, which is before that join or is the source it adds; or null.
+    /// </summary>
+    /// <remarks>
+    /// Every row of a <c>FULL JOIN</c> has its left side or its right side, and a later join that is no <c>RIGHT</c> or
+    /// <c>FULL</c> one keeps that true of every row of the <c>FROM</c>, and the <c>WHERE</c> keeps some of them.  So
+    /// there is no side when no <c>FULL JOIN</c> is read or a <c>RIGHT JOIN</c> comes after the last one, and a source
+    /// added after it is of neither.
+    /// </remarks>
+    public OperandScope? SideOf(TokenRange range)
+    {
+        if (_sources is not { } sources || RowFilter.NameOf(_tokens, range) is not [var qualifier, _])
+        {
+            return null;
+        }
+
+        var full = Enumerable.Range(0, sources.Count).LastOrDefault(index => sources[index].IsFull, -1);
+        if (
+            full < 0
+            || sources.Skip(full + 1).Any(static source => source.IsRight)
+            || Enumerable
+                .Range(0, sources.Count)
+                .Where(index => string.Equals(sources[index].Name, qualifier, StringComparison.Ordinal))
+                .ToList()
+                is not [var at]
+        )
+        {
+            return null;
+        }
+
+        if (at < full)
+        {
+            return OperandScope.LeftSide;
+        }
+
+        return at == full ? OperandScope.RightSide : null;
+    }
+
     /// <summary>True when the range is a column alone that these rows hold no <c>NULL</c> of.</summary>
     public bool KeepsFromNull(TokenRange range) =>
         RowFilter.NameOf(_tokens, range) is { } parts && (_filter.Keeps(parts) || IsKeptByACte(parts));
