@@ -2713,7 +2713,7 @@ For a bundle of `diagnose`:
 
 - **The path of `--out` ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a bundle is not written over a .sql file, a sidecar, a project or a solution`, before it describes anything, and touches nothing.  Give the bundle a name of its own, such as `report.zip`.
 - **The bundle or its mapping cannot be written.**  Its folder is not there, it is a folder, or the system does not let the tool write it.  The query has been described by then.  Nothing is written past the file that failed: when the mapping fails, the bundle is written and its line printed, and the error is at the mapping.  The exit code is 1.  Run the command again with an `--out` in a folder that exists and can be written.
-- **An `--out` path that may be a secret is named by its position**, as for a log.  When the bundle is written, its lines say `bundle written to the path at position 5` and `mapping written beside the bundle, with '.mapping.json' after its name`.
+- **An `--out` path that may be a secret is named by its position**, as for a log.  When the bundle is written, its lines say `bundle written to the path at position 5` and `mapping written beside the bundle, with '.mapping.json' after its name`, and a mapping that cannot be written is `The mapping beside the path at position 5`.
 
 See: [Logs](reference/cli.md#logs), [making a bundle with `diagnose`](reference/bundles.md#diagnose)
 
@@ -5196,6 +5196,8 @@ The run goes on as if the file gave no connection at all.  So the tool reports [
 $ dotnet sqlsource describe /work/App
 /work/App/.env : error SQLSRC285: '/work/App/.env' cannot be read: Access to the path '/work/App/.env' is denied.
 ```
+
+An `--env-file` path that may be a secret is named by its position, as `The path at position 3 cannot be read: the system would not read it`, since the words of the system repeat the path: see [how an error names a path](reference/cli.md#paths).
 
 **Fix:** do one of these.
 

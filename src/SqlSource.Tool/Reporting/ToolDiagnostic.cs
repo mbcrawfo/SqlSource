@@ -70,8 +70,17 @@ internal sealed record ToolDiagnostic(
     /// <param name="given">The token that named the file, or null when none did.</param>
     public static ToolDiagnostic NotChanged(string path, string tried, string reason, UsageValue? given) =>
         given is { MayBePrintedAsPath: false }
-            ? Create(ToolDiagnostics.FileCannotBeChanged, given.NamedAsPath(path), tried, "the system refused")
+            ? NotChangedAt(given.NamedAsPath(path), tried)
             : NotChanged(path, tried, reason);
+
+    /// <summary>
+    /// <c>SQLSRC218</c> at no file, for a file that a message may name only by the position of its token, without the
+    /// system's reason, which quotes the path.
+    /// </summary>
+    /// <param name="named">How the message names the file: <c>The path at position 5</c>.</param>
+    /// <param name="tried">What could not be done to it: <c>written</c>, <c>deleted</c> or <c>read</c>.</param>
+    public static ToolDiagnostic NotChangedAt(string named, string tried) =>
+        Create(ToolDiagnostics.FileCannotBeChanged, named, tried, "the system refused");
 
     /// <summary>
     /// An error at a file, at no position in it, whose message does not quote that file first, as an error at a

@@ -122,6 +122,27 @@ public sealed class DotEnvRunTests : IDisposable
         );
     }
 
+    // A token that may be a secret, whose file the system refuses, as it does a name too long for it: the system's
+    // words quote the path, so the error names it by its position and leaves them out.
+    [Fact]
+    public async Task Run_EnvFileThatReadsAsNoPathAndCannotBeRead_IsSqlsrc285ByItsPosition()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = "Host=db";
+        _scene.Run.ReadTextFile = path =>
+            Path.GetFileName(path) == Secrets.Marker
+                ? throw new IOException($"The path '{path}' is too long")
+                : Hosts.ReadUnderTheTemporaryFolder(path);
+
+        var result = await _scene.DescribeAsync("--env-file", Secrets.Marker);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith(
+            "sqlsource : error SQLSRC285: The path at position 3 cannot be read: the system would not read it\n"
+        );
+        result.Error.ShouldNotContain(Secrets.Marker);
+        result.Out.ShouldNotContain(Secrets.Marker);
+    }
+
     // The file is shared with other programs: what is not the tool's is none of its business.
     [Fact]
     public async Task Run_DotEnvFileOfOtherKeysAlone_SaysNothing()

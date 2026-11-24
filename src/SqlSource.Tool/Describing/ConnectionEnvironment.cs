@@ -61,9 +61,16 @@ internal sealed class ConnectionEnvironment
     /// <param name="unitFolder">The folder of the run's unit.</param>
     /// <param name="envFile">The full path of the run's <c>.env</c> file, or null when it reads none.</param>
     /// <param name="host">The environment and the files.</param>
-    /// <param name="named">How a message names that file, which may be a position in place of its path.</param>
-    public static ConnectionEnvironment Load(string unitFolder, string? envFile, ToolHost host, string? named) =>
-        Of(host.GetEnvironmentVariable, DotEnvSearch.Read(envFile, host.ReadTextFile), unitFolder, named);
+    /// <param name="heldAt">
+    /// The position of an <c>--env-file</c> token that may not be printed, which then names the file, or null.
+    /// </param>
+    public static ConnectionEnvironment Load(string unitFolder, string? envFile, ToolHost host, int? heldAt) =>
+        Of(
+            host.GetEnvironmentVariable,
+            DotEnvSearch.Read(envFile, host.ReadTextFile, heldAt),
+            unitFolder,
+            heldAt is { } position ? $"the path at position {position}" : envFile
+        );
 
     /// <summary>
     /// The value of a variable and where it came from: the environment's when it is not blank, with the variable as

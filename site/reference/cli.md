@@ -92,6 +92,7 @@ sqlsource : error SQLSRC203: The path at position 2 is not a .sln, .slnx or .csp
 
 A path is named in full when it holds neither `=` nor `;` and one of these is true:
 
+- it is empty, as an unset variable of a shell gives;
 - it ends in `.sln`, `.slnx`, `.csproj`, `.sql`, `.env`, `.log`, `.json`, `.jsonl` or `.zip`, in any case;
 - it names a file or a folder that exists when the run starts;
 - it holds `/` or `\`, and the first folder it names exists, as `src/Typo/App` does when `src` exists.

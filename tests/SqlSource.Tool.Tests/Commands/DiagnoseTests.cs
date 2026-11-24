@@ -413,6 +413,24 @@ public sealed class DiagnoseTests : IDisposable
         result.Error.ShouldNotContain(Secrets.Marker);
     }
 
+    // The mapping beside a bundle named by its position is named by that position too, and not as the bundle.
+    [Fact]
+    public async Task Diagnose_MappingOfAnOutThatReadsAsNoPathCannotBeWritten_IsSQLSRC218BesideItsPosition()
+    {
+        _ = _scene.AddCase(_scene.Case(Plain));
+        _ = Directory.CreateDirectory(_scene.PathOf(Secrets.Marker + BundleFiles.MappingSuffix));
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", Secrets.Marker);
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBe("sqlsource: bundle written to the path at position 5\n");
+        result.Error.ShouldStartWith(
+            "sqlsource : error SQLSRC218: The mapping beside the path at position 5 could not be written: "
+                + "the system refused\n"
+        );
+        result.Error.ShouldNotContain(Secrets.Marker);
+    }
+
     // The zip is written, and then its mapping cannot be: the error is at the mapping, which the user needs to read
     // what comes back.
     [Fact]
@@ -455,6 +473,26 @@ public sealed class DiagnoseTests : IDisposable
         );
         File.Exists(zip).ShouldBeFalse();
         File.Exists(zip + BundleFiles.MappingSuffix).ShouldBeFalse();
+    }
+
+    // The same refusal at an --out that reads as no path: at no file, with the bundle named by its position.
+    [Fact]
+    public async Task Diagnose_ATokenThatCannotBeMadeSafeAtAnOutThatReadsAsNoPath_IsSQLSRC293ByItsPosition()
+    {
+        var fixture = _scene.Case(Plain);
+        _ = _scene.AddCase(fixture);
+        var capture = JsonNode.Parse(fixture.Capture).ShouldNotBeNull();
+        var open = capture["calls"]!.AsArray().First(static call => call!["method"]!.GetValue<string>() == "open")!;
+        open["answer"]!["settings"]!.AsArray().Add(new JsonObject { ["name"] = "work_mem", ["value"] = "4MB" });
+        _scene.AnswerWith(CaptureJson.Read(capture.ToJsonString()).Value.ShouldNotBeNull());
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", Secrets.Marker);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith("sqlsource : error SQLSRC293: The bundle cannot be made safe to post: ");
+        result.Error.ShouldContain("    bundle: The path at position 5\n");
+        result.Error.ShouldNotContain(Secrets.Marker);
+        File.Exists(_scene.PathOf(Secrets.Marker)).ShouldBeFalse();
     }
 
     // SQL Server's describer and renaming, as PostgreSQL's above.

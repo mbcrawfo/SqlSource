@@ -339,7 +339,7 @@ internal static class DiagnoseRun
         await host.Out.WriteLineAsync(Cli.LinePrefix + WrittenLine("bundle", outPath, output));
         var mappingPath = outPath + BundleFiles.MappingSuffix;
         var text = Utf8.GetBytes(MappingFile.Write(mapping));
-        if (!Write(mappingPath, output, stream => stream.Write(text, 0, text.Length), context))
+        if (!Write(mappingPath, output, stream => stream.Write(text, 0, text.Length), context, isMapping: true))
         {
             return;
         }
@@ -391,7 +391,13 @@ internal static class DiagnoseRun
 
     // Makes the file, or empties the one that is there, and writes it.  False when the system would not, which is
     // SQLSRC218 at the file.
-    private static bool Write(string path, UsageValue output, Action<Stream> write, RunContext context)
+    private static bool Write(
+        string path,
+        UsageValue output,
+        Action<Stream> write,
+        RunContext context,
+        bool isMapping = false
+    )
     {
         try
         {
@@ -401,7 +407,15 @@ internal static class DiagnoseRun
         }
         catch (Exception exception) when (FileErrors.IsPathError(exception))
         {
-            context.Reporter.Report(ToolDiagnostic.NotChanged(path, "written", exception.Message, output));
+            // A mapping beside a bundle that is named by its position is named by that position too.
+            context.Reporter.Report(
+                isMapping && !output.MayBePrintedAsPath
+                    ? ToolDiagnostic.NotChangedAt(
+                        $"The mapping beside the path at position {output.Position}",
+                        "written"
+                    )
+                    : ToolDiagnostic.NotChanged(path, "written", exception.Message, output)
+            );
             return false;
         }
     }

@@ -181,7 +181,7 @@ internal static class DescribeRun
             sources.UnitFolder,
             sources.EnvFile,
             context.Host,
-            sources.EnvFileNamed
+            sources.EnvFileHeldAt
         );
         foreach (var error in environment.Errors)
         {

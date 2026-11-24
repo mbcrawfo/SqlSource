@@ -136,4 +136,4 @@ If a bundle holds the names and the SQL of the person who made it, `replay` says
 - Inside a quoted value, a control character is written as JSON writes it: `\n` for a line break, and `\t` for a tab.
 - A tab outside a quoted value is printed as it is.
 
-A bundle that cannot be read or replayed is an error, from [SQLSRC288](../diagnostics.md#sqlsrc288) to [SQLSRC291](../diagnostics.md#sqlsrc291).  The error names the bundle at its full path, and the exit code is `1`.  If the path holds `=` or `;`, the error names it as `The path at position <n>` instead, on a line labelled `bundle`.  The tool names each value of the command line that can be a secret in this way.
+A bundle that cannot be read or replayed is an error, from [SQLSRC288](../diagnostics.md#sqlsrc288) to [SQLSRC291](../diagnostics.md#sqlsrc291).  The error names the bundle at its full path, and the exit code is `1`.  If the path may be a secret, the error names it as `The path at position <n>` instead, on a line labelled `bundle`: see [how an error names a path](cli.md#paths).  The tool names each value of the command line that can be a secret in this way.

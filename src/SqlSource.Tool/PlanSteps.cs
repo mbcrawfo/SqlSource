@@ -254,11 +254,11 @@ internal static class PlanSteps
         var envFile = EnvFileOf(usage, unitFolder, host);
         return new ConnectionSources(ConnectionsOf(usage), unitFolder, envFile)
         {
-            EnvFileNamed =
+            EnvFileHeldAt =
                 envFile is not null
                 && SharedOptions.ValuesOf(usage, SharedOptions.EnvFile) is [{ MayBePrintedAsPath: false } held]
-                    ? $"the path at position {held.Position}"
-                    : envFile,
+                    ? held.Position
+                    : null,
         };
     }
 
