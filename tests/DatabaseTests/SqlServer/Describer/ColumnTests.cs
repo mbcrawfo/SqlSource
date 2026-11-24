@@ -257,6 +257,20 @@ public sealed class ColumnTests(SqlServerDatabases sqlServer)
         }
     }
 
+    // The server cannot say whether the one column of FOR JSON is an identity or a computed column, and answers NULL
+    // for both: the sidecar records that it is not known, and never that it is not.
+    [Fact]
+    public async Task DescribeAsync_ForJson_RecordsIdentityAndComputedAsUnknown()
+    {
+        var described = await Sessions.ShouldDescribeAsync(
+            sqlServer.ConnectionString,
+            Of(SqlDialectRules.SqlServer, "SELECT id, name FROM dbo.users FOR JSON PATH")
+        );
+
+        var column = described.Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+        (column.Identity, column.Computed).ShouldBe((null, null));
+    }
+
     // Mode 1 adds the key and rowversion columns of every table read; mode 2 adds ROWSTAT alone, whose name the server
     // ends with a NUL.
     [Fact]

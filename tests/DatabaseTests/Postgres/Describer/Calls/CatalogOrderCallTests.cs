@@ -65,16 +65,16 @@ public sealed class CatalogOrderCallTests(PostgresDatabases postgres)
         }
     }
 
-    // A label added BEFORE another sorts before it, though it was added after.
+    // A label added BEFORE another sorts before it, though it was added after and its text sorts after it.
     [Fact]
     public async Task TypesAsync_EnumWithALabelAddedBefore_AnswersTheLabelsInTheirOrder()
     {
         await postgres.ExecuteAsync(
-            "DROP TYPE IF EXISTS public.td_ordered; CREATE TYPE public.td_ordered AS ENUM ('b')"
+            "DROP TYPE IF EXISTS public.td_ordered; CREATE TYPE public.td_ordered AS ENUM ('a')"
         );
         try
         {
-            await postgres.ExecuteAsync("ALTER TYPE public.td_ordered ADD VALUE 'a' BEFORE 'b'");
+            await postgres.ExecuteAsync("ALTER TYPE public.td_ordered ADD VALUE 'b' BEFORE 'a'");
             var oid = Convert.ToInt64(
                 await postgres.ScalarAsync("SELECT 'public.td_ordered'::pg_catalog.regtype::pg_catalog.oid"),
                 CultureInfo.InvariantCulture
@@ -85,7 +85,7 @@ public sealed class CatalogOrderCallTests(PostgresDatabases postgres)
             );
 
             answer.Error.ShouldBeNull(answer.Error?.Message);
-            answer.Rows.ShouldNotBeNull().Single(row => row.Oid == oid).EnumLabels.ShouldBe(["a", "b"]);
+            answer.Rows.ShouldNotBeNull().Single(row => row.Oid == oid).EnumLabels.ShouldBe(["b", "a"]);
         }
         finally
         {

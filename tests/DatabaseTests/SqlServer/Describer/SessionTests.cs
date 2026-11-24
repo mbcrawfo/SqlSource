@@ -42,8 +42,8 @@ public sealed class SessionTests(SqlServerDatabases sqlServer)
         ]);
     }
 
-    // The edition is the server's, read so that an Azure SQL Database, 5, or Managed Instance, 8, is refused: the
-    // container's Developer edition is 3.
+    // The edition is the server's, read so that an Azure SQL Database, 5, or Managed Instance, 8, which reports a
+    // version of its own, is accepted whatever version it reports: the container's Developer edition is 3.
     [Fact]
     public async Task OpenAsync_Container_AnswersItsEdition()
     {
@@ -233,6 +233,179 @@ public sealed class SessionTests(SqlServerDatabases sqlServer)
 
         _ = await Should.ThrowAsync<OperationCanceledException>(answered);
         _ = thrown.ShouldNotBeNull("the token was cancelled before the server ran the command");
+    }
+
+    // A probe that is cancelled while the server runs it is the cancellation, and never a probe that does not bind,
+    // though SqlClient reports it as an error below the class that ends the connection.
+    [Fact]
+    public async Task ProbeAsync_CancelledWhileTheServerRunsIt_ThrowsOperationCanceled()
+    {
+        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var id = await SessionIdAsync(session);
+
+        await using var locked = await LockedTable.HoldAsync(sqlServer);
+        var probed = ProbeAsync(session, locked, cancel.Token);
+        try
+        {
+            await WaitOnTheLockAsync(id);
+        }
+        finally
+        {
+            // A wait that was never seen is ended too, so that the lock is not released under a running probe.
+            await cancel.CancelAsync();
+        }
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(probed);
+    }
+
+    // A probe that runs out of the connection's command timeout says nothing of the batch: its answer is the timeout,
+    // and never a probe that does not bind, though SqlClient reports it as an error below the class that ends the
+    // connection.  The lock holds the probe past the timeout, which ends it whenever the server took the lock.
+    [Fact]
+    public async Task ProbeAsync_TimedOut_AnswersTheTimeoutAndNoBinding()
+    {
+        var connection = new SqlConnectionStringBuilder(sqlServer.ConnectionString) { CommandTimeout = 1 };
+        await using var session = await Sessions.OpenSessionAsync(connection.ConnectionString);
+
+        await using var locked = await LockedTable.HoldAsync(sqlServer);
+        var answer = await ProbeAsync(session, locked, TestContext.Current.CancellationToken);
+
+        answer.Binds.ShouldBeNull();
+        LinesOf(answer.Error).ShouldBe(["Msg -2, Level 11, State 0: " + ConnectionTexts.NoAnswerInTime]);
+    }
+
+    // A probe whose session the server ends says nothing of the batch: its answer is the lost connection, and never a
+    // probe that does not bind.
+    [Fact]
+    public async Task ProbeAsync_SessionKilledWhileTheServerRunsIt_AnswersTheLostConnectionAndNoBinding()
+    {
+        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+        var id = await SessionIdAsync(session);
+
+        await using var locked = await LockedTable.HoldAsync(sqlServer);
+        var probed = ProbeAsync(session, locked, TestContext.Current.CancellationToken);
+        await WaitOnTheLockAsync(id);
+        await sqlServer.ExecuteAsync(string.Create(CultureInfo.InvariantCulture, $"KILL {id}"));
+        var answer = await probed;
+
+        answer.Binds.ShouldBeNull();
+        var errors = answer.Error.ShouldNotBeNull().Errors;
+        errors.ShouldNotBeEmpty();
+        errors.ShouldAllBe(static row => row.Message == ConnectionTexts.LostConnection);
+    }
+
+    // A session that the server ended between two calls: the next call fails on the connection, and every call after
+    // it finds the connection closed, each a SQLSRC225 that the connection was lost and never a bug.  SqlClient opens
+    // again a connection that the server ended while it was idle, unless ConnectRetryCount is 0, so the test's is.
+    [Fact]
+    public async Task DescribeAsync_SessionKilledBetweenCalls_IsSqlsrc225ThatTheConnectionWasLost()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var connection = new SqlConnectionStringBuilder(sqlServer.ConnectionString) { ConnectRetryCount = 0 };
+        await using var session = await Sessions.OpenSessionAsync(connection.ConnectionString);
+        var id = await SessionIdAsync(session);
+        var request = DescribeRequests.Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users");
+
+        await sqlServer.ExecuteAsync(string.Create(CultureInfo.InvariantCulture, $"KILL {id}"));
+        var first = await session.DescribeAsync(request, token);
+        var second = await session.DescribeAsync(request, token);
+
+        foreach (var described in (IEnumerable<Outcome<QueryDescription, DescribeFailure>>)[first, second])
+        {
+            var failure = described.Failure.ShouldNotBeNull();
+            failure.Descriptor.Id.ShouldBe("SQLSRC225");
+            failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+            failure.ServerLines.ShouldNotBeEmpty();
+            failure.ServerLines.ShouldAllBe(static line =>
+                line.EndsWith(ConnectionTexts.LostConnection, StringComparison.Ordinal)
+            );
+        }
+    }
+
+    // The probe of the locked table that "parameters" would send for a reused parameter, on the session's connection.
+    private static Task<SqlServerProbeAnswer> ProbeAsync(
+        SqlServerSession session,
+        LockedTable locked,
+        CancellationToken token
+    ) =>
+        new SqlServerLive(session.Connection).ProbeAsync(
+            new SqlServerProbeRequest($"SELECT id FROM dbo.{locked.Name} WHERE id = @a", "@a int"),
+            token
+        );
+
+    private static async Task<int> SessionIdAsync(SqlServerSession session)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var read = await session.Connection.CommandAsync("SELECT CAST(@@SPID AS int)", token);
+        return (int)await read.ExecuteScalarAsync(token);
+    }
+
+    private Task WaitOnTheLockAsync(int session) =>
+        Eventually.TrueAsync(
+            async () => await sqlServer.ScalarAsync(RunningWaitOf(session)) is 1,
+            "The server never showed the session waiting on the lock."
+        );
+
+    private static EquatableArray<string> LinesOf(SqlServerServerError? error) =>
+        SqlServerErrors.ServerLines(error.ShouldNotBeNull());
+
+    // A table of the test's own whose schema a second connection holds locked by an ALTER in a transaction it leaves
+    // open, so that a probe of it waits with no end of its own.  Disposing it rolls the ALTER back and drops the table.
+    private sealed class LockedTable : IAsyncDisposable
+    {
+        private readonly SqlServerDatabases _sqlServer;
+        private readonly SqlConnection _holder;
+        private SqlTransaction? _transaction;
+
+        private LockedTable(SqlServerDatabases sqlServer, SqlConnection holder, string name)
+        {
+            _sqlServer = sqlServer;
+            _holder = holder;
+            Name = name;
+        }
+
+        public string Name { get; }
+
+        public static async Task<LockedTable> HoldAsync(SqlServerDatabases sqlServer)
+        {
+            var token = TestContext.Current.CancellationToken;
+            var name = $"td_probe_{Guid.NewGuid():N}";
+            await sqlServer.ExecuteAsync($"CREATE TABLE dbo.{name} (id int NOT NULL PRIMARY KEY)");
+            var locked = new LockedTable(sqlServer, new SqlConnection(sqlServer.ConnectionString), name);
+            try
+            {
+                await locked._holder.OpenAsync(token);
+                locked._transaction = (SqlTransaction)await locked._holder.BeginTransactionAsync(token);
+                _ = await locked._holder.ExecuteAsync(
+                    $"ALTER TABLE dbo.{name} ADD x int NULL",
+                    transaction: locked._transaction
+                );
+                return locked;
+            }
+            catch
+            {
+                await locked.DisposeAsync();
+                throw;
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                if (_transaction is not null)
+                {
+                    await _transaction.DisposeAsync();
+                }
+
+                await _holder.DisposeAsync();
+            }
+            finally
+            {
+                await _sqlServer.ExecuteAsync($"DROP TABLE dbo.{Name}");
+            }
+        }
     }
 
     // Takes the session's exclusive application lock of the resource, waiting for it as long as it takes.
