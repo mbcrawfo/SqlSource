@@ -340,11 +340,6 @@
           "Microsoft.IdentityModel.Logging": "8.16.0"
         }
       },
-      "Microsoft.SqlServer.Server": {
-        "type": "Transitive",
-        "resolved": "1.0.0",
-        "contentHash": "N4KeF3cpcm1PUHym1RmakkzfkEv3GRMyofVv40uXsQhCQeglr2OHNcUk2WOG51AKpGO8ynGpo9M/kFXSzghwug=="
-      },
       "Microsoft.Testing.Extensions.Telemetry": {
         "type": "Transitive",
         "resolved": "2.4.0",
@@ -518,13 +513,19 @@
       "sqlsource": {
         "type": "Project"
       },
+      "SqlSource.DatabaseTests.SqlServer.ClrType": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.SqlServer.Server": "[1.0.0, )"
+        }
+      },
       "SqlSource.DatabaseTests.TestHarness": {
         "type": "Project",
         "dependencies": {
           "Shouldly": "[4.3.0, )",
-          "SqlSource": "[0.1.0-dev, )",
-          "SqlSource.Repository": "[0.1.0-dev, )",
-          "SqlSource.Testing": "[0.1.0-dev, )",
+          "SqlSource": "[0.2.1-dev, )",
+          "SqlSource.Repository": "[0.2.1-dev, )",
+          "SqlSource.Testing": "[0.2.1-dev, )",
           "Testcontainers.MsSql": "[4.16.0, )",
           "Testcontainers.PostgreSql": "[4.16.0, )",
           "xunit.v3.assert": "[4.0.1, )",
@@ -539,8 +540,8 @@
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Shouldly": "[4.3.0, )",
-          "SqlSource": "[0.1.0-dev, )",
-          "SqlSource.Repository": "[0.1.0-dev, )",
+          "SqlSource": "[0.2.1-dev, )",
+          "SqlSource.Repository": "[0.2.1-dev, )",
           "xunit.v3.extensibility.core": "[4.0.1, )"
         }
       },
@@ -552,7 +553,7 @@
           "Microsoft.VisualStudio.SolutionPersistence": "[1.0.52, )",
           "Npgsql": "[10.0.3, )",
           "Npgsql.NetTopologySuite": "[10.0.3, )",
-          "SqlSource": "[0.1.0-dev, )",
+          "SqlSource": "[0.2.1-dev, )",
           "System.CommandLine": "[2.0.12, )"
         }
       },
@@ -562,11 +563,11 @@
           "Dapper": "[2.1.89, )",
           "Microsoft.CodeAnalysis.CSharp": "[5.9.0, )",
           "Shouldly": "[4.3.0, )",
-          "SqlSource": "[0.1.0-dev, )",
-          "SqlSource.DatabaseTests.TestHarness": "[0.1.0-dev, )",
-          "SqlSource.Repository": "[0.1.0-dev, )",
-          "SqlSource.Testing": "[0.1.0-dev, )",
-          "SqlSource.Tool": "[0.1.0-dev, )",
+          "SqlSource": "[0.2.1-dev, )",
+          "SqlSource.DatabaseTests.TestHarness": "[0.2.1-dev, )",
+          "SqlSource.Repository": "[0.2.1-dev, )",
+          "SqlSource.Testing": "[0.2.1-dev, )",
+          "SqlSource.Tool": "[0.2.1-dev, )",
           "xunit.v3.assert": "[4.0.1, )",
           "xunit.v3.extensibility.core": "[4.0.1, )"
         }
@@ -576,6 +577,12 @@
         "requested": "[5.9.0, )",
         "resolved": "5.9.0",
         "contentHash": "jMNOo+uoBGiWbZ6Wx0dqU93r5WD4P5WnIRZdoz67RP5N09OUetHgAbo4L7hihOH1NHdD2TgW5/l+SP4gQukwww=="
+      },
+      "Microsoft.SqlServer.Server": {
+        "type": "CentralTransitive",
+        "requested": "[1.0.0, )",
+        "resolved": "1.0.0",
+        "contentHash": "N4KeF3cpcm1PUHym1RmakkzfkEv3GRMyofVv40uXsQhCQeglr2OHNcUk2WOG51AKpGO8ynGpo9M/kFXSzghwug=="
       },
       "Microsoft.VisualStudio.SolutionPersistence": {
         "type": "CentralTransitive",

@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Data.Common;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using SqlSource.DatabaseTests.SqlServer.Realistic;
 using SqlSource.DatabaseTests.TestHarness;
@@ -6,7 +9,8 @@ using SqlSource.DatabaseTests.TestHarness;
 namespace SqlSource.DatabaseTests.SqlServer;
 
 // The SQL Server of the collection UsesSqlServer: the database "fixtures" with the fixture schema, the database
-// "realistic" with its schema and seed, and the end-to-end databases "app" and "billing", each made once.
+// "realistic" with its schema and seed, the end-to-end databases "app" and "billing", and the database "user_clr" of
+// UserClrDatabase, each made once.
 public sealed class SqlServerDatabases() : SqlServerContainer(SqlClientFactory.Instance, EngineImage.SqlServer.Image)
 {
     public const string Database = "fixtures";
@@ -46,4 +50,8 @@ public sealed class SqlServerDatabases() : SqlServerContainer(SqlClientFactory.I
             ),
             (BillingDatabase, EndToEndFiles.SchemaAndSeed(EndToEndEngine.SqlServer, BillingDatabase)),
         ];
+
+    // The database "user_clr", of a CLR type of a user's own assembly, made last, since it enables CLR on the server.
+    protected override Task BuiltAsync(DbDataSource server, CancellationToken token) =>
+        UserClrDatabase.CreateAsync(server, SourceOf, token);
 }

@@ -68,7 +68,7 @@ A type that the table does not name gets its C# type by what it is:
 |----|----|
 | An alias type, `CREATE TYPE dbo.Email FROM nvarchar(320)` | Its base type's C# type: `dbo.Email` is a `string`.  To give it another, map it with the type override by its schema and name, `dbo.Email=MyApp.Email`.  `sysname` is a `string` |
 | A type of a newer SQL Server | None: SQLSRC246.  Map it with the type override to the type the application reads it as; the message names the key to write |
-| A CLR type of your own assembly | None: a query that returns or takes one cannot be described, as [a CLR type of your own](#limit-user-clr-type) says |
+| A CLR type of your own assembly, `CREATE TYPE dbo.Grade EXTERNAL NAME ...` | None: SQLSRC246.  Map it with the type override by its schema and name, `dbo.Grade=MyApp.Grade`, as [a CLR type of your own](#user-clr-type) says |
 
 <a id="type-notes"></a>
 
@@ -84,23 +84,41 @@ A type that the table does not name gets its C# type by what it is:
 - **`json`, the type of SQL Server 2025, is a `string`.**  It is a `JsonElement` where the library types turn System.Text.Json on: see [JSON](libraries.md#json).
 - **`vector` is a `Microsoft.Data.SqlTypes.SqlVector<float>`**, a type of Microsoft.Data.SqlClient.  The project references Microsoft.Data.SqlClient to name it.
 
+<a id="user-clr-type"></a>
+
+## A CLR type of your own
+
+A CLR type of your own assembly, made by `CREATE TYPE ... EXTERNAL NAME`, has no C# type until you map it.  A query that returns or takes one is described, and its build reports [SQLSRC246](../../../diagnostics.md#sqlsrc246), which names the key to map.  To read and send the type:
+
+1. Build the type's source for .NET too, with the same type name, in an assembly of the same name as the one on the server.  On .NET, the type takes its `SqlUserDefinedType` attribute from the package `Microsoft.SqlServer.Server`.
+2. Reference that build from the project of your queries.
+3. Map the type with the [type override](../../type-mapping.md#setting-type-overrides) by its schema and name, to the type of that build.
+
+For the type `dbo.Grade` of the assembly `Grades`, which `CREATE ASSEMBLY Grades` loaded into the database:
+
+```sql mssql
+CREATE TYPE dbo.Grade EXTERNAL NAME Grades.[MyApp.Grade];
+CREATE TABLE dbo.grades (id int NOT NULL PRIMARY KEY, grade dbo.Grade NOT NULL);
+```
+
+The application references a .NET build of `MyApp.Grade` in an assembly named `Grades`, and the settings file maps the type:
+
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "typeOverrides": {
+        "dbo.Grade": "MyApp.Grade",
+    },
+}
+```
+
+A query method then reads a column of the type as a `MyApp.Grade`, and sends a parameter of it as a `dbo.Grade`.  Microsoft.Data.SqlClient finds the C# type by its name and its assembly's name, as SQL Server gives them.
+
+SqlSource treats a column of such a type as one that can be null in some queries where SQL Server says it is never null, as it treats `geometry`: see [which columns can be null](nullability.md#nullability).
+
 <a id="limits"></a>
 
 ## Limits
-
-<a id="limit-user-clr-type"></a>
-
-### SQLSRC200 for a query of a CLR type of your own
-
-**What you see.**  `dotnet sqlsource describe` stops with [SQLSRC200](../../../diagnostics.md#sqlsrc200), `InvalidOperationException`, at a query that returns a column of a CLR type of your own assembly, made by `CREATE TYPE ... EXTERNAL NAME`, or takes a parameter of one.
-
-**Why.**  SQL Server names no system type for such a type when SqlSource describes the query, and SqlSource cannot read a type without one.  `hierarchyid`, `geography` and `geometry` are not affected.
-
-**What to do.**  Do one of these:
-
-- Return the column converted to a type SqlSource reads, such as `CAST(tag AS varbinary(max))` or `tag.ToString()`, and convert it in your code.
-- Declare the parameter as such a type with a [`-- param:` marker](../../parameters.md#param-marker), such as `nvarchar(100)`, and convert it in the query with `CAST(@tag AS dbo.Tag)`.
-- Move the query into a file of its own whose [output](../../settings.md#setting-output) is `sql`, which is not described.
 
 <a id="limit-ef-core-sqlclient"></a>
 

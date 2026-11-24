@@ -16,6 +16,9 @@ public sealed class SqlServerTypesTests
     private const string TypesAssembly =
         "Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91";
 
+    // The assembly-qualified name of a CLR type of a user's own assembly, as the server answers it.
+    private const string UserClrAssembly = "Tag, TagAsm, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null";
+
     [Theory]
     [InlineData("bigint", 8, 19, 0)]
     [InlineData("decimal(18,4)", 9, 18, 4)]
@@ -197,6 +200,59 @@ public sealed class SqlServerTypesTests
     [Fact]
     public void Declared_SystemType_IsItsName() =>
         SqlServerTypes.Declared(new SqlServerType("decimal(18,4)", 9, 18, 4, null)).ShouldBe("decimal(18,4)");
+
+    // A CLR type of a user's own assembly has no system type name, on 2017 and 2025 alike: it is named by its user
+    // type, and declared by it in brackets.
+    [Fact]
+    public void FromColumn_UserClrType_IsNamedByItsUserType()
+    {
+        var type = SqlServerTypes.FromColumn(Column(null, 5, 0, 0, "dbo", "Tag", UserClrAssembly));
+
+        type.ShouldBe(new SqlServerType("dbo.Tag", 5, 0, 0, new SqlServerUserType("dbo", "Tag", UserClrAssembly)));
+        SqlServerTypes.Spelled(type).ShouldBe("dbo.Tag");
+        SqlServerTypes.Declared(type).ShouldBe("[dbo].[Tag]");
+    }
+
+    [Fact]
+    public void FromParameter_UserClrType_IsNamedByItsUserType() =>
+        SqlServerTypes
+            .FromParameter(new SqlServerParameterRow("@t", null, 5, 0, 0, "dbo", "Tag", UserClrAssembly))
+            .ShouldBe(new SqlServerType("dbo.Tag", 5, 0, 0, new SqlServerUserType("dbo", "Tag", UserClrAssembly)));
+
+    [Fact]
+    public void FromDeclared_UserClrType_IsNamedByItsUserType() =>
+        SqlServerTypes
+            .FromDeclared(new SqlServerDeclaredRow(1, null, 5, 0, 0, "my schema", "odd ]type", UserClrAssembly))
+            .ShouldBe(
+                new SqlServerType(
+                    "my schema.odd ]type",
+                    5,
+                    0,
+                    0,
+                    new SqlServerUserType("my schema", "odd ]type", UserClrAssembly)
+                )
+            );
+
+    // A row with no type name is a CLR type of a user only with both its user type's name and an assembly.
+    [Theory]
+    [InlineData("dbo", "Email", null)]
+    [InlineData(null, null, UserClrAssembly)]
+    public void FromColumn_RowWithoutANameThatIsNoUserClrType_ThrowsInvalidOperationException(
+        string? schema,
+        string? name,
+        string? assemblyQualifiedName
+    ) =>
+        Should.Throw<InvalidOperationException>(() =>
+            SqlServerTypes.FromColumn(Column(null, 5, 0, 0, schema, name, assemblyQualifiedName))
+        );
+
+    [Fact]
+    public void FromParameter_UserClrTypeWithoutAFacet_ThrowsInvalidOperationException() =>
+        Should.Throw<InvalidOperationException>(() =>
+            SqlServerTypes.FromParameter(
+                new SqlServerParameterRow("@t", null, 5, null, 0, "dbo", "Tag", UserClrAssembly)
+            )
+        );
 
     [Fact]
     public void FromColumn_RowWithoutAName_ThrowsInvalidOperationException() =>

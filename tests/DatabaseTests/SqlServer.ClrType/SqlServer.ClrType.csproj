@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        A CLR type of a user's own assembly, for the tests of SqlServer that load it into a database: SQL Server loads
+        only an assembly of .NET Framework, so the net48 build is the one the server is given, and the net10.0 build,
+        of the same name and version, is the one SqlClient reads and sends the type through.  A library of the tests,
+        never a test project of its own.
+    -->
+    <PropertyGroup>
+        <TargetFrameworks>net48;net10.0</TargetFrameworks>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>false</IsTestProject>
+        <!--
+            The server and the sidecars name the type by its assembly-qualified name, so its version is fixed, never
+            the repository's, which VersionPrefix and BuildNumber move.
+        -->
+        <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+        <!-- The attribute of a CLR type is System.Data's on .NET Framework, which the server resolves. -->
+        <Reference Include="System.Data" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
+        <PackageReference Include="Microsoft.SqlServer.Server" />
+    </ItemGroup>
+</Project>

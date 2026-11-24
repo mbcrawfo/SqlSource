@@ -11,22 +11,29 @@ namespace SqlSource.Tool.Describing.SqlServer.Types;
 /// The name is the system type name verbatim, facets included, and the length, precision and scale are the row's.  A
 /// row that names a user type gives it its schema, name and, for a CLR type, assembly-qualified name: <c>sysname</c>
 /// is a user type of <c>sys</c> over <c>nvarchar(128)</c>, and <c>hierarchyid</c> one of <c>sys</c> with
-/// <c>Microsoft.SqlServer.Types</c>.  <c>bindName</c> is never written for SQL Server.
+/// <c>Microsoft.SqlServer.Types</c>.  A CLR type of a user's own assembly has no system type name, on 2017 and 2025
+/// alike, and is named <c>schema.name</c> by its user type, as <see cref="Spelled" /> names it.  <c>bindName</c> is
+/// never written for SQL Server.
 /// </remarks>
 internal static class SqlServerTypes
 {
     /// <summary>The type the server suggests for an undeclared parameter.</summary>
     /// <exception cref="InvalidOperationException">
-    /// The row has no type name or lacks a facet: the server typed the parameter, or it would have raised an error.
+    /// The row lacks a facet, or has no type name and is no CLR type of a user's own: the server typed the parameter,
+    /// or it would have raised an error.
     /// </exception>
     public static SqlServerType FromParameter(SqlServerParameterRow row) => Build(row);
 
     /// <summary>The type the server gives a declared parameter.</summary>
-    /// <exception cref="InvalidOperationException">The row has no type name or lacks a facet.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The row lacks a facet, or has no type name and is no CLR type of a user's own.
+    /// </exception>
     public static SqlServerType FromDeclared(SqlServerDeclaredRow row) => Build(row);
 
     /// <summary>The type the server gives a column of a result set.</summary>
-    /// <exception cref="InvalidOperationException">The row has no type name or lacks a facet.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The row lacks a facet, or has no type name and is no CLR type of a user's own.
+    /// </exception>
     public static SqlServerType FromColumn(SqlServerColumnRow row) => Build(row);
 
     /// <summary>
@@ -78,8 +85,8 @@ internal static class SqlServerTypes
     private static SqlServerType Build(ISqlServerTypeRow row)
     {
         if (
-            row
-            is not { SystemTypeName: { } name, MaxLength: { } maxLength, Precision: { } precision, Scale: { } scale }
+            row is not { MaxLength: { } maxLength, Precision: { } precision, Scale: { } scale }
+            || (row.SystemTypeName ?? UserClrName(row)) is not { } name
         )
         {
             throw new InvalidOperationException(
@@ -91,5 +98,17 @@ internal static class SqlServerTypes
             ? null
             : new SqlServerUserType(row.UserTypeSchema, row.UserTypeName, row.AssemblyQualifiedTypeName);
         return new SqlServerType(name, maxLength, precision, scale, userType);
+    }
+
+    // The name of a CLR type of a user's own assembly, to which the server gives no system type name: its user type as
+    // a message names it, schema.name, as Spelled does.  Null for a row with no type name that is no such type.
+    private static string? UserClrName(ISqlServerTypeRow row)
+    {
+        if (row is not { UserTypeName: { } name, AssemblyQualifiedTypeName: not null })
+        {
+            return null;
+        }
+
+        return row.UserTypeSchema is { } schema ? schema + "." + name : name;
     }
 }
