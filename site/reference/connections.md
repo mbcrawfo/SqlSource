@@ -127,7 +127,7 @@ If a line of a connection variable cannot be read, the tool reports [SQLSRC286](
 - a password that is the name of its logical database or of its dialect, such as `postgres`;
 - the password of a PostgreSQL password file that is a pipe, such as `PGPASSFILE=<(...)` in a shell;
 - the login, in an error of SQL Server about a query, such as an error for a database that the login may not open;
-- a secret that holds neither `=` nor `;`, typed alone where a path goes, or as the value of `--log`, `--env-file` or `--out`.  The tool prints it as a path, and logs it as typed.  A path goes in these places: the path of `describe` or `diagnose`, a `.sql` path, a value of `--project`, `--query` or `--scrub`, and the bundle of `replay`.
+- a secret typed where a path goes that reads as a path, such as one that ends in `.sql` or names a file that exists.  The tool prints it as a path, and logs it as typed: see [how an error names a path](cli.md#paths).
 
 You can also see `***` in the place of a word that is not a secret, such as the name of a column.  That word equals a password that the tool hides.
 
@@ -143,14 +143,14 @@ SQL Server can name the login in an error about a query.  The tool prints and lo
 
 On the command line, the tool guards against a connection string typed in the wrong place:
 
-- It does not print a connection string typed where a path goes, or as the value of `--project`, `--query`, `--scrub` or `--out`.
+- It does not print a connection string typed where a path goes, nor a password typed there alone, such as `dotnet sqlsource describe S3cret`: see [how an error names a path](cli.md#paths).
 - It does not print a connection string typed after `--database`.
 - It does not print a connection string typed after `--connection` without its `name=`, except for its first word.  It prints that word, such as `Host`, only when the word is close to the name of a database of the run.  Nothing after the first `=` is printed.
 - In the log, it writes `***` for every value of `--database` and `--connection`.
-- In the log, it writes `***` for a path that holds `=` or `;`, a value of `--project`, `--query` or `--scrub` included.
+- In the log, it writes `***` for each path that an error would name by its position.
 - It refuses a `--log`, `--env-file` or `--out` path that holds `=` or `;`.
 
-To the tool, a secret that holds neither `=` nor `;` is a path like any other.
+A secret that reads as a path, as one that ends in `.sql` does, is printed as a path.
 
 **What to do.**
 

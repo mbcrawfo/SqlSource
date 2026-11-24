@@ -86,6 +86,7 @@ public sealed class ToolDiagnosticsTests
             ToolDiagnostics.DirectoryCannotBeRead,
             ToolDiagnostics.ManifestCannotBeRead,
             ToolDiagnostics.FileCannotBeChanged,
+            ToolDiagnostics.DotEnvCannotBeRead,
         };
         // SQLSRC200 is formatted above, and SQLSRC215 starts with a count, SQLSRC231 with the name of the reader,
         // SQLSRC266 with a column's position, SQLSRC288 to SQLSRC291 with a sentence about the bundle, which the
@@ -155,7 +156,7 @@ public sealed class ToolDiagnosticsTests
 
     [Fact]
     public void DotEnvCannotBeRead_Message_HoldsThePathAndTheReason() =>
-        Format(ToolDiagnostics.DotEnvCannotBeRead, "/work/.env", "Access to the path is denied.")
+        Format(ToolDiagnostics.DotEnvCannotBeRead, "'/work/.env'", "Access to the path is denied.")
             .ShouldBe("'/work/.env' cannot be read: Access to the path is denied.");
 
     [Fact]

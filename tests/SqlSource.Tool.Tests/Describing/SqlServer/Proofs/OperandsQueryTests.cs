@@ -84,7 +84,8 @@ public sealed class OperandsQueryTests
     }
 
     // A CLR type, by its assembly or by the name of one of the system's, and a row of no type, may be a CLR type; an
-    // alias type such as sysname is none.  Each row is run with the operand answered null and not null.
+    // alias type such as sysname is none.  An answered row is one or the other, Clr or NotClr.  Each row is run with
+    // the operand answered null and not null.
     [Theory]
     [MemberData(nameof(ClrTypeRows))]
     public void AnswersOf_Type_NotClrAsTheRowSays(
@@ -106,7 +107,7 @@ public sealed class OperandsQueryTests
 
         OperandsQuery
             .AnswersOf(new SqlServerColumnsAnswer([row], null, null), 1)
-            .ShouldBe([new OperandFacts(NotNull: !nullable, notClr)]);
+            .ShouldBe([new OperandFacts(NotNull: !nullable, notClr, Clr: !notClr)]);
     }
 
     // Only a column of a table that is not computed is read twice as one value: a view's or a function's column may be

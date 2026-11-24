@@ -32,7 +32,7 @@ internal static class RunProjects
     /// <param name="unit">The solution or the project the run is on.</param>
     /// <param name="named">
     /// The paths that <c>--project</c> gave, as they were typed.  Empty when it gave none.  A message names one by
-    /// its position when it holds <c>=</c> or <c>;</c>.
+    /// its position when it may not be printed.
     /// </param>
     /// <param name="context">
     /// The working directory and what MSBuild is run with, where the errors go, and what ends the run.
@@ -129,12 +129,17 @@ internal static class RunProjects
     /// <summary>
     /// The manifest of a run that the build started: read from the file the build wrote, with no question to MSBuild.
     /// A file that does not exist or cannot be read, or that is no manifest, is reported at its full path, and gives
-    /// none.  A path of <c>--manifest</c> that holds <c>=</c> or <c>;</c> was refused before the run unless the run is
-    /// under <c>--online</c>, whose manifest's path the build wrote and is no secret, so the path is always printed.
+    /// none.  A token of <c>--manifest</c> that may not be printed is named by its position instead, and the build's
+    /// own path, under <c>--online</c>, is always printed.
     /// </summary>
     /// <param name="manifestPath">The full path of the manifest file.</param>
+    /// <param name="given">The token of <c>--manifest</c>.</param>
     /// <param name="context">What reads the file, where the error goes, and what ends the run.</param>
-    public static Task<ImmutableArray<ProjectManifest>> FromManifestAsync(string manifestPath, RunContext context)
+    public static Task<ImmutableArray<ProjectManifest>> FromManifestAsync(
+        string manifestPath,
+        UsageValue given,
+        RunContext context
+    )
     {
         var (host, reporter, cancellationToken) = context;
         cancellationToken.ThrowIfCancellationRequested();
@@ -145,18 +150,20 @@ internal static class RunProjects
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return Task.FromResult(Unreadable(manifestPath, exception.Message, reporter));
+            // The system's message quotes the path.
+            var reason = given.MayBePrintedAsPath ? exception.Message : "the system would not read it";
+            return Task.FromResult(Unreadable(manifestPath, given, reason, reporter));
         }
 
         if (text is null)
         {
-            return Task.FromResult(Unreadable(manifestPath, "there is no such file", reporter));
+            return Task.FromResult(Unreadable(manifestPath, given, "there is no such file", reporter));
         }
 
         var read = ManifestReader.Read(text);
         if (!read.Succeeded)
         {
-            return Task.FromResult(Unreadable(manifestPath, read.Failure, reporter));
+            return Task.FromResult(Unreadable(manifestPath, given, read.Failure, reporter));
         }
 
         RunEvents.Project(
@@ -167,15 +174,22 @@ internal static class RunProjects
         return Task.FromResult<ImmutableArray<ProjectManifest>>([read.Value]);
     }
 
-    private static ImmutableArray<ProjectManifest> Unreadable(string manifestPath, string reason, Reporter reporter)
+    private static ImmutableArray<ProjectManifest> Unreadable(
+        string manifestPath,
+        UsageValue given,
+        string reason,
+        Reporter reporter
+    )
     {
         reporter.Report(
-            ToolDiagnostic.AtFile(
-                ToolDiagnostics.ManifestCannotBeRead,
-                manifestPath,
-                UsageValue.Quoted(manifestPath),
-                reason
-            )
+            given.MayBePrintedAsPath
+                ? ToolDiagnostic.AtFile(
+                    ToolDiagnostics.ManifestCannotBeRead,
+                    manifestPath,
+                    UsageValue.Quoted(manifestPath),
+                    reason
+                )
+                : ToolDiagnostic.Create(ToolDiagnostics.ManifestCannotBeRead, $"at position {given.Position}", reason)
         );
         return [];
     }

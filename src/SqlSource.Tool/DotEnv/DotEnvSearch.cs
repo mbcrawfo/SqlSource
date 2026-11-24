@@ -52,7 +52,13 @@ internal static class DotEnvSearch
     /// file that cannot be read, or has a line of a key of the tool that cannot be, gives errors and no values, so the
     /// run goes on as if there were none.
     /// </summary>
-    public static DotEnvFile Read(string? path, Func<string, string?> readTextFile)
+    /// <param name="path">The full path of the file, or null when the run reads none.</param>
+    /// <param name="readTextFile">The host's.</param>
+    /// <param name="heldAt">
+    /// The position of an <c>--env-file</c> token that may not be printed, or null: a file that cannot be read is then
+    /// named by it, at no file, without the system's reason, which quotes the path.
+    /// </param>
+    public static DotEnvFile Read(string? path, Func<string, string?> readTextFile, int? heldAt = null)
     {
         if (path is null)
         {
@@ -69,7 +75,20 @@ internal static class DotEnvSearch
             return new DotEnvFile(
                 path,
                 [],
-                [ToolDiagnostic.ForFile(ToolDiagnostics.DotEnvCannotBeRead, path, exception.Message)]
+                [
+                    heldAt is { } position
+                        ? ToolDiagnostic.Create(
+                            ToolDiagnostics.DotEnvCannotBeRead,
+                            $"The path at position {position}",
+                            "the system would not read it"
+                        )
+                        : ToolDiagnostic.AtFile(
+                            ToolDiagnostics.DotEnvCannotBeRead,
+                            path,
+                            UsageValue.Quoted(path),
+                            exception.Message
+                        ),
+                ]
             );
         }
 

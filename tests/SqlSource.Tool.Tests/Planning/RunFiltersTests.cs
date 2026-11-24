@@ -29,7 +29,11 @@ public sealed class RunFiltersTests
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), AboveTheRoot.SkipReason);
 
-        var filters = RunFilters.Create([new UsageValue(null, AboveTheRoot.SqlFile, 1)], [], WorkingDirectory);
+        var filters = RunFilters.Create(
+            [new UsageValue(null, AboveTheRoot.SqlFile, 1) { MayBePrintedAsPath = true }],
+            [],
+            WorkingDirectory
+        );
 
         filters
             .Files.ShouldHaveSingleItem()

@@ -53,6 +53,21 @@ public sealed class ProofTests
     public void Holds_StoredWithoutAnswers_DoesNotHold() => new Proof.Stored(0).Holds(null).ShouldBeFalse();
 
     [Fact]
+    public void Holds_ClrOfAnOperandOfAClrType_IsTrueWhateverItsNullability() =>
+        new Proof.Clr(0).Holds([new OperandFacts(NotNull: false, NotClr: false, Clr: true)]).ShouldBeTrue();
+
+    [Fact]
+    public void Holds_ClrOfAnOperandOfNoClrType_IsFalse() =>
+        new Proof.Clr(0).Holds([new OperandFacts(NotNull: true, NotClr: true, Stored: true)]).ShouldBeFalse();
+
+    // An operand not answered is never shown of a CLR type, though it may be one.
+    [Fact]
+    public void Holds_ClrWithoutAnswers_DoesNotHold() => new Proof.Clr(0).Holds(null).ShouldBeFalse();
+
+    [Fact]
+    public void Shifted_Clr_MovesItsIndex() => new Proof.Clr(1).Shifted(2).ShouldBe(new Proof.Clr(3));
+
+    [Fact]
     public void Holds_AnyOf_IsTrueWhenOnePartHolds()
     {
         var proof = new Proof.AnyOf([new Proof.Operand(0), new Proof.Operand(1)]);

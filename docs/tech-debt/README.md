@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0127`
+Next id: `TD-0128`
 
 ## Active items
 
@@ -14,7 +14,6 @@ Next id: `TD-0127`
 | [TD-0016](TD-0016-settings-file-beside-a-late-targets-file-is-missed.md) | Open | 2026-10-06 | Low | In a project that is not of the SDK, or one that drops `SqlSource.AfterSdk.targets` from `AfterMicrosoftNETSdkTargets`, a `.sql` file that a target adds from `GenerateMSBuildEditorConfigFileCore` or `CoreCompile` misses a settings file that only it reaches, unless the target hooks `SqlSourceListFiles` |
 | [TD-0018](TD-0018-token-and-parameter-lists-are-built-in-quadratic-time.md) | Open | 2026-10-08 | Low | The distinct count and the name lookup of a query's tokens, and the lookup of its parameters, are quadratic in their number: a query with 6,000 distinct tokens took about 0.45 s to parse |
 | [TD-0022](TD-0022-query-that-keeps-its-comments-is-built-and-scanned-twice.md) | Open | 2026-10-08 | Low | A query that keeps its comments has its SQL built and scanned for tokens twice, so its parse allocates and takes about twice as much |
-| [TD-0023](TD-0023-path-without-an-equals-sign-is-printed-as-given.md) | Open | 2026-10-09 | Low | The `sqlsource` tool prints, and writes to the `arguments` of its log, a token with neither `=` nor `;` typed where a path stands (the unit of `describe`, a `.sql` path, a `--project` value, a `--log` path) as the path it is taken for, so a secret typed there alone reaches the output |
 | [TD-0024](TD-0024-no-test-reaches-the-line-that-a-command-line-is-not-valid.md) | Open | 2026-10-09 | Low | No test reaches the line `sqlsource: the command line is not valid`, which the `sqlsource` tool writes when System.CommandLine and its own check of the command line disagree; it waits for a kind of option or argument that the two read differently |
 | [TD-0025](TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md) | Open | 2026-10-09 | Low | The `sqlsource` tool, and the online build of a project with several target frameworks, do not see a `.sql` file, or a C# file, that a target adds from a hook of the build: only a target that hooks `SqlSourceListFiles` runs before the project manifest is written, and the build reports the file's queries as having no entry |
 | [TD-0026](TD-0026-manifest-of-a-multi-targeted-project-is-the-first-frameworks.md) | Open | 2026-10-09 | Low | For a project with several target frameworks the `sqlsource` tool, run by hand or by the online build, reads the first one alone: a file, an attribute or a reference to SqlSource that only another framework has is not seen, and the build of that framework reports its queries as having no entry |
@@ -44,7 +43,7 @@ Next id: `TD-0127`
 | [TD-0120](TD-0120-database-tests-do-not-run-on-windows.md) | Open | 2026-11-18 | Low | The tests against a real database do not run on Windows, where the drivers' network layer differs, since GitHub's Windows runners cannot start the pinned Linux images |
 | [TD-0121](TD-0121-repository-interface-of-a-repeated-type-parameter.md) | Open | 2026-11-22 | Low | A repository around which an inner type parameter or a nested type hides an outer type parameter implements another constructed type's interface, and a repeated parameter raises CS0693 in its generated interface |
 | [TD-0122](TD-0122-model-in-a-namespace-named-await.md) | Open | 2026-11-22 | Low | A model in a namespace with a part named `await` is written without its `@`, so an asynchronous method that names it fails with CS4003 |
-| [TD-0124](TD-0124-sql-server-answers-not-null-for-a-set-operator-over-a-clr-type.md) | Open | 2026-11-23 | High | SQL Server answers not null for a `UNION ALL` or `VALUES` of a `NOT NULL` `geometry` or `geography` and a string, directly or through a derived table, a CTE or a view, and the query returns `NULL` when the string is `'NULL'`; the describer keeps that answer |
+| [TD-0127](TD-0127-sql-server-cannot-describe-a-users-clr-type.md) | Open | 2026-11-24 | Medium | A query that returns a column or takes a parameter of a CLR type of a user's own assembly ends the SQL Server describe run with `SQLSRC200`, since the server gives such a type no `system_type_name` |
 
 ## Columns
 
