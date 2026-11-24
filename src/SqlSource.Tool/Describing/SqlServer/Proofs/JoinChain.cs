@@ -15,12 +15,23 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// <param name="IsOptionalBesidesItsLeftJoin">
 /// True when a join other than its own <c>LEFT JOIN</c> can make it <c>NULL</c>.
 /// </param>
+/// <param name="Reference">
+/// Its tokens: its name or derived table, with its alias, column list and hints, without the join's words or its
+/// <c>ON</c>.
+/// </param>
+/// <param name="JoinStart">The index of the first word of the join that adds it; -1 for the first source.</param>
+/// <param name="IsDerived">True when it is a derived table.</param>
+/// <param name="IsFull">True when its own join is <c>FULL</c>.</param>
 internal sealed record JoinSource(
     string Name,
     string? OnePartName,
     IReadOnlyList<int> Outer,
     bool IsOptional,
-    bool IsOptionalBesidesItsLeftJoin
+    bool IsOptionalBesidesItsLeftJoin,
+    TokenRange Reference,
+    int JoinStart,
+    bool IsDerived,
+    bool IsFull
 );
 
 /// <summary>A <c>FROM</c> that is a chain of joins read left to right, each source a name or a derived table.</summary>
@@ -49,9 +60,9 @@ internal static class JoinChain
             return null;
         }
 
-        var read = new List<(string Name, string? OnePart, JoinKind Kind, int[] Outer)>
+        var read = new List<(SourceReference Source, JoinKind Kind, int[] Outer, int JoinStart)>
         {
-            (first.Name, first.OnePart, JoinKind.Inner, []),
+            (first, JoinKind.Inner, [], -1),
         };
         while (at < from.End)
         {
@@ -60,6 +71,7 @@ internal static class JoinChain
                 return null;
             }
 
+            var joinStart = at;
             var outer = join.Kind == JoinKind.Left ? Enumerable.Range(at, join.Length - 1).ToArray() : [];
             at += join.Length;
             if (Reference(tokens, ref at, from.End) is not { } source)
@@ -72,22 +84,26 @@ internal static class JoinChain
                 return null;
             }
 
-            read.Add((source.Name, source.OnePart, join.Kind, outer));
+            read.Add((source, join.Kind, outer, joinStart));
         }
 
         return
         [
             .. read.Select(
-                (source, index) =>
+                (joined, index) =>
                 {
                     var byLater = read.Skip(index + 1)
                         .Any(static later => later.Kind is JoinKind.Right or JoinKind.Full);
                     return new JoinSource(
-                        source.Name,
-                        source.OnePart,
-                        source.Outer,
-                        byLater || source.Kind is JoinKind.Left or JoinKind.Full,
-                        byLater || source.Kind == JoinKind.Full
+                        joined.Source.Name,
+                        joined.Source.OnePart,
+                        joined.Outer,
+                        byLater || joined.Kind is JoinKind.Left or JoinKind.Full,
+                        byLater || joined.Kind == JoinKind.Full,
+                        joined.Source.Range,
+                        joined.JoinStart,
+                        joined.Source.IsDerived,
+                        joined.Kind == JoinKind.Full
                     );
                 }
             ),
@@ -143,8 +159,9 @@ internal static class JoinChain
     }
 
     // "name [[AS] alias] [WITH (hints)]" or "( ... ) [AS] alias [(columns)]".
-    private static (string Name, string? OnePart)? Reference(IReadOnlyList<TsqlToken> tokens, ref int at, int end)
+    private static SourceReference? Reference(IReadOnlyList<TsqlToken> tokens, ref int at, int end)
     {
+        var start = at;
         if (at < end && tokens[at].IsSymbol("("))
         {
             var close = SelectBody.ClosingParenthesis(tokens, at, end);
@@ -170,7 +187,7 @@ internal static class JoinChain
                 at = columns + 1;
             }
 
-            return (derived, null);
+            return new SourceReference(derived, null, new TokenRange(start, at), IsDerived: true);
         }
 
         var parts = new List<string>();
@@ -203,7 +220,12 @@ internal static class JoinChain
             at = hints + 1;
         }
 
-        return (name, parts.Count == 1 ? parts[0] : null);
+        return new SourceReference(
+            name,
+            parts.Count == 1 ? parts[0] : null,
+            new TokenRange(start, at),
+            IsDerived: false
+        );
     }
 
     private static string? Alias(IReadOnlyList<TsqlToken> tokens, ref int at, int end)
@@ -280,4 +302,6 @@ internal static class JoinChain
         at = end;
         return end > start;
     }
+
+    private sealed record SourceReference(string Name, string? OnePart, TokenRange Range, bool IsDerived);
 }
