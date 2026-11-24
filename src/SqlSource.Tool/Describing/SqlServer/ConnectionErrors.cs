@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using Microsoft.Data.SqlClient;
@@ -83,6 +84,13 @@ internal static class ConnectionErrors
 
     /// <summary>The class from which an error ends the connection.</summary>
     public const int FatalClass = 20;
+
+    /// <summary>
+    /// Whether the error ended the session: one of its errors is of <see cref="FatalClass" /> or above, or it has none,
+    /// which <see cref="Of" /> answers as the lost connection too.
+    /// </summary>
+    public static bool EndsTheSession(SqlException exception) =>
+        exception.Errors.Count == 0 || exception.Errors.Cast<SqlError>().Any(static error => error.Class >= FatalClass);
 
     // The numbers of the other errors that open reads.
     private const int LoginFailed = 18456;
