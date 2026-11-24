@@ -24,6 +24,7 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 internal sealed class FilteredRows
 {
     private readonly IReadOnlyList<TsqlToken> _tokens;
+    private readonly TokenRange? _from;
     private readonly RowFilter _filter;
     private readonly IReadOnlyList<JoinSource>? _sources;
     private readonly IReadOnlyList<CommonTableExpression> _ctes;
@@ -31,6 +32,7 @@ internal sealed class FilteredRows
 
     private FilteredRows(
         IReadOnlyList<TsqlToken> tokens,
+        TokenRange? from,
         RowFilter filter,
         IReadOnlyList<JoinSource>? sources,
         IReadOnlyList<CommonTableExpression> ctes,
@@ -40,6 +42,7 @@ internal sealed class FilteredRows
     )
     {
         _tokens = tokens;
+        _from = from;
         _filter = filter;
         _sources = sources;
         _ctes = ctes;
@@ -92,7 +95,39 @@ internal sealed class FilteredRows
             }
         }
 
-        return new FilteredRows(tokens, filter, sources, ctes, madeInner, cuts, guards);
+        return new FilteredRows(tokens, body.From, filter, sources, ctes, madeInner, cuts, guards);
+    }
+
+    /// <summary>
+    /// The pieces of the user's <c>FROM</c> that give the rows of the scope, each a run of its tokens, in order; or
+    /// null for <see cref="OperandScope.Rows" />, whose rows are the body's own <c>FROM</c> through its
+    /// <c>WHERE</c>, and for a side when the <c>FROM</c> has no <c>FULL JOIN</c> this reads.
+    /// </summary>
+    /// <remarks>
+    /// The left side of the last <c>FULL JOIN</c> is the <c>FROM</c> from its word <c>FROM</c> to the first word of
+    /// that join, and its right side the word <c>FROM</c> and the source that join adds, without its <c>ON</c>.
+    /// Neither has the <c>WHERE</c>.
+    /// </remarks>
+    public IReadOnlyList<TokenRange>? FromOf(OperandScope scope)
+    {
+        if (scope == OperandScope.Rows || _from is not { } from || _sources is null)
+        {
+            return null;
+        }
+
+        var full = _sources.LastOrDefault(static source => source.IsFull);
+        if (full is null)
+        {
+            return null;
+        }
+
+        return scope switch
+        {
+            OperandScope.LeftSide => [new TokenRange(from.Start, full.JoinStart)],
+            OperandScope.RightSide => [new TokenRange(from.Start, from.Start + 1), full.Reference],
+            OperandScope.Rows => null,
+            _ => throw UnexpectedEnumValueException.Of(scope),
+        };
     }
 
     /// <summary>True when the range is a column alone that these rows hold no <c>NULL</c> of.</summary>

@@ -220,39 +220,35 @@ internal sealed class ColumnProofs
             )
             .ToList();
 
-        // Each branch numbers its operands from 0, and the answers are one list, so a proof moves by the operands of
-        // the branches before its own.
+        // Each branch numbers its operands from 0, and the answers are one list, so a proof moves to the places of its
+        // operands' answers, after the operands of the branches before its own.
         var queries = new List<OperandQuery>();
-        var offsets = new int[branches.Count];
+        var places = new Func<int, int>[branches.Count];
         var asked = 0;
         for (var at = 0; at < branches.Count; at++)
         {
-            offsets[at] = asked;
-            var operands = branches[at].Proofs.Operands;
-            if (operands.Count > 0)
-            {
-                queries.Add(
-                    new OperandQuery(
-                        OperandsQuery.Text(
-                            sql,
-                            tokens,
-                            statement.With,
-                            branches[at].Body,
-                            operands,
-                            branches[at].Filtered.Cuts
-                        ),
-                        operands.Count
-                    )
-                );
-                asked += operands.Count;
-            }
+            var (calls, of) = OperandsQuery.Calls(
+                sql,
+                tokens,
+                statement.With,
+                branches[at].Body,
+                branches[at].Proofs,
+                branches[at].Filtered,
+                branches[at].Filtered.Cuts
+            );
+            var before = asked;
+            places[at] = index => before + of[index];
+            queries.AddRange(calls);
+            asked += calls.Sum(static call => call.Count);
         }
 
         var proofs = parts
             .Select(of =>
                 of is null
                     ? null
-                    : ExpressionProofs.AllOf(of.Select((part, at) => WithGuard(part, guards[at]).Shifted(offsets[at])))
+                    : ExpressionProofs.AllOf(
+                        of.Select((part, at) => WithGuard(part, guards[at]).Renumbered(places[at]))
+                    )
             )
             .ToList();
         var ctes = CteProofs.Read(sql, tokens, statement, proofs.OfType<Proof>(), asked);

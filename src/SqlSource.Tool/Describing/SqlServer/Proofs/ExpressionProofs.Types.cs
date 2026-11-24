@@ -126,7 +126,7 @@ internal sealed partial class ExpressionProofs
             return Proof.No;
         }
 
-        _leaves.Add(range);
+        _leaves.Add((range, OperandScope.Rows));
         return new Proof.NotClr(_leaves.Count - 1);
     }
 }

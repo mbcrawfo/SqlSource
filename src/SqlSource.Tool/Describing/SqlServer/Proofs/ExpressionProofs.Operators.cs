@@ -84,7 +84,7 @@ internal sealed partial class ExpressionProofs
     // A column whose source the server is asked.  Its source is the same in every context, a grouping set's included.
     private Proof.Stored StoredLeaf(TokenRange column)
     {
-        _leaves.Add(column);
+        _leaves.Add((column, OperandScope.Rows));
         return new Proof.Stored(_leaves.Count - 1);
     }
 
