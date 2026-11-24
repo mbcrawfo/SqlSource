@@ -130,7 +130,7 @@ If a line of a connection variable cannot be read, the tool reports [SQLSRC286](
 - the login, in an error of SQL Server about a query, such as an error for a database that the login may not open;
 - a secret typed where a path goes that reads as a path, such as one that ends in `.sql` or names a file that exists.  The tool prints it as a path, and logs it as typed: see [how an error names a path](cli.md#paths).
 
-You can also see `***` in the place of a word that is not a secret, such as the name of a column.  That word equals a password that the tool hides.
+You can also see `***` in the place of a word that is not a secret, such as the name of a column.  That word equals a password that the tool hides.  In a log, `***` can also stand in the place of two values that together make a password, such as `postgres` and `1` for the password `postgres1`.
 
 **Why.**  The tool writes a connection value as `***` wherever it finds the whole value.  It writes each password of the value as `***` only where the password stands apart from other letters, digits and underscores.  It does the same for a password from `PGPASSWORD` or a PostgreSQL password file.  From a password file, it hides the password of each entry that the connection may use, up to the first that the driver surely uses.  When neither the connection string nor `PGUSER` names the user, the tool cannot tell which user's entry the driver takes, so it hides the password of each of them.  The tool leaves these passwords as they are, but where a message gives one as the value of a password, as in `Password=pg;`:
 

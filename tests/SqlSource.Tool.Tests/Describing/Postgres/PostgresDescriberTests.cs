@@ -116,6 +116,8 @@ public sealed class PostgresDescriberTests
     [InlineData("Host=pg1;Port=6000;Database=db", "u", "match")]
     [InlineData("Host=pg1;Port=6000;Username=u", null, "other-db")]
     [InlineData("Host=pg1;Port=6000;Database=db", null, "other-user|match|fallback")]
+    [InlineData("Host=pg1;Port=6000;Database=db", "", "other-user|match|fallback")]
+    [InlineData("Host=pg1;Port=6000;Database=db;Username=", null, "other-user|match|fallback")]
     [InlineData("Host=pg2;Port=6000;Database=db;Username=u", null, "fallback")]
     public void SecretsOf_PasswordFile_IsTheEntriesThatMayMatchUpToTheFirstSure(
         string connection,

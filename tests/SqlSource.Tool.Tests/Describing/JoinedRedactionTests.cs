@@ -94,6 +94,8 @@ public sealed class JoinedRedactionTests
     [InlineData("word=hunter22 b|a Host=db;Pass", "*** b|a ***")]
     [InlineData("x hun|between|ter22", "x ***|between|***")]
     [InlineData("ter22 x|hun", "*** x|***")]
+    [InlineData("unter22 b|a h", "*** b|a ***")]
+    [InlineData("2 b|a hunter2", "*** b|a ***")]
     public void OfEveryPair_WholeOrPartOverTwoTextsOutOfOrder_IsTheMarkInBoth(string texts, string expected)
     {
         var split = texts.Split('|');
@@ -111,6 +113,15 @@ public sealed class JoinedRedactionTests
     [InlineData("ter22hun")]
     public void OfEveryPair_HalvesThatMakeNoTokenOrAreOneText_AreLeft(string texts) =>
         JoinedRedaction.OfEveryPair(texts.Split('|'), Password).ShouldBe(texts.Split('|'));
+
+    // An end of a part that is no letter, digit or "_" is not judged against the text beside it.
+    [Fact]
+    public void OfEveryPair_PartThatStartsWithASymbolAfterALetter_IsTheMarkInBoth()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=!hunter22", ["!hunter22"]);
+
+        JoinedRedaction.OfEveryPair(["ter22 y", "x!hun"], secret).ShouldBe(["*** y", "x***"]);
+    }
 
     // Every text that holds a half is marked, whichever other text holds the rest.
     [Fact]

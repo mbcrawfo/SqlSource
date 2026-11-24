@@ -52,7 +52,10 @@ internal sealed class ConnectionSecret(
     IEnumerable<string?>? forms = null
 )
 {
-    /// <summary>The length below which a part is dropped.</summary>
+    /// <summary>
+    /// The length below which a part is found only as a password key's value (<see cref="KeyedParts" />), not as a
+    /// token.
+    /// </summary>
     public const int MinimumPartLength = 4;
 
     // All are made once, the parts from the wholes, since a part that equals a whole adds nothing.
