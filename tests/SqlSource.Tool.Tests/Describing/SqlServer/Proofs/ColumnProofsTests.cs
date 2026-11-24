@@ -503,6 +503,9 @@ public sealed class ColumnProofsTests
     [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY ROLLUP (id, name_len_p)")]
     [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY GROUPING SETS ((id, name_len_p), ())")]
     [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY ALL id, name_len_p")]
+    [InlineData("SELECT * FROM dbo.users GROUP BY ROLLUP (id, name_len_p)")]
+    [InlineData("SELECT * FROM dbo.users GROUP BY GROUPING SETS ((id, name_len_p), ())")]
+    [InlineData("SELECT * FROM dbo.users GROUP BY ALL id, name_len_p")]
     [InlineData("SELECT id, CAST(name_len_p AS bigint) AS name_len_p FROM dbo.users")]
     [InlineData("SELECT id, (SELECT name_len_p FROM dbo.users WHERE id = 0) AS name_len_p FROM dbo.users")]
     [InlineData("SELECT id, (name_len_p) AS name_len_p FROM dbo.users")]
@@ -909,6 +912,31 @@ public sealed class ColumnProofsTests
         var proofs = Read(sql, ExpressionRow(1, "n"));
 
         proofs.OperandQueries.Skip(1).Select(static query => query.Sql).ShouldBe([left, right]);
+    }
+
+    // The rows' call asks a.z after a.x and b.y, before the sides' calls, though the proofs number it last: each item
+    // reads its own operands' answers, not the answers at its operands' indexes.
+    [Fact]
+    public void Apply_ItemAfterAFullJoinPair_ReadsItsOwnAnswer()
+    {
+        var proofs = Read(
+            "SELECT COALESCE(a.x, b.y) AS c1, a.z + 1 AS c2 FROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id",
+            ExpressionRow(1, "c1"),
+            ExpressionRow(2, "c2")
+        );
+
+        proofs.OperandQueries.ShouldBe([
+            new ColumnProofs.OperandQuery(
+                "SELECT a.x\nAS [1],\nb.y\nAS [2],\na.z\nAS [3]\nFROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id",
+                3
+            ),
+            new ColumnProofs.OperandQuery("SELECT a.x\nAS [1]\nFROM dbo.a AS a", 1),
+            new ColumnProofs.OperandQuery("SELECT b.y\nAS [1]\nFROM\ndbo.b AS b", 1),
+        ]);
+        var nullable = new OperandFacts(false, true, Stored: true);
+        var notNull = new OperandFacts(true, true, Stored: true);
+        Nullability(proofs.Apply([nullable, nullable, nullable, notNull, notNull]))
+            .ShouldBe([(false, SidecarValues.NullableSource.Expression), (true, SidecarValues.NullableSource.Server)]);
     }
 
     // A geometry column that the server answers not null and names no source for.

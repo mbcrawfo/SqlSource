@@ -258,6 +258,28 @@ public sealed partial class CteProofsTests
         Nullability(proofs.Apply(SideFacts(proofs, sidesNotNull: false))).ShouldBe([Server]);
     }
 
+    // The branch's rows' call asks a.z after a.x and b.y, before the sides' calls, though the proofs number it last:
+    // each item reads its own operands' answers, not the answers at its operands' indexes.
+    [Fact]
+    public void Apply_BranchItemAfterAFullJoinPair_ReadsItsOwnAnswer()
+    {
+        const string With =
+            "WITH q (n, m) AS (SELECT COALESCE(a.x, b.y), a.z + 1 FROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id "
+            + "UNION ALL SELECT 1, 2)";
+        var proofs = Read($"{With} SELECT n, m FROM q", Rows("n", "m"));
+
+        proofs
+            .OperandQueries.Skip(1)
+            .Select(static query => query.Sql)
+            .ShouldBe([
+                $"{With}\nSELECT a.x\nAS [1],\nb.y\nAS [2],\na.z\nAS [3]\n"
+                    + "FROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id",
+                $"{With}\nSELECT a.x\nAS [1]\nFROM dbo.a AS a",
+                $"{With}\nSELECT b.y\nAS [1]\nFROM\ndbo.b AS b",
+            ]);
+        Nullability(proofs.Apply(SideFacts(proofs, sidesNotNull: true))).ShouldBe([Proved, Server]);
+    }
+
     // A CTE that no proof reads asks nothing.
     [Fact]
     public void Read_CteNotRead_AsksNothingOfIt()

@@ -59,7 +59,8 @@ internal sealed class ColumnProofs
     // The proof of each column, by its place, or null for a column that has none.
     private readonly IReadOnlyList<Proof?> _proofs;
 
-    // Whether the catalog proves each column, by its place: a PERSISTED NOT NULL column read from its one table.
+    // Whether the catalog proves each column, by its place: a PERSISTED NOT NULL column read from a table no join makes
+    // NULL.
     private readonly IReadOnlyList<bool> _catalog;
 
     // Whether each column, by its place, is answered not null and may hold a CLR type's Null, so that it is nullable

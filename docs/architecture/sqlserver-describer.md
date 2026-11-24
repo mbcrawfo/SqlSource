@@ -47,7 +47,7 @@ The folder [`Proofs/`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/) ho
 | [`ExpressionProofs.Operators.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ExpressionProofs.Operators.cs) | The forms that are no call: `AT TIME ZONE`, and the `CASE` that replaces a column's `NULL` |
 | [`OperandsQuery.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/OperandsQuery.cs) | The text of `operands`, and the reading of its answer |
 | [`CteProofs.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/CteProofs.cs) | The proof of each column of a CTE of several branches that a proof reads, a recursive one among them, by its branches and their `operands` calls |
-| [`ColumnProofs.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ColumnProofs.cs) | The proof of each column of a describe, the `PERSISTED NOT NULL` computed column read from its one table among them, the rule that widens a column of a CLR type, and the columns and the rows of `table` as they correct them |
+| [`ColumnProofs.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ColumnProofs.cs) | The proof of each column of a describe, among them [a computed column](#a-computed-column) read from a table no join makes `NULL`, by the catalog when it is `PERSISTED NOT NULL` and by its definition otherwise, the rule that widens a column of a CLR type, and the columns and the rows of `table` as they correct them |
 
 ## The connection
 
