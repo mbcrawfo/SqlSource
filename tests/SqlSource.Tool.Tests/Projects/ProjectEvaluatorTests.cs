@@ -160,7 +160,29 @@ public sealed class ProjectEvaluatorTests : IDisposable
 
         evaluation.State.ShouldBe(ProjectState.NotRestored);
         evaluation.Manifests.ShouldBeEmpty();
-        _runner.Requests.Count.ShouldBe(3);
+        // The first framework that was not restored settles it: the second is not asked.
+        _runner.Requests.Count.ShouldBe(2);
+    }
+
+    // A framework added since the last restore has the reference and none of the package, as NuGet's import under a
+    // condition on the framework gives, and the project is not restored, first or last: a plan of the other frameworks
+    // alone could leave out what only that one needs.
+    [Theory]
+    [InlineData("net8.0")]
+    [InlineData("net10.0")]
+    public async Task Evaluate_OneFrameworkNotRestored_IsNotRestoredWithNoManifest(string notRestored)
+    {
+        var assets = _folder.WriteFile("App/obj/project.assets.json");
+        var project = new FakeProject { TargetFrameworks = "net8.0;net10.0", ProjectAssetsFile = assets };
+        project.PackageReferences.Add("SqlSource");
+        project.ImportedByFramework[notRestored] = "";
+        _runner.Default = project;
+
+        var evaluation = await EvaluateAsync();
+
+        evaluation.State.ShouldBe(ProjectState.NotRestored);
+        evaluation.Manifests.ShouldBeEmpty();
+        evaluation.Failure.ShouldBeNull();
     }
 
     [Fact]

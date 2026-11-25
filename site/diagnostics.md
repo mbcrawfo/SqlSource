@@ -2798,6 +2798,7 @@ $ dotnet sqlsource describe
 1. Run `dotnet restore` on the solution or the project.
 2. Run the command again.
 
+- **A project with several target frameworks gives this error when one framework was not restored**, as after you add a framework to `TargetFrameworks`.  The tool describes none of its frameworks until you restore.
 - **In a solution every C# project is checked, one that has no SQL too.**  A run on a fresh checkout must not succeed by finding nothing.
 - **A reference that keeps the MSBuild files of the package out of the project gives this error after a restore as well**, `ExcludeAssets="build"` for one.  Remove that from the reference.
 

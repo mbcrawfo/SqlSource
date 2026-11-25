@@ -225,14 +225,16 @@ public sealed class OnlineMultiTargetTests : IDisposable
         runs.ShouldAllBe(run => run.Manifests.Count == 2);
     }
 
-    // Each manifest's path reaches the tool whole, from a folder whose name the shell reads a $ of and MSBuild a % of,
-    // and a project whose name the shell reads a $( and a ` of, which the name of each manifest holds.  A build of the
-    // second framework alone is evaluated before the run, so it is given the sidecar of a file that it alone lists
-    // from what the run created, by the full path the other framework's configuration gave.
+    // Each manifest's path reaches the tool whole from a project whose name the shell reads a $( and a ` of, cmd a %
+    // of and MSBuild a ; and a %41 of, which the name of each manifest holds, as OnlineBuildTests' project of one
+    // framework has.  The manifests are given relative to the project, so the folder's name, which the shell reads a $
+    // of and MSBuild a % of, reaches only the full path of a created sidecar: a build of the second framework alone is
+    // evaluated before the run, so it is given the sidecar of a file that it alone lists from what the run created,
+    // by the full path the other framework's configuration gave.
     [Fact]
     public async Task Build_ProjectFolderWithShellCharacters_GivesTheToolEveryManifest()
     {
-        const string OddName = "p $(q)`r`.csproj";
+        const string OddName = "p q;r%41$(s)`t`.csproj";
         var copied = _fixtures.Copy("OnlineMulti", folder: "a $b %c");
         var folder = Path.GetDirectoryName(copied)!;
         var project = Path.Combine(folder, OddName);

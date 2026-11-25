@@ -291,6 +291,8 @@ public sealed class ManifestRunTests : IDisposable
     [Fact]
     public async Task Describe_OneOfTwoManifestsCannotBeRead_PlansNothing()
     {
+        // With a connection, a plan of the first manifest alone would open the database and write its sidecar.
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Secrets.Connection;
         var first = _scene.WriteManifest();
         var missing = _scene.Run.Folder.PathOf("obj/missing.manifest");
 

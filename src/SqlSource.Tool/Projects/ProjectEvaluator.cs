@@ -197,7 +197,6 @@ internal static class ProjectEvaluator
     )
     {
         var manifests = ImmutableArray.CreateBuilder<ProjectManifest>();
-        var notRestored = false;
         var directory = Path.GetDirectoryName(manifestFile) ?? "";
         var stem = Path.GetFileNameWithoutExtension(manifestFile);
         for (var index = 0; index < frameworks.Length; index++)
@@ -209,8 +208,14 @@ internal static class ProjectEvaluator
                 return Failed(project, reason, result);
             }
 
+            // A framework that was not restored makes the project not restored, as a failed one fails it: a plan of
+            // the other frameworks alone could leave out what only that one needs.
             var state = StateOf(answer, assetsFile);
-            notRestored |= state == ProjectState.NotRestored;
+            if (state == ProjectState.NotRestored)
+            {
+                return new ProjectEvaluation(project, ProjectState.NotRestored, AssetsFile: assetsFile);
+            }
+
             if (state != ProjectState.UsesSqlSource)
             {
                 continue;
@@ -237,12 +242,7 @@ internal static class ProjectEvaluator
             manifests.AddRange(evaluation.Manifests);
         }
 
-        var overall = notRestored ? ProjectState.NotRestored : ProjectState.DoesNotUseSqlSource;
-        if (manifests.Count != 0)
-        {
-            overall = ProjectState.UsesSqlSource;
-        }
-
+        var overall = manifests.Count != 0 ? ProjectState.UsesSqlSource : ProjectState.DoesNotUseSqlSource;
         return new ProjectEvaluation(project, overall, manifests.ToImmutable(), AssetsFile: assetsFile);
     }
 

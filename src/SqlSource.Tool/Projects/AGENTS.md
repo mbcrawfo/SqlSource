@@ -7,6 +7,6 @@
 - **`Projects/RunProjects.cs` is the one place that says which projects a run is on** and what is said of each: the unit's projects, or the ones `--project` names.  A project of a solution that does not use SqlSource is left out silently unless it was named; one that was not restored is an error everywhere.  `Projects/SolutionReader.cs` reads a solution with `Microsoft.VisualStudio.SolutionPersistence`, and the reason of `SQLSRC223` is that library's text: no test compares it.
 - **An evaluation reports nothing.**  `ProjectEvaluator` runs several projects at once and gives each error as data, in a `ProjectEvaluation`, so that the caller reports them in the order of the projects.
 - **`Projects/ProjectEvaluator.cs` only evaluates a project and runs the package's target `SqlSourceWriteManifest`, into a file of the run's temporary folder** ([evaluating a project](../../../docs/architecture/tool.md#evaluating-a-project)).
-- **A project's target frameworks fail together.**  When one framework's evaluation or target fails, the project has no manifest at all: a plan of its other frameworks could delete a sidecar that the failed one alone needs.
+- **A project's target frameworks fail together.**  When one framework's evaluation or target fails, or one framework was not restored, the project has no manifest at all: a plan of its other frameworks could delete a sidecar that the failed one alone needs.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.
