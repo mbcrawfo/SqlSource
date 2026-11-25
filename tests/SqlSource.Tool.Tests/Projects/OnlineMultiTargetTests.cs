@@ -274,12 +274,12 @@ public sealed class OnlineMultiTargetTests : IDisposable
     public async Task Clean_DeletesEveryFrameworksManifest()
     {
         await BuildOnlineAsync();
-        string[] manifests =
-        [
-            Path.Combine(_folder, "obj", "Debug", "net8.0", "App.csproj" + ManifestSuffix),
-            Path.Combine(_folder, "obj", "Debug", "net10.0", "App.csproj" + ManifestSuffix),
-        ];
-        manifests.ShouldAllBe(manifest => File.Exists(manifest));
+        // The configuration's folder is the environment's, Release in CI.
+        var manifests = RunFiles().Where(file => file.EndsWith(ManifestSuffix, StringComparison.Ordinal)).ToList();
+        manifests
+            .Select(manifest => Path.GetFileName(Path.GetDirectoryName(manifest)))
+            .OrderBy(framework => framework, StringComparer.Ordinal)
+            .ShouldBe(["net10.0", "net8.0"]);
 
         await CleanAsync();
 
@@ -323,8 +323,10 @@ public sealed class OnlineMultiTargetTests : IDisposable
         run.Manifests[0].ShouldContain("TargetFramework=net8.0");
         run.Manifests[1].ShouldContain("TargetFramework=net10.0");
         Path.GetFullPath(run.Arguments[2], _folder).ShouldBe(given);
-        Path.GetFullPath(run.Arguments[4], _folder)
-            .ShouldBe(Path.Combine(_folder, "obj", "Debug", "net10.0", "App.csproj" + ManifestSuffix));
+        // Under the configuration's folder, which is the environment's, Release in CI.
+        var other = Path.GetFullPath(run.Arguments[4], _folder);
+        other.ShouldStartWith(Path.Combine(_folder, "obj") + Path.DirectorySeparatorChar);
+        other.ShouldEndWith(Path.Combine("net10.0", "App.csproj" + ManifestSuffix));
         (await File.ReadAllLinesAsync(given, TestContext.Current.CancellationToken)).ShouldContain(
             "TargetFramework=net8.0"
         );
