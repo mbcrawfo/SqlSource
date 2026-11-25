@@ -67,7 +67,8 @@ public sealed class RunPlannerTests : IDisposable
                 SqlDialect.PostgreSql,
                 getUser.Query.Segments,
                 getUser.Query.Tokens,
-                getUser.Query.Parameters
+                getUser.Query.Parameters,
+                getUser.Query.MarkedVariables
             )
         );
         getUser.Hash!.Length.ShouldBe(64);

@@ -127,6 +127,7 @@ A `-- variable:` marker inside a query says that a name is a variable of the que
 - **The name is not a query parameter wherever the query writes it**, in any spelling, and in a token's default too.  So the query's input model has no property for it, and its method sends no value for it.
 - **It works under every dialect.**  Use it for a user variable of MySQL or MariaDB, and for the parameter of a procedure that the SQL creates.
 - **The marker goes inside a query, under its `-- name:` line.**  In the file header it is [SQLSRC116](../diagnostics.md#sqlsrc116).
+- **Adding, removing or changing a name of the marker makes the query's sidecar out of date**, as a change to the SQL does.  Run `dotnet sqlsource describe` again: see [describing again](sidecars.md#describing-again).
 - **MySqlConnector sends a query that writes a user variable only when the connection string sets `AllowUserVariables=true`.**  Without it, MySqlConnector takes `@last` for a parameter that the command lacks, and the query fails when it runs.
 
 <a id="names-read-as-parameters"></a>

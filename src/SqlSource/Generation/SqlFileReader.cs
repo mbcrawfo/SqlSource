@@ -62,6 +62,7 @@ internal static class SqlFileReader
                     MemberLocationMarker = MarkerLocationOf(file.Path, text, block.MemberLocationMarker),
                     VisibilityMarker = MarkerLocationOf(file.Path, text, block.VisibilityMarker),
                     DeclaredVariables = block.DeclaredVariables,
+                    MarkedVariables = block.MarkedVariables,
                     MethodErrors = DiagnosticsOf(file.Path, text, block.MethodErrors),
                 }
             );

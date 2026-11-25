@@ -106,6 +106,7 @@ If you have already taken one side of the conflict, skip step 2.  In step 3, run
 - **The SQL of the query.**  A change to a comment alone does not count.
 - **The database type or the nullability of a `-- param:` marker of the query**, `not null` included.  The C# type after `->` does not count, and neither does a `-- column:` marker.
 - **The default of one of the tokens of the query.**
+- **The names of a [`-- variable:` marker](parameters.md#variable-marker) of the query**, since they take names out of its query parameters.  Their order and spelling count too.
 - **The dialect of the query, or its [logical database](connections.md#connections).**
 - **The version of the tool.**  Each entry keeps the version that wrote it, and the tool describes again an entry that another version wrote.  So the tool describes again the whole of a sidecar that another version wrote.  Until it does, the build warns of it ([SQLSRC240](../diagnostics.md#sqlsrc240)).
 

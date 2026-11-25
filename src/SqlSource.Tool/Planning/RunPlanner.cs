@@ -258,7 +258,7 @@ internal static class RunPlanner
             query,
             NeedsEntry: true,
             QuerySettings.ResolveDatabase(query.Markers, owner.Level, SqlDialectName.Canonical(dialect)),
-            SqlQueryHash.Compute(dialect, query.Segments, query.Tokens, query.Parameters),
+            SqlQueryHash.Compute(dialect, query.Segments, query.Tokens, query.Parameters, query.MarkedVariables),
             problems
         );
     }

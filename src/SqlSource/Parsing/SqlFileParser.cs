@@ -333,6 +333,7 @@ internal static class SqlFileParser
                     MemberLocationMarker = scope?.MemberLocationMarker,
                     VisibilityMarker = scope?.VisibilityMarker,
                     DeclaredVariables = query.DeclaredVariables,
+                    MarkedVariables = SqlParameterList.NamesOf(text, scope?.Variables ?? []),
                     MethodErrors = FindRefusedEmptyLists(query),
                 }
             );

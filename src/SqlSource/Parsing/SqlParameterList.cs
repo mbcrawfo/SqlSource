@@ -199,6 +199,29 @@ internal static class SqlParameterList
         return kept;
     }
 
+    /// <summary>
+    /// Each name of <paramref name="marked" /> once, as first written, in order: the names a query's hash reads.
+    /// </summary>
+    public static EquatableArray<string> NamesOf(string text, IReadOnlyList<TextSpan> marked)
+    {
+        if (marked.Count == 0)
+        {
+            return EquatableArray<string>.Empty;
+        }
+
+        var names = ImmutableArray.CreateBuilder<string>(marked.Count);
+        for (var position = 0; position < marked.Count; position++)
+        {
+            var span = marked[position];
+            if (!GivenBefore(text, marked, position, text.AsSpan(span.Start, span.Length)))
+            {
+                names.Add(text.Substring(span.Start, span.Length));
+            }
+        }
+
+        return new EquatableArray<string>(names.ToImmutable());
+    }
+
     private static bool GivenBefore(string text, IReadOnlyList<TextSpan> marked, int position, ReadOnlySpan<char> name)
     {
         for (var earlier = 0; earlier < position; earlier++)
