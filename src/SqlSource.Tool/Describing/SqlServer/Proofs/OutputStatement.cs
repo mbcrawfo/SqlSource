@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
@@ -60,14 +59,6 @@ internal sealed record OutputStatement(
     IReadOnlyList<Assignment>? Assignments
 )
 {
-    // How a column the SET writes is matched: a collation may make Shipped_At, or a name written in other widths or
-    // accents, the column shipped_at.
-    private const CompareOptions Loosely =
-        CompareOptions.IgnoreCase
-        | CompareOptions.IgnoreNonSpace
-        | CompareOptions.IgnoreKanaType
-        | CompareOptions.IgnoreWidth;
-
     // The clauses of an UPDATE after its SET, or of a DELETE after its target, in the order T-SQL takes them.
     private enum Clause
     {
@@ -176,26 +167,43 @@ internal sealed record OutputStatement(
     }
 
     /// <summary>
-    /// True when an assignment writes <paramref name="column" />, its name equal ignoring case, accents, kana and
-    /// width, or when <see cref="Assignments" /> is null, since a <c>SET</c> the reader cannot follow may write any.
+    /// True when an assignment may write <paramref name="column" />: the two names, without their trailing spaces,
+    /// are equal ignoring ASCII case, or either holds a character other than an ASCII letter, a digit, <c>_</c>,
+    /// <c>@</c>, <c>#</c> or <c>$</c>, which a collation may equate with another spelling.  Or when
+    /// <see cref="Assignments" /> is null, since a <c>SET</c> the reader cannot follow may write any.
     /// </summary>
     /// <param name="column">The target's column.</param>
     public bool Writes(string column) =>
-        Assignments is null || Assignments.Any(assignment => IsLooselyEqual(assignment.Column, column));
+        Assignments is null || Assignments.Any(assignment => MayBeTheSameColumn(assignment.Column, column));
 
     /// <summary>
     /// The one assignment that writes <paramref name="column" />, by <see cref="Writes" />'s match, when its name is
-    /// the column's ordinally; or null when none or several write it, or <see cref="Assignments" /> is null.
+    /// the column's ordinally; or null when none or several may write it, or <see cref="Assignments" /> is null.
     /// </summary>
     /// <param name="column">The target's column.</param>
     public Assignment? AssignmentOf(string column) =>
-        Assignments?.Where(assignment => IsLooselyEqual(assignment.Column, column)).ToList() is [var one]
+        Assignments?.Where(assignment => MayBeTheSameColumn(assignment.Column, column)).ToList() is [var one]
         && string.Equals(one.Column, column, StringComparison.Ordinal)
             ? one
             : null;
 
-    private static bool IsLooselyEqual(string left, string right) =>
-        CultureInfo.InvariantCulture.CompareInfo.Compare(left, right, Loosely) == 0;
+    // True unless both names, without their trailing spaces, are plain and differ ignoring ASCII case.  SQL Server
+    // ignores a name's trailing spaces, so [b ] is the column b, and a collation may equate names that differ in case
+    // or, with any other character, in what this runtime cannot tell: ß and ss, æ and ae, a fullwidth letter and its
+    // ASCII one.  So a name that is not plain may be every column, whatever the runtime's globalization.
+    private static bool MayBeTheSameColumn(string left, string right)
+    {
+        var leftName = left.TrimEnd(' ');
+        var rightName = right.TrimEnd(' ');
+        return !IsPlain(leftName)
+            || !IsPlain(rightName)
+            || string.Equals(leftName, rightName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // True when the name is not empty and holds only ASCII letters, digits, _, @, # and $, which no collation equates
+    // with another spelling but by case.
+    private static bool IsPlain(string name) =>
+        name.Length > 0 && name.All(static c => char.IsAsciiLetterOrDigit(c) || c is '_' or '@' or '#' or '$');
 
     // An UPDATE or a DELETE, read by the same rules but for what comes between the name and the OUTPUT.
     private static OutputStatement? ReadChange(IReadOnlyList<TsqlToken> tokens, Shape shape, OutputKind kind)

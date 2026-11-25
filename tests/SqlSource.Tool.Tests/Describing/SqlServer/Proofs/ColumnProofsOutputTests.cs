@@ -380,6 +380,17 @@ public sealed partial class ColumnProofsOutputTests
     )]
     public void Output_ReviewCases_StayNullable(string sql) => ShouldProveNothing(sql, Stored(1, "b", true, "t"));
 
+    // SQL Server ignores a name's trailing spaces, so each SET writes the column the WHERE keeps, and the server names
+    // an item as it is written.
+    [Theory]
+    [InlineData("UPDATE dbo.t SET [b ] = NULL OUTPUT inserted.b WHERE b IS NOT NULL", "b")]
+    [InlineData("UPDATE dbo.t SET [b  ] = NULL OUTPUT inserted.b WHERE b IS NOT NULL", "b")]
+    [InlineData("UPDATE dbo.t SET [B ] = NULL OUTPUT inserted.b WHERE b IS NOT NULL", "b")]
+    [InlineData("UPDATE o SET o.[b ] = NULL OUTPUT inserted.b FROM dbo.t AS o WHERE o.b IS NOT NULL", "b")]
+    [InlineData("UPDATE dbo.t SET b = NULL OUTPUT inserted.[b ] WHERE [b ] IS NOT NULL", "b ")]
+    public void Output_SetOfTheColumnWithTrailingSpaces_StaysNullable(string sql, string name) =>
+        ShouldProveNothing(sql, Stored(1, name, true, "t") with { SourceColumn = "b" });
+
     // A computed column, a view's and one of a CLR type are not the target's stored column the filter tested.
     [Theory]
     [InlineData("UPDATE o SET a = 1 OUTPUT inserted.b FROM dbo.t AS o WHERE o.b IS NOT NULL", "computed")]

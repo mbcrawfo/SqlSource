@@ -333,8 +333,7 @@ public sealed class OutputStatementTests
     public void Writes_MatchesASpellingTheCollationMayEquate()
     {
         var (tokens, statement) = ReadOne(
-            // A fullwidth n, which a collation that ignores width makes the column note.
-            "UPDATE o SET Shipped_At = NULL, [ｎote] = 'x' OUTPUT inserted.id "
+            "UPDATE o SET Shipped_At = NULL, NOTE = 'x' OUTPUT inserted.id "
                 + "FROM dbo.orders AS o JOIN dbo.customers AS u ON u.id = o.customer_id"
         );
 
@@ -348,6 +347,31 @@ public sealed class OutputStatementTests
         statement.IsTargetColumn(tokens, ["shipped_at"], "shipped_at").ShouldBeFalse();
         statement.IsTargetColumn(tokens, ["o", "Shipped_At"], "shipped_at").ShouldBeFalse();
     }
+
+    // SQL Server ignores a name's trailing spaces, and a collation may equate a name of any character but an ASCII
+    // letter, a digit, _, @, # or $ with another spelling, so such a name may write every column.
+    [Theory]
+    [InlineData("[b ] = NULL", "b")]
+    [InlineData("[b  ] = NULL", "b")]
+    [InlineData("[B ] = NULL", "b")]
+    [InlineData("o.[b ] = NULL", "b")]
+    [InlineData("b = NULL", "b ")]
+    [InlineData("[ｂ] = NULL", "b")]
+    [InlineData("[ß] = NULL", "ss")]
+    [InlineData("ss = NULL", "ß")]
+    [InlineData("[æ] = NULL", "ae")]
+    [InlineData("[b c] = NULL", "a")]
+    [InlineData("[a-b] = NULL", "a")]
+    public void Writes_ANameTheServerMayEquate_WritesTheColumn(string set, string column) =>
+        ReadOne($"UPDATE o SET {set} OUTPUT inserted.b FROM dbo.t AS o").Statement.Writes(column).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("a = NULL", "b")]
+    [InlineData("[a ] = NULL", "b")]
+    [InlineData("a = NULL", "b ")]
+    [InlineData("a_1 = NULL, [$a#] = NULL", "a_2")]
+    public void Writes_AnotherPlainName_DoesNotWriteTheColumn(string set, string column) =>
+        ReadOne($"UPDATE o SET {set} OUTPUT inserted.b FROM dbo.t AS o").Statement.Writes(column).ShouldBeFalse();
 
     // The one assignment that writes a column is its value's only when it names the column ordinally.
     [Fact]
@@ -364,8 +388,20 @@ public sealed class OutputStatementTests
         statement.AssignmentOf("status").ShouldBeNull();
     }
 
+    // A name the server may equate with any column is the assignment of its own spelling alone.
+    [Theory]
+    [InlineData("[ß] = 1", "ß")]
+    [InlineData("[b ] = 1, a = 2", "b ")]
+    public void AssignmentOf_AlonePossiblyEveryColumn_GivesItForItsOwnSpelling(string set, string column) =>
+        ReadOne($"UPDATE o SET {set} OUTPUT inserted.a FROM dbo.t AS o")
+            .Statement.AssignmentOf(column)
+            .ShouldNotBeNull()
+            .Column.ShouldBe(column);
+
     [Theory]
     [InlineData("UPDATE o SET a = 1, A = 2 OUTPUT inserted.a FROM dbo.t AS o")]
+    [InlineData("UPDATE o SET [a ] = 1 OUTPUT inserted.a FROM dbo.t AS o")]
+    [InlineData("UPDATE o SET a = 1, [ß] = 2 OUTPUT inserted.a FROM dbo.t AS o")]
     [InlineData("UPDATE o SET a += 1 OUTPUT inserted.a FROM dbo.t AS o")]
     [InlineData("DELETE o OUTPUT deleted.a FROM dbo.t AS o")]
     [InlineData("INSERT INTO dbo.t (a) OUTPUT inserted.a VALUES (1)")]

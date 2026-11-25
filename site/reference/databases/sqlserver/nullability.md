@@ -105,7 +105,7 @@ For the `WHERE` and the `SET`, all of these must be true:
 - for an `inserted` column, each item of the `SET` is `x = value`, `o.x = value` or `@v = value`;
 - for the value that the `SET` writes, the `SET` writes the column once, with the name that the `OUTPUT` gives it.
 
-Any other item of the `SET`, such as `x += 1` or `@v = x = 0`, counts as one that writes every column.  Names that differ only in case, accents or width count as the same column: a `SET` that writes `Shipped_At` writes `shipped_at`.
+Any other item of the `SET`, such as `x += 1` or `@v = x = 0`, counts as one that writes every column.  Names that differ only in case or in trailing spaces count as the same column: a `SET` that writes `Shipped_At` or `[shipped_at ]` writes `shipped_at`.  A name with any character but an ASCII letter, a digit, `_`, `@`, `#` or `$`, such as `[ß]` or `[ship date]`, counts as every column, since a collation may make it the same as another spelling.
 
 **SqlSource treats none of these items as never null in two kinds of query:**
 

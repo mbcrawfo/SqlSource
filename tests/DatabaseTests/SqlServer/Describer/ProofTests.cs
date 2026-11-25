@@ -1279,9 +1279,9 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         };
 
     // The cases of the review, each NULL in some row that the statement changes: a SET that writes the filtered
-    // column, by any spelling; a target that is a view, a CTE or a derived table whose x is the table's b under another
-    // name; a filter on another source's column of the same name; a pseudo-table inside an expression; and a MERGE,
-    // whose inserted is NULL in a row it deletes.
+    // column, by any spelling, trailing spaces too; a target that is a view, a CTE or a derived table whose x is the
+    // table's b under another name; a filter on another source's column of the same name; a pseudo-table inside an
+    // expression; and a MERGE, whose inserted is NULL in a row it deletes.
     public static TheoryData<string> BreakingOutputs =>
         [
             "UPDATE o SET o.b = NULL OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL",
@@ -1290,6 +1290,8 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             "UPDATE o SET b = DEFAULT OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL",
             "UPDATE dbo.proof_rows SET b = DEFAULT OUTPUT inserted.b WHERE b IS NOT NULL",
             "UPDATE dbo.proof_rows SET b = NULL OUTPUT inserted.b WHERE b IS NOT NULL",
+            "UPDATE dbo.proof_rows SET [b ] = NULL OUTPUT inserted.b WHERE b IS NOT NULL",
+            "UPDATE dbo.proof_rows SET b = NULL OUTPUT inserted.[b ] WHERE [b ] IS NOT NULL",
             "UPDATE dbo.proof_rows_twice SET x = NULL OUTPUT inserted.b WHERE b IS NOT NULL",
             "WITH v AS (SELECT id, b AS x, b FROM dbo.proof_rows) UPDATE v SET x = NULL OUTPUT inserted.b "
                 + "WHERE b IS NOT NULL",
