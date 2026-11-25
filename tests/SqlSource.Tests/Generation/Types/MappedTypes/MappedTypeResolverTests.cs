@@ -226,6 +226,9 @@ public sealed class MappedTypeResolverTests
             public sealed class ArrOf<T, U>
                 where U : System.Collections.Generic.IList<T[]>;
 
+            public sealed class ArrIL<T, U>
+                where U : System.Collections.Generic.IList<T[]?>;
+
             public sealed class ItemList<T, U>
                 where U : System.Collections.Generic.IList<Holder<T>.Item?>;
 
@@ -264,6 +267,10 @@ public sealed class MappedTypeResolverTests
             // A type parameter used where nullable annotations are off keeps its argument's nullability.
             public sealed class OldBox<T, U>
                 where U : System.Collections.Generic.IList<T>;
+
+            // An invariant type parameter of a constraint written where nullable annotations are off.
+            public sealed class OldList<T>
+                where T : System.Collections.Generic.IList<string>;
         }
         #nullable enable
 
@@ -697,6 +704,17 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::MyApp.SameBox<int>")]
     [InlineData("global::MyApp.SameBox<global::System.Uri>")]
     [InlineData("global::MyApp.MaybeSame<string>")]
+    [InlineData("global::MyApp.ArrIL<string, global::System.Collections.Generic.List<string[]?>>")]
+    [InlineData("global::MyApp.OldList<global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<string?>, string[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<object?>, string[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.ICollection<string?>, string[]>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IList<"
+            + "global::System.Collections.Generic.IEnumerable<string?>>, "
+            + "global::System.Collections.Generic.List<string>[]>"
+    )]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<int>, int[]>")]
     [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<string[]?>, string[]?[]>")]
     [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<string[][]?>, string[][]?[]>")]
     [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<int[]?>, int[]?[]>")]
@@ -782,6 +800,13 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::MyApp.Names<global::System.Collections.Generic.IEnumerable<string?>>")]
     [InlineData("global::MyApp.MaybeSorted<global::System.Collections.Generic.Comparer<string>>")]
     [InlineData("global::MyApp.MaybeSame<global::MyApp.PlainSame>")]
+    [InlineData("global::MyApp.ArrIL<string, global::System.Collections.Generic.List<string[]>>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<string>, string?[]>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IList<"
+            + "global::System.Collections.Generic.KeyValuePair<string, int>>, "
+            + "global::System.Collections.Generic.KeyValuePair<string?, int>[]>"
+    )]
     [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<string[]>, string[]?[]>")]
     [InlineData(
         "global::MyApp.PairBox<global::System.Collections.Generic.IList<string[]?[]>, "

@@ -160,21 +160,23 @@ internal static class GenericConstraints
     // Whether a type that converts to another, nullability aside, keeps the nullability of the other's type arguments
     // and array elements, as the compiler's conversion does with nullability: a pair at an invariant type parameter,
     // or a value type at a variant one, has the same nullability all through; at an out parameter the source's
-    // converts to the target's, and at an in parameter the reverse.  An argument whose base types and interfaces have
-    // none of the target's definition keeps it, since the conversion is then not by a type argument.
+    // converts to the target's, and at an in parameter the reverse.  An array converts by its element, to an array and
+    // to its generic interfaces alike, as S[] converts to IList<T> whenever S converts to T, though IList<T> is
+    // invariant.  An argument whose base types and interfaces have none of the target's definition keeps it, since
+    // the conversion is then not by a type argument.
     private static bool KeepsInnerNullability(ITypeSymbol source, ITypeSymbol target)
     {
         switch (target)
         {
             case IArrayTypeSymbol targetArray:
-                if (source is not IArrayTypeSymbol sourceArray)
-                {
-                    return true;
-                }
-
-                return sourceArray.ElementType.IsValueType
-                    ? SameNullability(sourceArray.ElementType, targetArray.ElementType)
-                    : ConvertsWithNullability(sourceArray.ElementType, targetArray.ElementType);
+                return source is not IArrayTypeSymbol sourceArray
+                    || ArgumentKeepsNullability(sourceArray.ElementType, targetArray.ElementType, VarianceKind.Out);
+            case INamedTypeSymbol { TypeArguments.Length: 1 } targetNamed
+                when source is IArrayTypeSymbol { IsSZArray: true } vector
+                    && vector.AllInterfaces.Any(face =>
+                        SymbolEqualityComparer.Default.Equals(face.OriginalDefinition, targetNamed.OriginalDefinition)
+                    ):
+                return ArgumentKeepsNullability(vector.ElementType, targetNamed.TypeArguments[0], VarianceKind.Out);
             case INamedTypeSymbol targetNamed when IsGeneric(targetNamed):
                 var candidates = TypeAndBaseTypes(source)
                     .Concat(source.AllInterfaces)
