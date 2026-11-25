@@ -137,12 +137,13 @@ public sealed class ScanTests(PostgresDatabases postgres)
         ]);
     }
 
-    // A plan of one relation prints bare names at a Limit over a Sort over the scan.  The function's name gates it.
+    // A plan of one relation prints bare names at a Limit over a Sort over the scan.  The label old, a word of the
+    // gate, gates it, and names no row of a SELECT.
     [Fact]
     public async Task DescribeAsync_BareNamesAtARootOverOneScan_AreTheRelations() =>
         (
             await WalkedAsync(
-                "SELECT id, name, deleted_at FROM users WHERE left(name, 1) = @initial ORDER BY name LIMIT 10"
+                "SELECT id, name, deleted_at AS old FROM users WHERE left(name, 1) = @initial ORDER BY name LIMIT 10"
             )
         ).ShouldBe([NotNullCatalog, NotNullCatalog, NullableCatalog]);
 

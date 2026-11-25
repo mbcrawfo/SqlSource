@@ -43,7 +43,7 @@ A list parameter is a query parameter written directly after `IN` or `NOT IN`, w
 - **On PostgreSQL, a list in the index predicate of `ON CONFLICT` fails when it is empty or null.**  See [PostgreSQL's parameters](databases/postgresql/index.md#parameters).
 - **On PostgreSQL, a list can make the columns of a query's joined tables able to be null.**  This happens when both of these are true:
   - the list stands after a `NOT`, or its truth is used as a value, as in `(o.id IN @ids) IS FALSE`;
-  - the query holds a word such as `LEFT`, `RIGHT`, `FULL` or `OUTER`, even as the name of a function.
+  - the query holds a word such as `LEFT`, `RIGHT`, `FULL` or `OUTER`, other than as the name of a function.
 
   Why: an empty list keeps the rows that an outer join filled with null.  [Which columns can be null](databases/postgresql/nullability.md#nullability) gives every word and every use.
 - **A null value in a list of a reference type, such as a `string`, is sent as a `NULL`.**  After `IN` it matches nothing, and the other values still match.

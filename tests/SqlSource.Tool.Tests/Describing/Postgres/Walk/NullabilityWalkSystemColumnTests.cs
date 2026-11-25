@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -32,7 +33,7 @@ public sealed class NullabilityWalkSystemColumnTests
             new PlanInstancesCache(root, null),
             columns,
             origins,
-            new WalkScope(false, false, true, PostgresTables.Of(table), [])
+            new WalkScope(false, OldAndNewNames.None, true, PostgresTables.Of(table), [])
         );
     }
 

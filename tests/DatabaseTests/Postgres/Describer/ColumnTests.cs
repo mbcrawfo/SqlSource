@@ -544,9 +544,9 @@ public sealed class ColumnTests(PostgresDatabases postgres)
 
     // The rule replaces the INSERT by its action, and the rows of its RETURNING list are the action's, while the row
     // description keeps the target as the column's origin: the column is nullable whatever the target's NOT NULL
-    // says, whether the query is gated or not.  The gated one's plan inserts into the other table under its own
-    // alias, which the walk maps to the target's column and finds nothing extends.  Its constant is the rewritten
-    // statement's, which the plan prints, and is never NULL.
+    // says, whether the query is gated or not.  The gated one, gated by its label new, has a plan that inserts into
+    // the other table under its own alias, which the walk maps to the target's column and finds nothing extends.  Its
+    // constant is the rewritten statement's, which the plan prints, and is never NULL.
     [Fact]
     public async Task DescribeAsync_ReturningOfATableWithAnInsteadRule_IsNullableByTheCatalog()
     {
@@ -567,7 +567,7 @@ public sealed class ColumnTests(PostgresDatabases postgres)
 
         var plain = await ShouldDescribeAsync("INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id");
         var gated = await ShouldDescribeAsync(
-            "INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id, left('a', 1) AS l"
+            "INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id, left('a', 1) AS new"
         );
 
         // An INSERT's nullable column is planned for the value it writes, which the rule's action does not write here.
@@ -666,9 +666,10 @@ public sealed class ColumnTests(PostgresDatabases postgres)
         Of(columns).ShouldBe([NullableOuterJoin, NotNullCatalog]);
     }
 
-    // The gate reads words: a function named as one gates a query that has no join.
+    // A word of a join that a "(" follows is a function's name and gates nothing: the query is walked for its column of
+    // no origin alone, and its other column keeps the catalog's answer.
     [Fact]
-    public async Task DescribeAsync_FunctionNamedAsAGateWord_IsWalkedAndFindsNothing()
+    public async Task DescribeAsync_FunctionNamedAsAGateWord_IsNotGatedAndIsWalkedForItsExpression()
     {
         var description = await ShouldDescribeAsync("SELECT id, left(name, 3) AS l FROM users");
 

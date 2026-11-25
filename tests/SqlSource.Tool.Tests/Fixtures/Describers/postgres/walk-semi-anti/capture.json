@@ -29,7 +29,7 @@
       "method": "prepare",
       "request": {
         "statement": "sqlsource_1",
-        "sql": "SELECT u.id, left(u.name, 1) AS initial\nFROM users u\nWHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)\n    AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.user_id = u.id)",
+        "sql": "SELECT u.id, left(u.name, 1) AS initial\nFROM users u\nLEFT JOIN users r ON r.id = u.id\nWHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)\n    AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.user_id = u.id)",
         "types": []
       },
       "answer": {
@@ -221,7 +221,7 @@
     {
       "method": "check",
       "request": {
-        "sql": "SELECT u.id, left(u.name, 1) AS initial\nFROM users u\nWHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)\n    AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.user_id = u.id)",
+        "sql": "SELECT u.id, left(u.name, 1) AS initial\nFROM users u\nLEFT JOIN users r ON r.id = u.id\nWHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)\n    AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.user_id = u.id)",
         "parameters": []
       },
       "answer": {
@@ -240,7 +240,7 @@
         "error": null,
         "driverError": null,
         "sent": {
-          "text": "SELECT u.id, left(u.name, 1) AS initial\nFROM users u\nWHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)\n    AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.user_id = u.id)",
+          "text": "SELECT u.id, left(u.name, 1) AS initial\nFROM users u\nLEFT JOIN users r ON r.id = u.id\nWHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)\n    AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.user_id = u.id)",
           "parameters": []
         },
         "textRefused": null

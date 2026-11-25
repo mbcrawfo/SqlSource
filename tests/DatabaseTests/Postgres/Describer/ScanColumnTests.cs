@@ -77,8 +77,6 @@ public sealed class ScanColumnTests(PostgresDatabases postgres)
                     + "WHERE s.id > 0",
                 "?"
             },
-            // The word NEW, here an alias, may name the new row, so no scan is read.
-            { $"SELECT s.c AS new FROM (SELECT t.id, count(*) AS c FROM {T} t GROUP BY t.id OFFSET 0) s", "?" },
             // A cast the plan does not print: an inlined function's result is text, whatever its entry's type.
             { "SELECT f.t, f.c FROM scan_columns.as_text() f", "??" },
             { "SELECT f.t FROM scan_columns.union_as_text() f", "?" },
@@ -141,6 +139,25 @@ public sealed class ScanColumnTests(PostgresDatabases postgres)
             await postgres.ExecuteAsync(ScratchSchema.ScanColumns);
 
             await ShouldAnswerAsync(sql, expected);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropScanColumns);
+        }
+    }
+
+    // On 18 the word NEW, here a column's label, may name the new row, so no scan is read.  Before 18 it names none.
+    [Fact]
+    public async Task DescribeAsync_ColumnThroughAScanInAStatementThatSaysNew_IsProvedBefore18()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ScanColumns);
+
+            await ShouldAnswerAsync(
+                $"SELECT s.c AS new FROM (SELECT t.id, count(*) AS c FROM {T} t GROUP BY t.id OFFSET 0) s",
+                postgres.Major >= 18 ? "?" : "n"
+            );
         }
         finally
         {

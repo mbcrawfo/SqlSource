@@ -14,11 +14,25 @@ internal static class UnicodeEscape
     /// followed at once by an escape of a low one.  The second is '\0' for a single character, which no escape can
     /// name.  next is the index after what was read.
     /// </summary>
-    public static bool TryRead(ReadOnlySpan<char> text, int at, out char first, out char second, out int next)
+    public static bool TryRead(ReadOnlySpan<char> text, int at, out char first, out char second, out int next) =>
+        TryRead(text, at, '\\', out first, out second, out next);
+
+    /// <summary>
+    /// Reads the escape at text[at] as <see cref="TryRead(ReadOnlySpan{char}, int, out char, out char, out int)" />
+    /// does, with the escape character that a <c>UESCAPE</c> clause chose in place of the backslash.
+    /// </summary>
+    public static bool TryRead(
+        ReadOnlySpan<char> text,
+        int at,
+        char escape,
+        out char first,
+        out char second,
+        out int next
+    )
     {
         first = '\0';
         second = '\0';
-        if (!TryReadCodePoint(text, at, out var codePoint, out next))
+        if (!TryReadCodePoint(text, at, escape, out var codePoint, out next))
         {
             return false;
         }
@@ -31,7 +45,7 @@ internal static class UnicodeEscape
         if (codePoint is >= 0xD800 and <= 0xDBFF)
         {
             // The high surrogate waits for its low one.
-            if (!TryReadCodePoint(text, next, out var low, out next) || low is < 0xDC00 or > 0xDFFF)
+            if (!TryReadCodePoint(text, next, escape, out var low, out next) || low is < 0xDC00 or > 0xDFFF)
             {
                 return false;
             }
@@ -52,19 +66,20 @@ internal static class UnicodeEscape
         return true;
     }
 
-    // Reads one escape to its code point, from U+0001 to U+10FFFF, a surrogate included.
-    private static bool TryReadCodePoint(ReadOnlySpan<char> text, int at, out int codePoint, out int next)
+    // Reads one escape to its code point, from U+0001 to U+10FFFF, a surrogate included.  The escape character doubled
+    // is itself.
+    private static bool TryReadCodePoint(ReadOnlySpan<char> text, int at, char escape, out int codePoint, out int next)
     {
         codePoint = 0;
         next = at;
-        if (at >= text.Length || text[at] != '\\' || at + 1 >= text.Length)
+        if (at >= text.Length || text[at] != escape || at + 1 >= text.Length)
         {
             return false;
         }
 
-        if (text[at + 1] == '\\')
+        if (text[at + 1] == escape)
         {
-            codePoint = '\\';
+            codePoint = escape;
             next = at + 2;
             return true;
         }

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -29,7 +30,7 @@ public sealed class NullabilityWalkValuesTests
             origins,
             new WalkScope(
                 false,
-                false,
+                OldAndNewNames.None,
                 true,
                 PostgresTables.Of(),
                 [.. Enumerable.Repeat(BuiltInTypes.Int4, columnCount)],
