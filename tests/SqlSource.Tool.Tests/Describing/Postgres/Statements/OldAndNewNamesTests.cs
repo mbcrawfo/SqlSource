@@ -79,6 +79,10 @@ public sealed class OldAndNewNamesTests
     [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS o NEW AS n) 1")]
     [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS 1) 1")]
     [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS o")]
+    // A name outside ASCII: a server of a single-byte encoding folds it by its locale and cuts it by its own bytes.
+    [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS Ö) ö.v")]
+    [InlineData("UPDATE t SET v = 1 RETURNING WITH (NEW AS \"é\") 1")]
+    [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS U&\"\\00e9\") 1")]
     public void Of_WithThatCannotBeRead_IsUnknown(string sql)
     {
         var read = OldAndNewNames.Of(sql, 18);

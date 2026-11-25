@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
 
@@ -23,7 +24,9 @@ namespace SqlSource.Tool.Describing.Postgres.Statements;
 /// <c>ModifyTable</c>'s, so the set may hold a name that names no row there.  That costs an alias of that name the
 /// heuristic and is never a wrong answer.  A name is compared as the server keeps it: a word folded to lower case, a
 /// quoted name exactly, a <c>U&amp;"..."</c> one decoded, each cut to 63 bytes (<see cref="PostgresIdentifiers" />).
-/// A clause this reader cannot follow, or a name it cannot decode, is <see cref="Unknown" />.
+/// A clause this reader cannot follow, a name it cannot decode, or a name with a character above U+007F is
+/// <see cref="Unknown" />: a server of a single-byte encoding folds such a character by its locale and cuts a name
+/// by its own bytes, so only an ASCII name is read as every server reads it.
 /// </para>
 /// </remarks>
 internal sealed class OldAndNewNames
@@ -90,8 +93,9 @@ internal sealed class OldAndNewNames
         return new OldAndNewNames(mayBeNamed: true, names);
     }
 
-    // Reads "(OLD AS name, NEW AS name)" from the index into the names: false for anything else, or a name that cannot
-    // be decoded.
+    // Reads "(OLD AS name, NEW AS name)" from the index into the names: false for anything else, a name that cannot be
+    // decoded, or one with a character above U+007F, which a server of another encoding than UTF-8 may fold and cut
+    // otherwise than the tool does.
     private static bool TryReadOptions(List<Token> tokens, int at, HashSet<string> names)
     {
         if (!IsPunctuation(tokens, at, '('))
@@ -107,6 +111,7 @@ internal sealed class OldAndNewNames
                 || !(IsKeyword(tokens[at], "OLD") || IsKeyword(tokens[at], "NEW"))
                 || !IsKeyword(tokens[at + 1], "AS")
                 || tokens[at + 2] is not { Kind: TokenKind.Word or TokenKind.Name, Name: { } name }
+                || !Ascii.IsValid(name)
             )
             {
                 return false;
