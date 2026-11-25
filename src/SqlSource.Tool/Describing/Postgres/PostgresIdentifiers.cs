@@ -86,6 +86,27 @@ internal static class PostgresIdentifiers
     }
 
     /// <summary>
+    /// Whether a character is white space as PostgreSQL's lexer reads it: a space, <c>\t</c>, <c>\n</c>,
+    /// <c>\r</c>, <c>\f</c> or <c>\v</c>.  Any other character, a no-break space among them, is no white space: one
+    /// above U+007F is part of a word (<see cref="IsWordStart" />).
+    /// </summary>
+    public static bool IsWhiteSpace(char character) => character is ' ' or '\t' or '\n' or '\r' or '\f' or '\v';
+
+    /// <summary>
+    /// The text from its first character that is no white space, as <see cref="IsWhiteSpace" /> reads it.
+    /// </summary>
+    public static ReadOnlySpan<char> WithoutLeadingWhiteSpace(ReadOnlySpan<char> text)
+    {
+        var at = 0;
+        while (at < text.Length && IsWhiteSpace(text[at]))
+        {
+            at++;
+        }
+
+        return text[at..];
+    }
+
+    /// <summary>
     /// The name a word of SQL stands for, as PostgreSQL folds and cuts it: ASCII letters in lower case, and no more
     /// than <see cref="MaxNameBytes" /> bytes.  A letter above U+007F is kept as it is, as a server of UTF-8 keeps it.
     /// </summary>
@@ -209,7 +230,7 @@ internal static class PostgresIdentifiers
             return '\\';
         }
 
-        var text = sql.AsSpan(span.Start, span.Length).TrimStart();
+        var text = WithoutLeadingWhiteSpace(sql.AsSpan(span.Start, span.Length));
         if (
             !text.StartsWith("UESCAPE", StringComparison.OrdinalIgnoreCase)
             || (text.Length > "UESCAPE".Length && IsWordPart(text["UESCAPE".Length]))
@@ -218,7 +239,7 @@ internal static class PostgresIdentifiers
             return '\\';
         }
 
-        if (!text["UESCAPE".Length..].IsWhiteSpace())
+        if (!WithoutLeadingWhiteSpace(text["UESCAPE".Length..]).IsEmpty)
         {
             return null;
         }
@@ -236,7 +257,7 @@ internal static class PostgresIdentifiers
         }
 
         end = at + 1;
-        return char.IsWhiteSpace(escape) ? null : escape;
+        return IsWhiteSpace(escape) ? null : escape;
     }
 
     // The index of the first lexeme from the index that is no comment and no text of white space alone.
@@ -249,7 +270,7 @@ internal static class PostgresIdentifiers
                 DescriberSql.IsCommentOrHint(lexemes[at].Kind)
                 || (
                     lexemes[at] is { Kind: SqlLexemeKind.Text, Span: var span }
-                    && sql.AsSpan(span.Start, span.Length).IsWhiteSpace()
+                    && WithoutLeadingWhiteSpace(sql.AsSpan(span.Start, span.Length)).IsEmpty
                 )
             )
         )

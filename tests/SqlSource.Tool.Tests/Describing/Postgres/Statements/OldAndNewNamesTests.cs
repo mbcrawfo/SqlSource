@@ -61,11 +61,14 @@ public sealed class OldAndNewNamesTests
         read.MayName("t").ShouldBeFalse();
     }
 
-    // The server cuts a name at 63 bytes, and the plan prints it cut.
-    [Fact]
-    public void Of_LongName_IsCutAsTheServerCutsIt()
+    // The server cuts a name at 63 bytes, and the plan prints it cut: a word, a quoted name and an escaped one.
+    [Theory]
+    [InlineData("ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo")]
+    [InlineData("\"ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\"")]
+    [InlineData("U&\"\\006Fooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\"")]
+    public void Of_LongName_IsCutAsTheServerCutsIt(string name)
     {
-        var read = OldAndNewNames.Of($"UPDATE t SET v = 1 RETURNING WITH (OLD AS {new string('o', 70)}) 1", 18);
+        var read = OldAndNewNames.Of($"UPDATE t SET v = 1 RETURNING WITH (OLD AS {name}) 1", 18);
 
         read.MayName(new string('o', 63)).ShouldBeTrue();
         read.MayName(new string('o', 70)).ShouldBeFalse();
@@ -83,6 +86,11 @@ public sealed class OldAndNewNamesTests
     [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS Ö) ö.v")]
     [InlineData("UPDATE t SET v = 1 RETURNING WITH (NEW AS \"é\") 1")]
     [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS U&\"\\00e9\") 1")]
+    // PostgreSQL's white space is ASCII alone, so a Unicode space starts a word, and the name is not "o".
+    [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS \u00A0o) 1")]
+    [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS \u3000o) 1")]
+    [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS \u2028o) 1")]
+    [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS \u0085o) 1")]
     public void Of_WithThatCannotBeRead_IsUnknown(string sql)
     {
         var read = OldAndNewNames.Of(sql, 18);

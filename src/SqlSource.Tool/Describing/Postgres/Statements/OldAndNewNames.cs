@@ -184,7 +184,7 @@ internal sealed class OldAndNewNames
         while (at < text.Length)
         {
             var character = text[at];
-            if (char.IsWhiteSpace(character))
+            if (PostgresIdentifiers.IsWhiteSpace(character))
             {
                 at++;
             }

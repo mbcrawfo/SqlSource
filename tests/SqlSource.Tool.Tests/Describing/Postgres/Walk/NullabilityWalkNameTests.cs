@@ -13,7 +13,10 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 // old and the new row, and a MERGE at the root.
 public sealed class NullabilityWalkNameTests
 {
-    // PostgreSQL 18's old row is no instance: only the target's alias is a reference the walk proves.
+    // PostgreSQL 18's old row is no instance: only an alias that is none of the rows' names is a reference the walk
+    // proves.
+    private static readonly OldAndNewNames OldAndNew = OldAndNewNames.Of("UPDATE t SET v = 1 RETURNING old.v", 18);
+
     [Fact]
     public void Run_ReferenceToTheOldRow_IsNotProved()
     {
@@ -25,7 +28,7 @@ public sealed class NullabilityWalkNameTests
             Output = ["COALESCE(old.id, NULL::integer)", "COALESCE(t.id, NULL::integer)"],
         };
 
-        AnswersOf(RunAs(Scope(true, oldAndNew: OldAndNewNames.Unknown), plan, Expression, Expression))
+        AnswersOf(RunAs(Scope(true, oldAndNew: OldAndNew), plan, Expression, Expression))
             .ShouldBe([UnknownNoOrigin, NotNullExpression]);
     }
 
@@ -120,7 +123,8 @@ public sealed class NullabilityWalkNameTests
     }
 
     // PostgreSQL 18 prints its old row as "old.id", and an inner scope may alias a table "old" as well: in a
-    // statement that names OLD or NEW, only the target's alias is mapped at a ModifyTable.
+    // statement that names OLD or NEW, only an alias none of the rows' names is maps at a ModifyTable, and none when
+    // the names are unknown.
     private static readonly PlanNode ModifyOverOld = Over("ModifyTable", Scan("old")) with
     {
         Alias = "ord2",
@@ -130,7 +134,7 @@ public sealed class NullabilityWalkNameTests
     [Fact]
     public void Run_AliasAtAModifyTableThatIsNotTheTargetsWhereOldOrNewMayBeNamed_KeepsTheHeuristic() =>
         AnswersOf(Run(ModifyOverOld, OldAndNewNames.Unknown, NotNull, NotNull))
-            .ShouldBe([NullableHeuristic, NotNullCatalog]);
+            .ShouldBe([NullableHeuristic, NullableHeuristic]);
 
     // The flag is what decides: without it the same plan maps the alias.
     [Fact]
@@ -153,13 +157,13 @@ public sealed class NullabilityWalkNameTests
         AnswersOf(Run(plan, names, NotNull, NotNull, NotNull))
             .ShouldBe([NullableHeuristic, NotNullCatalog, NotNullCatalog]);
         AnswersOf(Run(plan, OldAndNewNames.Unknown, NotNull, NotNull, NotNull))
-            .ShouldBe([NullableHeuristic, NullableHeuristic, NotNullCatalog]);
+            .ShouldBe([NullableHeuristic, NullableHeuristic, NullableHeuristic]);
     }
 
-    // A name a WITH gives is the row's, and the target's own alias is always the target, old though it is: the server
-    // gives the target the name.
+    // A name a WITH gives is the row's, and a target aliased old keeps the heuristic too: an INSERT through a view
+    // prints the table under the alias of the view's query, which may be old, as the old row is.
     [Fact]
-    public void Run_NameAWithGivesAndATargetAliasedOld_AreTheRowAndTheTarget()
+    public void Run_NameAWithGivesAndATargetAliasedOld_KeepTheHeuristic()
     {
         var names = OldAndNewNames.Of("UPDATE t AS old SET v = 1 FROM s RETURNING WITH (NEW AS s2) s2.id", 18);
         var plan = Over("ModifyTable", Join("Inner", Scan("old"), Scan("s2"))) with
@@ -168,7 +172,7 @@ public sealed class NullabilityWalkNameTests
             Output = ["s2.id", "old.id"],
         };
 
-        AnswersOf(Run(plan, names, NotNull, NotNull)).ShouldBe([NullableHeuristic, NotNullCatalog]);
+        AnswersOf(Run(plan, names, NotNull, NotNull)).ShouldBe([NullableHeuristic, NullableHeuristic]);
     }
 
     // A single-target UPDATE or DELETE prints bare names on every major, and the flag is a word of the SQL: a bare
@@ -194,7 +198,7 @@ public sealed class NullabilityWalkNameTests
             Output = ["GREATEST(id, opt)", "GREATEST(a.id, a.opt)"],
         };
 
-        AnswersOf(RunAs(Scope(true, oldAndNew: OldAndNewNames.Unknown), plan, Expression, Expression))
+        AnswersOf(RunAs(Scope(true, oldAndNew: OldAndNew), plan, Expression, Expression))
             .ShouldBe([UnknownNoOrigin, NotNullExpression]);
     }
 

@@ -335,6 +335,28 @@ public sealed class WalkTests(PostgresDatabases postgres)
         ).ShouldBe([NullableHeuristic]);
     }
 
+    // An INSERT through a view prints the table under the alias of the view's query, here old, as it prints the old
+    // row, which is NULL on every row an INSERT returns.  So the target's alias is held to the rows' names too.
+    [Fact]
+    public async Task DescribeAsync_InsertThroughAViewThatAliasesItsTableOld_KeepsTheOldRowUnproved()
+    {
+        postgres.SkipBelow(18, PostgresDatabases.NoOldAndNewInReturning);
+        try
+        {
+            await postgres.ExecuteAsync("CREATE VIEW walk_old_view AS SELECT * FROM orders old");
+
+            var description = await ShouldDescribeAsync(
+                "INSERT INTO walk_old_view (user_id, total) VALUES (@user_id, @total) RETURNING old.id + 1 AS e"
+            );
+
+            Of(description.Columns.ShouldNotBeNull()).ShouldBe([UnknownNoOrigin]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync("DROP VIEW IF EXISTS walk_old_view");
+        }
+    }
+
     // PostgreSQL 18's old row cannot be given the name of a table of the statement: the server refuses it.
     [Fact]
     public async Task DescribeAsync_OldAliasThatIsAlsoATablesAlias_IsRefusedByTheServer()

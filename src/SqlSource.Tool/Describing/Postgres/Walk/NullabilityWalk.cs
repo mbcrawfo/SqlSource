@@ -139,10 +139,10 @@ internal sealed record WalkScope(
 /// At a root <c>ModifyTable</c> PostgreSQL 18 prints the old and the new row of a <c>RETURNING</c> list as
 /// <c>old.column</c> and <c>new.column</c>, or under the names <c>WITH (OLD AS ..., NEW AS ...)</c> gives them, and
 /// a table of an inner scope, the <c>SELECT</c> of an <c>INSERT</c> or a subquery in <c>FROM</c>, can have the same
-/// alias in the plan.  Where a reference may be the old or the new row (<see cref="WalkScope.OldAndNew" />), a
-/// qualified reference there maps when it names the target's own alias, which the server never lets the old or the
-/// new row take, or an alias that neither row may have; so does one at the root of a plan a scan scans, a
-/// data-modifying CTE's.
+/// alias in the plan, and so can the target, reached through a view whose query aliases its table so.  Where a
+/// reference may be the old or the new row (<see cref="WalkScope.OldAndNew" />), a qualified reference there maps only
+/// when it names an alias that neither row may have, the target's included; so does one at the root of a plan a scan
+/// scans, a data-modifying CTE's.
 /// </para>
 /// </remarks>
 internal static partial class NullabilityWalk
@@ -199,9 +199,9 @@ internal static partial class NullabilityWalk
             return Unusable(WalkReasons.OutputDiffers, root, instances, columns);
         }
 
-        var targetAlias = plans.TargetAliasOf(root);
+        var rowsMayBeNamed = plans.RowsMayBeNamedAt(root);
         var expressions =
-            fits && !instances.HasSetOperation ? new Expressions(plans, root, instances, targetAlias) : null;
+            fits && !instances.HasSetOperation ? new Expressions(plans, root, instances, rowsMayBeNamed) : null;
 
         var valuesNeverNull = ValuesColumnsOf(root, entries, columns.Count, scope);
         var listsARelation = PostgresTableMatcher.ListsARelation(columns, origins);
@@ -235,7 +235,7 @@ internal static partial class NullabilityWalk
                         origin,
                         entries[index],
                         instances,
-                        targetAlias,
+                        rowsMayBeNamed,
                         plans
                     ),
                     _ => Kept(columns[index], entries[index]),
@@ -309,7 +309,7 @@ internal static partial class NullabilityWalk
         }
 
         return plans.InstancesOf(child) is { Reason: null, HasSetOperation: false } instances
-            && new Expressions(plans, child, instances, plans.TargetAliasOf(child), 1).EntryProves(
+            && new Expressions(plans, child, instances, plans.RowsMayBeNamedAt(child), 1).EntryProves(
                 values[origin.Attribute.Attnum - 1],
                 type
             );
@@ -327,7 +327,7 @@ internal static partial class NullabilityWalk
         IReadOnlyList<string> entries
     )
     {
-        var expressions = new Expressions(plans, root, instances, plans.TargetAliasOf(root));
+        var expressions = new Expressions(plans, root, instances, plans.RowsMayBeNamedAt(root));
         var walked = new List<WalkedColumn>(columns.Count);
         var answered = false;
         for (var index = 0; index < columns.Count; index++)
@@ -482,14 +482,14 @@ internal static partial class NullabilityWalk
         ColumnOrigin origin,
         string entry,
         PlanInstances instances,
-        string? targetAlias,
+        bool rowsMayBeNamed,
         Plans plans
     )
     {
         var reference = OutputReference.Parse(entry);
         var instance = reference is null
             ? null
-            : plans.InstanceOf(reference, instances, targetAlias, BareNames.OfTheOneRelation)?.Instance;
+            : plans.InstanceOf(reference, instances, rowsMayBeNamed, BareNames.OfTheOneRelation)?.Instance;
 
         var resolved = instance switch
         {
@@ -585,19 +585,17 @@ internal static partial class NullabilityWalk
 
         public PlanInstances InstancesOf(PlanNode root) => cache.Of(root);
 
-        // The target's alias of a ModifyTable that may return the old or the new row, which a qualified reference may
-        // always name, or null when any alias may be mapped.  A ModifyTable without an alias has the empty one, which
-        // no reference names.
-        public string? TargetAliasOf(PlanNode root) =>
-            scope.OldAndNew.MayBeNamed && root.NodeType == PlanNodeTypes.ModifyTable
-                ? root.Alias ?? string.Empty
-                : null;
+        // Whether the root is a ModifyTable that may return the old or the new row, where a qualified reference maps
+        // only to an alias that none of the rows' names is.
+        public bool RowsMayBeNamedAt(PlanNode root) =>
+            scope.OldAndNew.MayBeNamed && root.NodeType == PlanNodeTypes.ModifyTable;
 
         /// <summary>
         /// The instance an entry's reference names, with the alias that names it: a qualified one's alias, when the
-        /// plan's root has no target that may return the old or the new row (<see cref="TargetAliasOf" />), or the
-        /// alias is the target's or one neither row may have (<see cref="OldAndNewNames.MayName" />); and a bare
-        /// one's by the rule of the caller.
+        /// plan's root is no <c>ModifyTable</c> that may return the old or the new row
+        /// (<see cref="RowsMayBeNamedAt" />), or the alias is one neither row may have
+        /// (<see cref="OldAndNewNames.MayName" />), the target's alias included; and a bare one's by the rule of the
+        /// caller.
         /// </summary>
         /// <remarks>
         /// The rules differ by what each caller reads, and each keeps the answers it has always given.  In a scanned
@@ -607,12 +605,14 @@ internal static partial class NullabilityWalk
         /// <c>DescribeAsync_ReturningOldAndNew_KeepsTheHeuristic</c> of <c>ColumnTests</c> pins.  An expression
         /// refuses a bare name there, a stricter rule kept from before the names were read, which costs an expression
         /// over a single-target <c>UPDATE</c> or <c>DELETE</c> of 18 that names either row its proof.  A bare name of
-        /// <see cref="BareNames.OfTheOneRelation" /> is not held to the target's alias, as it never was.
+        /// <see cref="BareNames.OfTheOneRelation" /> is not held to the rows' names, as it never was.  The target's
+        /// alias is held to them as any other: an <c>INSERT</c> through a view prints the table under the alias of the
+        /// view's query, which may be <c>old</c>, as the old row is.
         /// </remarks>
         public (string Alias, PlanInstance Instance)? InstanceOf(
             OutputReference reference,
             PlanInstances instances,
-            string? targetAlias,
+            bool rowsMayBeNamed,
             BareNames bareNames
         )
         {
@@ -628,12 +628,7 @@ internal static partial class NullabilityWalk
             var held = reference.Alias is not null || bareNames != BareNames.OfTheOneRelation;
             return
                 alias is not null
-                && (
-                    !held
-                    || targetAlias is null
-                    || string.Equals(alias, targetAlias, StringComparison.Ordinal)
-                    || !scope.OldAndNew.MayName(alias)
-                )
+                && (!held || !rowsMayBeNamed || !scope.OldAndNew.MayName(alias))
                 && instances.TryFind(alias, out var instance)
                 ? (alias, instance)
                 : null;
@@ -695,7 +690,7 @@ internal static partial class NullabilityWalk
                 return Resolution.Unknown;
             }
 
-            var targetAlias = TargetAliasOf(child);
+            var rowsMayBeNamed = RowsMayBeNamedAt(child);
             var found = Resolution.NoCandidate;
             foreach (var entry in entries)
             {
@@ -713,7 +708,7 @@ internal static partial class NullabilityWalk
                     continue;
                 }
 
-                if (InstanceOf(reference, instances, targetAlias, BareNames.Refused) is not { } named)
+                if (InstanceOf(reference, instances, rowsMayBeNamed, BareNames.Refused) is not { } named)
                 {
                     return Resolution.Unknown;
                 }

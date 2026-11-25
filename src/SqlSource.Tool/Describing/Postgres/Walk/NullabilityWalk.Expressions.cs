@@ -15,7 +15,8 @@ internal static partial class NullabilityWalk
     // an instance that only that join extends is under (ExpressionContext.ProvedOnFullJoinSides), for a COALESCE over
     // both sides.  A bare name is the plan's one relation's (PlanInstances.BareAlias): a plan of several prints every
     // name with its alias but the columns of a relation the planner proved empty, a Result under an outer join, and at
-    // a ModifyTable that may return the old or the new row only the target's alias is a relation.  An entry is read in
+    // a ModifyTable that may return the old or the new row an alias is a relation only when it is none of the rows'
+    // names (Plans.InstanceOf).  An entry is read in
     // a plan where no join
     // null-extends a side, or where the walk follows it to the node that computes it and no join null-extends that
     // node: a node prints a value computed under it in one pair of parentheses, at every node up to the root.  An
@@ -25,7 +26,7 @@ internal static partial class NullabilityWalk
         Plans plans,
         PlanNode root,
         PlanInstances instances,
-        string? targetAlias,
+        bool rowsMayBeNamed,
         int plansFollowed = 0
     )
     {
@@ -78,10 +79,13 @@ internal static partial class NullabilityWalk
         private bool ScannedPlanProves(PlanNode child, long columnType) =>
             child.Output is { Count: > 0 } entries
             && plans.InstancesOf(child) is { Reason: null, HasSetOperation: false } scanned
-            && new Expressions(plans, child, scanned, plans.TargetAliasOf(child), plansFollowed + 1).EveryEntryProves(
-                entries,
-                columnType
-            );
+            && new Expressions(
+                plans,
+                child,
+                scanned,
+                plans.RowsMayBeNamedAt(child),
+                plansFollowed + 1
+            ).EveryEntryProves(entries, columnType);
 
         private bool EveryEntryProves(IReadOnlyList<string> entries, long columnType)
         {
@@ -300,7 +304,13 @@ internal static partial class NullabilityWalk
                 found =
                     find() is { } subRoot
                     && plans.InstancesOf(subRoot) is { Reason: null, HasSetOperation: false } subInstances
-                        ? new Expressions(plans, subRoot, subInstances, plans.TargetAliasOf(subRoot), plansFollowed + 1)
+                        ? new Expressions(
+                            plans,
+                            subRoot,
+                            subInstances,
+                            plans.RowsMayBeNamedAt(subRoot),
+                            plansFollowed + 1
+                        )
                         : null;
                 _subPlans[key] = found;
             }
@@ -579,9 +589,10 @@ internal static partial class NullabilityWalk
             );
 
         // The alias a reference names and its instance: a bare name is the plan's one relation's, unless the
-        // statement may name OLD or NEW, and only the plan's one alias where it has one.
+        // statement may name the old or the new row, and at a ModifyTable that may return them a qualified name only
+        // when it is none of the rows' names (Plans.InstanceOf).
         private (string Alias, PlanInstance Instance)? InstanceOf(OutputReference reference) =>
-            plans.InstanceOf(reference, instances, targetAlias, BareNames.OfTheOneRelationUnlessOldOrNew);
+            plans.InstanceOf(reference, instances, rowsMayBeNamed, BareNames.OfTheOneRelationUnlessOldOrNew);
 
         // The type of the column of the name through the instance's rows, when each proves it, all of one type.
         private long? ProvedTypeThrough(PlanInstance instance, string column) =>

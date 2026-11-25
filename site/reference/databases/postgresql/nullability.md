@@ -165,7 +165,8 @@ SqlSource treats a column as one that can be null when one of these is true:
 - **The query has `ROLLUP`, `CUBE` or `GROUPING SETS`.**  SqlSource treats every column of such a query as one that can be null, except a `count(...)` without `OVER` or a `grouping(...)` that is the whole column.
 - **On PostgreSQL 18, the query names `OLD` or `NEW`, and the column is a subquery, an `IN (SELECT ...)`, an `= ANY (SELECT ...)`, or an expression that a subquery in `FROM` or a `WITH` query computes.**  This holds even for one that the list above says is never null.
 - **On PostgreSQL 18, the query names `OLD` or `NEW`, and a column of its `RETURNING` list is one of these:**
-  - a column of a table aliased `old` or `new`, or by a name that `RETURNING WITH (OLD AS ..., NEW AS ...)` gives, unless the table is the one the statement changes;
+  - a column of a table aliased `old` or `new`, or by a name that `RETURNING WITH (OLD AS ..., NEW AS ...)` gives, the table the statement changes included;
+  - any column written with its table's name, when a name that `WITH` gives holds a character outside ASCII;
   - an expression over a column written without its table's name, in an `UPDATE` or a `DELETE` of one table.
 
   SqlSource does not tell such a column from one of the old or the new row, which is null where the row does not exist.

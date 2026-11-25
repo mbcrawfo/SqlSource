@@ -164,7 +164,9 @@ internal static class OuterJoinGate
             }
 
             var start = Math.Max(from, lexeme.Span.Start);
-            var rest = sql.AsSpan(start, lexeme.Span.Start + lexeme.Span.Length - start).TrimStart();
+            var rest = PostgresIdentifiers.WithoutLeadingWhiteSpace(
+                sql.AsSpan(start, lexeme.Span.Start + lexeme.Span.Length - start)
+            );
             if (!rest.IsEmpty)
             {
                 return rest[0] == '(';

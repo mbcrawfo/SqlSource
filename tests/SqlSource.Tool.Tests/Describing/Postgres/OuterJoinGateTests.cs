@@ -41,6 +41,8 @@ public sealed class OuterJoinGateTests
     [InlineData("left")]
     [InlineData("SELECT 1 FROM a LEFT JOIN (b JOIN c ON true) ON true")]
     [InlineData("SELECT 1 FROM a LEFT /* ( */ JOIN b ON true")]
+    // A Unicode space is no white space to PostgreSQL: it is part of the word after it, so no "(" follows the LEFT.
+    [InlineData("SELECT 1 FROM a LEFT \u00A0(b) JOIN c ON true")]
     [InlineData("SELECT left(name, 3) FROM a LEFT JOIN b ON true")]
     // A join however it is spaced or quoted.
     [InlineData("SELECT 1 FROM a\nLEFT\nJOIN b ON true")]
