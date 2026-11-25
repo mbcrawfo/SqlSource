@@ -13,7 +13,7 @@ internal sealed partial class SqlRenamer
     {
         private void LineCommentOfQueryFile(SqlLexeme comment)
         {
-            if (SqlMarkerReader.Read(text, comment) is not { } marker)
+            if (SqlMarkerReader.Read(text, comment, renamer._rules) is not { } marker)
             {
                 _into.ReplaceTo(comment.Span.End, "--");
                 return;
@@ -27,6 +27,7 @@ internal sealed partial class SqlRenamer
                 SqlMarkerKind.Dialect => SqlDialectMarker.TryRead(text, marker, out _) ? value : null,
                 SqlMarkerKind.Database => DatabaseMarker(value),
                 SqlMarkerKind.Param => ParamMarker(marker),
+                SqlMarkerKind.Variable => VariableMarker(marker),
                 SqlMarkerKind.Token => TokenMarker(marker),
                 SqlMarkerKind.TokenIgnore => TokenIgnoreMarker(marker),
                 SqlMarkerKind.Summary
@@ -123,6 +124,17 @@ internal sealed partial class SqlRenamer
                 declaration.Nullable
             );
         }
+
+        // "@a, @b": each variable's name, renamed as the SQL's parameters and variables are.
+        private string? VariableMarker(SqlMarker marker) =>
+            BundleQueryFile.ReadMarker(text, renamer._rules, marker, static scope => scope.Variables) is { } names
+                ? string.Join(
+                    ", ",
+                    names.Select(name =>
+                        renamer._rules.ParameterPrefix + renamer.ParameterName(text.Substring(name.Start, name.Length))
+                    )
+                )
+                : null;
 
         // "{{name:default}}": the name a token's, quoted, since the generator compares it as written, and the default
         // renamed as SQL.

@@ -110,7 +110,7 @@ Set sqlfluff's `dialect` to one that suits the SqlSource dialect of your files:
 | `ansi` | Any |
 | `mssql` | `tsql` |
 | `postgres`, `cockroachdb` | `postgres`, `duckdb`, `redshift`, `greenplum`, `materialize` |
-| `mysql`, `mariadb` | `mysql`, `mariadb` |
+| `mysql`, `mariadb`, with or without [`version=`](../reference/dialects.md#server-version) | `mysql`, `mariadb` |
 | `mysql`, `mariadb` with `ansi-quotes` or `no-backslash-escapes` | None |
 | `sqlite` | `sqlite` |
 | `oracle` | `oracle` |
@@ -251,6 +251,8 @@ $ sqlfluff lint .
 - **`CV06` that `fix` does not fix.**  See [CV06 on a query without `;`](#limit-cv06-without-semicolon).
 - **No report on the white space or comments after a query.**  See [white space and comments after a query without `;`](#limit-text-after-query).
 - **pip upgrades sqlfluff, or a pre-commit hook fails to install.**  See [sqlfluff 4.4 or older](#limit-sqlfluff-version).
+- **`TMP` and "… ends a line only at a line feed, and this file has a carriage return alone …".**  See [a carriage return alone](#limit-carriage-return-alone).
+- **`LXR` or `PRS` inside a `/*! ... */` comment of MySQL or MariaDB.**  See [a versioned comment that holds `*/`](#limit-versioned-comment).
 
 <a id="limits"></a>
 
@@ -275,6 +277,26 @@ $ sqlfluff lint .
 **Why.**  The query is checked as if it ended in `;`.  The white space and comments after its last SQL stand where that `;` would be, and the `;` is not in your file, so sqlfluff shows no report there.
 
 **What to do.**  End the query with `;`.  The white space and comments after it are then checked and fixed.
+
+<a id="limit-carriage-return-alone"></a>
+
+### A carriage return alone
+
+**What you see.**  sqlfluff reports `TMP`, "The SqlSource dialect mysql ends a line only at a line feed, and this file has a carriage return alone", and checks nothing in the file.  It happens under `mysql`, `mariadb`, `sqlite` and `cockroachdb`.
+
+**Why.**  The file has a carriage return with no line feed after it.  These databases, and SqlSource, read it as no line end, so a `--` comment runs past it.  sqlfluff reads it as a line break, so it would check the comment's text after it as SQL, and `fix` would write a line feed there and change what your query runs.
+
+**What to do.**  End the file's lines with a line feed, or with a carriage return and a line feed.  To keep the carriage return in a comment's text, leave the file out of the run.
+
+<a id="limit-versioned-comment"></a>
+
+### A versioned comment that holds `*/`
+
+**What you see.**  sqlfluff reports `LXR`, "Unable to lex characters", or `PRS`, "Found unparsable section", inside a versioned comment of a `mysql` or `mariadb` file, such as `/*!80000 '*/' AS note, */`.  SqlSource reads the file without an error.
+
+**Why.**  The comment's body holds `*/` inside a string or a comment.  Your server runs the body as SQL, and SqlSource reads it the same way, so the comment ends at a later `*/`.  sqlfluff ends every block comment at its first `*/`, so it reads the rest as SQL that does not parse.
+
+**What to do.**  Write the `*/` inside the comment another way, such as `CONCAT('*', '/')`, or leave the file out of the run.
 
 <a id="limit-sqlfluff-version"></a>
 

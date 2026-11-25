@@ -246,7 +246,11 @@ public sealed class SqlGeneratorParameterScopeTests
 
     private static SqlMarker Marker(string line)
     {
-        var marker = SqlMarkerReader.Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0]);
+        var marker = SqlMarkerReader.Read(
+            line,
+            SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0],
+            SqlDialectRules.Ansi
+        );
         return marker.ShouldNotBeNull();
     }
 }

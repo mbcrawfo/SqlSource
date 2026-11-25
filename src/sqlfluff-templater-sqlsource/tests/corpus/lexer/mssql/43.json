@@ -1,0 +1,21 @@
+{
+  "fileName": "Query.sql",
+  "settings": [
+    "{ \"dialect\": \"mssql\" }"
+  ],
+  "input": "a -- c\rb",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["Text", 0, 2],
+      ["LineComment", 2, 6],
+      ["Text", 6, 8]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

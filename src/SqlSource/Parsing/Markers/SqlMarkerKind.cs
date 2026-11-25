@@ -90,4 +90,9 @@ internal enum SqlMarkerKind
     /// query of its file.
     /// </summary>
     NestedClass,
+
+    /// <summary>
+    /// <c>-- variable:</c> names a variable of its query, such as a user variable of MySQL, which is no parameter.
+    /// </summary>
+    Variable,
 }

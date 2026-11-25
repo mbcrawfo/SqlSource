@@ -86,6 +86,12 @@ internal sealed record SqlQuery(
     public EquatableArray<string> DeclaredVariables { get; init; }
 
     /// <summary>
+    /// The names the query's <c>-- variable:</c> markers give, each once, as first written, without their prefix, in
+    /// marker order, which the query's hash reads.  Empty when it has no such marker.
+    /// </summary>
+    public EquatableArray<string> MarkedVariables { get; init; }
+
+    /// <summary>
     /// The errors of the query's SQL that are errors only when its output has a method,
     /// <see cref="OutputKind.Methods" /> or <see cref="OutputKind.Repository" />: a list that its method would send in
     /// a form the database refuses.  <c>MethodPlanner</c> reports them and gives the query no method.  Empty when

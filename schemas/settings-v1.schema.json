@@ -17,14 +17,14 @@
       "type": "boolean"
     },
     "dialect": {
-      "description": "The SQL dialect of the .sql files, with options after a comma for mysql and mariadb, as \"mysql,ansi-quotes\". Matched ignoring case and the white space around each part. Default `ansi`.",
+      "description": "The SQL dialect of the .sql files, with options after a comma for mysql and mariadb, as \"mysql,ansi-quotes\", and for them the version of the server, as \"mysql,version=8.0.36\". Matched ignoring case and the white space around each part. Default `ansi`.",
       "type": "string",
       "anyOf": [
         {
           "enum": ["ansi", "mssql", "postgres", "cockroachdb", "mysql", "mariadb", "sqlite", "oracle"]
         },
         {
-          "pattern": "^\\s*(?:(?:[aA][nN][sS][iI]|[mM][sS][sS][qQ][lL]|[sS][qQ][lL][sS][eE][rR][vV][eE][rR]|[tT][sS][qQ][lL]|[pP][oO][sS][tT][gG][rR][eE][sS]|[pP][oO][sS][tT][gG][rR][eE][sS][qQ][lL]|[cC][oO][cC][kK][rR][oO][aA][cC][hH][dD][bB]|[cC][oO][cC][kK][rR][oO][aA][cC][hH]|[sS][qQ][lL][iI][tT][eE]|[oO][rR][aA][cC][lL][eE])|(?:[mM][yY][sS][qQ][lL]|[mM][aA][rR][iI][aA][dD][bB])(?:\\s*,\\s*(?:[aA][nN][sS][iI]-[qQ][uU][oO][tT][eE][sS]|[aA][nN][sS][iI]_[qQ][uU][oO][tT][eE][sS]|[nN][oO]-[bB][aA][cC][kK][sS][lL][aA][sS][hH]-[eE][sS][cC][aA][pP][eE][sS]|[nN][oO]_[bB][aA][cC][kK][sS][lL][aA][sS][hH]_[eE][sS][cC][aA][pP][eE][sS]))*)?\\s*$"
+          "pattern": "^(?![\\s\\S]*[vV][eE][rR][sS][iI][oO][nN]\\s*=[\\s\\S]*[vV][eE][rR][sS][iI][oO][nN]\\s*=)\\s*(?:(?:[aA][nN][sS][iI]|[mM][sS][sS][qQ][lL]|[sS][qQ][lL][sS][eE][rR][vV][eE][rR]|[tT][sS][qQ][lL]|[pP][oO][sS][tT][gG][rR][eE][sS]|[pP][oO][sS][tT][gG][rR][eE][sS][qQ][lL]|[cC][oO][cC][kK][rR][oO][aA][cC][hH][dD][bB]|[cC][oO][cC][kK][rR][oO][aA][cC][hH]|[sS][qQ][lL][iI][tT][eE]|[oO][rR][aA][cC][lL][eE])|(?:[mM][yY][sS][qQ][lL]|[mM][aA][rR][iI][aA][dD][bB])(?:\\s*,\\s*(?:[aA][nN][sS][iI]-[qQ][uU][oO][tT][eE][sS]|[aA][nN][sS][iI]_[qQ][uU][oO][tT][eE][sS]|[nN][oO]-[bB][aA][cC][kK][sS][lL][aA][sS][hH]-[eE][sS][cC][aA][pP][eE][sS]|[nN][oO]_[bB][aA][cC][kK][sS][lL][aA][sS][hH]_[eE][sS][cC][aA][pP][eE][sS]|[vV][eE][rR][sS][iI][oO][nN]\\s*=\\s*(?:0?[1-9]|[1-9][0-9])\\.[0-9]{1,2}\\.[0-9]{1,2}))*)?\\s*$"
         }
       ]
     },

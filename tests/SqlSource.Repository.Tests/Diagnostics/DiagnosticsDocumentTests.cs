@@ -149,7 +149,7 @@ public sealed partial class DiagnosticsDocumentTests
 
             var line = "-- generator: " + parameter;
             var marker = SqlMarkerReader
-                .Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0])
+                .Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0], SqlDialectRules.Ansi)
                 .ShouldNotBeNull();
             var errors = new List<SqlParseError>();
             new SqlGeneratorParameterScope().Read(line, marker, errors);
