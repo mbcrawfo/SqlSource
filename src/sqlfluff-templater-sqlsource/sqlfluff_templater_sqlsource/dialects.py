@@ -113,8 +113,8 @@ def parse_dialect_name(value: str) -> DialectChoice | None:
     for part in parts:
         version = _read_version(part)
         if version is not None:
-            # The same version twice counts once, as an option does; two versions are no server.
-            if found not in (Dialect.MYSQL, Dialect.MARIADB) or server_version not in (0, version):
+            # A server has one version, so a second is refused, even the same one, as the schema refuses it.
+            if found not in (Dialect.MYSQL, Dialect.MARIADB) or server_version != 0:
                 return None
             server_version = version
             continue

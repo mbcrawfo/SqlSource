@@ -95,6 +95,7 @@ def test_build_of_a_dialect_reads_its_comments_and_hints(dialect, text, expected
     [
         ("SELECT 1 -- c\r, 2\nFROM t", "SELECT 1\nFROM t"),
         ("SELECT 1,\r  2  \r\n\r\nFROM t", "SELECT 1,\r  2\nFROM t"),
+        ("SELECT 'a\rb', /*! x\ry */ 1", "SELECT 'a\rb', /*! x\ry */ 1"),
     ],
 )
 def test_carriage_return_alone_under_mysql_ends_no_line(text, expected):

@@ -95,6 +95,39 @@ public sealed class BundleQueryFileTests
         }
     }
 
+    // A -- variable: marker of several names, or of one name twice, is renamed name by name as the SQL's names are, so
+    // the renamed file reads back with the same variables: no warning that a marked name is not written.
+    [Theory]
+    [InlineData("-- variable: @n, @m")]
+    [InlineData("-- variable: @n, @n")]
+    [InlineData("-- variable:@n,@M")]
+    public void RenameQueryFile_VariableMarkerOfAList_RenamesEachNameAsTheSqlIs(string line)
+    {
+        var engine = new FakeEngineRenaming(SqlDialect.PostgreSql);
+        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold, engine.Spelled);
+        var refusals = new List<RenamingRefusal>();
+        var renamer = new SqlRenamer(
+            engine,
+            mapping,
+            new HashSet<string>(["id"], SqlParameterName.Comparer),
+            RenamingCopies.None
+        );
+
+        var text = "-- name: Get\n" + line + "\nSELECT @n, @m, @id\n";
+
+        var renamed = renamer.RenameQueryFile(text, refusals.Add).Text;
+
+        refusals.ShouldBeEmpty();
+        TokenCheck.Check(engine, mapping, [], renamed, expected: null).ShouldBeNull();
+        var parsed = SqlFileParser.Parse(renamed, "Q.sql", SqlDialect.PostgreSql);
+        parsed.Errors.ShouldBeEmpty();
+        parsed.Warnings.ShouldBeEmpty();
+        var original = SqlFileParser.Parse(text, "Q.sql", SqlDialect.PostgreSql).Blocks.ShouldHaveSingleItem();
+        var block = parsed.Blocks.ShouldHaveSingleItem();
+        block.Parameters.Count.ShouldBe(original.Parameters.Count);
+        block.DeclaredVariables.Count.ShouldBe(original.DeclaredVariables.Count);
+    }
+
     // A file of one query with the kind's line where the generator takes it: a marker of the file header before the
     // query's name, the second name after the query's SQL, any other inside the query.
     private static string FileOf(SqlMarkerKind kind, string name)

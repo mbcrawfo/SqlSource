@@ -102,7 +102,7 @@ The plan is read by the SqlSource dialect, and the stand-ins are chosen by the s
 
 ### Byte order marks and line endings
 
-SqlSource reads a file without its byte order mark.  sqlfluff drops the mark when it detects the encoding, and keeps it in the text when the encoding is configured; then `process` plans the text after the mark and shifts every span by its length.  sqlfluff reads a file with universal newlines, so the text the templater gets has `\n` alone, as the corpus's `repo/` cases have.  The port still reads `\r` and `\r\n` as the parser does, for the fidelity cases that keep their own line endings.
+SqlSource reads a file without its byte order mark.  sqlfluff drops the mark when it detects the encoding, and keeps it in the text when the encoding is configured; then `process` plans the text after the mark and shifts every span by its length.  sqlfluff reads a file with universal newlines, so the text the templater gets has `\n` alone, as the corpus's `repo/` cases have.  The port still reads `\r` and `\r\n` as the parser does, for the fidelity cases that keep their own line endings.  Under a dialect whose rules end no line at a `\r` alone, `process` reads the file's own bytes from `fname`, and a `\r` with no `\n` after it is a `SQLTemplaterError` at its line and position: sqlfluff would read a line break there, lint the text after it as SQL, and `fix` would write the `\n`.  A file that is not on disk, such as standard input, is not read.
 
 ## How the two sides keep each other honest
 

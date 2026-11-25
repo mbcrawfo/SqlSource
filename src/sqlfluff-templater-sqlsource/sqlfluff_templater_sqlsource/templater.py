@@ -2,6 +2,7 @@
 
 import dataclasses
 import os
+import re
 from pathlib import Path
 
 from sqlfluff.core.config import FluffConfig
@@ -20,6 +21,7 @@ from sqlfluff_templater_sqlsource.errors import (
 )
 from sqlfluff_templater_sqlsource.plan import Plan, build_plan
 from sqlfluff_templater_sqlsource.render import render
+from sqlfluff_templater_sqlsource.rules import DialectRules
 from sqlfluff_templater_sqlsource.settings import resolve_dialect
 from sqlfluff_templater_sqlsource.stand_ins import UNLINTABLE_OPTIONS, compatible
 
@@ -61,6 +63,8 @@ class SqlSourceTemplater(RawTemplater):
                 errors.append(SQLTemplaterError(_mismatch(plan.dialect, sqlfluff_dialect)))
             if plan.error is not None:
                 errors.append(_stopping_error(in_str, plan.error, mark))
+            if not DialectRules.for_choice(plan.dialect).carriage_return_ends_line:
+                errors.extend(_lone_carriage_return(fname, plan.dialect))
             if errors:
                 return None, errors
             return render(in_str, _shifted(plan, mark), sqlfluff_dialect or "ansi", fname), []
@@ -87,6 +91,41 @@ def _mismatch(sqlsource: DialectChoice, sqlfluff_dialect: str) -> str:
         f"The SqlSource dialect {dialect} with {' and '.join(options)} cannot be linted with the sqlfluff dialect "
         f"{sqlfluff_dialect}, or with any other: {'; '.join(_OPTION_REASONS[option] for option in options)}."
     )
+
+
+# A carriage return with no line feed after it, as the file holds it.  sqlfluff reads a file with universal newlines,
+# so the text it hands the templater has a line feed there; under a dialect that ends no line at a carriage return
+# alone, sqlfluff would then lint a comment's text as SQL, and `fix` would write the line feed and change the query.
+_LONE_CARRIAGE_RETURN = re.compile(r"\r(?!\n)")
+
+# What sqlfluff counts as a line break when it reads a file.
+_LINE_BREAK = re.compile(r"\r\n|\r|\n")
+
+
+# The error at the file's first carriage return alone, at its line and position as sqlfluff counts them, or nothing
+# for a file that has none or that is not on disk, such as standard input.
+def _lone_carriage_return(fname: str, dialect: DialectChoice) -> list[SQLTemplaterError]:
+    path = Path(fname)
+    if not path.is_file():
+        return []
+    raw = path.read_bytes()
+    text = raw.decode("utf-16") if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else raw.decode("utf-8", errors="replace")
+    text = text.removeprefix(_BYTE_ORDER_MARK)
+    found = _LONE_CARRIAGE_RETURN.search(text)
+    if found is None:
+        return []
+    before = text[: found.start()]
+    breaks = list(_LINE_BREAK.finditer(before))
+    line_start = breaks[-1].end() if breaks else 0
+    return [
+        SQLTemplaterError(
+            f"The SqlSource dialect {canonical_name(dialect.dialect)} ends a line only at a line feed, and this file "
+            "has a carriage return alone, which sqlfluff reads as a line break, so it could lint and fix a comment's "
+            "text as SQL.",
+            line_no=len(breaks) + 1,
+            line_pos=found.start() - line_start + 1,
+        )
+    ]
 
 
 # The error at its line and position, both counted from 1, in the text sqlfluff handed the templater.

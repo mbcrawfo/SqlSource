@@ -121,7 +121,6 @@ public sealed class SqlMarkerReaderTests
         Markers("--\tname: A\nSELECT 1", SqlDialectRules.MariaDb).ShouldBe(["Name:A"]);
     }
 
-    // Oracle's line hint is kept in the SQL, so it is never a marker.
     // A carriage return alone ends no line under MySQL, so a comment after it does not start its line.
     [Theory]
     [InlineData(nameof(SqlDialect.Ansi), "Name:A")]
@@ -130,6 +129,7 @@ public sealed class SqlMarkerReaderTests
     public void Read_CommentAfterACarriageReturnAlone_IsAMarkerWhereThatEndsALine(string dialect, string expected) =>
         string.Join(" ", Markers("SELECT 1 /* x */\r-- name: A", RulesOf(dialect))).ShouldBe(expected);
 
+    // Oracle's line hint is kept in the SQL, so it is never a marker.
     [Fact]
     public void Read_LineHintOfOracle_IsNotAMarker() =>
         Markers("--+ name: A\nSELECT 1", SqlDialectRules.Oracle).ShouldBeEmpty();

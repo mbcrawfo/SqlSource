@@ -171,6 +171,34 @@ internal static class SqlParameterList
         }
     }
 
+    /// <summary>
+    /// <paramref name="declarations" /> without those of a name that <paramref name="marked" /> gives, which
+    /// <see cref="CheckVariables" /> reports, so that no other error of the declaration is reported beside it.
+    /// </summary>
+    public static IReadOnlyList<SqlParameterDeclaration> WithoutVariables(
+        string text,
+        IReadOnlyList<SqlParameterDeclaration> declarations,
+        IReadOnlyList<TextSpan> marked
+    )
+    {
+        if (marked.Count == 0 || declarations.Count == 0)
+        {
+            return declarations;
+        }
+
+        var kept = new List<SqlParameterDeclaration>(declarations.Count);
+        for (var index = 0; index < declarations.Count; index++)
+        {
+            var name = declarations[index].Name.AsSpan();
+            if (!GivenBefore(text, marked, marked.Count, name))
+            {
+                kept.Add(declarations[index]);
+            }
+        }
+
+        return kept;
+    }
+
     private static bool GivenBefore(string text, IReadOnlyList<TextSpan> marked, int position, ReadOnlySpan<char> name)
     {
         for (var earlier = 0; earlier < position; earlier++)

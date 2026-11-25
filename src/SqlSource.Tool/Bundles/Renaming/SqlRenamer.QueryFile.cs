@@ -125,10 +125,15 @@ internal sealed partial class SqlRenamer
             );
         }
 
-        // "@name": a variable's name, renamed as the SQL's parameters and variables are.
+        // "@a, @b": each variable's name, renamed as the SQL's parameters and variables are.
         private string? VariableMarker(SqlMarker marker) =>
-            BundleQueryFile.ReadMarker(text, renamer._rules, marker, static scope => scope.Variables) is [var name]
-                ? renamer._rules.ParameterPrefix + renamer.ParameterName(text.Substring(name.Start, name.Length))
+            BundleQueryFile.ReadMarker(text, renamer._rules, marker, static scope => scope.Variables) is { } names
+                ? string.Join(
+                    ", ",
+                    names.Select(name =>
+                        renamer._rules.ParameterPrefix + renamer.ParameterName(text.Substring(name.Start, name.Length))
+                    )
+                )
                 : null;
 
         // "{{name:default}}": the name a token's, quoted, since the generator compares it as written, and the default

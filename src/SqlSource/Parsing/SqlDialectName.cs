@@ -100,8 +100,8 @@ internal static class SqlDialectName
             var part = comma < 0 ? rest : rest.Slice(0, comma);
             if (TryReadVersion(part, out var version))
             {
-                // The same version twice counts once, as an option does; two versions are no server.
-                if (!TakesVersion(dialect) || (serverVersion != 0 && serverVersion != version))
+                // A server has one version, so a second is refused, even the same one, as the schema refuses it.
+                if (!TakesVersion(dialect) || serverVersion != 0)
                 {
                     return false;
                 }

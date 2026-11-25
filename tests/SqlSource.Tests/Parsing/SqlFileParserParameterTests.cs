@@ -266,6 +266,32 @@ public sealed class SqlFileParserParameterTests
         Warnings(text).ShouldBeEmpty();
     }
 
+    // A name given twice that the query does not write, or that a -- param: marker declares, is reported once, at its
+    // first place.
+    [Theory]
+    [InlineData("-- variable: @m, @m")]
+    [InlineData("-- variable: @m\n-- variable: @M")]
+    public void Parse_VariableGivenTwiceThatIsNotWritten_IsWarnedOnceAtItsFirstPlace(string markers)
+    {
+        var text = "-- name: Q\n" + markers + "\nSELECT 1\n";
+        var at = text.IndexOf("@m", StringComparison.Ordinal);
+
+        Warnings(text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.VariableNotWritten, new TextSpan(at, 2), "@m")]);
+    }
+
+    [Theory]
+    [InlineData("-- variable: @m, @m\n-- param: @m int")]
+    [InlineData("-- variable: @m\n-- variable: @M\n-- param: @m int")]
+    public void Parse_VariableGivenTwiceThatAParamMarkerDeclares_IsReportedOnceAtItsFirstPlace(string markers)
+    {
+        var text = "-- name: Q\n" + markers + "\nSELECT @m\n";
+        var at = text.IndexOf("@m", StringComparison.Ordinal);
+
+        Errors(text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.VariableDeclaredAsParameter, new TextSpan(at, 2), "@m")]);
+    }
+
     [Theory]
     [InlineData("-- variable: @n\n-- param: @N int")]
     [InlineData("-- param: @n int\n-- variable: @m, @n")]
@@ -276,6 +302,18 @@ public sealed class SqlFileParserParameterTests
 
         Errors(text)
             .ShouldBe([SqlParseError.Create(SqlParseErrorKind.VariableDeclaredAsParameter, new TextSpan(at, 2), "@n")]);
+    }
+
+    // A -- param: marker without a type of a name the query writes is no SQLSRC117: SQLSRC128 alone says what is wrong.
+    [Fact]
+    public void Parse_VariableThatAParamMarkerWithoutATypeDeclares_IsSqlsrc128Alone()
+    {
+        const string Text = "-- name: Q\n-- variable: @n\n-- param: @n\nSELECT @n\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.VariableDeclaredAsParameter, TextSpans.Of(Text, "@n"), "@n"),
+            ]);
     }
 
     [Fact]

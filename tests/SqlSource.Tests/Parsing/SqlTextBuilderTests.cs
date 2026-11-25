@@ -203,6 +203,7 @@ public sealed class SqlTextBuilderTests
     [InlineData("SELECT 1 -- c\r, 2\nFROM t", true, "SELECT 1 -- c\r, 2\nFROM t")]
     [InlineData("SELECT 1,\r  2  \r\n\r\nFROM t", false, "SELECT 1,\r  2\nFROM t")]
     [InlineData("SELECT 1 -- c\r\n\r\nFROM t -- d\r\n", true, "SELECT 1 -- c\n\nFROM t -- d")]
+    [InlineData("SELECT 'a\rb', /*! x\ry */ 1", false, "SELECT 'a\rb', /*! x\ry */ 1")]
     public void Build_CarriageReturnAloneUnderMySql_EndsNoLine(string text, bool keepComments, string expected) =>
         Build(text, keepComments, SqlDialectRules.MySql).ShouldBe(expected);
 

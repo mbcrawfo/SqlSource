@@ -100,7 +100,7 @@ A versioned comment, such as `/*!80000 ... */`, holds SQL that a MySQL or MariaD
 - **Without `version=`, a comment with a version ends at its first `*/`.**
 - **A comment with no version, `/*! ... */`, is always read as SQL**, with or without `version=`, since both databases always run it.
 - **MariaDB never runs a `/*!` comment whose version is from 50700 to 99999**, so under `mariadb` such a comment ends at its first `*/` whatever the version.  Its own `/*M! ... */` has no such exception.
-- **The version is three numbers of one or two digits, as `8.0.36`.**  `version=8.0` or `version=8` is the same error as an option that does not exist.  Two different versions are an error too.
+- **The version is three numbers of one or two digits, as `8.0.36`.**  `version=8.0` or `version=8` is the same error as an option that does not exist.  A second `version=` is an error too, even of the same version.
 - **Each comment is kept whole in the generated SQL**, whether your server runs it or not, as every hint is.
 
 - **Options are not case-sensitive, and come in any order.**  Spaces around the name and each option are ignored.
@@ -127,10 +127,11 @@ A versioned comment, such as `/*!80000 ... */`, holds SQL that a MySQL or MariaD
 | Kept as hints, besides `/*+ ... */` and `/*! ... */` | | | | | | `/*M! ... */` | | `--+ ...` |
 | A name declared with `DECLARE @name` is a local variable, not a parameter ([declared variables](parameters.md#declared-variables)) | No | Yes | No | No | No | No | No | No |
 
-Six details:
+Seven details:
 
 - In `mssql`, a `]]` inside brackets stands for one `]`.  In `sqlite`, the first `]` ends the identifier.
 - In `mysql` and `mariadb`, an option changes the first row (see [options](#dialect-options)).
+- In `mysql`, `mariadb`, `sqlite` and `cockroachdb`, a file whose lines end with a carriage return alone is one line, as these databases read it, so a `--` comment runs to the end of the file, and no [marker](sql-files.md#marker) after the first line is read.
 - In `mysql` and `mariadb`, a `/*! ... */` hint that the server runs is read as SQL to find its end, so a string inside it can hold `*/`.  `version=` says which ones the server runs (see [the server's version](#server-version)).
 - In `postgres` and `cockroachdb`, an `E'...'` string that is continued on the next line is one string.  Each later part takes backslash escapes too.
 - In `postgres`, `--` comments can stand between the parts of such a string, as PostgreSQL allows.  They are removed like any other comment.  In `cockroachdb`, only white space can stand there.

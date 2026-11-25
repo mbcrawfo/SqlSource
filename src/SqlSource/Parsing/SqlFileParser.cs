@@ -433,7 +433,7 @@ internal static class SqlFileParser
                 rules,
                 new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables, uses),
                 tokenDefaults,
-                scope?.Declarations ?? [],
+                scope is null ? [] : SqlParameterList.WithoutVariables(text, scope.Declarations, scope.Variables),
                 _errors,
                 _warnings
             );

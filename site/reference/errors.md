@@ -6,13 +6,14 @@ This page tells you how SqlSource reports a problem: how severe it is, where you
 
 ## Errors, warnings and information
 
-Every problem that SqlSource finds is an error.  You cannot turn an error off or make it a warning.  Eight ids are the exceptions.
+Every problem that SqlSource finds is an error.  You cannot turn an error off or make it a warning.  Nine ids are the exceptions.
 
-These six are warnings:
+These seven are warnings:
 
 - [SQLSRC026](../diagnostics.md#sqlsrc026): the build cannot start the `sqlsource` tool, and goes on with the sidecars it has.
 - [SQLSRC031](../diagnostics.md#sqlsrc031): a connection is marked for a logical database that no repository query uses.
 - [SQLSRC121](../diagnostics.md#sqlsrc121): a parameter of a SQL Server query is written in two spellings.
+- [SQLSRC129](../diagnostics.md#sqlsrc129): a `-- variable:` marker names a variable that its query does not write.
 - [SQLSRC240](../diagnostics.md#sqlsrc240): another version of the tool wrote a sidecar, or an entry of one.
 - [SQLSRC245](../diagnostics.md#sqlsrc245): an entry of a sidecar names no query that needs it.
 - [SQLSRC284](../diagnostics.md#sqlsrc284): a short name of a C# type that you chose finds a type of a package that the project does not reference itself.
@@ -22,7 +23,7 @@ These two are information, about the version of a database driver:
 - [SQLSRC248](../diagnostics.md#sqlsrc248), for Npgsql.
 - [SQLSRC268](../diagnostics.md#sqlsrc268), for Microsoft.Data.SqlClient.
 
-The section of each of the eight says how a project can configure it.
+The section of each of the nine says how a project can configure it.
 
 Information is not in the output of `dotnet build`.  An IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](../diagnostics.md#sqlsrc248) says.
 

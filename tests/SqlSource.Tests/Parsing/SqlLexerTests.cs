@@ -514,10 +514,14 @@ public sealed class SqlLexerTests
     [InlineData("MySql+NoBackslashEscapes", 80400, "/*!50600 'a\\'*/ x", "Hint:/*!50600 'a\\'*/ | Text: x")]
     [InlineData("MySql", 80400, "/*!50600 @p */ x", "Hint:/*!50600 @p */ | Text: x")]
     [InlineData("MySql", 80400, "/*M!50600 a */ b */", "BlockComment:/*M!50600 a */ | Text: b */")]
-    [InlineData("MariaDb", 110400, "/*!50700 a */ b */", "Hint:/*!50700 a */ | Text: b */")]
-    [InlineData("MariaDb", 110400, "/*!99999 a */ b */", "Hint:/*!99999 a */ | Text: b */")]
+    // MariaDB never runs a /*! version from 50700 to 99999, though the server's version is above it: the comment ends
+    // at its first */, where a body read as SQL would run past it.
+    [InlineData("MariaDb", 110400, "/*!50700 # */\n */ x", "Hint:/*!50700 # */ | Text:\n */ x")]
+    [InlineData("MariaDb", 110400, "/*!99999 # */\n */ x", "Hint:/*!99999 # */ | Text:\n */ x")]
+    [InlineData("MariaDb", 110400, "/*!50699 # */\n */ x", "Hint:/*!50699 # */\n */ | Text: x")]
+    [InlineData("MariaDb", 110400, "/*M!50700 # */\n */ x", "Hint:/*M!50700 # */\n */ | Text: x")]
     [InlineData("MariaDb", 110400, "/*!50600 '*/' */ x", "Hint:/*!50600 '*/' */ | Text: x")]
-    [InlineData("MariaDb", 110400, "/*!080400 a */ b */", "Hint:/*!080400 a */ | Text: b */")]
+    [InlineData("MariaDb", 110400, "/*!080400 # */\n */ x", "Hint:/*!080400 # */ | Text:\n */ x")]
     [InlineData("MariaDb", 110400, "/*!100100, '*/' */ x", "Hint:/*!100100, '*/' */ | Text: x")]
     [InlineData("MariaDb", 110400, "/*!5060000 a */ b */", "Hint:/*!5060000 a */ | Text: b */")]
     [InlineData("MariaDb", 110400, "/*M!50700 '*/' */ x", "Hint:/*M!50700 '*/' */ | Text: x")]

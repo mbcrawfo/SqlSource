@@ -592,3 +592,45 @@ def test_empty_file_lints(tmp_path):
     linted = lint("", "postgres", tmp_path)
 
     assert codes(linted) == []
+
+
+# sqlfluff reads a file with universal newlines, so the templater reads the file itself to find a carriage return
+# alone, which these dialects read as no line end: sqlfluff would lint and fix the comment's text after it as SQL.
+@pytest.mark.parametrize(
+    ("sqlfluff_dialect", "sqlsource"),
+    [("mysql", "mysql"), ("mariadb", "mariadb"), ("sqlite", "sqlite"), ("postgres", "cockroachdb")],
+)
+def test_carriage_return_alone_under_a_dialect_that_ends_no_line_there_is_a_templating_error(
+    sqlfluff_dialect, sqlsource, tmp_path
+):
+    (tmp_path / "sqlsource.json").write_text(f'{{ "root": true, "dialect": "{sqlsource}" }}', encoding="utf-8")
+    raw = "-- name: A\nSELECT 1 AS a, -- c\r 2 AS b\nFROM t;\n"
+    (tmp_path / "Query.sql").write_bytes(raw.encode("utf-8"))
+
+    linted = lint(raw.replace("\r", "\n"), sqlfluff_dialect, tmp_path)
+
+    violations = linted.get_violations()
+    assert [violation.rule_code() for violation in violations] == ["TMP"]
+    assert violations[0].desc().startswith(f"The SqlSource dialect {sqlsource} ends a line only at a line feed")
+    assert (violations[0].line_no, violations[0].line_pos) == (2, 20)
+    assert linted.templated_file is None
+
+
+@pytest.mark.parametrize(
+    ("sqlsource", "raw"),
+    [
+        # A dialect that ends a line at a carriage return alone reads the file as sqlfluff does.
+        ("postgres", "-- name: A\nSELECT 1 AS a -- c\rFROM t;\n"),
+        # A carriage return and a line feed end a line in every dialect.
+        ("mysql", "-- name: A\r\nSELECT 1 AS a -- c\r\nFROM t;\r\n"),
+    ],
+)
+def test_carriage_return_that_ends_a_line_for_the_dialect_is_linted(sqlsource, raw, tmp_path):
+    (tmp_path / "sqlsource.json").write_text(f'{{ "root": true, "dialect": "{sqlsource}" }}', encoding="utf-8")
+    (tmp_path / "Query.sql").write_bytes(raw.encode("utf-8"))
+
+    linted = lint(
+        raw.replace("\r\n", "\n").replace("\r", "\n"), "mysql" if sqlsource == "mysql" else "postgres", tmp_path
+    )
+
+    assert [code for code in codes(linted) if code in ("PRS", "TMP", "LXR")] == []

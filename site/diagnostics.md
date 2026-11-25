@@ -443,7 +443,7 @@ After `mysql` or `mariadb`, the value can name options, each after a comma, as i
 
 - an option that does not exist;
 - an option after any other dialect;
-- a version that is not three such numbers, such as `version=8.0`, or two different versions;
+- a version that is not three such numbers, such as `version=8.0`, or a second `version=`;
 - a comma with nothing before it or after it.
 
 These keys take one value from a list.  The value matches in any case, and with or without hyphens and spaces:
@@ -2216,7 +2216,7 @@ See: [Variables the SQL sets](reference/parameters.md#variable-marker)
 
 Reported by: the build.
 
-A name that a `-- variable:` marker gives is not written anywhere in its query: not in its SQL, a token's default included, and not in the default of a `-- token:` marker of one of its tokens.  A comment or a string that holds the name does not count.  The warning is at the name in the marker.
+A name that a `-- variable:` marker gives is not written anywhere in its query: not in its SQL, a token's default included, and not in the default of a `-- token:` marker of one of its tokens.  A comment, a string or a hint, such as `/*!80000 SET @last = 1 */`, that holds the name does not count.  The warning is at the name in the marker.
 
 ```sql error
 -- name: GetOrders

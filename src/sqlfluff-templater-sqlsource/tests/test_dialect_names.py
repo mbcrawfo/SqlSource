@@ -140,10 +140,7 @@ def test_version_option_is_that_of_the_parser():
         ("mysql,version=8.0.36", DialectChoice(Dialect.MYSQL, DialectOptions.NONE, 80036)),
         ("mariadb, version = 10.11.6 ", DialectChoice(Dialect.MARIADB, DialectOptions.NONE, 101106)),
         ("MySQL,VERSION=8.4.0,ansi-quotes", DialectChoice(Dialect.MYSQL, DialectOptions.ANSI_QUOTES, 80400)),
-        (
-            "mysql,ansi_quotes,version=5.7.44,Version=5.7.44",
-            DialectChoice(Dialect.MYSQL, DialectOptions.ANSI_QUOTES, 50744),
-        ),
+        ("mysql,ansi_quotes,Version=5.7.44", DialectChoice(Dialect.MYSQL, DialectOptions.ANSI_QUOTES, 50744)),
         ("mysql,version=08.04.00", DialectChoice(Dialect.MYSQL, DialectOptions.NONE, 80400)),
         ("mariadb,version=11.4.10", DialectChoice(Dialect.MARIADB, DialectOptions.NONE, 110410)),
     ],
@@ -171,6 +168,8 @@ def test_version_of_a_server_is_read(value, expected):
         "mysql,versions=8.0.36",
         "mysql,version=٨.0.36",
         "mysql,version=8.0.36,version=8.4.0",
+        "mysql,version=8.0.36,version=8.0.36",
+        "mysql,version=8.0.36,\n  VERSION = 08.00.36",
     ],
 )
 def test_version_that_is_not_one_is_refused(value):

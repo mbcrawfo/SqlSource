@@ -94,6 +94,8 @@ Find the message of the exception in this list.  Each entry gives the cause, wha
 
 - **`CV06` at the end of a query, and `sqlfluff fix` does not fix it.**  With `multiline_newline = True`, a query of several lines without `;` is reported.  End it with `;`.  See [CV06 on a query without `;`](sqlfluff.md#limit-cv06-without-semicolon).
 - **sqlfluff reports nothing on the white space or comments after a query.**  The white space and comments between a query without `;` and the next query are neither reported nor fixed.  End the query with `;`.  See [white space and comments after a query without `;`](sqlfluff.md#limit-text-after-query).
+- **sqlfluff reports `TMP` for a file with a carriage return alone.**  Under `mysql`, `mariadb`, `sqlite` and `cockroachdb`, sqlfluff would read it as a line break where SqlSource does not.  See [a carriage return alone](sqlfluff.md#limit-carriage-return-alone).
+- **sqlfluff reports `LXR` or `PRS` inside a `/*! ... */` comment of MySQL or MariaDB.**  The comment holds `*/` in a string or a comment, which sqlfluff reads as its end.  See [a versioned comment that holds `*/`](sqlfluff.md#limit-versioned-comment).
 - **pip upgrades sqlfluff when it installs the templater, or a pre-commit hook of sqlfluff fails to install.**  The templater needs sqlfluff 4.5 or later.  See [sqlfluff 4.4 or older](sqlfluff.md#limit-sqlfluff-version).
 
 <a id="watch"></a>
