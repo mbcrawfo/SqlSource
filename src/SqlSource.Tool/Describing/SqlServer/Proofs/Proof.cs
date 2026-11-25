@@ -105,7 +105,7 @@ internal abstract record Proof
     }
 
     /// <summary>
-    /// Holds when every branch of a CTE of several branches proves its column at that place, as
+    /// Holds when every branch of a CTE, of one branch or of several, proves its column at that place, as
     /// <see cref="CteProofs" /> decides; never by itself.
     /// </summary>
     /// <param name="Cte">The CTE's place in the <c>WITH</c> clause.</param>

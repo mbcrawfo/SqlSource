@@ -128,6 +128,26 @@ internal sealed partial class ExpressionProofs(
     }
 
     /// <summary>
+    /// The proof that a value an <c>UPDATE</c>'s <c>SET</c> writes is not null, over the <c>UPDATE</c>'s rows.
+    /// </summary>
+    /// <remarks>
+    /// <c>DEFAULT</c> writes the column's default, which may be <c>NULL</c>, and is no expression to ask; under
+    /// <c>GROUP BY ALL</c> nothing is proved.  The value converts to the column's type, so it must be of no CLR type
+    /// too: a CLR value's <c>ToString</c> may be <c>NULL</c>.  A value that is one leaf alone is asked, since what the
+    /// server answered is the column the <c>SET</c> writes, not the value.
+    /// </remarks>
+    public Proof OfAssigned(TokenRange value)
+    {
+        if (body.Grouping == SelectGrouping.All || (value.Count == 1 && tokens[value.Start].Is("DEFAULT")))
+        {
+            return Proof.No;
+        }
+
+        _leaves.Clear();
+        return Numbered(AllOf([Expression(value, rows: false), TypeOf(value)]));
+    }
+
+    /// <summary>
     /// The proof that a branch's item gives the value of a column of a CLR type that no conversion made: the item, one
     /// leaf whole, answered as a stored column (<see cref="Proof.Stored" />) of a type that may be a CLR type
     /// (<see cref="Proof.Clr" />).  A set operator converts a branch of a string to a CLR type, and a string may parse
@@ -472,8 +492,8 @@ internal sealed partial class ExpressionProofs(
                 ? new Proof.AnyOf([new Proof.Operand(index), new Proof.Stored(index)])
                 : new Proof.Operand(index);
 
-        // A column of a CTE of several branches is not null when every branch proves it, which CteProofs decides.
-        // Its branches convert to the column's type, and a string converts to a CLR type's Null.
+        // A column of a CTE is not null when every branch proves it, which CteProofs decides.  Its branches convert to
+        // the column's type, and a string converts to a CLR type's Null.
         return filtered?.CteColumnOf(range) is { } column
             ? new Proof.AnyOf([
                 leaf,

@@ -12,7 +12,8 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// A column is kept from <c>NULL</c> when a conjunct of the <c>WHERE</c> rejects it (<see cref="RowFilter" />), or when
 /// it is read from a CTE that no join here can make <c>NULL</c>, and that CTE's own <c>WHERE</c> keeps the column it
 /// returns from <c>NULL</c>, through earlier CTEs too.  A CTE of several branches keeps nothing from <c>NULL</c> this
-/// way: <see cref="CteColumnOf" /> names its column, which <see cref="CteProofs" /> proves by its branches.
+/// way.  <see cref="CteColumnOf" /> names the column of a CTE of one branch or more, which <see cref="CteProofs" />
+/// proves by its branches.
 /// </para>
 /// <para>
 /// A <c>LEFT JOIN</c> whose source a conjunct rejects, by a column qualified with that source's name, returns only rows
@@ -210,7 +211,7 @@ internal sealed class FilteredRows
 
     /// <summary>
     /// The place of the CTE, among those these rows can read, and of its column, that the range reads: a column alone
-    /// of a source that names a CTE of several branches, which no join here can make <c>NULL</c>; or null.
+    /// of a source that names a CTE of one branch or more, which no join here can make <c>NULL</c>; or null.
     /// </summary>
     /// <remarks>
     /// The CTE's columns are its column list, or else the names of its first branch's items, and each branch must have
@@ -224,7 +225,7 @@ internal sealed class FilteredRows
             || SourceOf(parts) is not { OnePartName: { } name } source
             || IsOptional(source)
             || LastCteNamed(name) is not { } at
-            || _ctes[at] is not { Branches: { Count: > 1 } branches } cte
+            || _ctes[at] is not { Branches: { Count: > 0 } branches } cte
         )
         {
             return null;
