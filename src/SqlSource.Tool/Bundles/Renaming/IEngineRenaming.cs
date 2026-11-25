@@ -119,8 +119,9 @@ internal interface IEngineRenaming
     /// <summary>
     /// A string of a <see cref="FieldRuleKind.Own" /> member renamed, such as a plan, an error's message or a
     /// setting's value: every name through the scope, every literal through <see cref="IRenamingScope.Literal" />,
-    /// and nothing of the user's kept.  A string it cannot read safely is refused through the scope, and its return is
-    /// then not used.
+    /// and nothing of the user's kept, but in a member of the entry that <see cref="DeriveEntry" /> makes again, such
+    /// as SQL Server's name of a user's CLR type, which the token check then reads as made.  A string it cannot read
+    /// safely is refused through the scope, and its return is then not used.
     /// </summary>
     string RenameOwn(RenamingField field, IRenamingScope scope);
 
@@ -148,7 +149,8 @@ internal interface IEngineRenaming
     /// <summary>
     /// Derives in the renamed entry of <c>expected.json</c>, once its every member is renamed and the capture's calls
     /// are derived, what the pipeline makes by its own rule: a parameter's <c>bindName</c> as the derived request of
-    /// the call that bound it holds it.  It writes into <paramref name="entry" /> alone.
+    /// the call that bound it holds it, or SQL Server's name of a user's CLR type made again from the entry's renamed
+    /// user type.  It writes into <paramref name="entry" /> alone.
     /// </summary>
     /// <param name="entry">The renamed entry.</param>
     /// <param name="calls">Every call of the capture, renamed and derived.</param>

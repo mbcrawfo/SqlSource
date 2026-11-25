@@ -201,7 +201,7 @@ public sealed class SqlServerFieldsTests
 
         foreach (var record in (string[])["parameters[].type.", "columns[].type."])
         {
-            rules[$"{BundleFiles.Expected} {record}name"] = FieldRule.TypeSpelling;
+            rules[$"{BundleFiles.Expected} {record}name"] = FieldRule.Own;
             rules[$"{BundleFiles.Expected} {record}bindName"] = FieldRule.TypeSpelling;
             rules[$"{BundleFiles.Expected} {record}userType.schema"] = FieldRule.Name(NameClass.Schema);
             rules[$"{BundleFiles.Expected} {record}userType.name"] = FieldRule.Name(NameClass.Type);

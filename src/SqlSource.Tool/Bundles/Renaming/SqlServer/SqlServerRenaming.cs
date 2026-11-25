@@ -6,24 +6,27 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Quoting;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Types;
 
 namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
 
 /// <summary>
 /// SQL Server's part of the renaming: its word rule, a fold that ignores case, the words of
 /// <see cref="SqlServerVocabulary" />, the rules of <see cref="SqlServerFields" />, the rows of <c>sys</c>,
-/// <c>INFORMATION_SCHEMA</c> and the system resource, the copies of a reused parameter, and the renaming of a message
-/// by <see cref="SqlServerMessages" />.
+/// <c>INFORMATION_SCHEMA</c> and the system resource, the copies of a reused parameter, the renaming of a message by
+/// <see cref="SqlServerMessages" />, and the entry's type names.
 /// </summary>
 /// <remarks>
 /// A name folds ignoring case whatever the database's collation, and each spelling keeps a case of its own through
 /// <see cref="Spelled" />, so the pipeline's comparisons by ordinal and ignoring case both keep their answers, unless
 /// the first replacement's letters cannot tell the spellings apart (<see cref="NameMapping.FellBack" />), when a
 /// changed answer is refused and the renaming tried again with a new key.  SQL Server has no plan and the describer
-/// asks no list in name order, so it registers and derives nothing: the tool's <c>AS [1]</c> is kept as its word, and
-/// a copy of a reused parameter comes through <see cref="CopiesIn" />.
+/// asks no list in name order, so it registers nothing and derives nothing in a call: the tool's <c>AS [1]</c> is kept
+/// as its word, and a copy of a reused parameter comes through <see cref="CopiesIn" />.  In the entry, it derives the
+/// name of a CLR type of a user's own (<see cref="DeriveEntry" />).
 /// </remarks>
 internal sealed class SqlServerRenaming : IEngineRenaming
 {
@@ -167,13 +170,116 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     public void Register(RenamingCall call, IRenamingScope scope) { }
 
-    public string RenameOwn(RenamingField field, IRenamingScope scope) => SqlServerMessages.Rename(field.Value, scope);
+    /// <summary>
+    /// An error's message, by <see cref="SqlServerMessages" />, or the entry's type <c>name</c>: a type's spelling
+    /// renamed as SQL whose new words are types, but the name of a CLR type of a user's own, which is left as it is for
+    /// <see cref="DeriveEntry" /> to make again, since the lexer may not read it (<c>dbo.a'Grade</c>,
+    /// <c>dbo.1Grade</c>).  The token check finds the name of the user's in a type <see cref="DeriveEntry" /> missed.
+    /// </summary>
+    public string RenameOwn(RenamingField field, IRenamingScope scope)
+    {
+        if (!IsEntryTypeName(field))
+        {
+            return SqlServerMessages.Rename(field.Value, scope);
+        }
 
-    public IEnumerable<string> WordsOf(RenamingField field) => SqlServerMessages.WordsOf(field.Value);
+        return field.Row is { } type && UserClrNameOf(type) is not null
+            ? field.Value
+            : scope.Sql(field.Value, NameClass.Type).Text;
+    }
+
+    /// <summary>
+    /// The words of a renamed message, by <see cref="SqlServerMessages" />, or of the entry's type <c>name</c>: each
+    /// run of characters that are neither white space nor punctuation, and each punctuation character, so that a word
+    /// of a type's spelling and each part of a user CLR type's name is checked.
+    /// </summary>
+    public IEnumerable<string> WordsOf(RenamingField field) =>
+        IsEntryTypeName(field) ? TypeWordsOf(field.Value) : SqlServerMessages.WordsOf(field.Value);
 
     public void Derive(RenamingCall call, IReadOnlyList<RenamingCall> calls, IRenamingScope scope) { }
 
-    public void DeriveEntry(JsonObject entry, IReadOnlyList<RenamingCall> calls) { }
+    /// <summary>
+    /// Gives each type of the renamed entry that is a CLR type of a user's own its name made again from its renamed
+    /// user type, by <see cref="SqlServerTypes.UserClrName" />, as the describer makes it from the renamed rows.
+    /// Such a type has an assembly-qualified name and a schema that is not <c>sys</c>, and the server gives it no
+    /// system type name, so its name is the describer's and never the server's.  <see cref="RenameOwn" /> leaves it
+    /// as it is, since lexed as SQL a name whose schema or name holds a space, a <c>]</c>, a dot, a quote or a leading
+    /// digit would not be the one the replay makes, or would not lex.
+    /// </summary>
+    public void DeriveEntry(JsonObject entry, IReadOnlyList<RenamingCall> calls)
+    {
+        foreach (var list in (string[])[SidecarKeys.Parameters, SidecarKeys.Columns])
+        {
+            if (entry[list] is not JsonArray items)
+            {
+                continue;
+            }
+
+            foreach (var item in items)
+            {
+                if (item?[SidecarKeys.Type] is JsonObject type && UserClrNameOf(type) is { } name)
+                {
+                    type[SidecarKeys.Name] = name;
+                }
+            }
+        }
+    }
+
+    // Whether the member is the name of a type record of the entry, the one Own member that is no message.
+    private static bool IsEntryTypeName(RenamingField field) =>
+        field.Method == BundleFiles.Expected
+        && field.Path.EndsWith("." + SidecarKeys.Type + "." + SidecarKeys.Name, StringComparison.Ordinal);
+
+    // The words of a type's spelling: each run of characters that are neither white space nor punctuation, and each
+    // punctuation character alone.
+    private static IEnumerable<string> TypeWordsOf(string spelling)
+    {
+        var start = -1;
+        for (var index = 0; index <= spelling.Length; index++)
+        {
+            var at = index < spelling.Length ? spelling[index] : ' ';
+            var punctuation = SqlRenamer.Punctuation.Contains(at, StringComparison.Ordinal);
+            if (!char.IsWhiteSpace(at) && !punctuation)
+            {
+                start = start < 0 ? index : start;
+                continue;
+            }
+
+            if (start >= 0)
+            {
+                yield return spelling[start..index];
+                start = -1;
+            }
+
+            if (punctuation)
+            {
+                yield return at.ToString();
+            }
+        }
+    }
+
+    // The name of a type record whose user type is a CLR type of a user's own: one with a name and an
+    // assembly-qualified name, in a schema that is not sys, exactly, as SystemSchemas.IsSqlServer compares it.
+    private static string? UserClrNameOf(JsonObject type)
+    {
+        if (
+            type[SidecarKeys.UserType] is not JsonObject user
+            || user[SidecarKeys.Name] is not JsonValue nameValue
+            || !nameValue.TryGetValue<string>(out var name)
+            || user[SidecarKeys.AssemblyQualifiedName] is not JsonValue assembly
+            || !assembly.TryGetValue<string>(out var assemblyName)
+            || assemblyName.Length == 0
+        )
+        {
+            return null;
+        }
+
+        var schema =
+            user[SidecarKeys.Schema] is JsonValue schemaValue && schemaValue.TryGetValue<string>(out var text)
+                ? text
+                : null;
+        return SystemSchemas.IsSqlServer(schema) ? null : SqlServerTypes.UserClrName(schema, name);
+    }
 
     // A folded name of geometry, geography or hierarchyid, whose version is digits parted by dots.
     private static bool IsSystemClrType(string folded)

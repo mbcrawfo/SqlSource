@@ -6,7 +6,7 @@
 
 - **The queries are `tests/DatabaseTests/SqlServer/EndToEnd/`'s, copied into `obj/Mirror/` by the target `SyncAsyncMirrorQueries` of the `.csproj`**, never linked and never copied by hand: a linked `.sql` file keeps the settings files of its own folder, and `method-type=both` comes from this project's `sqlsource.json` above `obj/` ([why](README.md#the-queries)).
 - **No sidecar is written here**: the mirror copies the end-to-end project's, which `tools/describe-end-to-end.sh` writes.
-- **The claims mirror the end-to-end project's, one file each**: a claim added or moved there is added or moved here in the same change.
+- **The claims mirror the end-to-end project's, one file each**: a claim added or moved there is added or moved here in the same change.  `UserClr/` is the exception: its CLR type needs an assembly on the server, which this project does not load, so its queries are not mirrored.
 - **`Types/` and `Json/Types/` are this project's copies of the end-to-end types, in their namespaces**, since a test project compiles no file of another: a type the queries name, added or changed there, is copied here in the same change.
 
 ## Scenarios

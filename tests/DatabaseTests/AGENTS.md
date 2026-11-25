@@ -5,7 +5,7 @@
 ## Names
 
 - **The folder and the project file carry the short name, and the assembly and the root namespace the prefix**: `Postgres/Postgres.csproj` builds `SqlSource.DatabaseTests.Postgres`, and every namespace in it starts with that.  `Directory.Build.props` of this folder sets both from the project file's name; no project file sets them.
-- **The `project` lines of `tools/test-scopes.txt` are exactly the test projects of this folder; `TestHarness`, a library, and `QueryMethodAllocation`, `Postgres.SyncAsync` and `SqlServer.SyncAsync`, which the script never runs, have none, and `TestScopes` of `tests/SqlSource.Repository` derives the same assembly name from each**, so a new project here gets its `project` line and its folder's scope lines, and a `RunningProjectTests` copied from a sibling, in the same change ([why](../README.md#reading-the-repository)).
+- **The `project` lines of `tools/test-scopes.txt` are exactly the test projects of this folder; `TestHarness` and `SqlServer.ClrType`, libraries, and `QueryMethodAllocation`, `Postgres.SyncAsync` and `SqlServer.SyncAsync`, which the script never runs, have none, and `TestScopes` of `tests/SqlSource.Repository` derives the same assembly name from each**, so a new project here gets its `project` line and its folder's scope lines, and a `RunningProjectTests` copied from a sibling, in the same change ([why](../README.md#reading-the-repository)).
 
 ## Containers
 
@@ -24,6 +24,7 @@
 
 - **`Postgres.Npgsql8` and `SqlServer.SqlClient61` reference `src/SqlSource`, `tests/SqlSource.Repository` and `TestHarness` alone**, since they pin the oldest supported driver: a reference to the tool, to `tests/SqlSource.Tool.Testing` or to the engine's describer project is a package downgrade.
 - **`TestHarness` references `src/SqlSource`, `tests/SqlSource.Repository` and `tests/SqlSource.Testing` alone**, with no driver, no Dapper and nothing of the tool, so every project here, the driver-floor ones included, references it; a helper that needs a driver stays in the project.
+- **`SqlServer.ClrType` references nothing of the repository, and only `SqlServer` references it**, both its net10.0 build and its net48 build, which `SqlServer.csproj` embeds as `ServerClrType.dll`, since SQL Server loads only .NET Framework's assemblies.
 - **`Postgres` and `SqlServer` reference `tests/SqlSource.Tool.Testing` too**, for the describer, fixture and realistic-corpus helpers, and are the two projects the tool's fixtures and corpora are recorded through.
 - **`QueryMethodAllocation` references `src/SqlSource`, `TestHarness`, the current Npgsql and Microsoft.Data.SqlClient, and NodaTime**, and nothing of the tool, and links its queries from the two describer projects.
 - **`Postgres.SyncAsync` and `SqlServer.SyncAsync` reference `src/SqlSource`, `TestHarness` and their engine's current driver**, and nothing of the tool, and copy their engine's end-to-end queries into `obj/Mirror/` ([why](Postgres.SyncAsync/README.md#the-queries)).

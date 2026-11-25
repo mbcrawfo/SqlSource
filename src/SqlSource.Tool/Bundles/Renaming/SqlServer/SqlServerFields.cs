@@ -172,7 +172,8 @@ internal static class SqlServerFields
         {
             var record = type[..^1];
             var userType = JsonStrings.MemberOf(record, SidecarKeys.UserType);
-            Add(BundleFiles.Expected, JsonStrings.MemberOf(record, Name), FieldRule.TypeSpelling);
+            // Own, so that SqlServerRenaming leaves a user CLR type's name, which may not lex, to DeriveEntry.
+            Add(BundleFiles.Expected, JsonStrings.MemberOf(record, Name), FieldRule.Own);
             Add(BundleFiles.Expected, JsonStrings.MemberOf(record, SidecarKeys.BindName), FieldRule.TypeSpelling);
             Add(BundleFiles.Expected, JsonStrings.MemberOf(userType, Schema), FieldRule.Name(NameClass.Schema));
             Add(BundleFiles.Expected, JsonStrings.MemberOf(userType, Name), FieldRule.Name(NameClass.Type));

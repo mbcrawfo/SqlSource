@@ -4,11 +4,11 @@
 
 ## Sidecars and majors
 
-- **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/`, `EndToEnd/NetTopologySuite/Queries/` and `EndToEnd/Json/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
+- **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/`, `EndToEnd/NetTopologySuite/Queries/`, `EndToEnd/Json/Queries/` and `EndToEnd/UserClr/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
 - **`CheckTests` runs `--check` over the real project, never a copy, through `CliRun.Real`**, as `ErrorPathTests` does.
 - **No entry differs between the supported majors**, since `CheckTests` runs on each, 2017 and 2025 in CI and 2019 and 2022 every night: a parameter that two majors type differently declares its type with `-- param:`.
 - **A query of a type that 2017 lacks goes into `Queries/NewTypes.sql`, or `Json/Queries/JsonColumns.sql` for one of System.Text.Json on `json`**, which `CheckTests` leaves out below 17, and its test skips by `SkipBelow(17, ...)`.
-- **Every batch of `EndToEnd/app/schema.sql` and `EndToEnd/billing/schema.sql` runs on SQL Server 2017**; a type that 2017 lacks goes into `EndToEnd/app/new-types.sql`.
+- **Every batch of `EndToEnd/app/schema.sql`, `EndToEnd/billing/schema.sql` and `EndToEnd/user_clr/schema.sql` runs on SQL Server 2017**; a type that 2017 lacks goes into `EndToEnd/app/new-types.sql`.
 
 ## Queries and tests
 
@@ -24,7 +24,7 @@
 - **A test of what the pool keeps of a session knows the session by `ClientConnectionId`, never `ServerProcessId` or `@@SPID`, and runs again on a new pool when the pool hands back another**, as `EndToEnd/BatchQueryTests.cs` does, since a session can end in the pool and the one the pool opens in its place often gets its number.
 - **`EndToEnd/ErrorPaths/` is a fixture project that the test project never compiles or describes**: the `.csproj` removes it from `Compile`, `AdditionalFiles` and `None` and copies it to the output as `Fixtures/Projects/ErrorPaths/`.
 - **A change to `EndToEnd/ListQueryTests.cs` changes its copy in `tests/DatabaseTests/SqlServer.SqlClient61` too**, which runs the same lists on SqlClient 6.1.
-- **A query added here that has a pair under `method-type=both`, neither a stream nor a `<Query>Sync` copy, gets its scenarios in `tests/DatabaseTests/SqlServer.SyncAsync` in the same change**, or that project's coverage test fails at night.
+- **A query added here, outside `UserClr/`, that has a pair under `method-type=both`, neither a stream nor a `<Query>Sync` copy, gets its scenarios in `tests/DatabaseTests/SqlServer.SyncAsync` in the same change**, or that project's coverage test fails at night.
 - **`RowBufferQueryTests` is the eight generated methods and their twins handed to `RowBufferReads`** of `tests/DatabaseTests/TestHarness`, which holds the body, so a check of what every collection type returns goes there.
 
 ## NodaTime

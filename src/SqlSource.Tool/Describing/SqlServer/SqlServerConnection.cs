@@ -39,6 +39,21 @@ internal sealed class SqlServerConnection(string connectionString, IRunLog log) 
     private SqlConnection? _connection;
 
     /// <summary>
+    /// Whether the connection was lost: a call failed with an error that ended the session (<see cref="Lose" />), or
+    /// SqlClient reports the opened connection as no longer open, <c>Broken</c> or <c>Closed</c>.  SqlClient can go on
+    /// reporting a connection open that the server ended, so the record of the error, and not the state alone, makes
+    /// every later call the lost connection's.
+    /// </summary>
+    public bool IsLost
+    {
+        get => field || _connection is { State: not ConnectionState.Open };
+        private set;
+    }
+
+    /// <summary>Records that a call's error ended the session, so that every later call is refused as lost.</summary>
+    public void Lose() => IsLost = true;
+
+    /// <summary>
     /// The password of a connection string, as SqlClient reads it, or none when it gives none or cannot read it.
     /// </summary>
     /// <remarks>
@@ -160,11 +175,14 @@ internal sealed class SqlServerConnection(string connectionString, IRunLog log) 
     /// </remarks>
     private async Task<SqlConnection> OpenAsync(CancellationToken cancellationToken)
     {
+        if (IsLost)
+        {
+            throw new UnusableException(ConnectionTexts.LostConnection);
+        }
+
         if (_connection is not null)
         {
-            return _connection.State == ConnectionState.Open
-                ? _connection
-                : throw new UnusableException(ConnectionTexts.LostConnection);
+            return _connection;
         }
 
         var builder =
