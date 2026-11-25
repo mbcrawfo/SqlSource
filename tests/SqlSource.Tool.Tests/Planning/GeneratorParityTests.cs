@@ -135,6 +135,15 @@ public sealed class GeneratorParityTests : IDisposable
             ],
             ["Repo/A.sql", "Repo/B.sql", "Repo/C.sql"]
         ),
+        // The first declaration of the type has no attribute, and the claim is the next one's.
+        ["the attribute on the second part of a partial type"] = new(
+            1,
+            [
+                ("Repo/First.cs", "// SqlSourceGenerate\ninternal partial class Q { }\n"),
+                ("Repo/Second.cs", Using + "[SqlSourceGenerate(Source = \"B.sql\")]\ninternal partial class Q;\n"),
+            ],
+            ["Repo/A.sql", "Repo/B.sql"]
+        ),
         ["the default with no file"] = new(
             1,
             [("Repo/Missing.cs", Using + "[SqlSourceGenerate]\ninternal partial class Missing;\n")],

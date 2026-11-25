@@ -289,6 +289,31 @@ public sealed class AttributeReaderTests : IDisposable
             .Claims.ShouldHaveSingleItem()
             .Source.ShouldBe("A");
 
+    // A declaration of the type with no attribute, first in the order of the files, takes nothing from the one after it.
+    [Fact]
+    public void Read_PartialDeclarationWithoutTheAttributeFirst_IsNoClaimAndTheNextIs() =>
+        ReadFiles(
+            [],
+            ("A.cs", "// SqlSourceGenerate\ninternal partial class Q;\n"),
+            ("B.cs", "[SqlSource.SqlSourceGenerate(Source = \"B\")]\ninternal partial class Q;\n")
+        )
+            .Claims.ShouldHaveSingleItem()
+            .Source.ShouldBe("B");
+
+    // An alias of the file reaches that file alone, though the file is read for the project's aliases.
+    [Fact]
+    public void Read_AliasOfAFile_DoesNotReachAnotherFile() =>
+        ReadFiles(
+            [],
+            (
+                "A.cs",
+                "using Gen = SqlSource.SqlSourceGenerateAttribute;\n[Gen(Source = \"A\")]\ninternal partial class A;\n"
+            ),
+            ("B.cs", "[Gen(Source = \"B\")]\ninternal partial class B;\n")
+        )
+            .Claims.ShouldHaveSingleItem()
+            .Source.ShouldBe("A");
+
     // The second is not read at all, so a first that is not read leaves the type with no claim.
     [Fact]
     public void Read_AttributeOnTwoPartialDeclarationsTheFirstNotALiteral_IsSqlsrc208AndNoClaim()
