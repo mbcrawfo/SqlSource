@@ -169,7 +169,7 @@ public sealed class OuterJoinGateTests
             "INSERT INTO t (id) VALUES (1) RETURNING U&\"!006Fld\" /* c */ uescape\n'!'",
             "INSERT INTO t (id) VALUES (1) RETURNING U&\"\\zzzz\".id",
             "INSERT INTO t (id) VALUES (1) RETURNING U&\"\\006Fld\" UESCAPE '0'",
-            // Wherever it stands, a table's alias included: the walk then maps only the target's alias.
+            // Wherever it stands, a table's alias included: the walk then maps no alias that is one of the rows' names.
             "SELECT \"new\", \"old\" FROM t",
             "SELECT \"old\".id FROM t \"old\"",
         ];
