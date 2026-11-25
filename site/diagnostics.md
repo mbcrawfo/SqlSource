@@ -4094,6 +4094,7 @@ Some rules decide these cases:
 
 - **`[Experimental]` on the assembly or module that declares the type counts as on the type.**
 - **A type argument written with a `?` breaks a constraint that forbids null.**  Such a constraint is `notnull`, `class` without a `?`, or a base type or interface written without a `?`.  `System.Collections.Generic.Dictionary<string?, int>` breaks one, since its key is `notnull`.
+- **A `?` inside a type argument breaks a constraint whose type does not take it.**  `MyApp.Names<System.Collections.Generic.List<string?>>` breaks one where `Names<T>` requires `where T : System.Collections.Generic.IEnumerable<string>`, since its items can be null.  A constraint that only reads its type argument, such as `System.Collections.Generic.IComparer<string>` or `System.IEquatable<string>`, takes a `?` inside, so `System.Collections.Generic.Comparer<string?>` meets it.
 - **A type marked `[Obsolete]` or `[Experimental]` otherwise is accepted.**  Its model compiles without a warning.
 
 Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
