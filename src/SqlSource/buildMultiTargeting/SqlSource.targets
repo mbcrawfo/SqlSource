@@ -38,7 +38,6 @@
         <SqlSourceHasEnvFile
             Condition="'$(SqlSourceEnvFilePath)' != '' and $([System.IO.File]::Exists($(SqlSourceEnvFilePath)))"
             >true</SqlSourceHasEnvFile>
-        <SqlSourceFirstFramework>$([System.Text.RegularExpressions.Regex]::Match($(TargetFrameworks), '[^;\s]+'))</SqlSourceFirstFramework>
         <SqlSourceGoesOnline>false</SqlSourceGoesOnline>
         <SqlSourceGoesOnline
             Condition="'$(SqlSourceInCI)' != 'true' and ($(SqlSourceOnlineValue.Equals('true')) or ($(SqlSourceOnlineValue.Equals('auto')) and ('$(SqlSourceHasConnectionVariable)' == 'true' or '$(SqlSourceHasEnvFile)' == 'true')))"
@@ -46,23 +45,41 @@
         <MSBuildWarningsNotAsErrors>$(MSBuildWarningsNotAsErrors);SQLSRC026</MSBuildWarningsNotAsErrors>
     </PropertyGroup>
     <!--
-        Runs the sqlsource tool for the first framework before the outer build dispatches the inner builds, so that
-        the run comes before any inner build starts and an error of it stops the build before them.  Each inner build
-        calls SqlSourceRunOnline in the same configuration, the first framework's with SqlSourceOnlineRun=true, one of
-        its own that runs nothing of a framework's build, so that each framework searches for settings files after its
-        own hooks of CoreCompile.  The dispatch passes only TargetFramework, so every inner build's call names the
-        configuration this call built, and MSBuild answers it at once without running the tool again.  The condition is
-        SqlSourceRunOnline's, in the outer build alone.
+        Runs the sqlsource tool before the outer build dispatches the inner builds, so that the run comes before any
+        inner build starts and an error of it stops the build before them.  It finds the run's framework as each inner
+        build's SqlSourceDescribeOnline does, the first of TargetFrameworks, in its order, whose configuration of its
+        own answers SqlSourceOnlineFramework, which only a framework that imports the package has, and calls nothing
+        when none answers.  Each inner build calls SqlSourceRunOnline in the same configuration, that framework's with
+        SqlSourceOnlineRun=true, one of its own that runs nothing of a framework's build, so that each framework
+        searches for settings files after its own hooks of CoreCompile.  The dispatch passes only TargetFramework, so
+        every inner build's calls name the configurations these calls built, and MSBuild answers them at once without
+        running the tool again.  The condition is SqlSourceRunOnline's, in the outer build alone.
     -->
     <Target
         Name="SqlSourceRunOnlineBeforeDispatch"
         BeforeTargets="DispatchToInnerBuilds"
         Condition="'$(TargetFramework)' == '' and '$(TargetFrameworks)' != '' and '$(DesignTimeBuild)' != 'true' and '$(SqlSourceGoesOnline)' == 'true'"
     >
+        <ItemGroup>
+            <SqlSourceOnlineFrameworkAsked Include="$(TargetFrameworks)" />
+        </ItemGroup>
+        <MSBuild
+            Projects="$(MSBuildProjectFullPath)"
+            Targets="SqlSourceOnlineFramework"
+            Properties="TargetFramework=%(SqlSourceOnlineFrameworkAsked.Identity);SqlSourceOnlineRun=true"
+            SkipNonexistentTargets="true"
+        >
+            <Output TaskParameter="TargetOutputs" ItemName="SqlSourceOnlineFrameworkFound" />
+        </MSBuild>
+        <PropertyGroup>
+            <SqlSourceOnlineFrameworksFound>@(SqlSourceOnlineFrameworkFound)</SqlSourceOnlineFrameworksFound>
+            <SqlSourceOnlineRunFramework>$([System.Text.RegularExpressions.Regex]::Match($(SqlSourceOnlineFrameworksFound), '[^;]+'))</SqlSourceOnlineRunFramework>
+        </PropertyGroup>
         <MSBuild
             Projects="$(MSBuildProjectFullPath)"
             Targets="SqlSourceRunOnline"
-            Properties="TargetFramework=$(SqlSourceFirstFramework);SqlSourceOnlineRun=true"
+            Properties="TargetFramework=$(SqlSourceOnlineRunFramework);SqlSourceOnlineRun=true"
+            Condition="'$(SqlSourceOnlineRunFramework)' != ''"
         />
     </Target>
     <!-- editorconfig-checker-enable -->

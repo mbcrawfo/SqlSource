@@ -34,11 +34,16 @@ internal static class RunEvents
             members.Add(new("usesSqlSource", UsesSqlSource(evaluation.State)));
         }
 
-        if (evaluation?.Manifest is { } manifest)
+        var manifests = evaluation?.Manifests ?? [];
+        var frameworks = string.Join(';', manifests.Select(static manifest => manifest.TargetFramework));
+        var sqlFiles = DistinctCount(manifests.SelectMany(static manifest => manifest.Files));
+        if (!manifests.IsEmpty)
         {
-            members.Add(new("targetFramework", manifest.TargetFramework));
-            members.Add(new("sqlFiles", manifest.Files.Length));
-            members.Add(new("compileFiles", manifest.CompileFiles.Length));
+            members.Add(new("targetFramework", frameworks));
+            members.Add(new("sqlFiles", sqlFiles));
+            members.Add(
+                new("compileFiles", DistinctCount(manifests.SelectMany(static manifest => manifest.CompileFiles)))
+            );
         }
 
         trace.Log.Write("project", [.. members]);
@@ -46,9 +51,9 @@ internal static class RunEvents
             evaluation switch
             {
                 null => $"project '{path}' is left out: --project does not name it",
-                { Manifest: { } read } => string.Create(
+                { Manifests.IsEmpty: false } => string.Create(
                     CultureInfo.InvariantCulture,
-                    $"project '{path}': {read.TargetFramework}, {read.Files.Length} .sql files"
+                    $"project '{path}': {frameworks}, {sqlFiles} .sql files"
                 ),
                 { State: ProjectState.DoesNotUseSqlSource } =>
                     $"project '{path}' is left out: it does not use SqlSource",
@@ -56,6 +61,10 @@ internal static class RunEvents
             }
         );
     }
+
+    // The paths of a project's manifests that differ, ignoring case: a file that two frameworks list is one.
+    private static int DistinctCount(IEnumerable<string> paths) =>
+        paths.Distinct(StringComparer.OrdinalIgnoreCase).Count();
 
     /// <summary>A file that a type claims.</summary>
     public static void File(RunTrace trace, PlannedFile file)

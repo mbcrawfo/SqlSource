@@ -3,14 +3,31 @@
         Two target frameworks, with one .sql file and no sidecar, for the tests of the online build of a project with
         several.  The props and the targets of build/ are imported into the inner builds alone, and the targets of
         buildMultiTargeting/ into the outer build alone, as NuGet imports them.
+
+        Under OnlineMultiSecondFile, Second/ holds a .sql file and a C# file that net10.0 lists alone; otherwise neither
+        framework lists them.  Under OnlineMultiSecondOnly, build/ is imported into net10.0 alone, as a PackageReference
+        under a condition on the framework imports it.  OnlineMultiFrameworks, when set, is the project's
+        TargetFrameworks, unescaped, so that a test gives it a ; as %3B.
     -->
-    <ImportGroup Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net10.0'">
+    <PropertyGroup>
+        <OnlineMultiUsesSqlSource>false</OnlineMultiUsesSqlSource>
+        <OnlineMultiUsesSqlSource Condition="'$(TargetFramework)' == 'net10.0'">true</OnlineMultiUsesSqlSource>
+        <OnlineMultiUsesSqlSource Condition="'$(TargetFramework)' == 'net8.0' and '$(OnlineMultiSecondOnly)' != 'true'"
+            >true</OnlineMultiUsesSqlSource>
+    </PropertyGroup>
+    <ImportGroup Condition="'$(OnlineMultiUsesSqlSource)' == 'true'">
         <Import Project="../build/SqlSource.props" />
     </ImportGroup>
     <PropertyGroup>
         <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(OnlineMultiFrameworks)' != ''"
+            >$([MSBuild]::Unescape($(OnlineMultiFrameworks)))</TargetFrameworks>
     </PropertyGroup>
-    <ImportGroup Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net10.0'">
+    <ItemGroup Condition="'$(OnlineMultiSecondFile)' != 'true' or '$(TargetFramework)' != 'net10.0'">
+        <AdditionalFiles Remove="Second/**" />
+        <Compile Remove="Second/**" />
+    </ItemGroup>
+    <ImportGroup Condition="'$(OnlineMultiUsesSqlSource)' == 'true'">
         <Import Project="../build/SqlSource.targets" />
     </ImportGroup>
     <ImportGroup Condition="'$(TargetFramework)' == '' and '$(TargetFrameworks)' != ''">

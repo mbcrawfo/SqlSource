@@ -1,0 +1,25 @@
+{
+  "fileName": "Second.sql",
+  "settings": [
+    "{\n  // A test copies the project to the temporary directory, and \"root\" ends the chain at the copy, so that no\n  // settings file above the copy applies.\n  \"root\": true,\n  \"dialect\": \"postgres\",\n}\n"
+  ],
+  "input": "-- database: billing\n\n-- name: GetSecond\nSELECT 2;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 20],
+      ["Text", 20, 22],
+      ["LineComment", 22, 40],
+      ["Text", 40, 51]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 20, "name": null, "default": null },
+      { "kind": "markerComment", "start": 22, "end": 40, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

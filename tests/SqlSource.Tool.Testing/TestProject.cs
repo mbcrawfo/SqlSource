@@ -28,6 +28,10 @@ internal sealed class TestProject
 
     public string ProjectPath { get; }
 
+    // The framework the manifest is written for.  Two test projects of one name and folder with two frameworks are the
+    // two manifests of one project.
+    public string TargetFramework { get; set; } = "net10.0";
+
     public string LangVersion { get; set; } = "";
 
     public List<string> Constants { get; } = [];
@@ -109,7 +113,7 @@ internal sealed class TestProject
         var text = new StringBuilder();
         _ = text.Append("SqlSourceManifest=" + ManifestReader.Version + "\n");
         _ = text.Append("Project=").Append(ProjectPath).Append('\n');
-        _ = text.Append("TargetFramework=net10.0\n");
+        _ = text.Append("TargetFramework=").Append(TargetFramework).Append('\n');
         _ = text.Append("LangVersion=").Append(LangVersion).Append('\n');
         _ = text.Append("DefineConstants=").AppendJoin(';', Constants).Append('\n');
         _ = text.Append("SqlSourceBuildFolders=").Append(BuildFolders).Append('\n');

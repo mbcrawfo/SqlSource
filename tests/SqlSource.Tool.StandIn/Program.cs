@@ -11,8 +11,8 @@ namespace SqlSource.Tool.StandIn;
 // print to each stream, and the code to exit with.  What the file leaves out the run does not do, but for the lines of
 // the standard output, which are then a line of a summary, as of a run that described nothing, and the code, which is
 // then 0: so without the file it prints that line and exits with 0.  Each run first adds a line to stand-in.log in the
-// same folder, with its arguments and the lines of the manifest it was given, so that a test counts the runs and reads
-// what each was given.
+// same folder, with its arguments and the lines of each manifest it was given, in the order of its --manifest options,
+// so that a test counts the runs and reads what each was given.
 internal static class Program
 {
     private const string ScriptFile = "stand-in.json";
@@ -23,12 +23,18 @@ internal static class Program
 
     private static async Task<int> Main(string[] args)
     {
-        var manifestAt = Array.IndexOf(args, "--manifest") + 1;
-        var manifest =
-            manifestAt > 0 && manifestAt < args.Length ? await File.ReadAllLinesAsync(args[manifestAt]) : null;
+        var manifests = new List<string[]>();
+        for (var index = 0; index < args.Length - 1; index++)
+        {
+            if (args[index] == "--manifest")
+            {
+                manifests.Add(await File.ReadAllLinesAsync(args[index + 1]));
+            }
+        }
+
         await File.AppendAllTextAsync(
             LogFile,
-            JsonSerializer.Serialize(new StandInRun(args, manifest)) + Environment.NewLine
+            JsonSerializer.Serialize(new StandInRun(args, manifests)) + Environment.NewLine
         );
 
         using var script = JsonDocument.Parse(File.Exists(ScriptFile) ? await File.ReadAllTextAsync(ScriptFile) : "{}");
@@ -72,4 +78,4 @@ internal static class Program
 }
 
 // A line of stand-in.log.
-internal sealed record StandInRun(IReadOnlyList<string> Arguments, IReadOnlyList<string>? Manifest);
+internal sealed record StandInRun(IReadOnlyList<string> Arguments, IReadOnlyList<IReadOnlyList<string>> Manifests);

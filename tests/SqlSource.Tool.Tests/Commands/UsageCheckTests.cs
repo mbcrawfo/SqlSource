@@ -518,6 +518,8 @@ public sealed class UsageCheckTests
     [InlineData("describe", "--manifest", "m", "--online", "True")]
     [InlineData("describe", "--manifest", "m", "--connection", "billing=Host=db", "--verbose", "--force")]
     [InlineData("describe", "--manifest", "m", "--log", "run.log", "--check")]
+    [InlineData("describe", "--manifest", "a", "--manifest", "b")]
+    [InlineData("describe", "--manifest=a", "--manifest", "b", "--online", "auto")]
     public void CheckUsage_ManifestRun_GivesNoLine(params string[] args) =>
         DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args)).ShouldBeEmpty();
 
@@ -601,6 +603,22 @@ public sealed class UsageCheckTests
             .ShouldBe([
                 $"sqlsource: the value of option '--manifest' at position {position} holds '=' or ';', which a "
                     + "manifest's path may not",
+            ]);
+
+    // Each manifest of a project's frameworks is checked as the only one is.
+    [Fact]
+    public void CheckUsage_SeveralManifests_EachIsCheckedByItsPosition() =>
+        DescribeCommand
+            .CheckUsage(
+                UsageCheck.Check(
+                    Cli.BuildCommands(),
+                    ["describe", "--manifest", "a", "--manifest", " ", "--manifest=b;c"]
+                )
+            )
+            .ShouldBe([
+                "sqlsource: the value of option '--manifest' at position 5 is not a path",
+                "sqlsource: the value of option '--manifest' at position 6 holds '=' or ';', "
+                    + "which a manifest's path may not",
             ]);
 
     // The build's paths may hold them, as a project's name may, and a run under --online is the build's.

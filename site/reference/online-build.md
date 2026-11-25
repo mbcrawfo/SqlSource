@@ -62,12 +62,12 @@ Some builds use the committed sidecars, as a build without the tool does.  These
 - **While one of these errors is in the project, the tool deletes no sidecar.**  The tool also writes no sidecar for a `.sql` file that does not parse.  So the generator can then report the queries of that file as having no entry, [SQLSRC241](../diagnostics.md#sqlsrc241).
 - **A database that cannot be opened is [SQLSRC224](../diagnostics.md#sqlsrc224)**, and fails the build.  Its `help:` line says how to build without the database: remove its connection, or set `SqlSourceOnline` to `false`.
 
-**Several target frameworks.**  The tool runs once in a build, for the first framework that `TargetFrameworks` lists.  This is the framework that `describe` reads.  Every framework compiles with the sidecars that the tool wrote.  A build of another framework alone still runs the tool, for the first framework.  Each of these is such a build:
+**Several target frameworks.**  The tool runs once in a build, in the first framework of `TargetFrameworks` that uses SqlSource.  It reads every framework that uses SqlSource, as [`describe` does](describing.md#which-queries), and describes the queries that any of them needs.  Every framework compiles with the sidecars that the tool wrote.  A build of one framework alone still runs the tool once, for every framework.  Each of these is such a build:
 
 - a build with `-f`;
 - a build through a reference from a project of that framework.
 
-A query that only another framework claims is not described: see [a limit](describing.md#limit-several-target-frameworks).
+A build of one framework that does not use SqlSource does not run the tool.
 
 **In CI**, a build never runs the tool, whatever `SqlSourceOnline` says: see [running the tool in the build](#online-build).  Describe in a step of its own, with `describe --check`: see [check in CI](describing.md#check-in-ci).
 

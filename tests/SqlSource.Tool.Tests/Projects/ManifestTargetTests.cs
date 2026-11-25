@@ -145,7 +145,7 @@ public sealed class ManifestTargetTests : IDisposable
         output.ShouldContain("MSB4057");
     }
 
-    // TD-0026: the manifest is the first framework's.  What the project lists for another alone is not in it.
+    // The manifest is the given framework's: what the project lists for another alone is not in it.
     [Fact]
     public async Task WriteManifest_SeveralFrameworksAndTheFirstGiven_IsTheManifestOfThatFramework()
     {
