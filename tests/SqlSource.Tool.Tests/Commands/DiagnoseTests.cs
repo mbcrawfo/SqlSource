@@ -58,6 +58,21 @@ public sealed class DiagnoseTests : IDisposable
         replayed.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
+    // The query's project is read as "dotnet build -c" builds it.
+    [Fact]
+    public async Task Diagnose_Configuration_IsGivenToEveryRunOfMSBuild()
+    {
+        _ = _scene.AddCase(_scene.Case(Plain));
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.zip", "--configuration", "Release");
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        _scene.Run.Processes.Requests.ShouldNotBeEmpty();
+        _scene.Run.Processes.Requests.ShouldAllBe(request =>
+            FakeProcessRunner.PropertyOf(request, "Configuration") == "Release"
+        );
+    }
+
     [Fact]
     public async Task Diagnose_NoObfuscate_WritesARawBundleAndNoMapping()
     {

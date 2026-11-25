@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
@@ -12,7 +13,8 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Planning;
 
-// The tool's reader of [SqlSourceGenerate] works on syntax: it has no compilation and follows no name.
+// The tool's reader of [SqlSourceGenerate] works on syntax: it has no compilation, and follows a name only through
+// a using alias.
 public sealed class AttributeReaderTests : IDisposable
 {
     private const string SourcePrefix = "[SqlSourceGenerate(Source = ";
@@ -24,6 +26,14 @@ public sealed class AttributeReaderTests : IDisposable
     public void Dispose() => _folder.Dispose();
 
     private ProjectManifest Manifest(string langVersion, string[] constants, params string[] compile) =>
+        Manifest(langVersion, constants, compile, []);
+
+    private ProjectManifest Manifest(
+        string langVersion,
+        string[] constants,
+        string[] compile,
+        UsingAlias[] usingAliases
+    ) =>
         new()
         {
             ProjectPath = _folder.PathOf("App/App.csproj"),
@@ -34,6 +44,7 @@ public sealed class AttributeReaderTests : IDisposable
             Files = [],
             SettingsFiles = [],
             CompileFiles = [.. compile],
+            UsingAliases = [.. usingAliases],
         };
 
     private ProjectClaims Read(string source, string langVersion = "", params string[] constants)
@@ -120,6 +131,208 @@ public sealed class AttributeReaderTests : IDisposable
         claims.Claims.ShouldBeEmpty();
         claims.Errors.ShouldBeEmpty();
     }
+
+    // Several files of App/, in the order given, with the project's Using items that have an alias.
+    private ProjectClaims ReadFiles(UsingAlias[] usingAliases, params (string Name, string Text)[] files)
+    {
+        var paths = files.Select(file => _folder.WriteFile("App/" + file.Name, file.Text)).ToArray();
+        return AttributeReader.Read(Manifest("", [], paths, usingAliases), TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData("using Gen = SqlSource.SqlSourceGenerateAttribute;", "[Gen(Source = \"Q\")]")]
+    [InlineData("using Gen = global::SqlSource.SqlSourceGenerateAttribute;", "[Gen(Source = \"Q\")]")]
+    [InlineData("using Gen = SqlSourceGenerateAttribute;", "[Gen(Source = \"Q\")]")]
+    [InlineData("using GenAttribute = SqlSource.SqlSourceGenerateAttribute;", "[Gen(Source = \"Q\")]")]
+    [InlineData("using GenAttribute = SqlSource.SqlSourceGenerateAttribute;", "[GenAttribute(Source = \"Q\")]")]
+    [InlineData("using Gen = SqlSource.SqlSourceGenerateAttribute;", "[System.Serializable, Gen(Source = \"Q\")]")]
+    [InlineData("using Gen = SqlSource.SqlSourceGenerateAttribute;", "[type: Gen(Source = \"Q\")]")]
+    public void Read_AliasOfTheAttributeInTheFile_IsAClaim(string directive, string attributes) =>
+        Read($"{directive}\n\n{attributes}\ninternal static partial class Queries;\n")
+            .Claims.ShouldHaveSingleItem()
+            .Source.ShouldBe("Q");
+
+    // An alias of another type is no claim, and [GenAttribute] does not name the alias Gen.
+    [Theory]
+    [InlineData("using Gen = System.SerializableAttribute; // SqlSourceGenerate", "[Gen]")]
+    [InlineData("using Gen = SqlSource.SqlSourceGenerateAttribute;", "[GenAttribute]")]
+    [InlineData("using Gen = SqlSource.SqlSourceGenerateAttribute<int>;", "[Gen]")]
+    [InlineData("using Gen = SqlSource.SqlSourceGenerateAttribute;", "[Other.Gen]")]
+    [InlineData("using Gen = SqlSource.SqlSourceGenerateAttribute;", "[method: Gen]")]
+    public void Read_AliasOfAnotherTypeOrNameOfAnother_IsNoClaim(string directive, string attributes)
+    {
+        var claims = Read($"{directive}\n\n{attributes}\ninternal static partial class Queries;\n");
+
+        claims.Claims.ShouldBeEmpty();
+        claims.Errors.ShouldBeEmpty();
+    }
+
+    // An alias in a namespace reaches the types of that namespace alone, and one of the same name there hides the
+    // file's.
+    [Fact]
+    public void Read_AliasInANamespace_ReachesThatNamespaceAndHidesTheFilesAlias() =>
+        Read(
+            """
+            using Gen = SqlSource.SqlSourceGenerateAttribute;
+
+            namespace Inside
+            {
+                using Own = SqlSource.SqlSourceGenerateAttribute;
+
+                [Own(Source = "Inside")]
+                internal partial class InsideQueries;
+
+                namespace Deeper
+                {
+                    [Own(Source = "Deeper")]
+                    internal partial class DeeperQueries;
+                }
+            }
+
+            namespace Hidden
+            {
+                using Gen = System.SerializableAttribute;
+
+                [Gen(Source = "Hidden")]
+                internal partial class HiddenQueries;
+            }
+
+            namespace Outside
+            {
+                [Own(Source = "Outside")]
+                internal partial class OutsideQueries;
+
+                [Gen(Source = "File")]
+                internal partial class FileQueries;
+            }
+            """
+        )
+            .Claims.Select(static claim => claim.Source)
+            .ShouldBe(["Inside", "Deeper", "File"]);
+
+    [Fact]
+    public void Read_AliasInAFileScopedNamespace_IsAClaim() =>
+        Read(
+            """
+            namespace App;
+
+            using Gen = SqlSource.SqlSourceGenerateAttribute;
+
+            [Gen(Source = "Q")]
+            internal partial class Queries;
+            """
+        )
+            .Claims.ShouldHaveSingleItem()
+            .Source.ShouldBe("Q");
+
+    // A global using of one file reaches every file of the project, one that never holds the word too, and the claims
+    // stay in the order of the files.
+    [Fact]
+    public void Read_GlobalAliasOfAnotherFile_ReachesEveryFileInTheirOrder() =>
+        ReadFiles(
+            [],
+            ("First.cs", "[Gen(Source = \"First\")]\ninternal partial class First;\n"),
+            (
+                "Usings.cs",
+                "global using Gen = SqlSource.SqlSourceGenerateAttribute;\n\n"
+                    + "[SqlSource.SqlSourceGenerate(Source = \"Second\")]\ninternal partial class Second;\n"
+            ),
+            ("Third.cs", "[GenAttribute(Source = \"Third\")]\ninternal partial class Third;\n"),
+            ("Fourth.cs", "[Other(Source = \"Fourth\")]\ninternal partial class Fourth;\n")
+        )
+            .Claims.Select(static claim => claim.Source)
+            .ShouldBe(["First", "Second"]);
+
+    // A global using named GenAttribute is written [Gen], so a file that holds only "Gen" is read.
+    [Fact]
+    public void Read_GlobalAliasWithTheSuffix_ReachesAFileThatWritesItWithout() =>
+        ReadFiles(
+            [],
+            ("Usings.cs", "global using GenAttribute = SqlSource.SqlSourceGenerateAttribute;\n"),
+            ("Queries.cs", "[Gen(Source = \"Q\")]\ninternal partial class Queries;\n")
+        )
+            .Claims.ShouldHaveSingleItem()
+            .Source.ShouldBe("Q");
+
+    [Fact]
+    public void Read_GlobalAliasInsideAnIfThatDoesNotHold_IsNoClaim() =>
+        ReadFiles(
+            [],
+            ("Usings.cs", "#if FEATURE\nglobal using Gen = SqlSource.SqlSourceGenerateAttribute;\n#endif\n"),
+            ("Queries.cs", "[Gen(Source = \"Q\")]\ninternal partial class Queries;\n")
+        )
+            .Claims.ShouldBeEmpty();
+
+    // A Using item of the project with an alias is a global using that no Compile file holds.
+    [Theory]
+    [InlineData("SqlSource.SqlSourceGenerateAttribute", 1)]
+    [InlineData("global::SqlSource.SqlSourceGenerateAttribute", 1)]
+    [InlineData("System.SerializableAttribute", 0)]
+    [InlineData("not a name", 0)]
+    public void Read_UsingItemWithAnAlias_IsAnAliasOfEveryFile(string target, int expected) =>
+        ReadFiles([new UsingAlias("Gen", target)], ("Queries.cs", "[Gen]\ninternal partial class Queries;\n"))
+            .Claims.Length.ShouldBe(expected);
+
+    // The compiler rejects the second attribute of a type, and the generator reads the first, in the order of the
+    // files.
+    [Fact]
+    public void Read_AttributeOnTwoPartialDeclarations_IsReadAtTheFirst() =>
+        ReadFiles(
+            [],
+            ("A.cs", "namespace App.Data;\n[SqlSource.SqlSourceGenerate(Source = \"A\")]\ninternal partial class Q;\n"),
+            (
+                "B.cs",
+                "namespace App { namespace Data {\n"
+                    + "[SqlSource.SqlSourceGenerate(Source = \"B\")]\ninternal partial class Q; } }\n"
+            )
+        )
+            .Claims.ShouldHaveSingleItem()
+            .Source.ShouldBe("A");
+
+    // The second is not read at all, so a first that is not read leaves the type with no claim.
+    [Fact]
+    public void Read_AttributeOnTwoPartialDeclarationsTheFirstNotALiteral_IsSqlsrc208AndNoClaim()
+    {
+        var claims = ReadFiles(
+            [],
+            ("A.cs", "[SqlSource.SqlSourceGenerate(Source = nameof(Q))]\ninternal partial class Q;\n"),
+            ("B.cs", "[SqlSource.SqlSourceGenerate(Source = \"B\")]\ninternal partial class Q;\n")
+        );
+
+        claims.Claims.ShouldBeEmpty();
+        claims.Errors.ShouldHaveSingleItem().Descriptor.ShouldBe(ToolDiagnostics.AttributeArgumentNotLiteral);
+    }
+
+    // Types that differ in a namespace, an arity, the type around them, or a file of their own, are not one type.
+    [Theory]
+    [InlineData("namespace A;\n", "namespace B;\n", "", "", "")]
+    [InlineData("", "", "", "<T>", "")]
+    [InlineData("", "", "", "", "internal partial class Outer {\n")]
+    [InlineData("", "", "file ", "", "")]
+    public void Read_AttributeOnTwoTypesOfOneName_IsAClaimOfEach(
+        string firstNamespace,
+        string secondNamespace,
+        string modifier,
+        string typeParameters,
+        string outer
+    ) =>
+        ReadFiles(
+            [],
+            (
+                "A.cs",
+                firstNamespace
+                    + $"[SqlSource.SqlSourceGenerate(Source = \"A\")]\n{modifier}partial class Q{typeParameters};\n"
+            ),
+            (
+                "B.cs",
+                secondNamespace
+                    + outer
+                    + $"[SqlSource.SqlSourceGenerate(Source = \"B\")]\n{modifier}partial class Q;\n"
+                    + (outer.Length > 0 ? "}\n" : "")
+            )
+        )
+            .Claims.Select(static claim => claim.Source)
+            .ShouldBe(["A", "B"]);
 
     [Fact]
     public void Read_TwoAttributesOnOneDeclaration_TakesTheFirst() =>

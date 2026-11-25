@@ -44,17 +44,19 @@ public sealed class ProjectEvaluatorTests : IDisposable
     private Task<System.Collections.Immutable.ImmutableArray<ProjectEvaluation>> EvaluateAsync(
         IReadOnlyList<string> projects,
         string? solution = null,
-        CancellationToken? cancellationToken = null
+        CancellationToken? cancellationToken = null,
+        string? configuration = null
     ) =>
         ProjectEvaluator.EvaluateAsync(
             Hosts.Create(_folder.Path, _runner, _temp, _processors, _environment),
             projects,
             solution,
+            configuration,
             cancellationToken ?? TestContext.Current.CancellationToken
         );
 
-    private async Task<ProjectEvaluation> EvaluateAsync(string? solution = null) =>
-        (await EvaluateAsync([_project], solution)).ShouldHaveSingleItem();
+    private async Task<ProjectEvaluation> EvaluateAsync(string? solution = null, string? configuration = null) =>
+        (await EvaluateAsync([_project], solution, configuration: configuration)).ShouldHaveSingleItem();
 
     private string[] Projects(int count) =>
         [.. Enumerable.Range(0, count).Select(index => _folder.WriteFile($"P{index}/P{index}.csproj"))];
@@ -224,6 +226,35 @@ public sealed class ProjectEvaluatorTests : IDisposable
                 .Arguments.Single(argument => argument.StartsWith("-p:SolutionDir=", StringComparison.Ordinal))
                 .ShouldEndWith("Acme%2C Inc%3B100%25" + Path.DirectorySeparatorChar);
         }
+    }
+
+    // What "dotnet build -c" gives: the configuration as a global property of every run, each framework's too, escaped
+    // as a path is.
+    [Theory]
+    [InlineData("Release", "Release")]
+    [InlineData("Release;Staging,100%", "Release%3BStaging%2C100%25")]
+    public async Task Evaluate_Configuration_IsGivenToEveryRun(string configuration, string written)
+    {
+        _runner.Default = new FakeProject { TargetFrameworks = "net8.0;net10.0" };
+
+        var evaluation = await EvaluateAsync(configuration: configuration);
+
+        evaluation.State.ShouldBe(ProjectState.UsesSqlSource);
+        _runner.Requests.Count.ShouldBe(5);
+        foreach (var request in _runner.Requests)
+        {
+            FakeProcessRunner.PropertyOf(request, "Configuration").ShouldBe(configuration);
+            request.Arguments.ShouldContain("-p:Configuration=" + written);
+        }
+    }
+
+    // Without it the project's own default holds, which a variable of the environment can set.
+    [Fact]
+    public async Task Evaluate_NoConfiguration_GivesNone()
+    {
+        _ = await EvaluateAsync();
+
+        _runner.Requests.ShouldAllBe(request => FakeProcessRunner.PropertyOf(request, "Configuration") == null);
     }
 
     [Fact]

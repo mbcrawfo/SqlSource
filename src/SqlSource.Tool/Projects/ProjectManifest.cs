@@ -42,4 +42,15 @@ internal sealed class ProjectManifest
 
     /// <summary>The full paths of the project's <c>Compile</c> items.</summary>
     public required ImmutableArray<string> CompileFiles { get; init; }
+
+    /// <summary>
+    /// The project's <c>Using</c> items with an <c>Alias</c>, which the SDK makes global usings only on the way to a
+    /// compile, in the order of the manifest.  Empty for a manifest of an older package, which has no such line.
+    /// </summary>
+    public ImmutableArray<UsingAlias> UsingAliases { get; init; } = [];
 }
+
+/// <summary>A <c>Using</c> item of the project with an <c>Alias</c>: the alias's name and the type it names.</summary>
+/// <param name="Name">The alias, as the item's metadata has it.</param>
+/// <param name="Target">The item's identity, the name of the type or namespace, without <c>global::</c>.</param>
+internal readonly record struct UsingAlias(string Name, string Target);

@@ -67,6 +67,22 @@ public sealed class ManifestReaderTests
         manifest.CompileFiles.ShouldBeEmpty();
     }
 
+    // A Using item with an Alias: the alias ends at the first "=", and both are trimmed, as the SDK writes them into a
+    // global using.  A value with no alias names nothing, and is passed over.
+    [Fact]
+    public void Read_UsingAliasLines_AreTheAliasAndTheTypeInOrder() =>
+        Read(
+            "SqlSourceManifest=2\nProject=p\nUsingAlias=Gen=SqlSource.SqlSourceGenerateAttribute\n"
+                + "UsingAlias= Json = System.Text.Json\nUsingAlias=NoAlias\nUsingAlias==NoName"
+        )
+            .UsingAliases.ShouldBe([
+                new UsingAlias("Gen", "SqlSource.SqlSourceGenerateAttribute"),
+                new UsingAlias("Json", "System.Text.Json"),
+            ]);
+
+    [Fact]
+    public void Read_NoUsingAliasLine_GivesNone() => Read(Example).UsingAliases.ShouldBeEmpty();
+
     // A path is the rest of the line, as a File or a Compile line's is.
     [Fact]
     public void Read_SettingsLine_IsThePathAsItIs() =>

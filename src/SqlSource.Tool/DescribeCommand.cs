@@ -135,6 +135,8 @@ internal static class DescribeCommand
             Arity = ArgumentArity.Zero,
         };
 
+        var configuration = SharedOptions.ConfigurationOption();
+
         return new Command(Name, "Asks the databases of the projects to describe their queries")
         {
             path,
@@ -149,6 +151,7 @@ internal static class DescribeCommand
             manifest,
             online,
             watch,
+            configuration,
         };
     }
 
@@ -258,6 +261,13 @@ internal static class DescribeCommand
                     messages.Add(problem);
                 }
             }
+            else if (value.Option.Name == SharedOptions.Configuration)
+            {
+                if (SharedOptions.ProblemOfConfiguration(value) is { } problem)
+                {
+                    messages.Add(problem);
+                }
+            }
             else if (value.Option.Name == SharedOptions.EnvFile)
             {
                 if (SharedOptions.ProblemOfEnvFile(value, isOnline) is { } problem)
@@ -362,14 +372,15 @@ internal static class DescribeCommand
         return string.Equals(text, OnlineTrue, StringComparison.OrdinalIgnoreCase) ? OnlineMode.True : null;
     }
 
-    // What a value names of the run, which a run from a manifest does not take: the unit, a .sql file, a project or a
-    // database.  Null for the rest.
+    // What a value names of the run, which a run from a manifest does not take: the unit, a .sql file, a project, a
+    // database, or the configuration, which the build evaluated already.  Null for the rest.
     private static string? WhatIsNamedBy(UsageValue value) =>
         value.Option?.Name switch
         {
             null => SqlPath.IsSqlFile(value.Text) ? ".sql path" : "path",
             SharedOptions.Project => $"'{SharedOptions.Project}'",
             DatabaseOption => $"'{DatabaseOption}'",
+            SharedOptions.Configuration => $"'{SharedOptions.Configuration}'",
             _ => null,
         };
 
@@ -393,8 +404,8 @@ internal static class DescribeCommand
 
     /// <summary>
     /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--database</c>,
-    /// <c>--connection</c>, <c>--log</c>, <c>--env-file</c>, <c>--manifest</c> and <c>--online</c> the same values, in
-    /// the same order.  True for a command other than <c>describe</c>.
+    /// <c>--connection</c>, <c>--log</c>, <c>--env-file</c>, <c>--manifest</c>, <c>--online</c> and
+    /// <c>--configuration</c> the same values, in the same order.  True for a command other than <c>describe</c>.
     /// </summary>
     /// <remarks>
     /// The run reads these values from <see cref="Usage" />, and the log's <c>arguments</c> is redacted from it,
@@ -412,6 +423,7 @@ internal static class DescribeCommand
             && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.EnvFile)
             && SharedOptions.ReadsAs(usage, parsed, ManifestOption)
             && SharedOptions.ReadsAsOne(usage, parsed, OnlineOption)
+            && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.Configuration)
         );
 
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.

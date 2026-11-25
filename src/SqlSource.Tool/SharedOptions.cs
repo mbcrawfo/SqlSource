@@ -32,6 +32,8 @@ internal static class SharedOptions
 
     public const string EnvFile = "--env-file";
 
+    public const string Configuration = "--configuration";
+
     /// <summary>The environment variable that gives the log's path when <c>--log</c> does not.</summary>
     public const string LogVariable = "SQLSOURCE_LOG";
 
@@ -85,6 +87,21 @@ internal static class SharedOptions
                 "Read the connections from this .env file instead of the one in the folder of the solution or "
                 + "project; 'none' reads none.",
             HelpName = "path",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
+    /// <summary>
+    /// <c>--configuration</c>, which <c>PlanSteps.FindManifestsAsync</c> gives every run of MSBuild, as
+    /// <c>dotnet build -c</c> does.
+    /// </summary>
+    public static Option<string> ConfigurationOption() =>
+        new(Configuration)
+        {
+            Description =
+                "Read the projects in this configuration, as 'dotnet build -c' does, so that an attribute inside #if "
+                + "is read as that build reads it.  Each project's own default, Debug unless the environment says "
+                + "otherwise, when left out.",
+            HelpName = "name",
             Arity = ArgumentArity.ExactlyOne,
         };
 
@@ -194,6 +211,25 @@ internal static class SharedOptions
             : $"{Cli.LinePrefix}option '{Connection}' at position {value.Position} names a database that an "
                 + "earlier "
                 + "one names";
+    }
+
+    /// <summary>
+    /// What is wrong with a value of <c>--configuration</c>, as a whole line, or null: it is empty or white space, or
+    /// holds <c>=</c> or <c>;</c>, which are what a connection string is made of and no configuration's name holds, so
+    /// that the value may be one typed after the option.
+    /// </summary>
+    public static string? ProblemOfConfiguration(UsageValue configuration)
+    {
+        if (string.IsNullOrWhiteSpace(configuration.Text))
+        {
+            return $"{Cli.LinePrefix}the value of option '{Configuration}' at position {configuration.Position} is "
+                + "not a configuration's name";
+        }
+
+        return configuration.HoldsConnectionText
+            ? $"{Cli.LinePrefix}the value of option '{Configuration}' at position {configuration.Position} holds '=' "
+                + "or ';', which a configuration's name may not"
+            : null;
     }
 
     /// <summary>
