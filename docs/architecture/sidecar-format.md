@@ -69,7 +69,7 @@ So does moving a key that a reader neither requires nor refuses as `null` betwee
 A change raises the version when it:
 
 - removes, renames or retypes a key, or changes what it means: ordinals counted from one, `maxLength` in characters, a PostgreSQL `name` that drops its qualification, a `nullable` with a fourth state;
-- changes the algorithm or the input of `hash`, [`SqlQueryHash`](../../src/SqlSource/Parsing/SqlQueryHash.cs), since an older generator would call every entry stale and a newer one would take a stale file;
+- changes the algorithm or the input of `hash`, [`SqlQueryHash`](../../src/SqlSource/Parsing/SqlQueryHash.cs), since an older generator would call every entry stale and a newer one would take a stale file.  Input that only a query with new syntax has, such as the lines of its `-- variable:` names, raises nothing: no other query's hash moves, and an older generator, which reads that query's parameters differently, is right to call its entry stale;
 - adds a `resultKind`, which an older reader refuses as malformed;
 - adds a key that a reader cannot do without, or requires `columns` when `resultKind` is `none`;
 - writes `bindName` or `columns` as `null`, leaves out a parameter's or a column's `nullable`, or gives a new engine a type object without a string `name` or a column a `null` `type`, each of which an older reader refuses as malformed;

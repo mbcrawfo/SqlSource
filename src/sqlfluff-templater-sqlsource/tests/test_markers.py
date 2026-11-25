@@ -7,6 +7,8 @@ from sqlfluff_templater_sqlsource.lexer import Lexeme, LexemeKind, Lexer
 from sqlfluff_templater_sqlsource.markers import has_marker_form, place_of, read_marker, split_name
 from sqlfluff_templater_sqlsource.rules import DialectRules
 
+ANSI = DialectRules.for_choice(DialectChoice(Dialect.ANSI))
+
 
 def comments(text: str, dialect: Dialect = Dialect.ANSI) -> list[Lexeme]:
     lexemes, _ = Lexer(text, DialectRules.for_choice(DialectChoice(dialect))).read_to_end()
@@ -32,7 +34,16 @@ def test_marker_form_is_the_marker_wherever_it_stands(text, form, marker):
     (comment,) = comments(text)
 
     assert has_marker_form(text, comment) == form
-    assert (read_marker(text, comment) is not None) == marker
+    assert (read_marker(text, comment, ANSI) is not None) == marker
+
+
+# A carriage return alone ends no line under MySQL or SQLite, so a comment after it does not start its line.
+@pytest.mark.parametrize(("dialect", "marker"), [(Dialect.ANSI, True), (Dialect.MYSQL, False), (Dialect.SQLITE, False)])
+def test_comment_after_a_carriage_return_alone_is_a_marker_where_that_ends_a_line(dialect, marker):
+    text = "SELECT 1 /* x */\r-- name: A"
+    (comment,) = comments(text, dialect)
+
+    assert (read_marker(text, comment, DialectRules.for_choice(DialectChoice(dialect))) is not None) == marker
 
 
 def test_hash_comment_has_no_marker_form():
@@ -58,7 +69,7 @@ def test_text_is_never_in_marker_form():
 )
 def test_split_name_splits_a_name_marker_at_its_first_arrow(value, name, arrow):
     text = "-- name: " + value
-    marker = read_marker(text, comments(text)[0])
+    marker = read_marker(text, comments(text)[0], ANSI)
 
     (start, end), found = split_name(text, marker.value_start, marker.value_end)
 
@@ -68,7 +79,7 @@ def test_split_name_splits_a_name_marker_at_its_first_arrow(value, name, arrow):
 
 @pytest.mark.parametrize(("text", "place"), [("-- token: {{a}}", "{{a}}"), ("-- token:", "-- token:")])
 def test_place_of_a_marker_is_its_value_or_the_marker_when_it_has_none(text, place):
-    marker = read_marker(text, comments(text)[0])
+    marker = read_marker(text, comments(text)[0], ANSI)
 
     start, end = place_of(marker)
 

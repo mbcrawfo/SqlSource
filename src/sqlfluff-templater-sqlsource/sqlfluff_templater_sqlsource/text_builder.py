@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from sqlfluff_templater_sqlsource.lexer import Lexeme, LexemeKind
 from sqlfluff_templater_sqlsource.markers import read_marker
-from sqlfluff_templater_sqlsource.text import find_line_end
+from sqlfluff_templater_sqlsource.rules import DialectRules
 
 
 @dataclass(frozen=True)
@@ -63,12 +63,13 @@ class BlockText:
         return bisect.bisect_right(self.runs, offset, key=lambda run: run[key]) - 1
 
 
-def build(text: str, lexemes: list[Lexeme], start: int, end: int) -> BlockText:
-    """Builds the SQL of the lexemes from `start` up to `end`, without its comments."""
+def build(text: str, rules: DialectRules, lexemes: list[Lexeme], start: int, end: int) -> BlockText:
+    """Builds the SQL of the lexemes from `start` up to `end`, without its comments.  `rules` read them: they say
+    what ends a line."""
     if start >= end:
         return BlockText("", (), ())
 
-    writer = _Writer(text, lexemes[end - 1].end - lexemes[start].start)
+    writer = _Writer(text, rules, lexemes[end - 1].end - lexemes[start].start)
     for index in range(start, end):
         writer.append(lexemes[index])
     return writer.finish()
@@ -79,8 +80,9 @@ class _Writer:
     being written.  A line is judged when it ends: kept with its trailing blanks trimmed, or dropped by moving back to
     the end of the finished output."""
 
-    def __init__(self, source: str, size: int) -> None:
+    def __init__(self, source: str, rules: DialectRules, size: int) -> None:
         self._source = source
+        self._rules = rules
         # The output is never longer than its source: each character written stands for a different character read.
         self._buffer = [""] * size
         self._runs: list[tuple[int, int]] = []
@@ -97,7 +99,7 @@ class _Writer:
     def append(self, lexeme: Lexeme) -> None:
         if lexeme.kind in (LexemeKind.QUOTED, LexemeKind.HINT):
             self._append_protected(lexeme)
-        elif read_marker(self._source, lexeme) is not None:
+        elif read_marker(self._source, lexeme, self._rules) is not None:
             self._is_marker_line = True
         elif lexeme.kind == LexemeKind.PARAMETER:
             # A parameter is on a line with content and never on a marker's line, so the line is kept and the offset
@@ -115,11 +117,12 @@ class _Writer:
         self._end_line()
         return BlockText("".join(self._buffer[: self._finished]), tuple(self._runs), tuple(self._parameters))
 
-    # Text: a line terminator ends the output line.
+    # Text: a line terminator ends the output line.  A carriage return that ends no line in the dialect is copied as
+    # written, so that a kept comment never ends early.
     def _append_lines(self, lexeme: Lexeme) -> None:
         index = lexeme.start
         while index < lexeme.end:
-            line_end = find_line_end(self._source, index, lexeme.end)
+            line_end = self._rules.find_line_end(self._source, index, lexeme.end)
             self._copy(index, line_end)
             self._extend_content(index, line_end)
             if line_end < lexeme.end:
@@ -132,7 +135,7 @@ class _Writer:
     def _append_protected(self, lexeme: Lexeme) -> None:
         index = lexeme.start
         while index < lexeme.end:
-            line_end = find_line_end(self._source, index, lexeme.end)
+            line_end = self._rules.find_line_end(self._source, index, lexeme.end)
             self._copy(index, line_end)
             if line_end < lexeme.end:
                 self._write("\n", line_end)

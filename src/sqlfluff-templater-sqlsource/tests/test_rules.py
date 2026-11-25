@@ -64,3 +64,70 @@ def test_is_space_is_white_space_and_the_zero_width_space_outside_names(value, s
 @pytest.mark.parametrize("dialect", list(Dialect))
 def test_only_sql_server_declares_variables(dialect):
     assert DialectRules.for_choice(DialectChoice(dialect)).declared_variables == (dialect == Dialect.SQL_SERVER)
+
+
+@pytest.mark.parametrize(
+    ("dialect", "expected"),
+    [
+        (Dialect.ANSI, True),
+        (Dialect.SQL_SERVER, True),
+        (Dialect.POSTGRESQL, True),
+        (Dialect.MYSQL, False),
+        (Dialect.MARIADB, False),
+        (Dialect.SQLITE, False),
+        (Dialect.ORACLE, True),
+        (Dialect.COCKROACHDB, False),
+    ],
+)
+def test_carriage_return_ends_a_line_where_the_dialect_says(dialect, expected):
+    rules = DialectRules.for_choice(DialectChoice(dialect))
+
+    assert rules.carriage_return_ends_line == expected
+    assert rules.is_line_terminator("\r") == expected
+    assert rules.is_line_terminator("\n")
+    assert not rules.is_line_terminator(" ")
+
+
+# The cases of `FindLineEnd_Range_GivesWhereItsFirstLineEnds`.
+@pytest.mark.parametrize(
+    ("dialect", "text", "start", "end", "at"),
+    [
+        (Dialect.ANSI, "ab\rc\nd", 0, 6, 2),
+        (Dialect.MYSQL, "ab\rc\nd", 0, 6, 4),
+        (Dialect.MYSQL, "ab\r\nd", 0, 5, 2),
+        (Dialect.MYSQL, "a\r\r\nd", 0, 5, 2),
+        (Dialect.MYSQL, "\r\nd", 1, 3, 1),
+        (Dialect.MYSQL, "ab\rc", 0, 4, 4),
+        (Dialect.MYSQL, "ab\nc", 0, 2, 2),
+        (Dialect.MYSQL, "a\nb\nc", 2, 5, 3),
+    ],
+)
+def test_find_line_end_gives_where_the_first_line_ends(dialect, text, start, end, at):
+    assert DialectRules.for_choice(DialectChoice(dialect)).find_line_end(text, start, end) == at
+
+
+# Rows of `Lex_VersionedComment_IsReadAsTheServerReadsIt`: where the body of a versioned comment starts when the
+# server runs it, or None.
+@pytest.mark.parametrize(
+    ("dialect", "version", "text", "body"),
+    [
+        (Dialect.MYSQL, 0, "/*! x */", 3),
+        (Dialect.MYSQL, 0, "/*!1234 x */", 3),
+        (Dialect.MYSQL, 0, "/*!50700 x */", None),
+        (Dialect.MYSQL, 80400, "/*!50700 x */", 8),
+        (Dialect.MYSQL, 80400, "/*!100100\tx */", None),
+        (Dialect.MYSQL, 80400, "/*!100100\nx */", None),
+        (Dialect.MYSQL, 80400, "/*!100100, x */", 8),
+        (Dialect.MYSQL, 80400, "/*!080400 x */", 9),
+        (Dialect.MYSQL, 80400, "/*M!50700 x */", None),
+        (Dialect.MARIADB, 110400, "/*!50700 x */", None),
+        (Dialect.MARIADB, 110400, "/*!50699 x */", 8),
+        (Dialect.MARIADB, 110400, "/*M!50700 x */", 9),
+        (Dialect.MARIADB, 110400, "/*!100100, x */", 9),
+        (Dialect.MARIADB, 110400, "/*!5060000 x */", None),
+    ],
+)
+def test_runs_versioned_comment_reads_the_version_as_the_server_does(dialect, version, text, body):
+    rules = DialectRules.for_choice(DialectChoice(dialect, server_version=version))
+
+    assert rules.runs_versioned_comment(text, 0) == body

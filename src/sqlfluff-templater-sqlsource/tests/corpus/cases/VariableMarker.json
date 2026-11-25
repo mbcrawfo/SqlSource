@@ -1,0 +1,39 @@
+{
+  "fileName": "VariableMarker.sql",
+  "settings": [],
+  "input": "-- dialect: mysql\n-- name: A\n-- variable: @n\nSET @n := 1;\nSELECT {{t:users}} WHERE id IN @ids AND x = @n AND y IN @n\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 17],
+      ["Text", 17, 18],
+      ["LineComment", 18, 28],
+      ["Text", 28, 29],
+      ["LineComment", 29, 44],
+      ["Text", 44, 49],
+      ["Parameter", 49, 51],
+      ["Text", 51, 89],
+      ["Parameter", 89, 93],
+      ["Text", 93, 102],
+      ["Parameter", 102, 104],
+      ["Text", 104, 114],
+      ["Parameter", 114, 116],
+      ["Text", 116, 117]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 17, "name": null, "default": null },
+      { "kind": "markerComment", "start": 18, "end": 28, "name": null, "default": null },
+      { "kind": "markerComment", "start": 29, "end": 44, "name": null, "default": null },
+      { "kind": "parameter", "start": 49, "end": 51, "name": "n", "default": null },
+      { "kind": "token", "start": 65, "end": 76, "name": "t", "default": "users" },
+      { "kind": "list", "start": 89, "end": 93, "name": "ids", "default": null },
+      { "kind": "parameter", "start": 102, "end": 104, "name": "n", "default": null },
+      { "kind": "list", "start": 114, "end": 116, "name": "n", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

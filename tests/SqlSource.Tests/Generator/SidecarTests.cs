@@ -411,6 +411,30 @@ public sealed class SidecarTests
         UsableEntries(run).ShouldBeEmpty();
     }
 
+    // A -- variable: marker takes a name out of the parameters, so an entry written before it was added, or before it
+    // was removed, is stale: the parameters it describes are not the query's.
+    [Theory]
+    [InlineData(
+        "-- name: GetUser\nSELECT 1 WHERE @author = 1;\n",
+        "-- name: GetUser\n-- variable: @author\nSELECT 1 WHERE @author = 1;\n"
+    )]
+    [InlineData(
+        "-- name: GetUser\n-- variable: @author\nSELECT 1 WHERE @author = 1;\n",
+        "-- name: GetUser\nSELECT 1 WHERE @author = 1;\n"
+    )]
+    public void Run_EntryOfTheQueryBeforeAVariableMarkerChanged_IsSqlsrc244(string described, string now)
+    {
+        var before = new SqlFile(GeneratorHarness.UsersPath, described);
+        var after = new SqlFile(GeneratorHarness.UsersPath, now);
+
+        var run = Run(OutputKind.Models, after, Sidecars.Of(after, CurrentEntry(before, "GetUser")));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC244 {GetUserName}: The query 'GetUser' has changed since its entry was written.  Run 'sqlsource "
+                + "describe'.",
+        ]);
+    }
+
     [Fact]
     public void Run_OrphanEntry_IsAWarningAtItsKey()
     {
