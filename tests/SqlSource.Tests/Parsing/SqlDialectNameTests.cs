@@ -61,6 +61,29 @@ public sealed class SqlDialectNameTests
         choice.Options.ToString().ShouldBe(options);
     }
 
+    // The version of a MySQL or MariaDB server, as a versioned comment writes it.
+    [Theory]
+    [InlineData("mysql,version=8.0.36", "MySql", "None", 80036)]
+    [InlineData("mariadb, version = 10.11.6 ", "MariaDb", "None", 101106)]
+    [InlineData("MySQL,VERSION=8.4.0,ansi-quotes", "MySql", "AnsiQuotes", 80400)]
+    [InlineData("mysql,ansi_quotes,version=5.7.44,Version=5.7.44", "MySql", "AnsiQuotes", 50744)]
+    [InlineData("mysql,version=08.04.00", "MySql", "None", 80400)]
+    [InlineData("mariadb,version=11.4.10", "MariaDb", "None", 110410)]
+    [InlineData("mysql", "MySql", "None", 0)]
+    public void TryParse_NameWithAVersion_GivesTheVersionOfItsServer(
+        string value,
+        string dialect,
+        string options,
+        int version
+    )
+    {
+        SqlDialectName.TryParse(value, out var choice).ShouldBeTrue();
+
+        choice.Dialect.ToString().ShouldBe(dialect);
+        choice.Options.ToString().ShouldBe(options);
+        choice.ServerVersion.ShouldBe(version);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -91,6 +114,24 @@ public sealed class SqlDialectNameTests
     [InlineData("crdb")]
     [InlineData("ansi-quotes")]
     [InlineData("ansi-quotes,mysql")]
+    // A version that is not one: of another dialect, without three numbers of one or two digits, of major 0, two
+    // versions, or a word that is not version.
+    [InlineData("postgres,version=16.1.0")]
+    [InlineData("ansi,version=8.0.36")]
+    [InlineData("mysql,version=8.0")]
+    [InlineData("mysql,version=8")]
+    [InlineData("mysql,version=8.0.36.1")]
+    [InlineData("mysql,version=8.0.100")]
+    [InlineData("mysql,version=0.1.2")]
+    [InlineData("mysql,version=")]
+    [InlineData("mysql,version")]
+    [InlineData("mysql,version=8.0.x")]
+    [InlineData("mysql,version=8 .0.36")]
+    [InlineData("mysql,version=8.0.36 x")]
+    [InlineData("mysql,version 8.0.36")]
+    [InlineData("mysql,versions=8.0.36")]
+    [InlineData("mysql,version=٨.0.36")]
+    [InlineData("mysql,version=8.0.36,version=8.4.0")]
     // Another separator.
     [InlineData("mysql;ansi-quotes")]
     [InlineData("mysql ansi-quotes")]

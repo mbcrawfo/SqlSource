@@ -479,8 +479,9 @@ public sealed class SqlLexerTests
     // The second part of a continued string is not closed.  The error is at the quote of that part.
     [InlineData(nameof(SqlDialect.PostgreSql), "E'a'\n'b\\'", 5)]
     [InlineData(nameof(SqlDialect.PostgreSql), "E'a' -- c\n'b\\'c'\n  'd\\'", 19)]
-    // A reading that differs from the database, which docs/tech-debt/TD-0004 lists.  A MySQL comment for a version
-    // ends at the first */, inside a string of its body too, so the quote after it opens a string.
+    // A reading that differs from the database, which docs/tech-debt/TD-0004 lists.  A MySQL comment for a version,
+    // under rules that do not know the server's version, ends at the first */, inside a string of its body too, so the
+    // quote after it opens a string.
     [InlineData(nameof(SqlDialect.MySql), "/*!50700 '*/' */", 12)]
     // PostgreSQL has no backslash escape in b'...'.  CockroachDB has one, under its own dialect.
     [InlineData(nameof(SqlDialect.PostgreSql), "b'\\''", 1)]

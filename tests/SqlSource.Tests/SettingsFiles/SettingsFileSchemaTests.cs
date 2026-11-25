@@ -306,7 +306,12 @@ public sealed class SettingsFileSchemaTests
         var withOptions = SqlDialectName
             .Names.Where(name => SqlDialectName.OptionsOf(name.Dialect) != SqlDialectOptions.None)
             .Select(name => CaseFree(name.Name));
-        var options = SqlDialectName.Options.Select(option => CaseFree(option.Name));
+        // The server's version, which TryParse reads as three numbers of one or two ASCII digits, the major not zero.
+        var version = CaseFree(SqlDialectName.VersionOption) + @"\s*=\s*(?:0?[1-9]|[1-9][0-9])\.[0-9]{1,2}\.[0-9]{1,2}";
+        SqlDialectName
+            .Names.Where(name => SqlDialectName.TakesVersion(name.Dialect))
+            .ShouldAllBe(name => SqlDialectName.OptionsOf(name.Dialect) == everyOption);
+        var options = SqlDialectName.Options.Select(option => CaseFree(option.Name)).Append(version);
         var expected =
             @"^\s*(?:(?:"
             + string.Join("|", withoutOptions)

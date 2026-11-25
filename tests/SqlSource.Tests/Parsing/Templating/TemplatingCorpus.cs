@@ -245,6 +245,8 @@ internal static class TemplatingCorpus
                 _ = line.Append(", ").Append(((int)entry.Option).ToString(CultureInfo.InvariantCulture)).Append(']');
             }
         );
+        _ = json.Append(",\n  \"versionOption\": ");
+        AppendString(json, SqlDialectName.VersionOption);
         return json.Append("\n}\n").ToString();
     }
 

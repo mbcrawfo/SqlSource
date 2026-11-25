@@ -120,7 +120,10 @@ SELECT * FROM orders WHERE id > @last - 10;
 
 A `-- variable:` marker inside a query says that a name is a variable of the query, and not a query parameter.  The only query parameter of this query is `@customer`.  `@last` is a user variable that the SQL sets.
 
-- **The marker names one variable as the SQL writes it**: `@` and a name, and nothing after it.  Anything else, `-- variable: @a, @b` included, is [SQLSRC111](../diagnostics.md#sqlsrc111).  Write one marker for each variable.
+- **The marker names variables as the SQL writes them**: `@` and a name, separated by commas, as in `-- variable: @a, @b`.  Anything else is [SQLSRC111](../diagnostics.md#sqlsrc111), and the marker then names none of them.
+- **A query can have several markers.**  A name given twice, in one marker or two, in any spelling, counts once.
+- **A name that the query does not write is the warning [SQLSRC129](../diagnostics.md#sqlsrc129).**  Its spelling is likely wrong.  A name counts as written in the query's SQL, a token's default included, and in the default of a `-- token:` marker of one of its tokens.
+- **A name that a `-- param:` marker of the query declares too is [SQLSRC128](../diagnostics.md#sqlsrc128).**  A name is a variable or a query parameter, not both.
 - **The name is not a query parameter wherever the query writes it**, in any spelling, and in a token's default too.  So the query's input model has no property for it, and its method sends no value for it.
 - **It works under every dialect.**  Use it for a user variable of MySQL or MariaDB, and for the parameter of a procedure that the SQL creates.
 - **The marker goes inside a query, under its `-- name:` line.**  In the file header it is [SQLSRC116](../diagnostics.md#sqlsrc116).

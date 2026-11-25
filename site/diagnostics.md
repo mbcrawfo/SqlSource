@@ -439,10 +439,11 @@ The values that each key takes follow.
 - `postgresql` also means `postgres`.
 - `cockroach` also means `cockroachdb`.
 
-After `mysql` or `mariadb`, the value can name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  Each of these makes the whole value wrong:
+After `mysql` or `mariadb`, the value can name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`, and the server's version, `version=` and three numbers of one or two digits, as in `"mysql,version=8.0.36"`.  Each of these makes the whole value wrong:
 
 - an option that does not exist;
 - an option after any other dialect;
+- a version that is not three such numbers, such as `version=8.0`, or two different versions;
 - a comma with nothing before it or after it.
 
 These keys take one value from a list.  The value matches in any case, and with or without hyphens and spaces:
@@ -1496,7 +1497,7 @@ A `-- token:` marker holds exactly one token with a default, `{{name:default}}`,
 
 A `-- param:` marker starts with the query parameter as the SQL writes it, `@name`.  The parameter stands alone, or a space or `->` follows it.  What follows its `->` is a C# type, written as the type of a type override is.  It is never `default`, since nothing below a query maps a parameter: `-- param: @author -> default` is this error.
 
-A `-- variable:` marker holds one variable as the SQL writes it, `@name`, and nothing else: `-- variable: @a, @b` is this error.
+A `-- variable:` marker holds one variable or more as the SQL writes them, `@name`, separated by commas: `-- variable: @a, @b`.  Anything else is this error: `-- variable: a`, `-- variable: @a @b` and `-- variable: @a,` are.
 
 Inside a query, a `-- column:` marker holds the name of a column, then one of these, or both in this order:
 
@@ -2183,6 +2184,67 @@ FROM tested;
 - **Under the outputs `models` and `sql` it is no error**, since your own code sends the list.
 
 See: [List parameters](reference/list-parameters.md#list-parameters)
+
+## SQLSRC128
+
+**Variable is declared as a parameter**
+
+Reported by: the build and the tool.
+
+A name that a `-- variable:` marker gives is declared by a `-- param:` marker of the same query.  The error is at the name in the `-- variable:` marker.
+
+The `-- variable:` marker says that the name is no query parameter, and the `-- param:` marker says that it is one.
+
+```sql error
+-- name: GetOrders
+-- variable: @last
+-- param: @last int
+SET @last = (SELECT MAX(id) FROM orders);
+SELECT * FROM orders WHERE id = @last;
+```
+
+**Fix:** do one of these.
+
+- Remove the name from the `-- variable:` marker, if it is a query parameter.
+- Remove the `-- param:` marker, if it is a variable.
+
+See: [Variables the SQL sets](reference/parameters.md#variable-marker)
+
+## SQLSRC129
+
+**Variable is not written in its query**
+
+Reported by: the build.
+
+A name that a `-- variable:` marker gives is not written anywhere in its query: not in its SQL, a token's default included, and not in the default of a `-- token:` marker of one of its tokens.  A comment or a string that holds the name does not count.  The warning is at the name in the marker.
+
+```sql error
+-- name: GetOrders
+-- variable: @lastId
+SET @last = (SELECT MAX(id) FROM orders);
+SELECT * FROM orders WHERE id = @last;
+```
+
+```console
+/work/App/Queries/Orders.sql(2,14): warning SQLSRC129: '@lastId' is named by a '-- variable:' marker, and the query does not write it.  Correct its spelling, or remove it from the marker.
+```
+
+The name usually has a typing error, as `@lastId` has above.  The name the query writes, `@last`, is then read as a query parameter.
+
+**Fix:** do one of these.
+
+- Correct the spelling of the name in the marker.
+- Remove the name from the marker.
+
+A project can list it in `NoWarn` to turn it off:
+
+```xml
+<PropertyGroup>
+    <NoWarn>$(NoWarn);SQLSRC129</NoWarn>
+</PropertyGroup>
+```
+
+See: [Variables the SQL sets](reference/parameters.md#variable-marker)
 
 ## SQLSRC200
 

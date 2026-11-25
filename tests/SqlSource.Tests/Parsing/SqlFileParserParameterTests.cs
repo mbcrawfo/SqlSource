@@ -219,10 +219,15 @@ public sealed class SqlFileParserParameterTests
     [InlineData("@")]
     [InlineData("@ n")]
     [InlineData("@n int")]
-    [InlineData("@n,@m")]
+    [InlineData("@n @m")]
+    [InlineData("@n,")]
+    [InlineData("@n,,@m")]
+    [InlineData(",@n")]
+    [InlineData("@n;@m")]
+    [InlineData("@n, m")]
     [InlineData("@n -- c")]
     [InlineData("@@n")]
-    public void Parse_VariableMarkerThatIsNotOnePrefixedName_IsInvalid(string value)
+    public void Parse_VariableMarkerWithAnItemThatIsNotOnePrefixedName_IsInvalid(string value)
     {
         var text = "-- name: Q\n-- variable: " + value + "\nSELECT @n\n";
 
@@ -235,6 +240,70 @@ public sealed class SqlFileParserParameterTests
                     ""
                 ),
             ]);
+    }
+
+    [Theory]
+    [InlineData("-- variable: @a, @b")]
+    [InlineData("-- variable:@a,@b")]
+    [InlineData("-- variable:  @a ,\t@b  ")]
+    [InlineData("-- variable: @a\n-- variable: @b")]
+    public void Parse_VariableMarkerWithAList_NamesEachVariable(string markers)
+    {
+        var block = Blocks("-- name: Q\n" + markers + "\nSET @a = @b + @c;\n").ShouldHaveSingleItem();
+
+        Parameters(block).ShouldBe(["c:<none>:<unsaid>"]);
+        block.DeclaredVariables.ShouldBe(["a", "b"]);
+    }
+
+    // A name given twice, in one marker or in two, in any spelling, changes nothing and is reported nothing.
+    [Theory]
+    [InlineData("-- variable: @a, @a")]
+    [InlineData("-- variable: @a\n-- variable: @A")]
+    public void Parse_VariableGivenTwice_IsNotReported(string markers)
+    {
+        var text = "-- name: Q\n" + markers + "\nSET @a = 1;\n";
+
+        Warnings(text).ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("-- variable: @n\n-- param: @N int")]
+    [InlineData("-- param: @n int\n-- variable: @m, @n")]
+    public void Parse_VariableThatAParamMarkerDeclares_IsSqlsrc128(string markers)
+    {
+        var text = "-- name: Q\n" + markers + "\nSELECT @n, @m\n";
+        var at = text.IndexOf("@n", text.IndexOf("variable:", StringComparison.Ordinal), StringComparison.Ordinal);
+
+        Errors(text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.VariableDeclaredAsParameter, new TextSpan(at, 2), "@n")]);
+    }
+
+    [Fact]
+    public void Parse_VariableThatTheQueryDoesNotWrite_IsTheWarningSqlsrc129()
+    {
+        const string Text = "-- name: Q\n-- variable: @n, @Missing\nSELECT @n\n";
+
+        Warnings(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.VariableNotWritten, TextSpans.Of(Text, "@Missing"), "@Missing"),
+            ]);
+    }
+
+    // A variable is written where the query writes it in any spelling: in its SQL, an inline default included, or in
+    // the default of a -- token: marker of one of its tokens.  A comment, and a marker's default of another token, are
+    // no place it is written.
+    [Theory]
+    [InlineData("SELECT @N\n", true)]
+    [InlineData("SELECT {{f:LIMIT @n}}\n", true)]
+    [InlineData("-- token: {{g:LIMIT @n}}\nSELECT {{g}}\n", true)]
+    [InlineData("-- token: {{g:LIMIT @n}}\nSELECT 1\n", false)]
+    [InlineData("SELECT 1 -- @n\n", false)]
+    [InlineData("SELECT '@n'\n", false)]
+    public void Parse_VariableWrittenSomewhere_IsNotWarned(string rest, bool written)
+    {
+        var text = "-- name: Q\n-- variable: @n\n" + rest;
+
+        Warnings(text).Length.ShouldBe(written ? 0 : 1);
     }
 
     [Fact]

@@ -1,0 +1,32 @@
+{
+  "fileName": "MariaDbVersionedComment.sql",
+  "settings": [],
+  "input": "-- dialect: mariadb, version=11.4.2\n-- name: A\nSELECT 1 /*!50700 a */ /*M!50700 , '*/' */ /*!100100 , '*/' */ FROM t WHERE id = @id\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mariadb",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 35],
+      ["Text", 35, 36],
+      ["LineComment", 36, 46],
+      ["Text", 46, 56],
+      ["Hint", 56, 69],
+      ["Text", 69, 70],
+      ["Hint", 70, 89],
+      ["Text", 89, 90],
+      ["Hint", 90, 109],
+      ["Text", 109, 128],
+      ["Parameter", 128, 131],
+      ["Text", 131, 132]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 35, "name": null, "default": null },
+      { "kind": "markerComment", "start": 36, "end": 46, "name": null, "default": null },
+      { "kind": "parameter", "start": 128, "end": 131, "name": "id", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

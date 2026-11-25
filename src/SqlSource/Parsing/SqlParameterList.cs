@@ -132,6 +132,112 @@ internal static class SqlParameterList
             : new EquatableArray<SqlQueryParameter>(parameters.ToImmutable());
     }
 
+    /// <summary>
+    /// Reports each name of <paramref name="marked" />, the names of the query's <c>-- variable:</c> markers, that a
+    /// <c>-- param:</c> marker of the query declares, and warns of each that the query writes nowhere: not in its SQL,
+    /// an inline default included, nor in the default of a <c>-- token:</c> marker of one of its tokens.  A name given
+    /// twice is checked once, at its first place.
+    /// </summary>
+    public static void CheckVariables(
+        SqlDialectRules rules,
+        string text,
+        SqlScannedQuery query,
+        IReadOnlyList<SqlTokenDefault> markerDefaults,
+        IReadOnlyList<TextSpan> marked,
+        IReadOnlyList<SqlParameterDeclaration> declarations,
+        List<SqlParseError> errors,
+        List<SqlParseError> warnings
+    )
+    {
+        for (var position = 0; position < marked.Count; position++)
+        {
+            var span = marked[position];
+            var name = text.AsSpan(span.Start, span.Length);
+            if (GivenBefore(text, marked, position, name))
+            {
+                continue;
+            }
+
+            var place = new TextSpan(span.Start - 1, span.Length + 1);
+            var written = text.Substring(place.Start, place.Length);
+            if (IsDeclared(declarations, name))
+            {
+                errors.Add(SqlParseError.Create(SqlParseErrorKind.VariableDeclaredAsParameter, place, written));
+            }
+            else if (!IsWritten(rules, query, markerDefaults, name))
+            {
+                warnings.Add(SqlParseError.Create(SqlParseErrorKind.VariableNotWritten, place, written));
+            }
+        }
+    }
+
+    private static bool GivenBefore(string text, IReadOnlyList<TextSpan> marked, int position, ReadOnlySpan<char> name)
+    {
+        for (var earlier = 0; earlier < position; earlier++)
+        {
+            if (name.Equals(text.AsSpan(marked[earlier].Start, marked[earlier].Length), SqlParameterName.Comparison))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsDeclared(IReadOnlyList<SqlParameterDeclaration> declarations, ReadOnlySpan<char> name)
+    {
+        for (var index = 0; index < declarations.Count; index++)
+        {
+            if (name.Equals(declarations[index].Name.AsSpan(), SqlParameterName.Comparison))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsWritten(
+        SqlDialectRules rules,
+        SqlScannedQuery query,
+        IReadOnlyList<SqlTokenDefault> markerDefaults,
+        ReadOnlySpan<char> name
+    )
+    {
+        var sql = query.Sql;
+        foreach (var span in sql.Parameters)
+        {
+            var parameter = SqlParameterName.Of(span);
+            if (name.Equals(sql.Text.AsSpan(parameter.Start, parameter.Length), SqlParameterName.Comparison))
+            {
+                return true;
+            }
+        }
+
+        for (var position = 0; position < markerDefaults.Count; position++)
+        {
+            var marker = markerDefaults[position];
+            if (!Holds(query.Tokens, marker.Name))
+            {
+                continue;
+            }
+
+            foreach (var lexeme in SqlLexer.Lex(marker.Text, rules).Lexemes)
+            {
+                var parameter = lexeme.ParameterName;
+                if (
+                    lexeme.Kind == SqlLexemeKind.Parameter
+                    && name.Equals(marker.Text.AsSpan(parameter.Start, parameter.Length), SqlParameterName.Comparison)
+                )
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     // A list is a parameter that has a list use.  Its other uses must be list uses or null tests, and each other use is
     // reported where it is written.
     private static void MarkLists(

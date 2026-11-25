@@ -597,25 +597,38 @@ internal sealed class SqlMarkerScope(
         _ = _ignoredTokens.Add(name);
     }
 
-    // "@name", one name as the SQL writes it, and nothing after it.
+    // "@a, @b": names as the SQL writes them, separated by commas, with white space around each and nothing else.  A
+    // marker with one item that is not a name is not applied.
     private void ReadVariable(SqlMarker marker)
     {
-        var start = marker.ValueSpan.Start;
         var end = marker.ValueSpan.End;
-        if (start == end || text[start] != rules.ParameterPrefix)
+        var itemStart = marker.ValueSpan.Start;
+        var count = _variables?.Count ?? 0;
+        while (true)
         {
-            AddInvalid(marker);
-            return;
-        }
+            var comma = text.IndexOf(',', itemStart, end - itemStart);
+            var item = SqlText.Trim(text, itemStart, comma < 0 ? end : comma);
+            var nameEnd = item.IsEmpty ? item.Start : rules.FindParameterNameEnd(text, item.Start + 1, item.End);
+            if (
+                item.IsEmpty
+                || text[item.Start] != rules.ParameterPrefix
+                || nameEnd == item.Start + 1
+                || nameEnd != item.End
+            )
+            {
+                _variables?.RemoveRange(count, _variables.Count - count);
+                AddInvalid(marker);
+                return;
+            }
 
-        var nameEnd = rules.FindParameterNameEnd(text, start + 1, end);
-        if (nameEnd == start + 1 || nameEnd != end)
-        {
-            AddInvalid(marker);
-            return;
-        }
+            (_variables ??= []).Add(TextSpan.FromBounds(item.Start + 1, nameEnd));
+            if (comma < 0)
+            {
+                return;
+            }
 
-        (_variables ??= []).Add(TextSpan.FromBounds(start + 1, nameEnd));
+            itemStart = comma + 1;
+        }
     }
 
     // "@name [type] [null | not null] [-> [json] CSharpType]", the name ended by white space or by the arrow.  The

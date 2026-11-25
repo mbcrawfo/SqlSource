@@ -69,6 +69,10 @@ OPTIONS: tuple[tuple[str, DialectOptions], ...] = (
 )
 
 
+# The word of the option that gives the server's version, before its `=`: `version=8.0.36`.
+VERSION_OPTION = "version"
+
+
 def canonical_name(dialect: Dialect) -> str:
     """The name that stands for `dialect` wherever one name is needed: its first in the list."""
     return next(name for name, candidate in NAMES if candidate == dialect)
@@ -105,12 +109,43 @@ def parse_dialect_name(value: str) -> DialectChoice | None:
 
     allowed = options_of(found)
     options = DialectOptions.NONE
+    server_version = 0
     for part in parts:
+        version = _read_version(part)
+        if version is not None:
+            # The same version twice counts once, as an option does; two versions are no server.
+            if found not in (Dialect.MYSQL, Dialect.MARIADB) or server_version not in (0, version):
+                return None
+            server_version = version
+            continue
         option = _find(part, OPTIONS)
         if option is None or not option & allowed:
             return None
         options |= option
-    return DialectChoice(found, options)
+    return DialectChoice(found, options, server_version)
+
+
+# "version=M.m.p", the word ignoring case and white space around the =, each number one or two ASCII digits and the
+# major not zero, as a versioned comment writes it: M * 10000 + m * 100 + p.
+def _read_version(part: str) -> int | None:
+    start, end = trim(part, 0, len(part))
+    trimmed = part[start:end]
+    word = len(VERSION_OPTION)
+    if len(trimmed) <= word or not equals_ascii_ignoring_case(trimmed[:word], VERSION_OPTION):
+        return None
+    rest = trimmed[word:]
+    start, _ = trim(rest, 0, len(rest))
+    if start >= len(rest) or rest[start] != "=":
+        return None
+    rest = rest[start + 1 :]
+    start, _ = trim(rest, 0, len(rest))
+    numbers = rest[start:].split(".")
+    if len(numbers) != 3 or not all(
+        0 < len(number) <= 2 and all("0" <= c <= "9" for c in number) for number in numbers
+    ):
+        return None
+    version = int(numbers[0]) * 10000 + int(numbers[1]) * 100 + int(numbers[2])
+    return version if version >= 10000 else None
 
 
 _T = TypeVar("_T")

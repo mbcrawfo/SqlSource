@@ -44,7 +44,7 @@ The plan is exact for a file that SqlSource accepts.  A file with another error,
 | `markers` | `Parsing/Markers/SqlMarker.cs`, `SqlMarkerKind.cs` and `SqlMarkerReader.cs`, and the `PlaceOf` of `SqlFileParser` |
 | `dialect_marker` | `Parsing/SqlDialectMarker.cs`, and where `SqlFileParser.InvalidDialect` places its error |
 | `identifiers` | `SqlIdentifier.cs`, and the methods of Roslyn's `SyntaxFacts` that it and the token scanner call |
-| `marker_scope` | The `-- token:` and `-- token-ignore:` parts of `Parsing/Markers/SqlMarkerScope.cs` |
+| `marker_scope` | The `-- token:` and `-- token-ignore:` parts of `Parsing/Markers/SqlMarkerScope.cs`, and which markers each scope allows |
 | `text_builder` | `Parsing/SqlTextBuilder.cs` and `SqlBlockText.cs`, without the kept form |
 | `tokens` | The files of `Parsing/Tokens/` that find tokens and resolve defaults, without the segments |
 | `list_uses` | Whether `Parsing/SqlListUses.cs` gives a use as a list |

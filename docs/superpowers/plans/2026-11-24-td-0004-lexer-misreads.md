@@ -52,7 +52,7 @@ These decide the rules; the code comments cite them, not this plan.
 
 ### Task 2: Server version option and versioned comments (fix 1), C#
 
-Shape per the owner's answer to Q2 (recommended: `mysql,version=8.0.36`, the full `major.minor.patch`).
+The owner chose `mysql,version=8.0.36`, the full `major.minor.patch`, with an unnumbered `/*!` read as SQL without the option and MariaDB's `/*!` 50700 to 99999 never run.
 
 **Files:**
 - Modify: `src/SqlSource/Parsing/SqlDialectChoice.cs` (add `int ServerVersion`, 0 for none, as `major * 10000 + minor * 100 + patch`), `SqlDialectName.cs` (parse and name the option; `Accepted` is unchanged), `SqlDialectRules.cs` (`For` caches the rules of a version; `VersionedComments` rule: `None`, `MySql`, `MariaDb`; `ServerVersion`), `SqlLexer.cs` (`ReadBlockComment` of a `/*!` or `/*M!` that runs reads its body as SQL)
@@ -68,7 +68,7 @@ Shape per the owner's answer to Q2 (recommended: `mysql,version=8.0.36`, the ful
 
 ### Task 3: The `-- variable:` marker (fix 4), C#
 
-Shape per the owner's answer to Q1 (recommended: `-- variable: @n`, one name, inside a query only).
+The owner chose a list, `-- variable: @a, @b`, inside a query only.  A name a `-- param:` of the query declares is `SQLSRC128`, one the query never writes the warning `SQLSRC129`, and a name given twice counts once.
 
 **Files:**
 - Modify: `Markers/SqlMarkerKind.cs` (`Variable`), `Markers/SqlMarkerReader.cs` (`variable:`), `Markers/SqlMarkerScope.cs` (read it, `IsAllowedInQuery`), `SqlParameterList.cs` (leave the names out where `variables` are), `SqlFileParser.cs`, `src/SqlSource/Diagnostics/SqlDiagnostics.cs` and `site/diagnostics.md` for any new diagnostic
