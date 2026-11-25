@@ -6,8 +6,8 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer.Proofs;
 
-// The reader of an INSERT or an UPDATE with OUTPUT: its items, its FROM and WHERE, its target and its SET, or null for
-// any text that is not one it can follow.
+// The reader of an INSERT, an UPDATE or a DELETE with OUTPUT: its items, its FROM and WHERE, its target and its SET, or
+// null for any text that is not one it can follow.
 public sealed class OutputStatementTests
 {
     // The query of the realistic case update-orders-from-join-output.
@@ -147,6 +147,63 @@ public sealed class OutputStatementTests
     }
 
     [Fact]
+    public void Read_DeleteWithFrom_GivesItemsFromWhere()
+    {
+        var (tokens, statement) = ReadOne(
+            "DELETE o OUTPUT deleted.id FROM dbo.orders AS o JOIN dbo.customers AS c ON c.id = o.customer_id "
+                + "WHERE o.shipped_at < @x"
+        );
+
+        statement.Kind.ShouldBe(OutputKind.Delete);
+        statement.Rows.Items.ShouldHaveSingleItem().Name.ShouldBe("id");
+        statement.Target.ShouldBe("o");
+        statement.TargetIsAlias.ShouldBeTrue();
+        statement.Assignments.ShouldNotBeNull().ShouldBeEmpty();
+        statement.Writes("shipped_at").ShouldBeFalse();
+        Text(tokens, statement.Rows.From.ShouldNotBeNull())
+            .ShouldBe("FROM dbo . orders AS o JOIN dbo . customers AS c ON c . id = o . customer_id");
+        Text(tokens, statement.Rows.Where.ShouldNotBeNull()).ShouldBe("WHERE o . shipped_at < @x");
+        var rows = statement.Rows.FromThroughWhere.ShouldNotBeNull();
+        tokens[rows.Start].Text.ShouldBe("FROM");
+        tokens[rows.End - 1].Text.ShouldBe("@x");
+        statement.Rows.HasFrom.ShouldBeTrue();
+        statement.IsTargetColumn(tokens, ["o", "shipped_at"], "shipped_at").ShouldBeTrue();
+        statement.IsTargetColumn(tokens, ["shipped_at"], "shipped_at").ShouldBeFalse();
+    }
+
+    // The first FROM of a DELETE is optional, and comes before its target.
+    [Theory]
+    [InlineData("DELETE FROM dbo.orders OUTPUT deleted.id WHERE id = @id")]
+    [InlineData("DELETE dbo.orders OUTPUT deleted.id WHERE id = @id")]
+    public void Read_DeleteWithoutFrom_TargetIsTheTable(string sql)
+    {
+        var (tokens, statement) = ReadOne(sql);
+
+        statement.Kind.ShouldBe(OutputKind.Delete);
+        statement.Target.ShouldBe("orders");
+        statement.TargetIsAlias.ShouldBeFalse();
+        statement.Assignments.ShouldNotBeNull().ShouldBeEmpty();
+        statement.Rows.FromThroughWhere.ShouldBeNull();
+        statement.Rows.From.ShouldBeNull();
+        statement.Rows.HasFrom.ShouldBeFalse();
+        Text(tokens, statement.Rows.Where.ShouldNotBeNull()).ShouldBe("WHERE id = @id");
+        statement.Rows.Items.ShouldHaveSingleItem().Name.ShouldBe("id");
+        statement.IsTargetColumn(tokens, ["id"], "id").ShouldBeTrue();
+    }
+
+    // The clauses a DELETE may hold around its OUTPUT, each once and in order.
+    [Fact]
+    public void Read_DeleteWithTopHintsAndOption_EndsTheWhereAtTheOption()
+    {
+        var (tokens, statement) = ReadOne(
+            "DELETE TOP (5) PERCENT FROM [dbo].[t] WITH (ROWLOCK) OUTPUT deleted.a WHERE b = 2 OPTION (RECOMPILE)"
+        );
+
+        statement.Target.ShouldBe("t");
+        Text(tokens, statement.Rows.Where.ShouldNotBeNull()).ShouldBe("WHERE b = 2");
+    }
+
+    [Fact]
     public void Read_InsertValues_GivesTheItems()
     {
         var (tokens, statement) = ReadOne("INSERT INTO dbo.t (a) OUTPUT inserted.p, inserted.id VALUES (@x)");
@@ -176,7 +233,7 @@ public sealed class OutputStatementTests
     [InlineData(
         "MERGE dbo.t AS o USING dbo.s AS s ON s.id = o.id WHEN MATCHED THEN UPDATE SET o.a = s.a OUTPUT inserted.a;"
     )]
-    [InlineData("DELETE FROM dbo.t OUTPUT deleted.p WHERE id = 1")]
+    [InlineData("MERGE dbo.t AS o USING dbo.s AS s ON s.id = o.id WHEN MATCHED THEN DELETE OUTPUT deleted.a;")]
     [InlineData("SELECT a FROM dbo.t")]
     [InlineData("UPDATE dbo.t SET a = 1 OUTPUT inserted.a INTO @t WHERE id = 1")]
     [InlineData("INSERT INTO dbo.t (a) OUTPUT inserted.a INTO @t VALUES (1)")]
@@ -212,6 +269,36 @@ public sealed class OutputStatementTests
     [InlineData("INSERT INTO dbo.t OUTPUT inserted.a FROM dbo.s SELECT 1")]
     [InlineData("INSERT INTO dbo.t (a) VALUES (1) OUTPUT inserted.a")]
     [InlineData("INSERT INTO dbo.t OUTPUT inserted.a DEFAULT VALUES SELECT 1")]
+    [InlineData("DELETE FROM dbo.t OUTPUT deleted.a INTO @t WHERE id = 1")]
+    [InlineData("DELETE FROM dbo.t SET output = 1 OUTPUT deleted.a")]
+    [InlineData("DELETE dbo.t OUTPUT deleted.a FROM dbo.t AS o")]
+    [InlineData("DELETE t OUTPUT deleted.a FROM dbo.t AS o")]
+    [InlineData("DELETE FROM t OUTPUT deleted.a FROM other.t")]
+    [InlineData("DELETE o OUTPUT deleted.a FROM dbo.t AS o JOIN dbo.u AS o ON o.id = 1")]
+    [InlineData("DELETE x OUTPUT deleted.a FROM (SELECT a FROM dbo.t) AS x")]
+    [InlineData("DELETE o OUTPUT deleted.a FROM dbo.t AS o, dbo.u AS u")]
+    [InlineData("WITH c AS (SELECT a FROM dbo.t) DELETE c OUTPUT deleted.a")]
+    [InlineData("WITH c AS (SELECT a FROM dbo.t) DELETE FROM C OUTPUT deleted.a")]
+    [InlineData("WITH c AS (SELECT a FROM dbo.t) DELETE o OUTPUT deleted.a FROM c AS o")]
+    [InlineData("WITH XMLNAMESPACES ('u' AS x) DELETE FROM dbo.t OUTPUT deleted.a")]
+    [InlineData("DELETE @t OUTPUT deleted.a")]
+    [InlineData("DELETE FROM @t OUTPUT deleted.a")]
+    [InlineData("DELETE FROM dbo.t OUTPUT deleted.a WHERE CURRENT OF k")]
+    [InlineData("DELETE FROM dbo.t OUTPUT deleted.a WHERE id = 1; SELECT 1")]
+    [InlineData("DELETE FROM dbo.t OUTPUT deleted.a WHERE id = 1 SELECT 1")]
+    [InlineData("DELETE FROM dbo.t OUTPUT deleted.a DELETE dbo.t")]
+    [InlineData("DELETE FROM dbo.t WHERE id = 1 OUTPUT deleted.a")]
+    [InlineData("DELETE FROM dbo.t OUTPUT deleted.a WHERE id = 1 FROM dbo.t")]
+    [InlineData("DELETE FROM dbo.t OUTPUT deleted.a WHERE id = 1 WHERE id = 2")]
+    [InlineData("DELETE FROM dbo.t OUTPUT deleted.a OPTION (RECOMPILE) WHERE id = 1")]
+    [InlineData("DELETE FROM dbo.t WHERE id = 1")]
+    [InlineData("DELETE FROM dbo.t OUTPUT")]
+    [InlineData("DELETE FROM dbo.t OUTPUT deleted.a, WHERE id = 1")]
+    [InlineData("DELETE FROM a.b.c.d.e OUTPUT deleted.a")]
+    [InlineData("DELETE TOP 5 FROM dbo.t OUTPUT deleted.a")]
+    [InlineData("DELETE FROM FROM dbo.t OUTPUT deleted.a")]
+    [InlineData("DELETE FROM OUTPUT deleted.a")]
+    [InlineData("DELETE FROM dbo.t x OUTPUT deleted.a")]
     public void Read_NotOneToFollow_IsNull(string sql) => Read(sql).Statement.ShouldBeNull();
 
     // A SET item that is not "c = v", "q.c = v" of the target, or "@v = e" leaves the SET unread, and the statement

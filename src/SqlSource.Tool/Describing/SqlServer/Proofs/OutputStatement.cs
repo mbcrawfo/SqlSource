@@ -13,6 +13,9 @@ internal enum OutputKind
 
     /// <summary>An <c>UPDATE</c>.</summary>
     Update,
+
+    /// <summary>A <c>DELETE</c>.</summary>
+    Delete,
 }
 
 /// <summary>An item of an <c>UPDATE</c>'s <c>SET</c> that writes a column of its target.</summary>
@@ -20,8 +23,10 @@ internal enum OutputKind
 /// <param name="Value">The value it writes: the tokens after its <c>=</c>.</param>
 internal sealed record Assignment(string Column, TokenRange Value);
 
-/// <summary>An <c>INSERT</c> or an <c>UPDATE</c> with <c>OUTPUT</c>, with the <c>WITH</c> clause before it.</summary>
-/// <param name="Kind">Whether it is an <c>INSERT</c> or an <c>UPDATE</c>.</param>
+/// <summary>
+/// An <c>INSERT</c>, an <c>UPDATE</c> or a <c>DELETE</c> with <c>OUTPUT</c>, with the <c>WITH</c> clause before it.
+/// </summary>
+/// <param name="Kind">Whether it is an <c>INSERT</c>, an <c>UPDATE</c> or a <c>DELETE</c>.</param>
 /// <param name="With">
 /// The <c>WITH</c> clause, from the word <c>WITH</c> to the <c>)</c> of its last CTE, or an empty range before the
 /// statement when there is none.
@@ -29,19 +34,21 @@ internal sealed record Assignment(string Column, TokenRange Value);
 /// <param name="Ctes">The CTEs of the <c>WITH</c> clause, in order.</param>
 /// <param name="Rows">
 /// The rows it outputs, read as a <c>SELECT</c>'s: its items are the <c>OUTPUT</c> items, and its <c>FROM</c> and
-/// <c>WHERE</c> the <c>UPDATE</c>'s.  An <c>INSERT</c>'s has neither, and none has a <c>GROUP BY</c>, a
-/// <c>HAVING</c>, a <c>TOP</c> or an <c>OFFSET</c>.
+/// <c>WHERE</c> the <c>UPDATE</c>'s or the <c>DELETE</c>'s, the <c>FROM</c> after the <c>OUTPUT</c>.  An
+/// <c>INSERT</c>'s has neither, and none has a <c>GROUP BY</c>, a <c>HAVING</c>, a <c>TOP</c> or an <c>OFFSET</c>.
 /// </param>
 /// <param name="Target">
-/// The last part of the name the statement writes: the table's, or, for an <c>UPDATE</c> with a <c>FROM</c>, the name
-/// of the source of the <c>FROM</c> that is its target.
+/// The last part of the name the statement writes: the table's, or, for an <c>UPDATE</c> or a <c>DELETE</c> with a
+/// <c>FROM</c>, the name of the source of the <c>FROM</c> that is its target.
 /// </param>
 /// <param name="TargetIsAlias">
-/// True when the <c>UPDATE</c> has a <c>FROM</c>, so that <see cref="Target" /> names one of its sources.
+/// True when the <c>UPDATE</c> or the <c>DELETE</c> has a <c>FROM</c>, so that <see cref="Target" /> names one of its
+/// sources.
 /// </param>
 /// <param name="Assignments">
-/// The items of the <c>SET</c> that write a column, in order; null for an <c>INSERT</c>, and for a <c>SET</c> one of
-/// whose items is not <c>c = v</c>, <c>q.c = v</c> with <c>q</c> the target, or <c>@v = e</c>.
+/// The items of the <c>SET</c> that write a column, in order; empty for a <c>DELETE</c>, which writes none, and null
+/// for an <c>INSERT</c> and for a <c>SET</c> one of whose items is not <c>c = v</c>, <c>q.c = v</c> with <c>q</c> the
+/// target, or <c>@v = e</c>.
 /// </param>
 internal sealed record OutputStatement(
     OutputKind Kind,
@@ -61,7 +68,7 @@ internal sealed record OutputStatement(
         | CompareOptions.IgnoreKanaType
         | CompareOptions.IgnoreWidth;
 
-    // The clauses of an UPDATE after its SET, in the order T-SQL takes them.
+    // The clauses of an UPDATE after its SET, or of a DELETE after its target, in the order T-SQL takes them.
     private enum Clause
     {
         Output,
@@ -72,8 +79,8 @@ internal sealed record OutputStatement(
 
     /// <summary>
     /// The statement, or null when its text is not an optional <c>;</c>, an optional <c>WITH</c> clause and one
-    /// <c>INSERT</c> or <c>UPDATE</c> with <c>OUTPUT</c> that the reader follows, ending the text or followed by
-    /// <c>;</c> alone.
+    /// <c>INSERT</c>, <c>UPDATE</c> or <c>DELETE</c> with <c>OUTPUT</c> that the reader follows, ending the text or
+    /// followed by <c>;</c> alone.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -87,6 +94,11 @@ internal sealed record OutputStatement(
     /// [WHERE ...] [OPTION ( ... )]</c>, its name of one to four parts.  With a <c>FROM</c>, the name is of one part
     /// and exactly one source of the <c>FROM</c> is so named, a table with an alias or a name of one part: the server
     /// may join a target that no source names as another instance.  A <c>WHERE CURRENT OF</c> gives null.
+    /// </para>
+    /// <para>
+    /// A <c>DELETE</c> is <c>DELETE [TOP ( ... ) [PERCENT]] [FROM] name [WITH ( ... )] OUTPUT ... [FROM ...]
+    /// [WHERE ...] [OPTION ( ... )]</c>, read by the rules of an <c>UPDATE</c>: its first <c>FROM</c> comes before the
+    /// name, and the <c>FROM</c> of its sources after the <c>OUTPUT</c>.
     /// </para>
     /// <para>
     /// An <c>INSERT</c> is <c>INSERT [TOP ( ... ) [PERCENT]] [INTO] name [WITH ( ... )] [( columns )] OUTPUT ...</c>
@@ -130,7 +142,12 @@ internal sealed record OutputStatement(
         var shape = new Shape(new TokenRange(withStart, at), ctes, statement, level, output);
         if (tokens[at].Is("UPDATE"))
         {
-            return ReadUpdate(tokens, shape);
+            return ReadChange(tokens, shape, OutputKind.Update);
+        }
+
+        if (tokens[at].Is("DELETE"))
+        {
+            return ReadChange(tokens, shape, OutputKind.Delete);
         }
 
         return tokens[at].Is("INSERT") ? ReadInsert(tokens, shape) : null;
@@ -169,18 +186,29 @@ internal sealed record OutputStatement(
             CultureInfo.InvariantCulture.CompareInfo.Compare(assignment.Column, column, Loosely) == 0
         );
 
-    private static OutputStatement? ReadUpdate(IReadOnlyList<TsqlToken> tokens, Shape shape)
+    // An UPDATE or a DELETE, read by the same rules but for what comes between the name and the OUTPUT.
+    private static OutputStatement? ReadChange(IReadOnlyList<TsqlToken> tokens, Shape shape, OutputKind kind)
     {
         var end = shape.Statement.End;
         var at = TopEnd(tokens, shape.Statement.Start + 1, end);
-        if (TargetOf(tokens, at, end, shape.Ctes) is not var (parts, nameEnd) || !tokens[nameEnd].Is("SET"))
+        if (kind == OutputKind.Delete && at >= 0 && at < end && tokens[at].Is("FROM"))
+        {
+            at++;
+        }
+
+        // An UPDATE's name is followed by its SET, and a DELETE's by its OUTPUT.
+        if (
+            TargetOf(tokens, at, end, shape.Ctes) is not var (parts, nameEnd)
+            || (kind == OutputKind.Update ? !tokens[nameEnd].Is("SET") : nameEnd != shape.Output)
+        )
         {
             return null;
         }
 
-        var set = nameEnd;
+        // A DELETE has no SET: its first word stands for it, as no other word may.
+        var set = kind == OutputKind.Update ? nameEnd : shape.Statement.Start;
         var clauses = new List<(Clause Kind, int Start)>();
-        foreach (var index in shape.Level.Where(index => index > set))
+        foreach (var index in shape.Level.Where(index => index > set && index >= nameEnd))
         {
             if (ClauseAt(tokens[index]) is not { } clause)
             {
@@ -227,13 +255,13 @@ internal sealed record OutputStatement(
             Where = where,
         };
         return new OutputStatement(
-            OutputKind.Update,
+            kind,
             shape.With,
             shape.Ctes,
             rows,
             parts[^1],
             TargetIsAlias: from is not null,
-            AssignmentsOf(tokens, new TokenRange(set + 1, shape.Output), parts[^1])
+            kind == OutputKind.Update ? AssignmentsOf(tokens, new TokenRange(set + 1, shape.Output), parts[^1]) : []
         );
     }
 
@@ -432,7 +460,8 @@ internal sealed record OutputStatement(
         token.Is("VALUES") || token.Is("SELECT") || token.Is("DEFAULT") || token.Is("EXEC") || token.Is("EXECUTE");
 
     // True when a word that starts a statement stands at the statement's level other than its first word and the one
-    // at the index, an UPDATE's SET or the word that starts an INSERT's source: a batch of several.
+    // at the index, an UPDATE's SET or the word that starts an INSERT's source, or the first word again for a DELETE:
+    // a batch of several.
     private static bool HasOtherStatementWord(IReadOnlyList<TsqlToken> tokens, Shape shape, int allowed) =>
         shape.Level.Exists(index =>
             index != shape.Statement.Start
