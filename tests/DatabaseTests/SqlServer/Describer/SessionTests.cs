@@ -216,6 +216,7 @@ public sealed class SessionTests(SqlServerDatabases sqlServer)
             },
             ConnectionErrors.Of,
             static error => error,
+            session.Connection,
             token
         );
         try

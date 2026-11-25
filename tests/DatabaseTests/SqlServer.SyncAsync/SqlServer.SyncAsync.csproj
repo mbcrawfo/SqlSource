@@ -25,9 +25,14 @@
             it is in, so a linked one would keep the end-to-end project's.  The claims name this path.
         -->
         <SyncAsyncMirror>$(MSBuildProjectDirectory)/obj/Mirror/</SyncAsyncMirror>
-        <!-- The end-to-end project's fixture project and the scripts of its databases, which are not its queries. -->
+        <!--
+            The end-to-end project's fixture project and the scripts of its databases, which are not its queries, and
+            the queries of user_clr, whose CLR type needs an assembly on the server that this project does not load.
+        -->
         <SyncAsyncNotMirrored>../SqlServer/EndToEnd/ErrorPaths/**;../SqlServer/EndToEnd/app/**</SyncAsyncNotMirrored>
         <SyncAsyncNotMirrored>$(SyncAsyncNotMirrored);../SqlServer/EndToEnd/billing/**</SyncAsyncNotMirrored>
+        <SyncAsyncNotMirrored>$(SyncAsyncNotMirrored);../SqlServer/EndToEnd/user_clr/**</SyncAsyncNotMirrored>
+        <SyncAsyncNotMirrored>$(SyncAsyncNotMirrored);../SqlServer/EndToEnd/UserClr/**</SyncAsyncNotMirrored>
     </PropertyGroup>
     <ItemGroup>
         <SyncAsyncMirrored Include="../SqlServer/sqlsource.json" Into="" />

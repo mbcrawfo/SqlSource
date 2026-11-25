@@ -31,6 +31,10 @@ internal static class RepositoryPaths
     // The folder of the end-to-end queries whose folder turns System.Text.Json on, and their sidecars.
     public static string EndToEndJsonQueries { get; } = Path.Combine(EndToEnd, "Json", "Queries");
 
+    // The folder of the end-to-end queries of the database "user_clr", of a CLR type of a user's own, and their
+    // sidecars.
+    public static string EndToEndUserClrQueries { get; } = Path.Combine(EndToEnd, "UserClr", "Queries");
+
     // The file of the queries of those types, NewTypes.sql, which a server before major 17 cannot describe.
     public static string NewTypesQueries { get; } = Path.Combine(EndToEndQueries, "NewTypes.sql");
 

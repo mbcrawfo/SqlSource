@@ -7,8 +7,10 @@ tests/SqlSource.Tool.Testing
 tests/SqlSource.Tool.StandIn
 tests/DatabaseTests/TestHarness
 
-# Test data: the examples of the sidecar tests and the fixture projects, which are no tests.
+# Test data: the examples of the sidecar tests, the fixture projects and the CLR type that a database test loads, which
+# are no tests.
 tests/SqlSource.Tests/Snapshot/Examples
 tests/SqlSource.Tool.Tests/Fixtures/Projects
 tests/DatabaseTests/Postgres/EndToEnd/ErrorPaths
 tests/DatabaseTests/SqlServer/EndToEnd/ErrorPaths
+tests/DatabaseTests/SqlServer.ClrType
