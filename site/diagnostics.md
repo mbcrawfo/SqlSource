@@ -2800,7 +2800,7 @@ What the end of the message means:
 | `the sidecar does not exist` | A query of the file needs an entry, and the file has no sidecar |
 | `the sidecar cannot be read`, or `the sidecar has format 2, and this tool writes 1` | The sidecar is no sidecar of this version of the tool.  A merge conflict in it is the usual cause of the first |
 | `the sidecar has no entry` | The query was added, or renamed, since the sidecar was written |
-| `the query has changed since it was described` | The SQL, the type or the nullability of a `-- param:` marker, or the default of a token changed |
+| `the query has changed since it was described` | The SQL, the type or the nullability of a `-- param:` marker, the names of a `-- variable:` marker, or the default of a token changed |
 | `columns[2].nullable is true, and the database says false` | The database describes the query another way than the sidecar holds, such as a column that can now be null, or one now read from another table (`columns[0].origin.table`).  A change to the schema is the usual cause |
 | `database is "billing", and the project says "reports"` | The query belongs to another database, or another kind of database, than the one it was described against |
 | `the query is not in the file`, or `the query needs no entry` | The sidecar holds an entry for a query that was removed, or whose output is now `sql` |
@@ -3788,6 +3788,7 @@ The entry of the query in the sidecar is out of date: the query changed after it
 
 - the SQL of the query;
 - the type or the nullability of a `-- param:` marker;
+- the names of a [`-- variable:` marker](reference/parameters.md#variable-marker);
 - the default of one of its tokens.
 
 A change to a comment alone does not count, and neither does a C# type after `->`.

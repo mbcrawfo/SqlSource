@@ -34,7 +34,7 @@ To keep the sidecars current, run the command of each case:
 
 | When | Run |
 |----|----|
-| You add, change, rename or remove a query, the database type or the nullability of a `-- param:` marker (not its C# type after `->`), or a token's default | `dotnet sqlsource describe`, or a build that [runs the tool](online-build.md#running-in-the-build) |
+| You add, change, rename or remove a query, the database type or the nullability of a `-- param:` marker (not its C# type after `->`), the names of a `-- variable:` marker, or a token's default | `dotnet sqlsource describe`, or a build that [runs the tool](online-build.md#running-in-the-build) |
 | The schema of the database changes | `dotnet sqlsource describe --force`: see [after a schema change](describing.md#after-a-schema-change) |
 | While you work on your queries, to describe each one as you save it | `dotnet sqlsource describe --watch`: see [describe on save](describing.md#describe-on-save) |
 | You update the tool | `dotnet sqlsource describe`, or a build that runs the tool, which describes every query again |
