@@ -214,6 +214,7 @@ internal static class RunProjects
     {
         var selected = new HashSet<string>(PathComparer);
         var reported = new HashSet<string>(PathComparer);
+        Dictionary<string, string>? byRealPath = null;
         foreach (var name in named)
         {
             // Path.GetFullPath throws for an empty path, which is what an unset variable of a shell gives.
@@ -221,6 +222,14 @@ internal static class RunProjects
             if (projects.Contains(path, PathComparer))
             {
                 _ = selected.Add(path);
+            }
+            else if (
+                path.Length > 0
+                && (byRealPath ??= ByRealPath(projects)).TryGetValue(RealPath.Of(path), out var project)
+            )
+            {
+                // A path through a symbolic link selects the project by the unit's spelling of it.
+                _ = selected.Add(project);
             }
             else if (reported.Add(path))
             {
@@ -231,5 +240,17 @@ internal static class RunProjects
         }
 
         return [.. projects.Where(selected.Contains)];
+    }
+
+    // The unit's projects by their paths with every symbolic link resolved.  Of two that resolve alike, the first.
+    private static Dictionary<string, string> ByRealPath(ImmutableArray<string> projects)
+    {
+        var byRealPath = new Dictionary<string, string>(PathComparer);
+        foreach (var project in projects)
+        {
+            _ = byRealPath.TryAdd(RealPath.Of(project), project);
+        }
+
+        return byRealPath;
     }
 }

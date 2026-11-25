@@ -65,7 +65,7 @@ public sealed class SettingsFileSearchTests : IDisposable
     [Fact]
     public async Task Build_ProjectNamedThroughALink_AppliesItsSettingsFiles()
     {
-        Assert.SkipWhen(OperatingSystem.IsWindows(), LinkSkipReason);
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
         _ = _fixtures.Copy("Linked", "App/App.csproj");
         _ = Directory.CreateSymbolicLink(_fixtures.PathOf("Link"), _fixtures.PathOf("Linked"));
 
@@ -85,7 +85,7 @@ public sealed class SettingsFileSearchTests : IDisposable
     [Fact]
     public async Task Compile_DesignTimeBuildThroughALink_GivesTheFilesOutsideTheLinkByTheirFullPaths()
     {
-        Assert.SkipWhen(OperatingSystem.IsWindows(), LinkSkipReason);
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
         _ = _fixtures.Copy("Linked", "App/App.csproj");
         _ = _fixtures.CopyBuildFolder("Deep/build");
         _ = _fixtures.WriteFile(
@@ -121,7 +121,7 @@ public sealed class SettingsFileSearchTests : IDisposable
     [Fact]
     public async Task Build_FilesListedByFullPathsThroughALink_GetNoSettingsFileInsideTheLink()
     {
-        Assert.SkipWhen(OperatingSystem.IsWindows(), LinkSkipReason);
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
         _ = _fixtures.Copy("Linked", "App/App.csproj");
         _ = Directory.CreateSymbolicLink(_fixtures.PathOf("Link"), _fixtures.PathOf("Linked"));
 
@@ -139,9 +139,6 @@ public sealed class SettingsFileSearchTests : IDisposable
                 output
             );
     }
-
-    // A link needs a privilege on Windows, whose working folder keeps the spelling of a link anyway.
-    private const string LinkSkipReason = "Making a symbolic link needs a privilege on Windows.";
 
     // "dotnet build" of the copy, with the generator beside the tests.
     private static Task<(int ExitCode, string Output)> BuildLinkedAsync(string project, params string[] arguments) =>
