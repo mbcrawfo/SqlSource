@@ -200,25 +200,21 @@ internal static class GenericConstraints
         }
     }
 
-    // The type arguments of two types of one definition, those of their containing types too, which are invariant.
+    // The type arguments of two types of one definition, those of their containing types too, each by the variance of
+    // its own type parameter: a containing interface's out or in counts, as the compiler takes it.
     private static bool ArgumentsKeepNullability(INamedTypeSymbol source, INamedTypeSymbol target)
     {
-        var own = true;
         for (
             INamedTypeSymbol? from = source, to = target;
             from is not null && to is not null;
-            from = from.ContainingType, to = to.ContainingType, own = false
+            from = from.ContainingType, to = to.ContainingType
         )
         {
             var parameters = to.TypeParameters;
-            var equatable = own && IsEquatable(to);
+            var equatable = IsEquatable(to);
             for (var index = 0; index < parameters.Length; index++)
             {
-                var variance = VarianceKind.None;
-                if (own)
-                {
-                    variance = equatable ? VarianceKind.In : parameters[index].Variance;
-                }
+                var variance = equatable ? VarianceKind.In : parameters[index].Variance;
                 if (!ArgumentKeepsNullability(from.TypeArguments[index], to.TypeArguments[index], variance))
                 {
                     return false;
@@ -315,8 +311,8 @@ internal static class GenericConstraints
 
     // The type with the arguments of the constructed type and its containing types put for their type parameters.
     // A type with no type parameter in it is itself.  A type parameter used with a ?, T?, is its argument with a ?
-    // when that is a reference type, and an argument used where nullable annotations are off is oblivious, as the
-    // compiler substitutes them.
+    // when that is a reference type, and keeps its own annotation where nullable annotations are off, as the compiler
+    // substitutes them.
     private static ITypeSymbol Substitute(Compilation compilation, ITypeSymbol type, INamedTypeSymbol constructed)
     {
         switch (type)
@@ -439,21 +435,13 @@ internal static class GenericConstraints
                     .Equals(SetsRequiredMembersAttributeFullName, StringComparison.Ordinal) == true
             );
 
-    // The argument put for a type parameter used with the annotation: annotated when either is, else oblivious when
-    // either is.  A value type keeps its own, since T? of an unconstrained T is T itself for one.
-    private static ITypeSymbol WithUseAnnotation(ITypeSymbol argument, NullableAnnotation use)
-    {
-        if (
-            argument.IsValueType
-            || argument.NullableAnnotation == NullableAnnotation.Annotated
-            || use == NullableAnnotation.NotAnnotated
-        )
-        {
-            return argument;
-        }
-
-        return argument.WithNullableAnnotation(use);
-    }
+    // The argument put for a type parameter used with the annotation: annotated when either is, else the argument's
+    // own, even for a use where nullable annotations are off.  A value type keeps its own, since T? of an
+    // unconstrained T is T itself for one.
+    private static ITypeSymbol WithUseAnnotation(ITypeSymbol argument, NullableAnnotation use) =>
+        argument.IsValueType || use != NullableAnnotation.Annotated
+            ? argument
+            : argument.WithNullableAnnotation(NullableAnnotation.Annotated);
 
     // A reference type written with a ?, or System.Nullable<T>.
     private static bool IsNullable(ITypeSymbol type) =>

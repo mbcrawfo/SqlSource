@@ -20,7 +20,8 @@
 - The spec does not mention these, and the walk needs each to agree with the compiler:
   - The `T?` substitution; without it the walk would refuse a type the compiler takes.
   - `Substitute` kept no annotation when it rebuilt a type (a non-generic type from its definition, an array by `CreateArrayTypeSymbol`, whose element annotation is a separate argument); it now keeps them.
-  - `MappedTypeResolver.AsWritten` gave a reference type written without a `?` an oblivious annotation, which matches anything; it is now not annotated, as the `#nullable enable` model reads it.
+  - `MappedTypeResolver.AsWritten` gave a reference type written without a `?` an oblivious annotation, which matches anything; it is now not annotated, as the `#nullable enable` model reads it.  It also read only the first rank's `?`; a `?` before a later rank now closes the array written before it, as C# reads `string[]?[]`.
+  - A containing interface's own variance counts (`IOuter<out T>.IInner<U>`), and a type parameter used where nullable annotations are off keeps its argument's annotation, as the compiler does.
   - The compiler takes the `T` of `System.IEquatable<T>` as contravariant for nullability, so `string`, an `IEquatable<string?>`, meets `where T : IEquatable<T>`.  The walk does the same, and a row pins it.
 
 ## Review Focus
