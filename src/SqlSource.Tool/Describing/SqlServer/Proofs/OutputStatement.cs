@@ -181,10 +181,21 @@ internal sealed record OutputStatement(
     /// </summary>
     /// <param name="column">The target's column.</param>
     public bool Writes(string column) =>
-        Assignments is null
-        || Assignments.Any(assignment =>
-            CultureInfo.InvariantCulture.CompareInfo.Compare(assignment.Column, column, Loosely) == 0
-        );
+        Assignments is null || Assignments.Any(assignment => IsLooselyEqual(assignment.Column, column));
+
+    /// <summary>
+    /// The one assignment that writes <paramref name="column" />, by <see cref="Writes" />'s match, when its name is
+    /// the column's ordinally; or null when none or several write it, or <see cref="Assignments" /> is null.
+    /// </summary>
+    /// <param name="column">The target's column.</param>
+    public Assignment? AssignmentOf(string column) =>
+        Assignments?.Where(assignment => IsLooselyEqual(assignment.Column, column)).ToList() is [var one]
+        && string.Equals(one.Column, column, StringComparison.Ordinal)
+            ? one
+            : null;
+
+    private static bool IsLooselyEqual(string left, string right) =>
+        CultureInfo.InvariantCulture.CompareInfo.Compare(left, right, Loosely) == 0;
 
     // An UPDATE or a DELETE, read by the same rules but for what comes between the name and the OUTPUT.
     private static OutputStatement? ReadChange(IReadOnlyList<TsqlToken> tokens, Shape shape, OutputKind kind)

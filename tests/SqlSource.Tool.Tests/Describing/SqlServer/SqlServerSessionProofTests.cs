@@ -379,6 +379,35 @@ public sealed class SqlServerSessionProofTests
         }
     }
 
+    // An UPDATE's OUTPUT of a column its SET writes asks "operands" for the value written over the UPDATE's rows, after
+    // "columns" and before the "table" of the match, and no text names inserted.
+    [Fact]
+    public async Task DescribeAsync_UpdateOutputOfAWrittenColumn_AsksTheValueBeforeTheMatch()
+    {
+        const string Sql =
+            "UPDATE u SET u.nickname = c.name OUTPUT inserted.id, inserted.nickname "
+            + "FROM dbo.users AS u JOIN dbo.customers AS c ON c.id = u.id";
+        var operands = new SqlServerColumnsRequest(
+            "SELECT c.name\nAS [1]\nFROM dbo.users AS u JOIN dbo.customers AS c ON c.id = u.id",
+            null
+        );
+        var table = new SqlServerTableRequest("dbo", "users");
+        var script = Script(Sql, [IdColumn, NicknameColumn, Rowstat with { ColumnOrdinal = 3 }])
+            .Operands(operands, new SqlServerColumnsAnswer([OperandRow(1, false)], null, null))
+            .Table(table, new SqlServerColumnsAnswer([IdColumn, NicknameColumn, Rowstat], null, null));
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        asked.ShouldBe([
+            Call(Calls.Parameters, new SqlServerParametersRequest(Sql, null, null)),
+            Call(Calls.Columns, new SqlServerColumnsRequest(Sql, null)),
+            Call(Calls.Operands, operands),
+            Call(Calls.Table, table),
+        ]);
+        Nullability(described)
+            .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Expression)]);
+    }
+
     private static readonly SqlServerTableRequest Products = new("dbo", "products");
 
     // dbo.products of the realistic schema as "table" describes it: list_price NOT NULL, discount_pct NULL and

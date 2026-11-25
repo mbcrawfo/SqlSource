@@ -349,6 +349,29 @@ public sealed class OutputStatementTests
         statement.IsTargetColumn(tokens, ["o", "Shipped_At"], "shipped_at").ShouldBeFalse();
     }
 
+    // The one assignment that writes a column is its value's only when it names the column ordinally.
+    [Fact]
+    public void AssignmentOf_OneAssignmentOfTheSameName_GivesIt()
+    {
+        var (tokens, statement) = ReadOne(
+            "UPDATE o SET Shipped_At = NULL, o.note = 'x' OUTPUT inserted.id FROM dbo.t AS o"
+        );
+
+        var note = statement.AssignmentOf("note").ShouldNotBeNull();
+        Text(tokens, note.Value).ShouldBe("'x'");
+        statement.AssignmentOf("shipped_at").ShouldBeNull();
+        statement.AssignmentOf("Shipped_At").ShouldNotBeNull().Column.ShouldBe("Shipped_At");
+        statement.AssignmentOf("status").ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("UPDATE o SET a = 1, A = 2 OUTPUT inserted.a FROM dbo.t AS o")]
+    [InlineData("UPDATE o SET a += 1 OUTPUT inserted.a FROM dbo.t AS o")]
+    [InlineData("DELETE o OUTPUT deleted.a FROM dbo.t AS o")]
+    [InlineData("INSERT INTO dbo.t (a) OUTPUT inserted.a VALUES (1)")]
+    public void AssignmentOf_NoneOrSeveralOrUnread_IsNull(string sql) =>
+        ReadOne(sql).Statement.AssignmentOf("a").ShouldBeNull();
+
     // With a FROM of one source, that source is the target, so a column alone is the target's.
     [Fact]
     public void IsTargetColumn_FromOfOneSource_TakesAColumnAlone()
