@@ -84,8 +84,21 @@ internal sealed partial class ExpressionProofs
     // A column whose source the server is asked.  Its source is the same in every context, a grouping set's included.
     private Proof.Stored StoredLeaf(TokenRange column)
     {
-        _leaves.Add(column);
+        _leaves.Add((column, OperandScope.Rows));
         return new Proof.Stored(_leaves.Count - 1);
+    }
+
+    // A column of one side of the last FULL JOIN, asked over that side's rows alone.  In the select's context a
+    // grouping set's total holds it NULL.
+    private Proof SideLeaf(TokenRange column, OperandScope side, bool rows)
+    {
+        if (!rows && body.Grouping == SelectGrouping.Sets)
+        {
+            return Proof.No;
+        }
+
+        _leaves.Add((column, side));
+        return new Proof.Operand(_leaves.Count - 1);
     }
 
     private readonly record struct AtTimeZoneParts(TokenRange Value, TokenRange Zone);

@@ -24,6 +24,7 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 internal sealed class FilteredRows
 {
     private readonly IReadOnlyList<TsqlToken> _tokens;
+    private readonly TokenRange? _from;
     private readonly RowFilter _filter;
     private readonly IReadOnlyList<JoinSource>? _sources;
     private readonly IReadOnlyList<CommonTableExpression> _ctes;
@@ -31,6 +32,7 @@ internal sealed class FilteredRows
 
     private FilteredRows(
         IReadOnlyList<TsqlToken> tokens,
+        TokenRange? from,
         RowFilter filter,
         IReadOnlyList<JoinSource>? sources,
         IReadOnlyList<CommonTableExpression> ctes,
@@ -40,6 +42,7 @@ internal sealed class FilteredRows
     )
     {
         _tokens = tokens;
+        _from = from;
         _filter = filter;
         _sources = sources;
         _ctes = ctes;
@@ -92,7 +95,113 @@ internal sealed class FilteredRows
             }
         }
 
-        return new FilteredRows(tokens, filter, sources, ctes, madeInner, cuts, guards);
+        return new FilteredRows(tokens, body.From, filter, sources, ctes, madeInner, cuts, guards);
+    }
+
+    /// <summary>
+    /// The pieces of the user's <c>FROM</c> that give the rows of the scope, each a run of its tokens, in order; or
+    /// null for <see cref="OperandScope.Rows" />, whose rows are the body's own <c>FROM</c> through its
+    /// <c>WHERE</c>, and for a side when the <c>FROM</c> has no <c>FULL JOIN</c> this reads.
+    /// </summary>
+    /// <remarks>
+    /// The left side of the last <c>FULL JOIN</c> is the <c>FROM</c> from its word <c>FROM</c> to the first word of
+    /// that join, and its right side the word <c>FROM</c> and the source that join adds, without its <c>ON</c>.
+    /// Neither has the <c>WHERE</c>.
+    /// </remarks>
+    public IReadOnlyList<TokenRange>? FromOf(OperandScope scope)
+    {
+        if (scope == OperandScope.Rows || _from is not { } from || _sources is null)
+        {
+            return null;
+        }
+
+        var full = _sources.LastOrDefault(static source => source.IsFull);
+        if (full is null)
+        {
+            return null;
+        }
+
+        return scope switch
+        {
+            OperandScope.LeftSide => [new TokenRange(from.Start, full.JoinStart)],
+            OperandScope.RightSide => [new TokenRange(from.Start, from.Start + 1), full.Reference],
+            OperandScope.Rows => null,
+            _ => throw UnexpectedEnumValueException.Of(scope),
+        };
+    }
+
+    /// <summary>
+    /// The side of the last <c>FULL JOIN</c> whose source the range reads: a column <c>q.c</c> of two parts whose
+    /// <c>q</c> names, ordinally, exactly one source, which is before that join or is the source it adds; or null.
+    /// </summary>
+    /// <remarks>
+    /// Every row of a <c>FULL JOIN</c> has its left side or its right side, and a later join that is no <c>RIGHT</c> or
+    /// <c>FULL</c> one keeps that true of every row of the <c>FROM</c>, and the <c>WHERE</c> keeps some of them.  So
+    /// there is no side when no <c>FULL JOIN</c> is read or a <c>RIGHT JOIN</c> comes after the last one, and a source
+    /// added after it is of neither.
+    /// </remarks>
+    public OperandScope? SideOf(TokenRange range)
+    {
+        if (_sources is not { } sources || RowFilter.NameOf(_tokens, range) is not [var qualifier, _])
+        {
+            return null;
+        }
+
+        var full = Enumerable.Range(0, sources.Count).LastOrDefault(index => sources[index].IsFull, -1);
+        if (
+            full < 0
+            || sources.Skip(full + 1).Any(static source => source.IsRight)
+            || Enumerable
+                .Range(0, sources.Count)
+                .Where(index => string.Equals(sources[index].Name, qualifier, StringComparison.Ordinal))
+                .ToList()
+                is not [var at]
+        )
+        {
+            return null;
+        }
+
+        if (at < full)
+        {
+            return OperandScope.LeftSide;
+        }
+
+        return at == full ? OperandScope.RightSide : null;
+    }
+
+    /// <summary>
+    /// True when the range, a column alone or a <c>q.*</c>, reads a source that is a table no join of these rows can
+    /// make <c>NULL</c>: its one source is no derived table, is not optional, and has no one-part name that a CTE has,
+    /// compared ignoring case.
+    /// </summary>
+    /// <remarks>
+    /// The server names a table as the source of a column that a derived table or a CTE passes on, and names it still
+    /// where an outer join makes the column <c>NULL</c>, so a row of the result is a row of that table only so.  A
+    /// CTE's name is compared ignoring case, as a database whose collation ignores it resolves the name; whether the
+    /// source is a table, and no view or function, the caller reads from the column's row.
+    /// </remarks>
+    public bool IsOfATableNoJoinMakesNull(TokenRange range)
+    {
+        string[]? parts;
+        if (range.Count == 3 && _tokens[range.End - 1].IsSymbol("*"))
+        {
+            parts =
+                _tokens[range.End - 2].IsSymbol(".")
+                && RowFilter.NameOf(_tokens, new TokenRange(range.Start, range.Start + 1)) is [var qualifier]
+                    ? [qualifier, "*"]
+                    : null;
+        }
+        else
+        {
+            parts = RowFilter.NameOf(_tokens, range);
+        }
+
+        return parts is not null
+            && SourceOf(parts) is { IsDerived: false, IsOptional: false } source
+            && (
+                source.OnePartName is not { } name
+                || !_ctes.Any(cte => string.Equals(cte.Name, name, StringComparison.OrdinalIgnoreCase))
+            );
     }
 
     /// <summary>True when the range is a column alone that these rows hold no <c>NULL</c> of.</summary>

@@ -15,7 +15,7 @@
 See [the online build](../../../docs/architecture/msbuild-and-manifest.md#the-online-build).
 
 - **The online targets hook nothing**: `SqlSourceTrackAdditionalFiles` depends on `SqlSourceDescribeOnline`, which reaches `SqlSourceRunOnline` by a dependency or a call.  A hook would run the tool where the search does not run.
-- **The tool runs in `SqlSourceRunOnline` alone, once, for the first framework**, since two runs would undo each other's sidecars.  A multi-targeted project's builds, the first framework's too, call it with `SqlSourceOnlineRun=true`, never in a framework's own configuration ([why](../../../docs/architecture/msbuild-and-manifest.md#the-online-build)).
+- **The tool runs in `SqlSourceRunOnline` alone, once, on every framework's manifest**, since two runs would undo each other's sidecars.  A multi-targeted project runs it, and writes each other framework's manifest, with `SqlSourceOnlineRun=true`, never in a framework's own configuration ([why](../../../docs/architecture/msbuild-and-manifest.md#the-online-build)).
 - **`buildMultiTargeting/SqlSource.targets` holds the outer build's call, and repeats the properties its condition reads with the text of `build/SqlSource.targets`**: change both, `BuildFileTests` holds them equal.
 - **Never read `$(SQLSOURCE_CONNECTION)`, in any case**: MSBuild logs a variable read as a property with its value.  Test it with `IsNullOrWhiteSpace` of `GetEnvironmentVariable`.
 - **Compare `SqlSourceOnlineValue` with `Equals`, never `==`**: a condition reads `yes` as `true`.

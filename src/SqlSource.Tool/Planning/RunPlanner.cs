@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -35,15 +36,23 @@ internal static class RunPlanner
     {
         var errors = ImmutableArray.CreateBuilder<ToolDiagnostic>();
         var settingsFiles = new RunSettingsFiles();
-        var unclaimed = ImmutableArray.CreateBuilder<int>(manifests.Length);
 
-        // A file that two projects claim is planned once, under the first.
+        // The manifests of one project are consecutive, a framework each.  A file that two of them or two projects
+        // claim is planned once, under the first.
+        var projects = new List<ProjectWork>();
+        var projectsByPath = new Dictionary<string, ProjectWork>(StringComparer.Ordinal);
         var works = new List<FileWork>();
         var byPath = new Dictionary<string, FileWork>(SqlPath.Comparer);
         foreach (var manifest in manifests)
         {
-            var (claimedFiles, unclaimedCount) = ReadProject(manifest, settingsFiles, errors, cancellationToken);
-            unclaimed.Add(unclaimedCount);
+            if (!projectsByPath.TryGetValue(manifest.ProjectPath, out var project))
+            {
+                project = new ProjectWork(manifest.ProjectPath);
+                projectsByPath.Add(manifest.ProjectPath, project);
+                projects.Add(project);
+            }
+
+            var claimedFiles = ReadProject(manifest, project, settingsFiles, errors, cancellationToken);
             foreach (var claimed in claimedFiles)
             {
                 if (byPath.TryGetValue(claimed.NormalizedPath, out var work))
@@ -71,23 +80,27 @@ internal static class RunPlanner
         return new RunPlanResult(
             new RunPlan(new EquatableArray<PlannedFile>([.. files]), databases, filters),
             new EquatableArray<ToolDiagnostic>(errors.ToImmutable()),
-            new EquatableArray<int>(unclaimed.MoveToImmutable())
+            new EquatableArray<(string ProjectPath, int Files)>([
+                .. projects.Select(static project => (project.ProjectPath, project.Unclaimed)),
+            ])
         );
     }
 
-    // The claimed files of one project, in the order of their paths, each with the settings files that reach it, and
-    // the number of its listed files that no type of it claims.  The errors of the project are added: those of reading
-    // its attributes, SQLSRC208 and SQLSRC271, then the problems of the settings files that its .sql files and C# files
-    // reach, as the generator reports them, of each file once in the run.
-    private static (List<ClaimedFile> Claimed, int Unclaimed) ReadProject(
+    // The claimed files of one manifest, in the order of their paths, each with the settings files that reach it.  The
+    // project learns which of its files are listed and which claimed.  The errors are added: those of reading the
+    // attributes, SQLSRC208 and SQLSRC271, once for the project when another framework compiles the same file, then
+    // the problems of the settings files that its .sql files and C# files reach, as the generator reports them, of
+    // each file once in the run.
+    private static List<ClaimedFile> ReadProject(
         ProjectManifest manifest,
+        ProjectWork project,
         RunSettingsFiles settingsFiles,
         ImmutableArray<ToolDiagnostic>.Builder errors,
         CancellationToken cancellationToken
     )
     {
         var claims = AttributeReader.Read(manifest, cancellationToken);
-        errors.AddRange(claims.Errors);
+        errors.AddRange(claims.Errors.Where(project.Reports));
 
         var settingsFileSet = settingsFiles.Of(manifest, cancellationToken);
         var listed = ListedFiles.Read(manifest);
@@ -97,11 +110,13 @@ internal static class RunPlanner
         var claimed = new List<ClaimedFile>(claimsOf.Count);
         foreach (var path in listed.Paths)
         {
+            _ = project.Listed.Add(path);
             if (!claimsOf.TryGetValue(path, out var types))
             {
                 continue;
             }
 
+            _ = project.Claimed.Add(path);
             var text = new SqlFileText(listed[path]);
             // The chain of the file's folder in this project's settings files, as the generator finds it.
             var chain = settingsFileSet.ChainOf(path);
@@ -124,7 +139,7 @@ internal static class RunPlanner
             listed.Paths.Concat(buildFolders.ReachingPaths(manifest.CompileFiles)),
             errors
         );
-        return (claimed, listed.Paths.Count - claimed.Count);
+        return claimed;
     }
 
     // The claims of each claimed file, by its path, in the order they came.  A claim says nothing of what its files
@@ -283,12 +298,15 @@ internal static class RunPlanner
             ClaimsOf(work)
         );
 
-    // Who claims the file, for the log: every claim of every project, in their order.
+    // Who claims the file, for the log: every claim of every project, in their order, once each when several
+    // frameworks of a project make it.
     private static EquatableArray<FileClaim> ClaimsOf(FileWork work) =>
         new([
-            .. work.Claimants.SelectMany(claimant =>
-                claimant.Types.Select(type => new FileClaim(claimant.ProjectPath, type.SourcePath, type.Position))
-            ),
+            .. work
+                .Claimants.SelectMany(claimant =>
+                    claimant.Types.Select(type => new FileClaim(claimant.ProjectPath, type.SourcePath, type.Position))
+                )
+                .Distinct(),
         ]);
 
     private static ContinuationLine HelpForToken(string name) =>
@@ -450,6 +468,24 @@ internal static class RunPlanner
 
     private static bool IsNamed(PlannedQuery query, RunFilters filters) =>
         filters.Databases.IsEmpty || (query.Database is { } database && filters.NamesDatabase(database));
+
+    // One project of the run while its manifests are read: the files any of its frameworks lists and the files any
+    // claims, and the errors it has reported.
+    private sealed class ProjectWork(string projectPath)
+    {
+        private readonly HashSet<ToolDiagnostic> _reported = [];
+
+        public string ProjectPath => projectPath;
+
+        public HashSet<string> Listed { get; } = [with(SqlPath.Comparer)];
+
+        public HashSet<string> Claimed { get; } = [with(SqlPath.Comparer)];
+
+        public int Unclaimed => Listed.Count(path => !Claimed.Contains(path));
+
+        // Whether the error is new to the project.
+        public bool Reports(ToolDiagnostic error) => _reported.Add(error);
+    }
 
     // One claimed file as one project sees it.  Chain is that of the file's folder in the project's settings files, and
     // Level is the chain's, as the generator's FileLevel gives it.

@@ -525,6 +525,32 @@ public sealed class RunLogTests : IDisposable
         open.TryGetProperty("serverVersion", out _).ShouldBeFalse();
     }
 
+    // The frameworks list the same files, which count once.
+    [Fact]
+    public async Task Run_ProjectOfTwoFrameworks_HasOneProjectEventThatJoinsThemAndCountsItsFilesOnce()
+    {
+        var frameworks = new Queue<string>(["net8.0", "net10.0"]);
+        _scene.Run.Processes.Projects[_scene.Project.ProjectPath] = new FakeProject
+        {
+            TargetFrameworks = "net8.0;net10.0",
+            ManifestWriter = () =>
+                _scene
+                    .Project.ManifestText()
+                    .Replace(
+                        "TargetFramework=net10.0",
+                        "TargetFramework=" + frameworks.Dequeue(),
+                        StringComparison.Ordinal
+                    ),
+        };
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+
+        var project = LogReader.Events(Log, "project").ShouldHaveSingleItem();
+        Text(project, "targetFramework").ShouldBe("net8.0;net10.0");
+        project.GetProperty("sqlFiles").GetInt32().ShouldBe(1);
+        project.GetProperty("compileFiles").GetInt32().ShouldBe(1);
+    }
+
     [Fact]
     public async Task Run_ProjectThatProjectOptionLeavesOut_IsInTheLogAndWasNotAsked()
     {

@@ -193,7 +193,12 @@ internal static class DiagnoseRun
         }
 
         var manifests = (await PlanSteps.FindManifestsAsync(unit, usage, context)).Manifests;
-        var filters = RunFilters.Create([query.File], [], context.Host.WorkingDirectory);
+        var filters = RunFilters.Create(
+            [query.File],
+            [],
+            context.Host.WorkingDirectory,
+            [.. manifests.SelectMany(static manifest => manifest.Files)]
+        );
         if (
             await PlanSteps.PlanFromAsync(unit, manifests, filters, PlanSteps.IsAtAFileNotNamed, context)
             is not { } plan

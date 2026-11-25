@@ -10,7 +10,9 @@ namespace SqlSource.Tool.Projects;
 /// The full path of each project of the unit that the run asked MSBuild about, which <c>--project</c> narrows, in the
 /// unit's order: the ones with an error and the ones that do not use SqlSource too.
 /// </param>
-/// <param name="Manifests">The manifests of the projects, in the order of the projects.</param>
+/// <param name="Manifests">
+/// The manifests of the projects, in the order of the projects, a project's target frameworks one after another.
+/// </param>
 /// <param name="AssetsFiles">
 /// The full path of each project that MSBuild named the <c>project.assets.json</c> of, with that file's full path,
 /// whether it exists or not, in the order of the projects.

@@ -106,14 +106,17 @@ internal static class DescribeCommand
         var log = SharedOptions.LogOption();
         var envFile = SharedOptions.EnvFileOption();
 
-        // The two options of the build that calls the tool.  Each takes exactly one value, given once.
-        var manifest = new Option<string>(ManifestOption)
+        // The two options of the build that calls the tool.  --online takes exactly one value, given once;
+        // --manifest is given once for each target framework of the project, as --project is.
+        var manifest = new Option<string[]>(ManifestOption)
         {
             Description =
-                "Describe the project that this manifest file describes, without asking MSBuild.  For the use of "
-                + "the SqlSource build, which has written the file.",
+                "Describe the project that these manifest files describe, without asking MSBuild: the manifest of "
+                + "each of the project's target frameworks, each given with its own --manifest.  For the use of the "
+                + "SqlSource build, which has written the files.",
             HelpName = "path",
-            Arity = ArgumentArity.ExactlyOne,
+            Arity = ArgumentArity.OneOrMore,
+            AllowMultipleArgumentsPerToken = false,
         };
 
         var online = new Option<string>(OnlineOption)
@@ -407,7 +410,7 @@ internal static class DescribeCommand
             && SharedOptions.ReadsAs(usage, parsed, SharedOptions.Connection)
             && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.Log)
             && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.EnvFile)
-            && SharedOptions.ReadsAsOne(usage, parsed, ManifestOption)
+            && SharedOptions.ReadsAs(usage, parsed, ManifestOption)
             && SharedOptions.ReadsAsOne(usage, parsed, OnlineOption)
         );
 

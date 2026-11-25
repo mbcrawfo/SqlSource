@@ -13,7 +13,7 @@
       "resultKind": "rows",
       "matchesTable": null,
       "plan": "skipped",
-      "tableMatch": "order-differs",
+      "tableMatch": "columns-differ",
       "parameters": [
         {
           "name": "orderId",

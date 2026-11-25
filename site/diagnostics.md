@@ -2352,7 +2352,7 @@ $ dotnet sqlsource describe src/Tools/Tools.csproj
 The tool reads projects by these rules:
 
 - **A project of a solution that was not named is not an error.**  The tool leaves it out, and says nothing.
-- **A project with several target frameworks is read by the first of them.**  So a project that references SqlSource for a later framework alone is this error.
+- **A project with several target frameworks uses SqlSource when any of them does.**  So a project that references SqlSource for one framework alone is not this error.
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2362,7 +2362,7 @@ See: [Arguments](reference/cli.md#arguments)
 
 Reported by: the tool.
 
-`sqlsource` asks MSBuild about each project with `dotnet msbuild`: first what the project is, then which files the compiler is given.  One of those runs failed.  The lines under the error give the reason, and then the first twenty lines that MSBuild wrote.
+`sqlsource` asks MSBuild about each project with `dotnet msbuild`: first what the project is, then which files the compiler is given.  It asks about each target framework of a project that has several.  One of those runs failed, and the tool describes nothing of the project.  The lines under the error give the reason, and then the first twenty lines that MSBuild wrote.
 
 ```console
 $ dotnet sqlsource describe
@@ -2404,6 +2404,7 @@ Here the SqlSource package of the project and the `sqlsource` tool are of differ
 
 - **When the build runs the tool, the message names the manifest file that the build wrote, by its full path**, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, whatever the path holds.
 - **A `--manifest` path that you typed and that may be a secret is named by its position**, as `The project manifest at position 3 cannot be read`: see [how an error names a path](reference/cli.md#paths).  A reason of the system is then only `the system would not read it`, since its words repeat the path.
+- **The manifests can be of two projects**, as `it is of '/work/Tools/Tools.csproj', and the first manifest is of '/work/App/App.csproj'` says.  You can give `--manifest` once for each target framework of one project.  Give the manifests of one project alone.
 - **Any other reason, such as one that names a line, is a bug in SqlSource.**  The package wrote a file that the tool of its own version does not expect.  [Report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
 See: [Install the tool](reference/cli.md#install-the-tool)
@@ -2862,6 +2863,7 @@ $ dotnet sqlsource describe
 1. Run `dotnet restore` on the solution or the project.
 2. Run the command again.
 
+- **A project with several target frameworks gives this error when one framework was not restored**, as after you add a framework to `TargetFrameworks`.  The tool describes none of its frameworks until you restore.
 - **In a solution every C# project is checked, one that has no SQL too.**  A run on a fresh checkout must not succeed by finding nothing.
 - **A reference that keeps the MSBuild files of the package out of the project gives this error after a restore as well**, `ExcludeAssets="build"` for one.  Remove that from the reference.
 

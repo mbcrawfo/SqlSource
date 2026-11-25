@@ -306,6 +306,63 @@ public sealed class RunProjectsTests : IDisposable
         _runner.Requests.Count.ShouldBe(2);
     }
 
+    // A shell's $PWD keeps the spelling of a link to the working directory, which the system gives as the real folder.
+    [Fact]
+    public async Task Find_ProjectNamedThroughALinkToTheWorkingDirectory_IsThatProject()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
+        _ = Directory.CreateSymbolicLink(_folder.PathOf("Link"), _folder.Path);
+
+        var manifests = await FindInSolutionAsync(_folder.PathOf("Link/B/B.csproj"));
+
+        manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(_b);
+        Asked().ShouldBe([_b]);
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Find_ProjectNamedThroughALinkToAFolderAbove_IsThatProject()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
+        var above = Path.GetDirectoryName(_folder.Path)!;
+        _ = Directory.CreateSymbolicLink(_folder.PathOf("Up"), above);
+
+        var manifests = await FindInSolutionAsync(
+            Path.Combine(_folder.PathOf("Up"), Path.GetFileName(_folder.Path), "B", "B.csproj")
+        );
+
+        manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(_b);
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    // The unit keeps the spelling it was named by, and so do its projects, which MSBuild is asked about.
+    [Fact]
+    public async Task Find_SolutionNamedThroughALinkAndProjectByItsRealPath_IsTheSolutionsSpelling()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
+        _ = Directory.CreateSymbolicLink(_folder.PathOf("Link"), _folder.Path);
+        var throughLink = _folder.PathOf("Link/B/B.csproj");
+
+        var manifests = await FindAsync(new RunUnit(RunUnitKind.Solution, _folder.PathOf("Link/App.slnx")), _b);
+
+        manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(throughLink);
+        Asked().ShouldBe([throughLink]);
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Find_MissingProjectNamedThroughALink_IsSqlsrc207AsTyped()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
+        _ = Directory.CreateSymbolicLink(_folder.PathOf("Link"), _folder.Path);
+        var missing = _folder.PathOf("Link/D/D.csproj");
+
+        var manifests = await FindInSolutionAsync(missing, _b);
+
+        manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(_b);
+        _error.ToString().ShouldBe(Sqlsrc207(missing));
+    }
+
     [Fact]
     public async Task Find_NamedPathOutsideTheSolution_IsSqlsrc207AndTheRestIsRead()
     {
@@ -401,6 +458,36 @@ public sealed class RunProjectsTests : IDisposable
         var manifests = await FindInProjectAsync(Path.Combine("A", "A.csproj"));
 
         manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(_a);
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Find_ProjectWithSeveralFrameworks_GivesTheManifestOfEachConsecutively()
+    {
+        _runner.Projects[_a] = new FakeProject { TargetFrameworks = "net8.0;net10.0" };
+
+        var manifests = await FindInSolutionAsync();
+
+        manifests
+            .Select(manifest => (Path.GetFileName(manifest.ProjectPath), manifest.TargetFramework))
+            .ShouldBe([
+                ("A.csproj", "net8.0"),
+                ("A.csproj", "net10.0"),
+                ("B.csproj", "net10.0"),
+                ("C.csproj", "net10.0"),
+            ]);
+    }
+
+    [Fact]
+    public async Task Find_ProjectWithSqlSourceForASecondFrameworkAlone_IsInTheRunOfASolution()
+    {
+        var project = new FakeProject { TargetFrameworks = "net8.0;net10.0" };
+        project.ImportedByFramework["net8.0"] = "";
+        _runner.Projects[_a] = project;
+
+        var manifests = await FindInSolutionAsync();
+
+        manifests.Select(manifest => manifest.ProjectPath).ShouldBe([_a, _b, _c]);
         _error.ToString().ShouldBeEmpty();
     }
 

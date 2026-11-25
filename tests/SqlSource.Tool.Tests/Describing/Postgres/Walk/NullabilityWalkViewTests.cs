@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -19,7 +20,7 @@ public sealed class NullabilityWalkViewTests
             new PlanInstancesCache(root, null),
             columns,
             origins,
-            new WalkScope(false, false, true, Tables, [.. ColumnTypes(asked.Length)])
+            new WalkScope(false, OldAndNewNames.None, true, Tables, [.. ColumnTypes(asked.Length)])
         );
     }
 
@@ -73,7 +74,7 @@ public sealed class NullabilityWalkViewTests
             new PlanInstancesCache(Scan("t", "t.id", "t.id"), null),
             [built[0] with { Name = "id" }, built[1] with { Name = "opt" }],
             origins,
-            new WalkScope(false, false, true, Tables, [.. ColumnTypes(2)])
+            new WalkScope(false, OldAndNewNames.None, true, Tables, [.. ColumnTypes(2)])
         );
 
         AnswersOf(outcome).ShouldBe([UnknownView, UnknownView]);
