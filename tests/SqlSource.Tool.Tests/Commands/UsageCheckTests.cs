@@ -401,6 +401,8 @@ public sealed class UsageCheckTests
             "--no-obfuscate",
             "--env-file",
             "--env-file=none",
+            "--configuration",
+            "--configuration=Release",
         ];
         var root = Cli.BuildCommands();
         var disagreements = new List<string>();
@@ -422,7 +424,7 @@ public sealed class UsageCheckTests
 
             // The command reads the values of its options from what UsageCheck read, and System.CommandLine gives the
             // log's path, so the two must give --project, --database, --connection, --log, --manifest, --online,
-            // --env-file, --query, --out and --scrub the same values too.
+            // --env-file, --configuration, --query, --out and --scrub the same values too.
             if (
                 !usage.IsReadTheSameBy(parsed)
                 || !DescribeCommand.ReadsValuesAs(usage, parsed)
@@ -528,6 +530,7 @@ public sealed class UsageCheckTests
     [InlineData(".sql path", 4, "describe", "--manifest", "m", "Q.sql")]
     [InlineData("'--project'", 5, "describe", "--manifest", "m", "--project", "P")]
     [InlineData("'--database'", 5, "describe", "--manifest", "m", "--database", "billing")]
+    [InlineData("'--configuration'", 5, "describe", "--manifest", "m", "--configuration", "Release")]
     [InlineData("path", 2, "describe", "App.csproj", "--manifest", "m")]
     public void CheckUsage_ManifestWithAnythingThatNamesWhatToRun_IsReportedByThePositionOfTheValue(
         string kind,
@@ -636,6 +639,88 @@ public sealed class UsageCheckTests
             .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), ["describe", "--manifest", "m", "--log", "a;b.log"]))
             .ShouldBe([
                 "sqlsource: the value of option '--log' at position 5 holds '=' or ';', which a log's path may not",
+            ]);
+
+    [Theory]
+    [InlineData("Release", "describe", "--configuration", "Release")]
+    [InlineData("Staging 2", "describe", "--configuration=Staging 2", "App.csproj", "--watch")]
+    [InlineData("release", "describe", "--check", "--configuration:release")]
+    public void CheckUsage_Configuration_GivesNoLineAndItsValue(string expected, params string[] args)
+    {
+        var usage = UsageCheck.Check(Cli.BuildCommands(), args);
+
+        usage.Messages.ShouldBeEmpty();
+        DescribeCommand.CheckUsage(usage).ShouldBeEmpty();
+        SharedOptions.ValuesOf(usage, SharedOptions.Configuration).ShouldHaveSingleItem().Text.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Check_ConfigurationGivenTwice_IsNamedAndItsValueIsNot() =>
+        UsageCheck
+            .Check(Cli.BuildCommands(), ["describe", "--configuration", "Release", "--configuration=" + Secrets.Word])
+            .Messages.ShouldBe(["sqlsource: option '--configuration' is given more than once"]);
+
+    [Fact]
+    public void CheckUsage_ConfigurationOfDiagnoseWithAQuery_GivesNoLine()
+    {
+        var usage = UsageCheck.Check(
+            Cli.BuildCommands(),
+            ["diagnose", "--query", "Q.sql:N", "--out", "o.zip", "--configuration", "Release"]
+        );
+
+        usage.Messages.ShouldBeEmpty();
+        DiagnoseCommand.CheckUsage(usage).ShouldBeEmpty();
+        SharedOptions.ValuesOf(usage, SharedOptions.Configuration).ShouldHaveSingleItem().Text.ShouldBe("Release");
+    }
+
+    // A scrub reads no project.
+    [Fact]
+    public void CheckUsage_ConfigurationOfDiagnoseWithAScrub_IsReported() =>
+        DiagnoseCommand
+            .CheckUsage(
+                UsageCheck.Check(
+                    Cli.BuildCommands(),
+                    ["diagnose", "--scrub", "b.zip", "--out", "o.zip", "--configuration", "Release"]
+                )
+            )
+            .ShouldBe(["sqlsource: option '--scrub' takes no other option but '--out'"]);
+
+    [Theory]
+    [InlineData(7, "diagnose", "--query", "Q.sql:N", "--out", "o.zip", "--configuration", " ")]
+    [InlineData(6, "diagnose", "--query", "Q.sql:N", "--out", "o.zip", "--configuration=a=" + Secrets.Word)]
+    public void CheckUsage_ConfigurationOfDiagnoseThatIsNoName_IsReportedByItsPosition(
+        int position,
+        params string[] args
+    ) =>
+        DiagnoseCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldHaveSingleItem()
+            .ShouldStartWith($"sqlsource: the value of option '--configuration' at position {position} ");
+
+    [Theory]
+    [InlineData(3, "describe", "--configuration", "")]
+    [InlineData(2, "describe", "--configuration= ")]
+    public void CheckUsage_ConfigurationThatIsNoName_IsReportedByItsPosition(int position, params string[] args) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([
+                $"sqlsource: the value of option '--configuration' at position {position} is not a configuration's "
+                    + "name",
+            ]);
+
+    // Such a value may be a connection string typed after the option, and the log holds the value as it is given.
+    [Theory]
+    [InlineData(3, "describe", "--configuration", "Password=" + Secrets.Word)]
+    [InlineData(2, "describe", "--configuration=a;" + Secrets.Word)]
+    public void CheckUsage_ConfigurationWithAnEqualsSignOrASemicolon_IsNamedByItsPosition(
+        int position,
+        params string[] args
+    ) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([
+                $"sqlsource: the value of option '--configuration' at position {position} holds '=' or ';', which a "
+                    + "configuration's name may not",
             ]);
 
     // System.CommandLine's own message for a second value repeats it.

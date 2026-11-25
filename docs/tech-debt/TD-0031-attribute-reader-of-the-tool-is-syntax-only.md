@@ -1,15 +1,10 @@
-# TD-0031 - The tool reads `[SqlSourceGenerate]` as syntax, and misreads what only a compilation can tell
+# TD-0031 - The tool reads `[SqlSourceGenerate]` as syntax, and takes a type of the same name for it
 
 ## Problem
 
-[`AttributeReader`](../../src/SqlSource.Tool/Planning/AttributeReader.cs) finds the attribute by its name in the text of a project's C# files.  The generator finds it by its symbol.  Four things are therefore read differently by the two:
+[`AttributeReader`](../../src/SqlSource.Tool/Planning/AttributeReader.cs) finds the attribute by its name, or by a `using` alias of it, in the text of a project's C# files and its `Using` items.  The generator finds it by its symbol.  So a project's own `SqlSourceGenerateAttribute` in another namespace is a claim for the tool and nothing for the generator, and the tool describes queries that nothing uses.  So is an alias of such a type, since an alias's target is matched by its last name alone.
 
-- **An alias.**  `using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]` is a claim for the generator and nothing for the tool, so the type's queries are never described, and its build reports their entries as missing, `SQLSRC241`.
-- **A type of the same name.**  A project's own `SqlSourceGenerateAttribute` in another namespace is a claim for the tool and nothing for the generator.  The tool describes queries that nothing uses.
-- **`#if` under another configuration.**  The tool reads the files with the constants of the manifest, which are those of the configuration that `dotnet msbuild` evaluates, `Debug` unless the environment says otherwise, with each target framework's own.  An attribute inside `#if RELEASE` is not seen.
-- **The attribute on two partial declarations of one type.**  The generator takes the first, and the tool takes each for a claim, so it describes the files that either attribute's `Source` names.  The compiler rejects the second attribute, so only a project that does not build is read this way.
-
-A `Source` that is not a literal is not among them: the tool reports it, `SQLSRC208`.
+A `Source` that is not a literal is not among the differences: the tool reports it, `SQLSRC208`.  Nor is an attribute inside `#if`, which the tool reads with the constants of the configuration it evaluates, chosen by `--configuration` as `dotnet build -c` does, nor the attribute on two partial declarations of one type, which the tool reads at the first, as the generator does.
 
 ## Why it exists
 
@@ -17,12 +12,12 @@ The tool has no compilation.  Making one means resolving every reference of the 
 
 ## Impact
 
-Low.  Each case takes a project that does something unusual with the attribute's name, and the first is found at once, since the build reports the missing entries.
+Low.  It takes a project that names a type of its own after the attribute.  The manual lists it as a limit, [an attribute of your own named `SqlSourceGenerate`](../../site/reference/attributes.md#limit-attribute-of-the-same-name).
 
 ## Proposed fix
 
-For the alias: read the `using` aliases of a file, and of the project's global usings, and match an attribute through them.  For the configuration: let `describe` take the configuration to evaluate, as `dotnet build -c` does.  The type of the same name needs symbols, and is left.
+It needs what a name means in the compilation: the types each namespace holds.  A reader could follow `using` directives and namespaces to the namespace of the attribute's name, and refuse one that does not reach `SqlSource`, at the cost of reading every C# file of the project for the types it declares, and the types of its references for those it does not.
 
 ## Trigger
 
-A user reports a type whose queries the tool does not describe, or describes and should not.
+A user reports a type whose queries the tool describes and should not.

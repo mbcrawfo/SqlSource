@@ -105,10 +105,18 @@ internal static class PlanSteps
 
     /// <summary>
     /// The projects of the unit that the command line runs, which <c>--project</c> narrows, and their manifests: the
-    /// evaluation of each, and its manifest target.  A project with an error is reported and has no manifest.
+    /// evaluation of each, in the configuration that <c>--configuration</c> names, and its manifest target.  A project
+    /// with an error is reported and has no manifest.
     /// </summary>
     internal static Task<FoundProjects> FindManifestsAsync(RunUnit unit, Usage usage, RunContext context) =>
-        RunProjects.FindAsync(unit, SharedOptions.ValuesOf(usage, SharedOptions.Project), context);
+        RunProjects.FindAsync(
+            unit,
+            SharedOptions.ValuesOf(usage, SharedOptions.Project),
+            SharedOptions.ValuesOf(usage, SharedOptions.Configuration) is [{ } configuration]
+                ? configuration.Text
+                : null,
+            context
+        );
 
     /// <summary>
     /// The plan of the manifests, which <c>--database</c> and the <c>.sql</c> paths narrow, with what is wrong with it

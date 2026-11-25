@@ -658,7 +658,8 @@ public sealed class RunLogTests : IDisposable
             return;
         }
 
-        _ = _scene.Project.AddSource("Plain/Queries.cs", Plans.Type);
+        // A type of its own: a second attribute on the scene's Queries is read as the compiler reads it, not at all.
+        _ = _scene.Project.AddSource("Plain/Queries.cs", Plans.TypeNamed("PlainQueries"));
         var plain = _scene.Project.AddSql("Plain/Plain.sql", SqlTexts.Plain);
         var sidecar = SidecarFormat.PathFor(plain);
         await File.WriteAllTextAsync(sidecar, SidecarFiles.Empty(), TestContext.Current.CancellationToken);

@@ -148,6 +148,7 @@ The file is lines of `key=value`, and the key ends at the first `=`.  The target
 5. `File=` and the full path of each `AdditionalFiles` item whose extension is `.sql`, compared ignoring case, in the order of the items.
 6. `Settings=` and the full path of each `AdditionalFiles` item named `sqlsource.json`, compared ignoring case, once each: those the search added and any the project lists itself, so that the tool reads exactly the settings files the compiler is given.
 7. `Compile=` and the full path of each `Compile` item.
+8. `UsingAlias=`, the `Alias` of each `Using` item that has one, `=`, and the item's identity, the type or namespace it names.  The SDK writes such an item into a `global using` of a file under `obj` only on the way to a compile, so no `Compile` line holds it, and the tool reads `[SqlSourceGenerate]` through it.  A package before this line wrote none, and its manifest keeps version 2: the line is an addition.
 
 No line holds a setting: the tool reads the settings from the files of the `Settings` lines, as the generator does.  Version 1 had a `Property.<Name>=` line for each setting of the package and `File.<Name>=` lines for the item metadata of each `.sql` file.  Version 2 dropped them, and so the version rose: this tool would read a manifest of version 1, whose settings are on those lines, as setting nothing, without a word.
 
@@ -160,7 +161,7 @@ A path comes from an item's `FullPath`, and MSBuild does not split it.  [`tests/
 
 ### Reading it
 
-[`ManifestReader.Read`](../../src/SqlSource.Tool/Projects/ManifestReader.cs) gives a [`ProjectManifest`](../../src/SqlSource.Tool/Projects/ProjectManifest.cs), or the reason the text is not a manifest.  A `ProjectManifest` holds the project's path in `ProjectPath`, `TargetFramework`, `LangVersion` and `DefineConstants`, the value of the build's folders as it is in `BuildFolders`, which `BuildFolders.Of` decodes, and the paths of the `File`, `Settings` and `Compile` lines in `Files`, `SettingsFiles` and `CompileFiles`.
+[`ManifestReader.Read`](../../src/SqlSource.Tool/Projects/ManifestReader.cs) gives a [`ProjectManifest`](../../src/SqlSource.Tool/Projects/ProjectManifest.cs), or the reason the text is not a manifest.  A `ProjectManifest` holds the project's path in `ProjectPath`, `TargetFramework`, `LangVersion` and `DefineConstants`, the value of the build's folders as it is in `BuildFolders`, which `BuildFolders.Of` decodes, the paths of the `File`, `Settings` and `Compile` lines in `Files`, `SettingsFiles` and `CompileFiles`, and the `UsingAlias` lines in `UsingAliases`, each cut at its first `=` and trimmed, a value with no alias passed over.
 
 - The first line must be `SqlSourceManifest=2`.  A manifest of another version is not read at all, and the reason says that the package and the tool are out of step; the tool reports it as [SQLSRC206](../../site/diagnostics.md#sqlsrc206).  A byte order mark before it is passed over, and a line may end with `\r\n` as well as `\n`.
 - A key the reader does not know is passed over, and so is an empty line: both are how a later package adds to the format.  A `Property.` or `File.<Name>` line, which no package of version 2 writes, is such a key.
