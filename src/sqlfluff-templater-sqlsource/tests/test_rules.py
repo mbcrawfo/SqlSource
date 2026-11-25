@@ -104,3 +104,30 @@ def test_carriage_return_ends_a_line_where_the_dialect_says(dialect, expected):
 )
 def test_find_line_end_gives_where_the_first_line_ends(dialect, text, start, end, at):
     assert DialectRules.for_choice(DialectChoice(dialect)).find_line_end(text, start, end) == at
+
+
+# Rows of `Lex_VersionedComment_IsReadAsTheServerReadsIt`: where the body of a versioned comment starts when the
+# server runs it, or None.
+@pytest.mark.parametrize(
+    ("dialect", "version", "text", "body"),
+    [
+        (Dialect.MYSQL, 0, "/*! x */", 3),
+        (Dialect.MYSQL, 0, "/*!1234 x */", 3),
+        (Dialect.MYSQL, 0, "/*!50700 x */", None),
+        (Dialect.MYSQL, 80400, "/*!50700 x */", 8),
+        (Dialect.MYSQL, 80400, "/*!100100\tx */", None),
+        (Dialect.MYSQL, 80400, "/*!100100\nx */", None),
+        (Dialect.MYSQL, 80400, "/*!100100, x */", 8),
+        (Dialect.MYSQL, 80400, "/*!080400 x */", 9),
+        (Dialect.MYSQL, 80400, "/*M!50700 x */", None),
+        (Dialect.MARIADB, 110400, "/*!50700 x */", None),
+        (Dialect.MARIADB, 110400, "/*!50699 x */", 8),
+        (Dialect.MARIADB, 110400, "/*M!50700 x */", 9),
+        (Dialect.MARIADB, 110400, "/*!100100, x */", 9),
+        (Dialect.MARIADB, 110400, "/*!5060000 x */", None),
+    ],
+)
+def test_runs_versioned_comment_reads_the_version_as_the_server_does(dialect, version, text, body):
+    rules = DialectRules.for_choice(DialectChoice(dialect, server_version=version))
+
+    assert rules.runs_versioned_comment(text, 0) == body

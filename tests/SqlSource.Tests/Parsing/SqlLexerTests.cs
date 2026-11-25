@@ -502,6 +502,11 @@ public sealed class SqlLexerTests
     [InlineData("MySql", 0, "/*!50700 a */ b */", "Hint:/*!50700 a */ | Text: b */")]
     [InlineData("MySql", 0, "/*! , '*/' */ x", "Hint:/*! , '*/' */ | Text: x")]
     [InlineData("MySql", 0, "/*!123 '*/' */ x", "Hint:/*!123 '*/' */ | Text: x")]
+    // Four digits are no version: they are body, which always runs.
+    [InlineData("MySql", 0, "/*!1234 # */\n */ x", "Hint:/*!1234 # */\n */ | Text: x")]
+    // Six digits before any white space are a version, 10.1.0 here, which MySQL 8.4 does not run.
+    [InlineData("MySql", 80400, "/*!100100\t# */\n */ x", "Hint:/*!100100\t# */ | Text:\n */ x")]
+    [InlineData("MySql", 80400, "/*!100100\n# */\n */ x", "Hint:/*!100100\n# */ | Text:\n */ x")]
     [InlineData("MySql", 80400, "/*!080400 '*/' */ x", "Hint:/*!080400 '*/' */ | Text: x")]
     [InlineData("MySql", 80400, "/*!100100 a */ b */", "Hint:/*!100100 a */ | Text: b */")]
     [InlineData("MySql", 80400, "/*!100100, '*/' */ x", "Hint:/*!100100, '*/' */ | Text: x")]

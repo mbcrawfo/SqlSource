@@ -22,7 +22,7 @@ from sqlfluff_templater_sqlsource.errors import (
 from sqlfluff_templater_sqlsource.plan import Plan, build_plan
 from sqlfluff_templater_sqlsource.render import render
 from sqlfluff_templater_sqlsource.rules import DialectRules
-from sqlfluff_templater_sqlsource.settings import resolve_dialect
+from sqlfluff_templater_sqlsource.settings import decode, resolve_dialect
 from sqlfluff_templater_sqlsource.stand_ins import UNLINTABLE_OPTIONS, compatible
 
 # The title of each error that stops a plan, as its C# diagnostic descriptor gives it.  A test keeps it equal to
@@ -108,9 +108,7 @@ def _lone_carriage_return(fname: str, dialect: DialectChoice) -> list[SQLTemplat
     path = Path(fname)
     if not path.is_file():
         return []
-    raw = path.read_bytes()
-    text = raw.decode("utf-16") if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else raw.decode("utf-8", errors="replace")
-    text = text.removeprefix(_BYTE_ORDER_MARK)
+    text = decode(path.read_bytes())
     found = _LONE_CARRIAGE_RETURN.search(text)
     if found is None:
         return []

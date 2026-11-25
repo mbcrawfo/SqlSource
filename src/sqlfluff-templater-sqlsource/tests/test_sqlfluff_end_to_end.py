@@ -634,3 +634,29 @@ def test_carriage_return_that_ends_a_line_for_the_dialect_is_linted(sqlsource, r
     )
 
     assert [code for code in codes(linted) if code in ("PRS", "TMP", "LXR")] == []
+
+
+# The file is decoded as SqlSource decodes it, by its byte order mark: a line feed after a carriage return is found in
+# every encoding, and a carriage return alone too.
+@pytest.mark.parametrize(
+    "encoding", ["utf-8", "utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "utf-32", "utf-32-le", "utf-32-be"]
+)
+@pytest.mark.parametrize(("line_end", "tmp"), [("\r\n", False), ("\r", True)])
+def test_carriage_return_is_found_in_every_encoding(encoding, line_end, tmp, tmp_path):
+    (tmp_path / "sqlsource.json").write_text('{ "root": true, "dialect": "mysql" }', encoding="utf-8")
+    raw = f"-- name: A{line_end}SELECT 1 AS a -- c{line_end}FROM t;\n"
+    # A codec without a byte order mark of its own gets one, as an editor writes it.
+    bom = {
+        "utf-16-le": codecs.BOM_UTF16_LE,
+        "utf-16-be": codecs.BOM_UTF16_BE,
+        "utf-32-le": codecs.BOM_UTF32_LE,
+        "utf-32-be": codecs.BOM_UTF32_BE,
+    }
+    (tmp_path / "Query.sql").write_bytes(bom.get(encoding, b"") + raw.encode(encoding))
+
+    linted = lint(raw.replace("\r\n", "\n").replace("\r", "\n"), "mysql", tmp_path)
+
+    found = [violation for violation in linted.get_violations() if violation.rule_code() == "TMP"]
+    assert bool(found) == tmp
+    if tmp:
+        assert (found[0].line_no, found[0].line_pos) == (1, 11)

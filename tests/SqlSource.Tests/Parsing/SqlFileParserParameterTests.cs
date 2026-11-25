@@ -344,6 +344,24 @@ public sealed class SqlFileParserParameterTests
         Warnings(text).Length.ShouldBe(written ? 0 : 1);
     }
 
+    // A marker with an item that is not a name gives none of its names, so a name before that item is no variable that
+    // a -- param: marker could also declare.
+    [Fact]
+    public void Parse_VariableMarkerWithAnItemThatIsNotAName_GivesNoneOfItsNames()
+    {
+        const string Text = "-- name: Q\n-- variable: @n, m\n-- param: @n int\nSELECT @n\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    TextSpans.Of(Text, "@n, m"),
+                    "variable: @n, m",
+                    ""
+                ),
+            ]);
+    }
+
     [Fact]
     public void Parse_VariableMarkerWithoutAValue_IsInvalid()
     {
