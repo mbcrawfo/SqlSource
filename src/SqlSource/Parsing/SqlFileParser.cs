@@ -171,7 +171,7 @@ internal static class SqlFileParser
             var markers = new List<(int Index, SqlMarker Marker)>();
             for (var index = 0; index < lexemes.Count; index++)
             {
-                if (SqlMarkerReader.Read(text, lexemes[index]) is { Kind: SqlMarkerKind.Name } marker)
+                if (SqlMarkerReader.Read(text, lexemes[index], rules) is { Kind: SqlMarkerKind.Name } marker)
                 {
                     markers.Add((index, marker));
                 }
@@ -251,7 +251,7 @@ internal static class SqlFileParser
             for (var index = 0; index < end; index++)
             {
                 var lexeme = lexemes[index];
-                if (SqlMarkerReader.Read(text, lexeme) is { } marker)
+                if (SqlMarkerReader.Read(text, lexeme, rules) is { } marker)
                 {
                     if (marker.Kind == SqlMarkerKind.Dialect)
                     {
@@ -333,6 +333,7 @@ internal static class SqlFileParser
                     MemberLocationMarker = scope?.MemberLocationMarker,
                     VisibilityMarker = scope?.VisibilityMarker,
                     DeclaredVariables = query.DeclaredVariables,
+                    MarkedVariables = SqlParameterList.NamesOf(text, scope?.Variables ?? []),
                     MethodErrors = FindRefusedEmptyLists(query),
                 }
             );
@@ -351,7 +352,7 @@ internal static class SqlFileParser
             var summary = new List<string>();
             for (var index = start; index < end; index++)
             {
-                if (SqlMarkerReader.Read(text, lexemes[index]) is not { } marker)
+                if (SqlMarkerReader.Read(text, lexemes[index], rules) is not { } marker)
                 {
                     continue;
                 }
@@ -392,7 +393,7 @@ internal static class SqlFileParser
         // from it.
         private BuiltQuery BuildQuery(SqlMarkerScope? scope, int start, int end)
         {
-            var sql = SqlTextBuilder.Build(text, lexemes, start, end, keepComments: false);
+            var sql = SqlTextBuilder.Build(text, rules, lexemes, start, end, keepComments: false);
             var scanned = TokenScanner.Scan(sql.Text, scope?.IgnoredTokens ?? SqlMarkerScope.NoNames);
             foreach (var error in scanned.Errors)
             {
@@ -406,9 +407,12 @@ internal static class SqlFileParser
             var tokens = SqlTokenList.Create(text, sql, scanned.Occurrences, tokenDefaults, _errors);
 
             // A variable is written in the SQL where it is declared, so SQL without parameters declares none, and has
-            // no use to classify.
-            var variables =
-                sql.Parameters.Length == 0 ? null : SqlDeclaredVariables.Find(text, lexemes, start, end, rules);
+            // no use to classify.  A -- variable: marker names one in any dialect, which a token's default may write.
+            var variables = SqlDeclaredVariables.With(
+                sql.Parameters.Length == 0 ? null : SqlDeclaredVariables.Find(text, lexemes, start, end, rules),
+                text,
+                scope?.Variables ?? []
+            );
             // Where each list stands is read for SQL Server alone: a list there that no NOT reaches is sent empty as
             // one NULL, which SQL Server takes where it refuses a subquery.
             var places = ImmutableArray<SqlListPlace>.Empty;
@@ -430,10 +434,23 @@ internal static class SqlFileParser
                 rules,
                 new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables, uses),
                 tokenDefaults,
-                scope?.Declarations ?? [],
+                scope is null ? [] : SqlParameterList.WithoutVariables(text, scope.Declarations, scope.Variables),
                 _errors,
                 _warnings
             );
+            if (scope is { Variables.Count: > 0 })
+            {
+                SqlParameterList.CheckVariables(
+                    rules,
+                    text,
+                    new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables, uses),
+                    tokenDefaults,
+                    scope.Variables,
+                    scope.Declarations,
+                    _errors,
+                    _warnings
+                );
+            }
 
             if (spans is not null)
             {
@@ -563,7 +580,7 @@ internal static class SqlFileParser
             ISet<string> ignoredTokens
         )
         {
-            var kept = SqlTextBuilder.Build(text, lexemes, start, end, keepComments: true);
+            var kept = SqlTextBuilder.Build(text, rules, lexemes, start, end, keepComments: true);
             if (string.Equals(kept.Text, query.Sql.Text, StringComparison.Ordinal))
             {
                 return (null, EquatableArray<SqlParseError>.Empty);

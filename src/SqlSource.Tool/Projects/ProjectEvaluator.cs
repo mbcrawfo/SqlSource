@@ -19,8 +19,8 @@ namespace SqlSource.Tool.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// One run of <c>dotnet msbuild</c> evaluates a project and runs no target, and a second does the same under the
-/// first of several target frameworks.  The last, for a project that uses SqlSource alone, runs the target
+/// One run of <c>dotnet msbuild</c> evaluates a project and runs no target, and one more does the same under each of
+/// several target frameworks.  A run for each framework that uses SqlSource runs the target
 /// <c>SqlSourceWriteManifest</c> of the package, which writes a file the tool named.  So the tool reads nothing that
 /// MSBuild prints but the JSON of <c>-getProperty</c> and <c>-getItem</c>, writes nothing into a project, and never
 /// restores or builds one.
@@ -127,12 +127,15 @@ internal static class ProjectEvaluator
     }
 
     /// <summary>
-    /// The first of a project's <c>TargetFrameworks</c>, or null when it has none.
+    /// The frameworks of a project's <c>TargetFrameworks</c>: split at <c>;</c>, trimmed, with no empty entry and no
+    /// repeat, ignoring case, the first kept.
     /// </summary>
-    internal static string? FirstFramework(string targetFrameworks) =>
-        targetFrameworks
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .FirstOrDefault();
+    internal static ImmutableArray<string> Frameworks(string targetFrameworks) =>
+        [
+            .. targetFrameworks
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase),
+        ];
 
     private static async Task<ProjectEvaluation> EvaluateOneAsync(
         ToolHost host,
@@ -149,24 +152,116 @@ internal static class ProjectEvaluator
             return Failed(project, "the project file does not exist", new ProcessResult(0, "", ""));
         }
 
-        var asked = await AskAsync(host, project, solutionSwitches, cancellationToken);
-        if (!asked.Succeeded)
+        var evaluate = EvaluateArguments(project, solutionSwitches);
+        var result = await RunAsync(host, project, evaluate, cancellationToken);
+        if (!TryReadAnswer(result, out var answer, out var reason))
         {
-            return asked.Failure;
+            return Failed(project, reason, result);
         }
 
-        var assetsFile = AssetsFileOf(asked.Value.Answer, project);
-        var state = StateOf(asked.Value.Answer, assetsFile);
-        if (state != ProjectState.UsesSqlSource)
+        var assetsFile = AssetsFileOf(answer, project);
+
+        // NuGet imports a package's props into a project with several frameworks only under a condition on
+        // TargetFramework, so this answer says nothing but which frameworks there are.
+        var frameworks = answer.TargetFramework.Length != 0 ? [] : Frameworks(answer.TargetFrameworks);
+        if (frameworks.IsEmpty)
         {
-            return new ProjectEvaluation(project, state, AssetsFile: assetsFile);
+            var state = StateOf(answer, assetsFile);
+            return state == ProjectState.UsesSqlSource
+                ? await RunTargetAsync(host, project, manifestFile, [], solutionSwitches, assetsFile, cancellationToken)
+                : new ProjectEvaluation(project, state, AssetsFile: assetsFile);
         }
 
+        return await EvaluateFrameworksAsync(
+            host,
+            project,
+            frameworks,
+            evaluate,
+            solutionSwitches,
+            manifestFile,
+            assetsFile,
+            cancellationToken
+        );
+    }
+
+    // Each framework is evaluated in turn, and the target runs for each that uses SqlSource, into a file of its own.
+    private static async Task<ProjectEvaluation> EvaluateFrameworksAsync(
+        ToolHost host,
+        string project,
+        ImmutableArray<string> frameworks,
+        ImmutableArray<string> evaluate,
+        ImmutableArray<string> solutionSwitches,
+        string manifestFile,
+        string? assetsFile,
+        CancellationToken cancellationToken
+    )
+    {
+        var manifests = ImmutableArray.CreateBuilder<ProjectManifest>();
+        var directory = Path.GetDirectoryName(manifestFile) ?? "";
+        var stem = Path.GetFileNameWithoutExtension(manifestFile);
+        for (var index = 0; index < frameworks.Length; index++)
+        {
+            ImmutableArray<string> frameworkSwitch = [MSBuildProperty.Switch("TargetFramework", frameworks[index])];
+            var result = await RunAsync(host, project, [.. evaluate, .. frameworkSwitch], cancellationToken);
+            if (!TryReadAnswer(result, out var answer, out var reason))
+            {
+                return Failed(project, reason, result);
+            }
+
+            // A framework that was not restored makes the project not restored, as a failed one fails it: a plan of
+            // the other frameworks alone could leave out what only that one needs.
+            var state = StateOf(answer, assetsFile);
+            if (state == ProjectState.NotRestored)
+            {
+                return new ProjectEvaluation(project, ProjectState.NotRestored, AssetsFile: assetsFile);
+            }
+
+            if (state != ProjectState.UsesSqlSource)
+            {
+                continue;
+            }
+
+            var file = Path.Combine(
+                directory,
+                stem + "-" + index.ToString(CultureInfo.InvariantCulture) + Path.GetExtension(manifestFile)
+            );
+            var evaluation = await RunTargetAsync(
+                host,
+                project,
+                file,
+                frameworkSwitch,
+                solutionSwitches,
+                assetsFile,
+                cancellationToken
+            );
+            if (evaluation.State != ProjectState.UsesSqlSource)
+            {
+                return evaluation;
+            }
+
+            manifests.AddRange(evaluation.Manifests);
+        }
+
+        var overall = manifests.Count != 0 ? ProjectState.UsesSqlSource : ProjectState.DoesNotUseSqlSource;
+        return new ProjectEvaluation(project, overall, manifests.ToImmutable(), AssetsFile: assetsFile);
+    }
+
+    // Runs the target for one framework, or for the project's only one, and reads what it wrote.
+    private static async Task<ProjectEvaluation> RunTargetAsync(
+        ToolHost host,
+        string project,
+        string manifestFile,
+        ImmutableArray<string> frameworkSwitch,
+        ImmutableArray<string> solutionSwitches,
+        string? assetsFile,
+        CancellationToken cancellationToken
+    )
+    {
         var target = await RunManifestTargetAsync(
             host,
             project,
             manifestFile,
-            [.. asked.Value.FrameworkSwitch, .. solutionSwitches],
+            [.. frameworkSwitch, .. solutionSwitches],
             cancellationToken
         );
         var evaluation = target.Succeeded
@@ -182,15 +277,8 @@ internal static class ProjectEvaluator
             ? null
             : Path.GetFullPath(answer.ProjectAssetsFile, Path.GetDirectoryName(project) ?? "");
 
-    // Evaluates the project and runs no target; a project of several frameworks is evaluated again under its first.
-    private static async Task<Outcome<Evaluated, ProjectEvaluation>> AskAsync(
-        ToolHost host,
-        string project,
-        ImmutableArray<string> solutionSwitches,
-        CancellationToken cancellationToken
-    )
-    {
-        ImmutableArray<string> evaluate =
+    // Evaluates the project and runs no target.
+    private static ImmutableArray<string> EvaluateArguments(string project, ImmutableArray<string> solutionSwitches) =>
         [
             "msbuild",
             project,
@@ -202,26 +290,6 @@ internal static class ProjectEvaluator
             "-getItem:PackageReference",
             .. solutionSwitches,
         ];
-
-        var result = await RunAsync(host, project, evaluate, cancellationToken);
-        if (!TryReadAnswer(result, out var answer, out var reason))
-        {
-            return Outcome<Evaluated, ProjectEvaluation>.Failed(Failed(project, reason, result));
-        }
-
-        // NuGet imports a package's props into a project with several frameworks only under a condition on
-        // TargetFramework, so this answer says nothing but which framework is the first.  TD-0026.
-        if (answer.TargetFramework.Length != 0 || FirstFramework(answer.TargetFrameworks) is not { } first)
-        {
-            return Outcome<Evaluated, ProjectEvaluation>.Of(new Evaluated(answer, []));
-        }
-
-        ImmutableArray<string> frameworkSwitch = [MSBuildProperty.Switch("TargetFramework", first)];
-        result = await RunAsync(host, project, [.. evaluate, .. frameworkSwitch], cancellationToken);
-        return TryReadAnswer(result, out answer, out reason)
-            ? Outcome<Evaluated, ProjectEvaluation>.Of(new Evaluated(answer, frameworkSwitch))
-            : Outcome<Evaluated, ProjectEvaluation>.Failed(Failed(project, reason, result));
-    }
 
     // Runs the target of the package that writes the manifest, to the file the tool named.
     private static async Task<Outcome<ProcessResult, ProjectEvaluation>> RunManifestTargetAsync(
@@ -270,7 +338,7 @@ internal static class ProjectEvaluator
 
         var read = ManifestReader.Read(text);
         return read.Succeeded
-            ? new ProjectEvaluation(project, ProjectState.UsesSqlSource, read.Value)
+            ? new ProjectEvaluation(project, ProjectState.UsesSqlSource, [read.Value])
             : new ProjectEvaluation(
                 project,
                 ProjectState.Failed,
@@ -464,7 +532,4 @@ internal static class ProjectEvaluator
         string ProjectAssetsFile,
         ImmutableArray<string> PackageReferences
     );
-
-    // What the evaluation of a project gave, and the switch of the framework it was evaluated under, if any.
-    private readonly record struct Evaluated(Answer Answer, ImmutableArray<string> FrameworkSwitch);
 }

@@ -245,24 +245,55 @@ public sealed class WalkTests(PostgresDatabases postgres)
             )
         ).ShouldBe([NotNullCatalog, NotNullCatalog, NullableOuterJoin]);
 
-    // A DELETE of one table prints bare names, which are its target's.  The function's name is what gates it.
+    // A DELETE of one table prints bare names, which are its target's.  The label new, a word of the gate, gates it,
+    // and the old and the new row print qualified on 18.
     [Fact]
     public async Task DescribeAsync_DeleteReturningBareNames_GivesTheTargetTheCatalogsAnswer() =>
-        (await WalkedAsync("DELETE FROM orders WHERE left(note, 1) = @initial RETURNING id, note")).ShouldBe([
+        (await WalkedAsync("DELETE FROM orders WHERE left(note, 1) = @initial RETURNING id, note AS new")).ShouldBe([
             NotNullCatalog,
             NullableCatalog,
         ]);
 
-    // The gate lets the query in for the word, and here the word is a table's alias.  The plan prints a table
-    // aliased old as it prints PostgreSQL 18's old row, so in a statement that names the word any alias but the
-    // target's keeps the heuristic, on every version.
+    // The gate lets the query in for the word, and here the word is a table's alias.  On 18 the plan prints a table
+    // aliased old as it prints the old row, so that alias keeps the heuristic; before 18 the word names no row, and
+    // the alias is mapped.
     [Fact]
-    public async Task DescribeAsync_TableAliasedOld_KeepsTheHeuristicForItsColumns() =>
+    public async Task DescribeAsync_TableAliasedOld_KeepsTheHeuristicForItsColumnsOn18() =>
         (
             await WalkedAsync(
-                "UPDATE users u SET name = @name FROM orders old WHERE old.user_id = u.id RETURNING old.total, u.id"
+                "UPDATE users u SET name = @name FROM orders old WHERE old.user_id = u.id RETURNING old.id, u.id"
+            )
+        ).ShouldBe([postgres.Major >= 18 ? NullableHeuristic : NotNullCatalog, NotNullCatalog]);
+
+    // A joined table of any other alias is mapped in a statement that names the old and the new row, quoted "Old"
+    // included, which the server compares exactly and so is no old row.
+    [Fact]
+    public async Task DescribeAsync_JoinedTableBesideTheOldAndTheNewRow_IsMapped()
+    {
+        postgres.SkipBelow(18, PostgresDatabases.NoOldAndNewInReturning);
+
+        (
+            await WalkedAsync(
+                "UPDATE users u SET name = @name FROM orders \"Old\" WHERE \"Old\".user_id = u.id "
+                    + "RETURNING \"Old\".id, old.id, new.id"
+            )
+        ).ShouldBe([NotNullCatalog, NullableHeuristic, NullableHeuristic]);
+    }
+
+    // A name a WITH gives the old row, here one an inner scope's alias has too and spelt with an escape, is the row's,
+    // NULL on every row an INSERT returns, and keeps the heuristic.
+    [Fact]
+    public async Task DescribeAsync_InsertSelectFromATableOfTheNameAWithGives_KeepsTheHeuristic()
+    {
+        postgres.SkipBelow(18, PostgresDatabases.NoOldAndNewInReturning);
+
+        (
+            await WalkedAsync(
+                "INSERT INTO orders (user_id, total) SELECT p.id, 0 FROM users p "
+                    + "RETURNING WITH (OLD AS U&\"\\0070\") p.id, orders.id"
             )
         ).ShouldBe([NullableHeuristic, NotNullCatalog]);
+    }
 
     // An alias of an inner scope reaches the plan under its own name: the SELECT of an INSERT ... SELECT aliases
     // users old, and the old row of the RETURNING list prints as old.id too, NULL on every row an INSERT returns.
@@ -302,6 +333,28 @@ public sealed class WalkTests(PostgresDatabases postgres)
         (
             await WalkedAsync("INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING \"old\".id")
         ).ShouldBe([NullableHeuristic]);
+    }
+
+    // An INSERT through a view prints the table under the alias of the view's query, here old, as it prints the old
+    // row, which is NULL on every row an INSERT returns.  So the target's alias is held to the rows' names too.
+    [Fact]
+    public async Task DescribeAsync_InsertThroughAViewThatAliasesItsTableOld_KeepsTheOldRowUnproved()
+    {
+        postgres.SkipBelow(18, PostgresDatabases.NoOldAndNewInReturning);
+        try
+        {
+            await postgres.ExecuteAsync("CREATE VIEW walk_old_view AS SELECT * FROM orders old");
+
+            var description = await ShouldDescribeAsync(
+                "INSERT INTO walk_old_view (user_id, total) VALUES (@user_id, @total) RETURNING old.id + 1 AS e"
+            );
+
+            Of(description.Columns.ShouldNotBeNull()).ShouldBe([UnknownNoOrigin]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync("DROP VIEW IF EXISTS walk_old_view");
+        }
     }
 
     // PostgreSQL 18's old row cannot be given the name of a table of the statement: the server refuses it.

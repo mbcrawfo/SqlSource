@@ -439,10 +439,11 @@ The values that each key takes follow.
 - `postgresql` also means `postgres`.
 - `cockroach` also means `cockroachdb`.
 
-After `mysql` or `mariadb`, the value can name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  Each of these makes the whole value wrong:
+After `mysql` or `mariadb`, the value can name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`, and the server's version, `version=` and three numbers of one or two digits, as in `"mysql,version=8.0.36"`.  Each of these makes the whole value wrong:
 
 - an option that does not exist;
 - an option after any other dialect;
+- a version that is not three such numbers, such as `version=8.0`, or a second `version=`;
 - a comma with nothing before it or after it.
 
 These keys take one value from a list.  The value matches in any case, and with or without hyphens and spaces:
@@ -1435,7 +1436,7 @@ The value of a marker is not valid.  The cause is one of these:
 - What follows a name in a `-- name:` marker is not a shape.
 - A `-- dialect:` marker does not name a dialect.
 - A marker that holds a setting has a value that the setting does not take.  Examples are `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` and `-- library-types:`.
-- A `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
+- A `-- token:`, `-- token-ignore:`, `-- param:`, `-- variable:` or `-- column:` marker does not hold what it needs.
 
 The values that each marker takes follow.
 
@@ -1495,6 +1496,8 @@ A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else.  A quote or a block comment inside the default must close there.
 
 A `-- param:` marker starts with the query parameter as the SQL writes it, `@name`.  The parameter stands alone, or a space or `->` follows it.  What follows its `->` is a C# type, written as the type of a type override is.  It is never `default`, since nothing below a query maps a parameter: `-- param: @author -> default` is this error.
+
+A `-- variable:` marker holds one variable or more as the SQL writes them, `@name`, separated by commas: `-- variable: @a, @b`.  Anything else is this error: `-- variable: a`, `-- variable: @a @b` and `-- variable: @a,` are.
 
 Inside a query, a `-- column:` marker holds the name of a column, then one of these, or both in this order:
 
@@ -1688,6 +1691,7 @@ A file with no `-- name:` line is one query, and takes every marker.
 | `-- dialect:` | yes | no |
 | `-- generator:` | yes | yes |
 | `-- param:` | no | yes |
+| `-- variable:` | no | yes |
 | `-- token:` | no | yes |
 | `-- token-ignore:` | no | yes |
 | `-- database:` | yes | yes |
@@ -2181,6 +2185,67 @@ FROM tested;
 
 See: [List parameters](reference/list-parameters.md#list-parameters)
 
+## SQLSRC128
+
+**Variable is declared as a parameter**
+
+Reported by: the build and the tool.
+
+A name that a `-- variable:` marker gives is declared by a `-- param:` marker of the same query.  The error is at the name in the `-- variable:` marker.
+
+The `-- variable:` marker says that the name is no query parameter, and the `-- param:` marker says that it is one.
+
+```sql error
+-- name: GetOrders
+-- variable: @last
+-- param: @last int
+SET @last = (SELECT MAX(id) FROM orders);
+SELECT * FROM orders WHERE id = @last;
+```
+
+**Fix:** do one of these.
+
+- Remove the name from the `-- variable:` marker, if it is a query parameter.
+- Remove the `-- param:` marker, if it is a variable.
+
+See: [Variables the SQL sets](reference/parameters.md#variable-marker)
+
+## SQLSRC129
+
+**Variable is not written in its query**
+
+Reported by: the build.
+
+A name that a `-- variable:` marker gives is not written anywhere in its query: not in its SQL, a token's default included, and not in the default of a `-- token:` marker of one of its tokens.  A comment, a string or a hint, such as `/*!80000 SET @last = 1 */`, that holds the name does not count.  The warning is at the name in the marker.
+
+```sql error
+-- name: GetOrders
+-- variable: @lastId
+SET @last = (SELECT MAX(id) FROM orders);
+SELECT * FROM orders WHERE id = @last;
+```
+
+```console
+/work/App/Queries/Orders.sql(2,14): warning SQLSRC129: '@lastId' is named by a '-- variable:' marker, and the query does not write it.  Correct its spelling, or remove it from the marker.
+```
+
+The name usually has a typing error, as `@lastId` has above.  The name the query writes, `@last`, is then read as a query parameter.
+
+**Fix:** do one of these.
+
+- Correct the spelling of the name in the marker.
+- Remove the name from the marker.
+
+A project can list it in `NoWarn` to turn it off:
+
+```xml
+<PropertyGroup>
+    <NoWarn>$(NoWarn);SQLSRC129</NoWarn>
+</PropertyGroup>
+```
+
+See: [Variables the SQL sets](reference/parameters.md#variable-marker)
+
 ## SQLSRC200
 
 **The tool failed unexpectedly**
@@ -2287,7 +2352,7 @@ $ dotnet sqlsource describe src/Tools/Tools.csproj
 The tool reads projects by these rules:
 
 - **A project of a solution that was not named is not an error.**  The tool leaves it out, and says nothing.
-- **A project with several target frameworks is read by the first of them.**  So a project that references SqlSource for a later framework alone is this error.
+- **A project with several target frameworks uses SqlSource when any of them does.**  So a project that references SqlSource for one framework alone is not this error.
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2297,7 +2362,7 @@ See: [Arguments](reference/cli.md#arguments)
 
 Reported by: the tool.
 
-`sqlsource` asks MSBuild about each project with `dotnet msbuild`: first what the project is, then which files the compiler is given.  One of those runs failed.  The lines under the error give the reason, and then the first twenty lines that MSBuild wrote.
+`sqlsource` asks MSBuild about each project with `dotnet msbuild`: first what the project is, then which files the compiler is given.  It asks about each target framework of a project that has several.  One of those runs failed, and the tool describes nothing of the project.  The lines under the error give the reason, and then the first twenty lines that MSBuild wrote.
 
 ```console
 $ dotnet sqlsource describe
@@ -2339,6 +2404,7 @@ Here the SqlSource package of the project and the `sqlsource` tool are of differ
 
 - **When the build runs the tool, the message names the manifest file that the build wrote, by its full path**, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, whatever the path holds.
 - **A `--manifest` path that you typed and that may be a secret is named by its position**, as `The project manifest at position 3 cannot be read`: see [how an error names a path](reference/cli.md#paths).  A reason of the system is then only `the system would not read it`, since its words repeat the path.
+- **The manifests can be of two projects**, as `it is of '/work/Tools/Tools.csproj', and the first manifest is of '/work/App/App.csproj'` says.  You can give `--manifest` once for each target framework of one project.  Give the manifests of one project alone.
 - **Any other reason, such as one that names a line, is a bug in SqlSource.**  The package wrote a file that the tool of its own version does not expect.  [Report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
 See: [Install the tool](reference/cli.md#install-the-tool)
@@ -2735,7 +2801,7 @@ What the end of the message means:
 | `the sidecar does not exist` | A query of the file needs an entry, and the file has no sidecar |
 | `the sidecar cannot be read`, or `the sidecar has format 2, and this tool writes 1` | The sidecar is no sidecar of this version of the tool.  A merge conflict in it is the usual cause of the first |
 | `the sidecar has no entry` | The query was added, or renamed, since the sidecar was written |
-| `the query has changed since it was described` | The SQL, the type or the nullability of a `-- param:` marker, or the default of a token changed |
+| `the query has changed since it was described` | The SQL, the type or the nullability of a `-- param:` marker, the names of a `-- variable:` marker, or the default of a token changed |
 | `columns[2].nullable is true, and the database says false` | The database describes the query another way than the sidecar holds, such as a column that can now be null, or one now read from another table (`columns[0].origin.table`).  A change to the schema is the usual cause |
 | `database is "billing", and the project says "reports"` | The query belongs to another database, or another kind of database, than the one it was described against |
 | `the query is not in the file`, or `the query needs no entry` | The sidecar holds an entry for a query that was removed, or whose output is now `sql` |
@@ -2797,6 +2863,7 @@ $ dotnet sqlsource describe
 1. Run `dotnet restore` on the solution or the project.
 2. Run the command again.
 
+- **A project with several target frameworks gives this error when one framework was not restored**, as after you add a framework to `TargetFrameworks`.  The tool describes none of its frameworks until you restore.
 - **In a solution every C# project is checked, one that has no SQL too.**  A run on a fresh checkout must not succeed by finding nothing.
 - **A reference that keeps the MSBuild files of the package out of the project gives this error after a restore as well**, `ExcludeAssets="build"` for one.  Remove that from the reference.
 
@@ -3723,6 +3790,7 @@ The entry of the query in the sidecar is out of date: the query changed after it
 
 - the SQL of the query;
 - the type or the nullability of a `-- param:` marker;
+- the names of a [`-- variable:` marker](reference/parameters.md#variable-marker);
 - the default of one of its tokens.
 
 A change to a comment alone does not count, and neither does a C# type after `->`.

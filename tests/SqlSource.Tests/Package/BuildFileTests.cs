@@ -165,6 +165,9 @@ public sealed partial class BuildFileTests
                         or RunOnlineTarget
                         or ListSidecarsTarget
                         or CreatedSidecarsTarget
+                        or OnlineFrameworkTarget
+                        or FrameworkManifestsTarget
+                        or FrameworkInputsTarget
                     )
             )
             .ToList();

@@ -16,11 +16,11 @@ namespace SqlSource.Tool.Bundles;
 /// <para>
 /// The file is <c>-- dialect:</c>, the dialect the query was read by, <c>-- database:</c>, the query's logical
 /// database, then the query's own <c>-- name:</c> line, or one of its name for a file with no such line, and its
-/// region of the file as the file holds it: its SQL and comments, its <c>-- token:</c> and <c>-- token-ignore:</c>
-/// lines, and its <c>-- param:</c> lines without the C# type after <c>-&gt;</c>, which describes nothing to the
-/// database.  Every other marker is dropped with its line, as is the file's header.  So the file holds only the
-/// markers that <c>SqlRenamer</c>'s pass of a query file renames, and <c>BundleReplay.Plan</c> of it gives the query's
-/// name, shape, SQL, tokens, parameters, hash and database, whatever came from a settings file.
+/// region of the file as the file holds it: its SQL and comments, its <c>-- token:</c>, <c>-- token-ignore:</c> and
+/// <c>-- variable:</c> lines, and its <c>-- param:</c> lines without the C# type after <c>-&gt;</c>, which describes
+/// nothing to the database.  Every other marker is dropped with its line, as is the file's header.  So the file holds
+/// only the markers that <c>SqlRenamer</c>'s pass of a query file renames, and <c>BundleReplay.Plan</c> of it gives the
+/// query's name, shape, SQL, tokens, parameters, hash and database, whatever came from a settings file.
 /// </para>
 /// <para>
 /// The dialect carries no options, since a describable dialect has none.
@@ -39,7 +39,10 @@ internal static class BundleQueryFile
         var lexer = new SqlLexer(fileText, SqlDialectRules.For(dialect));
         _ = SqlDialectMarker.Apply(lexer, fileText);
         var lexed = lexer.ReadToEnd();
-        if (lexed.Error is not null || RegionOf(query, fileText, lexed.Lexemes) is not (var name, var start, var end))
+        if (
+            lexed.Error is not null
+            || RegionOf(query, fileText, lexed.Lexemes, lexer.Rules) is not (var name, var start, var end)
+        )
         {
             throw NotTheFile(query, nameof(fileText));
         }
@@ -63,8 +66,8 @@ internal static class BundleQueryFile
             if (
                 lexeme.Span.Start < start
                 || lexeme.Span.End > end
-                || SqlMarkerReader.Read(fileText, lexeme) is not { } found
-                || found.Kind is SqlMarkerKind.Token or SqlMarkerKind.TokenIgnore
+                || SqlMarkerReader.Read(fileText, lexeme, rules) is not { } found
+                || found.Kind is SqlMarkerKind.Token or SqlMarkerKind.TokenIgnore or SqlMarkerKind.Variable
             )
             {
                 continue;
@@ -93,12 +96,13 @@ internal static class BundleQueryFile
     private static (SqlMarker? Name, int Start, int End)? RegionOf(
         PlannedQuery query,
         string text,
-        EquatableArray<SqlLexeme> lexemes
+        EquatableArray<SqlLexeme> lexemes,
+        SqlDialectRules rules
     )
     {
         var nameSpan = query.Query.NameLocation.Span;
         var names = lexemes
-            .Select(lexeme => SqlMarkerReader.Read(text, lexeme))
+            .Select(lexeme => SqlMarkerReader.Read(text, lexeme, rules))
             .Where(static marker => marker is { Kind: SqlMarkerKind.Name })
             .Select(static marker => marker.GetValueOrDefault())
             .ToList();

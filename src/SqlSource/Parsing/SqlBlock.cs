@@ -82,6 +82,13 @@ internal sealed record SqlBlock(
     public EquatableArray<string> DeclaredVariables { get; init; }
 
     /// <summary>
+    /// The names the query's <c>-- variable:</c> markers give, each once, as first written, without their prefix, in
+    /// marker order, which the query's hash reads.  They are in <see cref="DeclaredVariables" /> too.  Empty when the
+    /// query has no such marker.
+    /// </summary>
+    public EquatableArray<string> MarkedVariables { get; init; }
+
+    /// <summary>
     /// The errors of the query's SQL that are errors only for a query whose output is <c>Methods</c>, as offsets into
     /// the file's text: a list that its method would send in a form the database refuses.  The method planner reports
     /// them and gives the query no method.  Empty when there are none.

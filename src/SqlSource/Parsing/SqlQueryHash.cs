@@ -13,10 +13,12 @@ namespace SqlSource.Parsing;
 /// list as the SQL writes it and each token as <c>{{name:default}}</c>, <c>{{name:}}</c> for an empty default and
 /// <c>{{name}}</c> for none; a line feed; and for each parameter that a <c>-- param:</c> marker declares with a type,
 /// a nullability or both, in the order of the query's list, its name, a space and its type when it has one,
-/// <c> null</c> or <c> not null</c> when the marker says so, and a line feed.  A comment changes no type and is not
-/// part of it, nor is a marker that gives neither, which describes nothing; a parameter's name, a default and a
-/// declared type or nullability are.  The definition is a contract with the files that hold a hash: changing it makes
-/// every one of them stale.
+/// <c> null</c> or <c> not null</c> when the marker says so, and a line feed; then, only for a query whose
+/// <c>-- variable:</c> markers name any, for each name once, in marker order and as first written, <c>@</c>, the name
+/// and a line feed, so that no other query's hash moved when the marker came.  A comment changes no type and is not
+/// part of it, nor is a marker that gives neither, which describes nothing; a parameter's name, a default, a declared
+/// type or nullability and a marked variable, which takes a name out of the parameters, are.  The definition is a
+/// contract with the files that hold a hash: changing it makes every one of them stale.
 /// </remarks>
 internal static class SqlQueryHash
 {
@@ -30,7 +32,8 @@ internal static class SqlQueryHash
         SqlDialect dialect,
         EquatableArray<SqlSegment> segments,
         EquatableArray<SqlToken> tokens,
-        EquatableArray<SqlQueryParameter> parameters
+        EquatableArray<SqlQueryParameter> parameters,
+        EquatableArray<string> markedVariables
     )
     {
         var input = new StringBuilder();
@@ -79,6 +82,12 @@ internal static class SqlQueryHash
             }
 
             _ = input.Append('\n');
+        }
+
+        // A parameter's line starts with its name, which holds no @ at its start, so a variable's line is never one.
+        foreach (var variable in markedVariables)
+        {
+            _ = input.Append('@').Append(variable).Append('\n');
         }
 
         using var sha = SHA256.Create();

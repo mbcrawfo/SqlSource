@@ -72,8 +72,6 @@ public sealed class WrittenValueTests(PostgresDatabases postgres)
             // A rule: DO INSTEAD returns its action's row, and DO ALSO makes a second plan.
             { "INSERT INTO written.ruled (id, a) VALUES (1, 'x') RETURNING a, id", "??" },
             { "INSERT INTO written.also (id, a) VALUES (1, 'x') RETURNING a", "?" },
-            // The word NEW, here an alias, may name the new row.
-            { "INSERT INTO written.t (id, a) VALUES (5, 'x') RETURNING a AS new", "?" },
             // UPDATE stays a limit.
             { "UPDATE written.t SET a = 'x' RETURNING a", "?" },
         };
@@ -158,6 +156,27 @@ public sealed class WrittenValueTests(PostgresDatabases postgres)
                 postgres,
                 "INSERT INTO written.t (id, a) VALUES (5, 'x') RETURNING old.a AS o, new.a AS n",
                 "??"
+            );
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropWritten);
+        }
+    }
+
+    // Before 18 the word NEW, here a column's label, names no row, so a value an INSERT writes is proved beside it.
+    // On 18 the new row may be named, and nothing written is read.
+    [Fact]
+    public async Task DescribeAsync_WrittenValueInAStatementThatSaysNew_IsProvedBefore18()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Written);
+
+            await ProvedColumns.ShouldAnswerAsync(
+                postgres,
+                "INSERT INTO written.t (id, a) VALUES (5, 'x') RETURNING a AS new",
+                postgres.Major >= 18 ? "?" : "n"
             );
         }
         finally

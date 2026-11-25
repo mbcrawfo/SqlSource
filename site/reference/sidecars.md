@@ -34,7 +34,7 @@ To keep the sidecars current, run the command of each case:
 
 | When | Run |
 |----|----|
-| You add, change, rename or remove a query, the database type or the nullability of a `-- param:` marker (not its C# type after `->`), or a token's default | `dotnet sqlsource describe`, or a build that [runs the tool](online-build.md#running-in-the-build) |
+| You add, change, rename or remove a query, the database type or the nullability of a `-- param:` marker (not its C# type after `->`), the names of a `-- variable:` marker, or a token's default | `dotnet sqlsource describe`, or a build that [runs the tool](online-build.md#running-in-the-build) |
 | The schema of the database changes | `dotnet sqlsource describe --force`: see [after a schema change](describing.md#after-a-schema-change) |
 | While you work on your queries, to describe each one as you save it | `dotnet sqlsource describe --watch`: see [describe on save](describing.md#describe-on-save) |
 | You update the tool | `dotnet sqlsource describe`, or a build that runs the tool, which describes every query again |
@@ -106,6 +106,7 @@ If you have already taken one side of the conflict, skip step 2.  In step 3, run
 - **The SQL of the query.**  A change to a comment alone does not count.
 - **The database type or the nullability of a `-- param:` marker of the query**, `not null` included.  The C# type after `->` does not count, and neither does a `-- column:` marker.
 - **The default of one of the tokens of the query.**
+- **The names of a [`-- variable:` marker](parameters.md#variable-marker) of the query**, since they take names out of its query parameters.  Their order and spelling count too.
 - **The dialect of the query, or its [logical database](connections.md#connections).**
 - **The version of the tool.**  Each entry keeps the version that wrote it, and the tool describes again an entry that another version wrote.  So the tool describes again the whole of a sidecar that another version wrote.  Until it does, the build warns of it ([SQLSRC240](../diagnostics.md#sqlsrc240)).
 

@@ -203,7 +203,13 @@ internal static class SidecarChecker
             else if (
                 !string.Equals(
                     entry.Hash,
-                    SqlQueryHash.Compute(dialect, query.Segments, query.Tokens, query.Parameters),
+                    SqlQueryHash.Compute(
+                        dialect,
+                        query.Segments,
+                        query.Tokens,
+                        query.Parameters,
+                        query.MarkedVariables
+                    ),
                     StringComparison.Ordinal
                 )
             )

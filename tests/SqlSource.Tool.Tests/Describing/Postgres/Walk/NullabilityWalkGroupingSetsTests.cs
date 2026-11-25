@@ -4,6 +4,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 using Xunit;
@@ -42,7 +43,7 @@ public sealed class NullabilityWalkGroupingSetsTests
             origins,
             new WalkScope(
                 true,
-                false,
+                OldAndNewNames.None,
                 catalogFunctionsFirst,
                 PostgresTables.Of(TableA, OrdersO),
                 [.. Enumerable.Repeat(BuiltInTypes.Int8, columnCount)],

@@ -32,7 +32,7 @@ internal static class SqlDialectMarker
         invalid = null;
         while (lexer.TryReadLeadingComment(out var comment))
         {
-            if (SqlMarkerReader.Read(text, comment) is not { } marker)
+            if (SqlMarkerReader.Read(text, comment, lexer.Rules) is not { } marker)
             {
                 continue;
             }

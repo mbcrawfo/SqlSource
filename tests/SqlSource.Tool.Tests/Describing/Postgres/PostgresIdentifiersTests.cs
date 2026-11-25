@@ -1,4 +1,7 @@
+using System.Linq;
 using Shouldly;
+using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
 
@@ -115,4 +118,88 @@ public sealed class PostgresIdentifiersTests
     [InlineData("x \u00E9\u4E2D y", 2, 4)]
     public void WordEnd_AtAWordADigitAndASymbol_EndsAfterTheRun(string text, int from, int end) =>
         PostgresIdentifiers.WordEnd(text, from).ShouldBe(end);
+
+    // downcase_identifier of a UTF-8 database folds ASCII letters alone.
+    [Theory]
+    [InlineData("OLD", "old")]
+    [InlineData("Abc_1$", "abc_1$")]
+    [InlineData("ÉtÉ", "ÉtÉ")]
+    public void FoldedWord_Word_HasItsAsciiLettersInLowerCase(string word, string name) =>
+        PostgresIdentifiers.FoldedWord(word).ShouldBe(name);
+
+    // truncate_identifier keeps 63 bytes and never cuts a character.
+    [Fact]
+    public void Truncated_LongName_KeepsTheBytesOfWholeCharactersThatFit()
+    {
+        PostgresIdentifiers.Truncated(new string('a', 70)).ShouldBe(new string('a', 63));
+        PostgresIdentifiers.Truncated(new string('a', 62) + "é").ShouldBe(new string('a', 62));
+        PostgresIdentifiers.Truncated(new string('a', 60) + "\uD83D\uDE00").ShouldBe(new string('a', 60));
+        PostgresIdentifiers
+            .Truncated(new string('a', 59) + "\uD83D\uDE00")
+            .ShouldBe(new string('a', 59) + "\uD83D\uDE00");
+        PostgresIdentifiers.Truncated("old").ShouldBe("old");
+    }
+
+    [Theory]
+    [InlineData("SELECT \"Old\"\"x\"", "Old\"x")]
+    [InlineData("SELECT U&\"\\006Fld\"", "old")]
+    [InlineData("SELECT u&\"a\\\\b\"", "a\\b")]
+    [InlineData("SELECT U&\"!006Fld\" UESCAPE '!'", "old")]
+    [InlineData("SELECT U&\"!006Fld\"/* c */ UESCAPE /* c */ '!' x", "old")]
+    [InlineData("SELECT U&\"\\0041\" uescapes", "A")]
+    // A U& that continues a word opens no escapes.
+    [InlineData("SELECT xU&\"\\0041\"", "\\0041")]
+    public void TryReadQuotedName_QuotedIdentifier_IsTheNameTheServerReads(string sql, string name)
+    {
+        var lexemes = DescriberSql.Lex(sql, SqlDialectRules.PostgreSql);
+        var index = Enumerable.Range(0, lexemes.Count).First(at => sql[lexemes[at].Span.Start] == '"');
+
+        PostgresIdentifiers.TryReadQuotedName(sql, lexemes, index, out var read, out _).ShouldBeTrue();
+        read.ShouldBe(name);
+    }
+
+    [Theory]
+    [InlineData("SELECT U&\"\\zz\"")]
+    [InlineData("SELECT U&\"\\DC00\"")]
+    [InlineData("SELECT U&\"!006F\" UESCAPE '0'")]
+    [InlineData("SELECT U&\"!006F\" UESCAPE '+'")]
+    [InlineData("SELECT U&\"!006F\" UESCAPE ' '")]
+    [InlineData("SELECT U&\"!006F\" UESCAPE '!!'")]
+    [InlineData("SELECT U&\"!006F\" UESCAPE x")]
+    public void TryReadQuotedName_EscapesThatCannotBeDecoded_IsNoName(string sql)
+    {
+        var lexemes = DescriberSql.Lex(sql, SqlDialectRules.PostgreSql);
+        var index = Enumerable.Range(0, lexemes.Count).First(at => sql[lexemes[at].Span.Start] == '"');
+
+        PostgresIdentifiers.TryReadQuotedName(sql, lexemes, index, out var read, out _).ShouldBeTrue();
+        read.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("SELECT 'old'")]
+    [InlineData("SELECT U&'old'")]
+    [InlineData("SELECT old")]
+    public void TryReadQuotedName_NoQuotedIdentifier_IsFalse(string sql)
+    {
+        var lexemes = DescriberSql.Lex(sql, SqlDialectRules.PostgreSql);
+
+        PostgresIdentifiers.TryReadQuotedName(sql, lexemes, lexemes.Count - 1, out _, out _).ShouldBeFalse();
+    }
+
+    // The end is past a UESCAPE clause, so a reader of names takes the clause as the identifier's.
+    [Fact]
+    public void TryReadQuotedName_UnicodeEscapeClause_EndsAfterItsString()
+    {
+        const string Sql = "SELECT U&\"!0041\" UESCAPE '!' x";
+        var lexemes = DescriberSql.Lex(Sql, SqlDialectRules.PostgreSql);
+
+        PostgresIdentifiers.TryReadQuotedName(Sql, lexemes, 1, out _, out var end).ShouldBeTrue();
+        end.ShouldBe(lexemes.Count - 1);
+
+        const string Plain = "\"a\" x";
+        PostgresIdentifiers
+            .TryReadQuotedName(Plain, DescriberSql.Lex(Plain, SqlDialectRules.PostgreSql), 0, out _, out end)
+            .ShouldBeTrue();
+        end.ShouldBe(1);
+    }
 }

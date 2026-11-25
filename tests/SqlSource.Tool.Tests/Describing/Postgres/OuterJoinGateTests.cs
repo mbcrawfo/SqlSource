@@ -36,9 +36,14 @@ public sealed class OuterJoinGateTests
     [InlineData("SELECT status, count(*) FROM users GROUP BY ROLLUP (status)")]
     [InlineData("SELECT status, count(*) FROM users GROUP BY GROUPING SETS ((status), ())")]
     [InlineData("SELECT status, grouping(status) FROM users GROUP BY CUBE(status)")]
-    // A function, and no join: the gate cannot tell, and the walk finds nothing to null-extend.
-    [InlineData("SELECT left(name, 3) FROM users")]
+    [InlineData("SELECT status, count(*) FROM users GROUP BY ROLLUP(status)")]
+    // A word of a join that no "(" follows, though one comes later.
     [InlineData("left")]
+    [InlineData("SELECT 1 FROM a LEFT JOIN (b JOIN c ON true) ON true")]
+    [InlineData("SELECT 1 FROM a LEFT /* ( */ JOIN b ON true")]
+    // A Unicode space is no white space to PostgreSQL: it is part of the word after it, so no "(" follows the LEFT.
+    [InlineData("SELECT 1 FROM a LEFT \u00A0(b) JOIN c ON true")]
+    [InlineData("SELECT left(name, 3) FROM a LEFT JOIN b ON true")]
     // A join however it is spaced or quoted.
     [InlineData("SELECT 1 FROM a\nLEFT\nJOIN b ON true")]
     [InlineData("SELECT 1 FROM a NATURAL FULL JOIN b")]
@@ -62,6 +67,13 @@ public sealed class OuterJoinGateTests
     [InlineData("SELECT id FROM users")]
     [InlineData("SELECT 1 FROM a JOIN b ON true")]
     [InlineData("SELECT status, count(*) FROM users GROUP BY status")]
+    // A word of a join that a "(" follows is a function's name: no alias can take it.
+    [InlineData("SELECT left(name, 3) FROM users")]
+    [InlineData("SELECT RIGHT (name, 3) FROM users")]
+    [InlineData("SELECT pg_catalog.left(name, 3) FROM users")]
+    [InlineData("SELECT left/* c */(name, 3) FROM users")]
+    [InlineData("SELECT left -- c\n(name, 3) FROM users")]
+    [InlineData("SELECT full(a), outer(b) FROM users")]
     // Inside a string, a comment, a hint, a quoted identifier and a dollar-quoted string.
     [InlineData("SELECT 'left join' FROM users")]
     [InlineData("SELECT 'merge' FROM t")]
@@ -110,6 +122,8 @@ public sealed class OuterJoinGateTests
     [InlineData("SELECT 'INSERT' FROM t")]
     [InlineData("SELECT 1 -- INSERT")]
     [InlineData("SELECT \"INSERT\" FROM t")]
+    // The quoted old and new row count for OLD and NEW alone.
+    [InlineData("SELECT \"old\" FROM t")]
     public void NamesInsert_WordInALongerNameAStringACommentOrAQuotedName_DoesNotNameIt(string sql) =>
         OuterJoinGate.NamesInsert(sql).ShouldBeFalse();
 
@@ -143,17 +157,20 @@ public sealed class OuterJoinGateTests
         OuterJoinGate.NamesOldOrNew(sql).ShouldBeFalse();
 
     // PostgreSQL 18 resolves "old" and "new" as the old and the new row of a RETURNING list, so a quoted identifier
-    // of either name counts, in any case.  The tool does not decode the escapes of a Unicode-escaped identifier, so
-    // any one counts.
+    // of either name counts, as the server compares a name: exactly, and a Unicode-escaped one decoded.  One whose
+    // escapes cannot be decoded counts.
     public static TheoryData<string> QuotedOldOrNew =>
         [
             "INSERT INTO t (id) VALUES (1) RETURNING \"old\".id",
-            "INSERT INTO t (id) VALUES (1) RETURNING \"NEW\".id",
-            "INSERT INTO t (id) VALUES (1) RETURNING \"Old\".id",
+            "INSERT INTO t (id) VALUES (1) RETURNING \"new\".id",
             "INSERT INTO t (id) VALUES (1) RETURNING U&\"\\006Fld\".id",
+            "INSERT INTO t (id) VALUES (1) RETURNING u&\"ne\\+000077\".id",
             "INSERT INTO t (id) VALUES (1) RETURNING U&\"!006Fld\" UESCAPE '!'",
-            "INSERT INTO t (id) VALUES (1) RETURNING u&\"x\".id",
-            // Wherever it stands, a table's alias included: the walk then maps only the target's alias.
+            "INSERT INTO t (id) VALUES (1) RETURNING U&\"!006Fld\" /* c */ uescape\n'!'",
+            "INSERT INTO t (id) VALUES (1) RETURNING U&\"\\zzzz\".id",
+            "INSERT INTO t (id) VALUES (1) RETURNING U&\"\\006Fld\" UESCAPE '0'",
+            // Wherever it stands, a table's alias included: at a root ModifyTable the walk then maps no alias that is
+            // one of the rows' names.
             "SELECT \"new\", \"old\" FROM t",
             "SELECT \"old\".id FROM t \"old\"",
         ];
@@ -169,5 +186,10 @@ public sealed class OuterJoinGateTests
             "SELECT \"bold\" FROM t",
             "SELECT \"new_total\" FROM t",
             "SELECT \"o\"\"ld\" FROM t",
+            // The server compares a quoted name exactly, so "Old" is no old row.
+            "SELECT \"Old\", \"NEW\" FROM t",
+            "SELECT U&\"x\", U&\"\\004Fld\" FROM t",
+            // A U& that continues a word opens no escapes: xU & "\006Fld".
+            "SELECT xU&\"\\006Fld\" FROM t",
         ];
 }

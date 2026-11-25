@@ -75,8 +75,36 @@ MySQL and MariaDB have SQL modes that change how a string is read.  If your serv
 }
 ```
 
+<a id="server-version"></a>
+
+### The server's version: `version=`
+
+```sql mysql,version=8.0.36
+-- dialect: mysql, version=8.0.36
+
+-- name: GetUsers
+SELECT /*!80000 '*/' AS note, */ id FROM users;
+```
+
+A versioned comment, such as `/*!80000 ... */`, holds SQL that a MySQL or MariaDB server runs when its version is at least the comment's.  To find where such a comment ends, SqlSource needs to know whether your server runs it, so write your server's version after the dialect, `version=` and three numbers:
+
+```jsonc
+// sqlsource.json
+{
+    "dialect": "mariadb,version=10.11.6",
+}
+```
+
+- **A comment that your server runs is read as SQL**, so a string or a comment inside it does not end it.  Above, `'*/'` is a string, and the comment ends at the `*/` after `note,`.
+- **A comment that your server does not run ends at its first `*/`**, as your server reads it.
+- **Without `version=`, a comment with a version ends at its first `*/`.**
+- **A comment with no version, `/*! ... */`, is always read as SQL**, with or without `version=`, since both databases always run it.
+- **MariaDB never runs a `/*!` comment whose version is from 50700 to 99999**, so under `mariadb` such a comment ends at its first `*/` whatever the version.  Its own `/*M! ... */` has no such exception.
+- **The version is three numbers of one or two digits, as `8.0.36`.**  `version=8.0` or `version=8` is the same error as an option that does not exist.  A second `version=` is an error too, even of the same version.
+- **Each comment is kept whole in the generated SQL**, whether your server runs it or not, as every hint is.
+
 - **Options are not case-sensitive, and come in any order.**  Spaces around the name and each option are ignored.
-- **Only `mysql` and `mariadb` have options.**  An option of another dialect, or one that does not exist, is the same error as a name that is not a dialect.  So is an empty option, as in `mysql,`.  [The settings page](settings.md#setting-dialect) gives the errors by place.
+- **Only `mysql` and `mariadb` have options**, `version=` included.  An option of another dialect, or one that does not exist, is the same error as a name that is not a dialect.  So is an empty option, as in `mysql,`.  [The settings page](settings.md#setting-dialect) gives the errors by place.
 - **In a `-- dialect:` marker, the value is the rest of the line**: the name, then the options, separated by commas.  Nothing else can follow it on the line, not even a comment.
 - **A value written in several places**, options included, follows [the rules of the dialect setting](settings.md#setting-dialect).
 
@@ -95,13 +123,16 @@ MySQL and MariaDB have SQL modes that change how a string is read.  If your serv
 | A `/*` inside a block comment needs its own `*/` | Yes | Yes | Yes | Yes | No | No | No | No |
 | `--` is a comment with no white space after it | Yes | Yes | Yes | Yes | No | No | Yes | Yes |
 | `#` starts a comment | No | No | No | No | Yes | Yes | No | No |
+| A carriage return with no line feed after it ends a line, and so a `--` or `#` comment | Yes | Yes | Yes | No | No | No | No | Yes |
 | Kept as hints, besides `/*+ ... */` and `/*! ... */` | | | | | | `/*M! ... */` | | `--+ ...` |
 | A name declared with `DECLARE @name` is a local variable, not a parameter ([declared variables](parameters.md#declared-variables)) | No | Yes | No | No | No | No | No | No |
 
-Five details:
+Seven details:
 
 - In `mssql`, a `]]` inside brackets stands for one `]`.  In `sqlite`, the first `]` ends the identifier.
 - In `mysql` and `mariadb`, an option changes the first row (see [options](#dialect-options)).
+- In `mysql`, `mariadb`, `sqlite` and `cockroachdb`, a file whose lines end with a carriage return alone is one line, as these databases read it, so a `--` comment runs to the end of the file, and no [marker](sql-files.md#marker) after the first line is read.
+- In `mysql` and `mariadb`, a `/*! ... */` hint that the server runs is read as SQL to find its end, so a string inside it can hold `*/`.  `version=` says which ones the server runs (see [the server's version](#server-version)).
 - In `postgres` and `cockroachdb`, an `E'...'` string that is continued on the next line is one string.  Each later part takes backslash escapes too.
 - In `postgres`, `--` comments can stand between the parts of such a string, as PostgreSQL allows.  They are removed like any other comment.  In `cockroachdb`, only white space can stand there.
 - In `cockroachdb`, a bytes literal, `b'...'`, takes backslash escapes as an `E'...'` string does.  So does `b'...'` in `mysql` and `mariadb`, where every string does.
@@ -122,11 +153,10 @@ SqlSource reads these differently from the database, whatever the dialect:
 
 | Construct | Database | How SqlSource reads it |
 |----|----|----|
-| A versioned comment whose body holds a string that contains `*/`, such as `/*!50700 SELECT '*/' */` | MySQL, MariaDB | The comment ends at the first `*/`, so the quote after it opens a string that is never closed: the error [SQLSRC101](../diagnostics.md#sqlsrc101).  Where the server ends the comment depends on the server's version |
+| A versioned comment whose body holds a string that contains `*/`, such as `/*!50700 SELECT '*/' */`, without [`version=`](#server-version) | MySQL, MariaDB | The comment ends at the first `*/`, so the quote after it opens a string that is never closed: the error [SQLSRC101](../diagnostics.md#sqlsrc101).  Where the server ends the comment depends on its version, so give it with `version=` |
 | A block comment that is still open at the end of the file | SQLite | The error [SQLSRC102](../diagnostics.md#sqlsrc102).  SQLite accepts it, but it would take every later query of the file with it |
-| A file whose lines end with a carriage return alone, with no line feed | MySQL, SQLite, CockroachDB | A line ends there, as in every dialect.  These databases end a `--` comment only at a line feed |
 | A client command that is not SQL: `DELIMITER`, `GO`, SQL*Plus `PROMPT` and `REM`, a psql `\` command | All | As SQL, so a quote in it can open a string |
-| A name that is not a parameter to the database: a user variable, `@x` for an absolute value, the parameter of a procedure that the SQL creates | MySQL, MariaDB, PostgreSQL, SQL Server | As a parameter: see [names that are read as parameters](parameters.md#names-read-as-parameters) |
+| A name that is not a parameter to the database: a user variable, `@x` for an absolute value, the parameter of a procedure that the SQL creates | MySQL, MariaDB, PostgreSQL, SQL Server | As a parameter, unless a [`-- variable:` marker](parameters.md#variable-marker) names it: see [names that are read as parameters](parameters.md#names-read-as-parameters) |
 
 A misread has one of two results:
 

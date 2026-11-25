@@ -76,7 +76,7 @@ The name of a generated file, which `HintName` builds from identifier values: `<
 
 ### Manifest
 
-What the compiler is given for one project, which the target `SqlSourceWriteManifest` writes to a file for the tool: the project's `.sql` files, the settings files, the `Compile` files, the folders the build writes into and the NuGet package folders, and a few properties of the SDK.  It holds no setting.  The tool reads it with `ManifestReader` into a `ProjectManifest`.
+What the compiler is given for one project, or for one target framework of a project that has several, which the target `SqlSourceWriteManifest` writes to a file for the tool: the project's `.sql` files, the settings files, the `Compile` files, the folders the build writes into and the NuGet package folders, and a few properties of the SDK.  It holds no setting.  The tool reads it with `ManifestReader` into a `ProjectManifest`.
 
 ### Origin
 

@@ -29,7 +29,7 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
     // Builds a copy with no sidecar, and finds the sidecar written and the model of its query in the assembly.
     public async Task ShouldCompileTheSidecarItCreatedAsync()
     {
-        var project = RealPath(_projects.Copy("ErrorPaths"));
+        var project = ByItsRealPath(_projects.Copy("ErrorPaths"));
         await ShouldCompileTheSidecarItCreatedAsync(Path.GetDirectoryName(project)!, project);
     }
 
@@ -40,7 +40,7 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
     // SQLSRC241 until the next build listed the sidecar.
     public async Task ShouldCompileTheSidecarItCreatedThroughALinkAsync()
     {
-        var folder = Path.GetDirectoryName(RealPath(_projects.Copy("ErrorPaths")))!;
+        var folder = Path.GetDirectoryName(ByItsRealPath(_projects.Copy("ErrorPaths")))!;
         var link = _projects.PathOf("Link");
         _ = Directory.CreateSymbolicLink(link, folder);
         await ShouldCompileTheSidecarItCreatedAsync(folder, Path.Combine(link, "App.csproj"));
@@ -70,7 +70,7 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
     // the same place, since the compiler still runs, and no error is anywhere else.
     public async Task ShouldFailAtTheRefusedQueryAsync()
     {
-        var project = RealPath(_projects.Copy("ErrorPaths"));
+        var project = ByItsRealPath(_projects.Copy("ErrorPaths"));
         var refused = Path.Combine(Path.GetDirectoryName(project)!, "Refused.sql");
         await File.WriteAllTextAsync(
             refused,
@@ -95,7 +95,7 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
     // what follows from the file: here the query has the default output, which a static type cannot have.
     public async Task ShouldListABrokenSettingsFileOnceAsync()
     {
-        var project = RealPath(_projects.Copy("ErrorPaths"));
+        var project = ByItsRealPath(_projects.Copy("ErrorPaths"));
         var settings = Path.Combine(Path.GetDirectoryName(project)!, "sqlsource.json");
         var text = await File.ReadAllTextAsync(settings, TestContext.Current.CancellationToken);
         text.ShouldContain("\"output\": \"models\"");
@@ -177,21 +177,5 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
     // path as MSBuild names it, under /var, and the compiler's under /private/var, where the compiler resolves a path
     // of the project's own.  The project is named by its real path, as a build of the .NET 10 SDK started in its folder
     // with no project named finds it, so that the errors of both name a file alike.
-    private static string RealPath(string path)
-    {
-        var real = Path.GetPathRoot(path)!;
-        foreach (
-            var name in path[real.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
-        )
-        {
-            real = Path.Combine(real, name);
-            var target = new FileInfo(real).ResolveLinkTarget(returnFinalTarget: true);
-            if (target is not null)
-            {
-                real = target.FullName;
-            }
-        }
-
-        return real;
-    }
+    private static string ByItsRealPath(string path) => RealPath.Of(path);
 }

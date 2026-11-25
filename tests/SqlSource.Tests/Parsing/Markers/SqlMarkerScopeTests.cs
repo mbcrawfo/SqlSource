@@ -56,7 +56,11 @@ public sealed class SqlMarkerScopeTests
         word.ShouldNotBeEmpty();
 
         var line = "-- " + word + ": x";
-        var marker = SqlMarkerReader.Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0]);
+        var marker = SqlMarkerReader.Read(
+            line,
+            SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0],
+            SqlDialectRules.Ansi
+        );
         marker.ShouldNotBeNull().Kind.ShouldBe(kind);
 
         var isAllowed = SqlMarkerScope.IsAllowedInQuery(kind) || SqlMarkerScope.IsAllowedInPreamble(kind);
@@ -461,7 +465,11 @@ public sealed class SqlMarkerScopeTests
     // A value that is not valid is another error, and is not what is asked here.
     private static bool IsTaken(string line, SqlScopeKind kind)
     {
-        var marker = SqlMarkerReader.Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0]);
+        var marker = SqlMarkerReader.Read(
+            line,
+            SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0],
+            SqlDialectRules.Ansi
+        );
         var errors = new List<SqlParseError>();
 
         new SqlMarkerScope(line, SqlDialectRules.Ansi, kind, errors).Read(marker.ShouldNotBeNull());
@@ -484,7 +492,7 @@ public sealed class SqlMarkerScopeTests
         var scope = new SqlMarkerScope(text, rules, kind, errors);
         foreach (var lexeme in SqlLexer.Lex(text, rules).Lexemes)
         {
-            if (SqlMarkerReader.Read(text, lexeme) is { } marker)
+            if (SqlMarkerReader.Read(text, lexeme, rules) is { } marker)
             {
                 scope.Read(marker);
             }

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres.Columns;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
@@ -46,9 +47,9 @@ internal sealed record WalkOutcome(
 /// for its joins: a query without one is planned for its columns of no origin, of a view or written by an
 /// <c>INSERT</c>, and no outer join its text writes can have touched the rest.
 /// </param>
-/// <param name="OldAndNewMayBeNamed">
-/// Whether the query's SQL names <c>OLD</c> or <c>NEW</c>, so that a reference at a root <c>ModifyTable</c> may be
-/// PostgreSQL 18's old or new row.
+/// <param name="OldAndNew">
+/// The names under which a reference may be PostgreSQL 18's old or new row (<see cref="OldAndNewNames" />): none before
+/// 18 or in a statement that names neither row.
 /// </param>
 /// <param name="CatalogFunctionsFirst">
 /// Whether the session finds <c>pg_catalog</c>'s functions first (<see cref="PostgresSearchPath" />), so that a
@@ -86,7 +87,7 @@ internal sealed record WalkOutcome(
 /// </param>
 /// <param name="ValuesNeverNull">
 /// For a statement that is a <c>VALUES</c> alone, whether every row holds a literal in each column
-/// (<see cref="Statements.ValuesStatement" />), or null for any other statement.  It answers a column only for a plan
+/// (<see cref="ValuesStatement" />), or null for any other statement.  It answers a column only for a plan
 /// that is a <c>Values Scan</c> under nodes that never project.
 /// </param>
 /// <param name="WrittenValuesStand">
@@ -100,7 +101,7 @@ internal sealed record WalkOutcome(
 /// </param>
 internal sealed record WalkScope(
     bool Gated,
-    bool OldAndNewMayBeNamed,
+    OldAndNewNames OldAndNew,
     bool CatalogFunctionsFirst,
     IReadOnlyDictionary<long, PostgresTableRow> Tables,
     IReadOnlyList<long> ColumnTypes,
@@ -138,9 +139,10 @@ internal sealed record WalkScope(
 /// At a root <c>ModifyTable</c> PostgreSQL 18 prints the old and the new row of a <c>RETURNING</c> list as
 /// <c>old.column</c> and <c>new.column</c>, or under the names <c>WITH (OLD AS ..., NEW AS ...)</c> gives them, and
 /// a table of an inner scope, the <c>SELECT</c> of an <c>INSERT</c> or a subquery in <c>FROM</c>, can have the same
-/// alias in the plan.  In a statement that names <c>OLD</c> or <c>NEW</c> a qualified reference there maps only to the
-/// target's own alias, which the server never lets the old or the new row take; so does one at the root of a plan a
-/// scan scans, a data-modifying CTE's.
+/// alias in the plan, and so can the target, reached through a view whose query aliases its table so.  Where a
+/// reference may be the old or the new row (<see cref="WalkScope.OldAndNew" />), a qualified reference there maps only
+/// when it names an alias that neither row may have, the target's included; so does one at the root of a plan a scan
+/// scans, a data-modifying CTE's.
 /// </para>
 /// </remarks>
 internal static partial class NullabilityWalk
@@ -197,9 +199,9 @@ internal static partial class NullabilityWalk
             return Unusable(WalkReasons.OutputDiffers, root, instances, columns);
         }
 
-        var onlyAlias = plans.OnlyAliasOf(root);
+        var rowsMayBeNamed = plans.RowsMayBeNamedAt(root);
         var expressions =
-            fits && !instances.HasSetOperation ? new Expressions(plans, root, instances, onlyAlias) : null;
+            fits && !instances.HasSetOperation ? new Expressions(plans, root, instances, rowsMayBeNamed) : null;
 
         var valuesNeverNull = ValuesColumnsOf(root, entries, columns.Count, scope);
         var listsARelation = PostgresTableMatcher.ListsARelation(columns, origins);
@@ -233,7 +235,7 @@ internal static partial class NullabilityWalk
                         origin,
                         entries[index],
                         instances,
-                        onlyAlias,
+                        rowsMayBeNamed,
                         plans
                     ),
                     _ => Kept(columns[index], entries[index]),
@@ -287,7 +289,7 @@ internal static partial class NullabilityWalk
     {
         if (
             !plans.Scope.WrittenValuesStand
-            || plans.Scope.OldAndNewMayBeNamed
+            || plans.Scope.OldAndNew.MayBeNamed
             || InsertTargetOf(root) is not { } target
             || !string.Equals(origin.Table.Schema, target.Schema, StringComparison.Ordinal)
             || !string.Equals(origin.Table.Name, target.Name, StringComparison.Ordinal)
@@ -307,7 +309,7 @@ internal static partial class NullabilityWalk
         }
 
         return plans.InstancesOf(child) is { Reason: null, HasSetOperation: false } instances
-            && new Expressions(plans, child, instances, plans.OnlyAliasOf(child), 1).EntryProves(
+            && new Expressions(plans, child, instances, plans.RowsMayBeNamedAt(child), 1).EntryProves(
                 values[origin.Attribute.Attnum - 1],
                 type
             );
@@ -325,7 +327,7 @@ internal static partial class NullabilityWalk
         IReadOnlyList<string> entries
     )
     {
-        var expressions = new Expressions(plans, root, instances, plans.OnlyAliasOf(root));
+        var expressions = new Expressions(plans, root, instances, plans.RowsMayBeNamedAt(root));
         var walked = new List<WalkedColumn>(columns.Count);
         var answered = false;
         for (var index = 0; index < columns.Count; index++)
@@ -480,14 +482,14 @@ internal static partial class NullabilityWalk
         ColumnOrigin origin,
         string entry,
         PlanInstances instances,
-        string? onlyAlias,
+        bool rowsMayBeNamed,
         Plans plans
     )
     {
         var reference = OutputReference.Parse(entry);
         var instance = reference is null
             ? null
-            : plans.InstanceOf(reference, instances, onlyAlias, BareNames.OfTheOneRelation)?.Instance;
+            : plans.InstanceOf(reference, instances, rowsMayBeNamed, BareNames.OfTheOneRelation)?.Instance;
 
         var resolved = instance switch
         {
@@ -583,31 +585,34 @@ internal static partial class NullabilityWalk
 
         public PlanInstances InstancesOf(PlanNode root) => cache.Of(root);
 
-        // The one alias a qualified reference may name at a ModifyTable that may return the old or the new row, or
-        // null when any alias may be mapped.  A ModifyTable without an alias leaves none: no reference is empty.
-        public string? OnlyAliasOf(PlanNode root) =>
-            scope.OldAndNewMayBeNamed && root.NodeType == PlanNodeTypes.ModifyTable ? root.Alias ?? string.Empty : null;
+        // Whether the root is a ModifyTable that may return the old or the new row, where a qualified reference maps
+        // only to an alias that none of the rows' names is.
+        public bool RowsMayBeNamedAt(PlanNode root) =>
+            scope.OldAndNew.MayBeNamed && root.NodeType == PlanNodeTypes.ModifyTable;
 
         /// <summary>
-        /// The instance an entry's reference names, with the alias that names it: a qualified one's alias, when it is
-        /// the one alias the plan's root allows (<see cref="OnlyAliasOf" />) or there is none; and a bare one's by
-        /// the rule of the caller.
+        /// The instance an entry's reference names, with the alias that names it: a qualified one's alias, when the
+        /// plan's root is no <c>ModifyTable</c> that may return the old or the new row
+        /// (<see cref="RowsMayBeNamedAt" />), or the alias is one neither row may have
+        /// (<see cref="OldAndNewNames.MayName" />), the target's alias included; and a bare one's by the rule of the
+        /// caller.
         /// </summary>
         /// <remarks>
         /// The rules differ by what each caller reads, and each keeps the answers it has always given.  In a scanned
         /// plan a bare name is never resolved (<see cref="BareNames.Refused" />).  A column with an origin maps one to
-        /// the plan's one relation, at a root <c>ModifyTable</c> its target, even in a statement that may name
-        /// <c>OLD</c> or <c>NEW</c>, since PostgreSQL 18 prints the old and the new row qualified, <c>old.id</c> and
-        /// <c>new.id</c>, as <c>DescribeAsync_ReturningOldAndNew_KeepsTheHeuristic</c> of <c>ColumnTests</c> pins.
-        /// An expression refuses a bare name in such a statement, a stricter rule kept as it is: a single-target
-        /// <c>UPDATE</c> or <c>DELETE</c> prints bare names on every major, and the statement is told by a word of
-        /// its SQL on every major, so changing either rule would change answers on 14 to 18.  A bare name of
-        /// <see cref="BareNames.OfTheOneRelation" /> is not held to the one alias, as it never was.
+        /// the plan's one relation, at a root <c>ModifyTable</c> its target, even where the old or the new row may
+        /// be named, since PostgreSQL 18 prints them qualified, <c>old.id</c> and <c>new.id</c>, as
+        /// <c>DescribeAsync_ReturningOldAndNew_KeepsTheHeuristic</c> of <c>ColumnTests</c> pins.  An expression
+        /// refuses a bare name there, a stricter rule kept from before the names were read, which costs an expression
+        /// over a single-target <c>UPDATE</c> or <c>DELETE</c> of 18 that names either row its proof.  A bare name of
+        /// <see cref="BareNames.OfTheOneRelation" /> is not held to the rows' names, as it never was.  The target's
+        /// alias is held to them as any other: an <c>INSERT</c> through a view prints the table under the alias of the
+        /// view's query, which may be <c>old</c>, as the old row is.
         /// </remarks>
         public (string Alias, PlanInstance Instance)? InstanceOf(
             OutputReference reference,
             PlanInstances instances,
-            string? onlyAlias,
+            bool rowsMayBeNamed,
             BareNames bareNames
         )
         {
@@ -617,13 +622,13 @@ internal static partial class NullabilityWalk
                 {
                     BareNames.Refused => null,
                     BareNames.OfTheOneRelation => instances.BareAlias,
-                    BareNames.OfTheOneRelationUnlessOldOrNew => scope.OldAndNewMayBeNamed ? null : instances.BareAlias,
+                    BareNames.OfTheOneRelationUnlessOldOrNew => scope.OldAndNew.MayBeNamed ? null : instances.BareAlias,
                     _ => throw UnexpectedEnumValueException.Of(bareNames),
                 };
             var held = reference.Alias is not null || bareNames != BareNames.OfTheOneRelation;
             return
                 alias is not null
-                && (!held || onlyAlias is null || string.Equals(alias, onlyAlias, StringComparison.Ordinal))
+                && (!held || !rowsMayBeNamed || !scope.OldAndNew.MayName(alias))
                 && instances.TryFind(alias, out var instance)
                 ? (alias, instance)
                 : null;
@@ -685,7 +690,7 @@ internal static partial class NullabilityWalk
                 return Resolution.Unknown;
             }
 
-            var onlyAlias = OnlyAliasOf(child);
+            var rowsMayBeNamed = RowsMayBeNamedAt(child);
             var found = Resolution.NoCandidate;
             foreach (var entry in entries)
             {
@@ -703,7 +708,7 @@ internal static partial class NullabilityWalk
                     continue;
                 }
 
-                if (InstanceOf(reference, instances, onlyAlias, BareNames.Refused) is not { } named)
+                if (InstanceOf(reference, instances, rowsMayBeNamed, BareNames.Refused) is not { } named)
                 {
                     return Resolution.Unknown;
                 }

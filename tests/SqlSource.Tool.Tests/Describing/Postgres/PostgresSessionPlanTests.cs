@@ -138,6 +138,30 @@ public sealed class PostgresSessionPlanTests
         AnswersOf(description).ShouldBe([NotNullCatalog]);
     }
 
+    // A word of a join that a "(" follows is a function's name, which gates nothing: a query whose every column has an
+    // origin needs no plan, and keeps the catalog's answer.
+    [Fact]
+    public async Task DescribeAsync_QueryWhoseOnlyGateWordIsAFunctionsName_NeedsNoPlan()
+    {
+        const string Sql = "SELECT id FROM users WHERE left(name, 1) = 'a'";
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = script.Prepares(1, Sql, [], new([], null));
+        _ = script.Columns(1, 0, PostgresTables.UsersId);
+        _ = script.Tables([users.Oid], users);
+        _ = script.Resolves([23], PostgresRows.Int4);
+        _ = script.Checks(Sql, [], PostgresTables.ExpressionOf(0, "id", PostgresRows.Int4.Oid));
+        var exchange = script.Frees(1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Listed(Sql), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        var description = described.Value.ShouldNotBeNull();
+        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        AnswersOf(description).ShouldBe([NotNullCatalog]);
+    }
+
     // users is the side the join keeps: its NOT NULL column stays so, by the catalog.
     [Fact]
     public async Task DescribeAsync_GatedQueryWhoseJoinKeepsTheColumnsSide_TakesTheCatalogsAnswerAndIsWalked()
@@ -292,13 +316,21 @@ public sealed class PostgresSessionPlanTests
     public async Task DescribeAsync_GatedStatementWithoutRows_HasNoPlan()
     {
         var script = new PostgresScript().Open();
-        _ = script.PreparesWithNoColumns(1, "DELETE FROM users WHERE left(name, 1) = 'a'", [], new([], null));
-        _ = script.Checks("DELETE FROM users WHERE left(name, 1) = 'a'", []);
+        _ = script.PreparesWithNoColumns(
+            1,
+            "DELETE FROM users u USING orders o LEFT JOIN users x ON x.id = o.user_id WHERE o.user_id = u.id",
+            [],
+            new([], null)
+        );
+        _ = script.Checks(
+            "DELETE FROM users u USING orders o LEFT JOIN users x ON x.id = o.user_id WHERE o.user_id = u.id",
+            []
+        );
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Listed("DELETE FROM users WHERE left(name, 1) = 'a'"),
+            Listed("DELETE FROM users u USING orders o LEFT JOIN users x ON x.id = o.user_id WHERE o.user_id = u.id"),
             TestContext.Current.CancellationToken
         );
 

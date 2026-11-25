@@ -74,10 +74,12 @@ $ dotnet sqlsource describe src/App/Queries/Users.sql src/App/Queries/Orders.sql
 - **The project or solution to run on.**  It is a `.sln`, `.slnx` or `.csproj` file, or a folder that holds exactly one of them.  Without it, the tool runs on the current folder.  You can give only one.
 - **The tool looks for the project or solution in that folder alone**, not in the folders below it.  If the folder holds none, the tool reports [SQLSRC201](../diagnostics.md#sqlsrc201).  If it holds more than one, the tool reports [SQLSRC202](../diagnostics.md#sqlsrc202).
 - **In a solution, the tool runs on every C# project that uses the SqlSource package.**  It leaves the other projects out, and says nothing about them.
+- **A project with several target frameworks uses the package when any of them does.**  The tool then reads each framework that uses it: see [which queries are described](describing.md#which-queries).
 - **Every C# project of the solution must be restored**, a project with no queries too.  If one is not, the tool reports [SQLSRC220](../diagnostics.md#sqlsrc220).
 - **A path that ends in `.sql` restricts the run to that file.**  You can give several.
 - **Each `.sql` path must be a file that a type of the run claims.**  If it is not, the tool reports [SQLSRC212](../diagnostics.md#sqlsrc212), and the rest of the run goes on.
 - **A relative path starts from the current folder.**
+- **A path through a symbolic link names the file the link leads to.**  This holds for a `.sql` path, the file of `--query` and a `--project` path.  It also holds when you reach the current folder through a link, as in a shell's `$PWD`.
 
 <a id="paths"></a>
 
@@ -113,7 +115,7 @@ The rule holds for every place a path goes: the path of `describe` or `diagnose`
 | `--check` | Describes every query of the run, compares with the sidecars, writes nothing: see [check in CI](describing.md#check-in-ci).  With `--force` too, it is `--check` |
 | `--verbose` | Prints what the run decides as it goes: see [`--verbose`](#verbose) |
 | `--log <path>` | Writes a record of the run to a file; a path that holds `=` or `;` is refused: see [logs](#logs) |
-| `--manifest <path>` | For the build's use: describes the project that the build's record of it names, without reading the project again.  It takes no project or solution, `.sql` path, `--project`, `--database` or `--watch`.  See [running in the build](online-build.md#running-in-the-build) |
+| `--manifest <path>` | For the build's use: describes the project that the build's record of it names, without reading the project again.  May be given once for each target framework of the project; records of two projects are [SQLSRC206](../diagnostics.md#sqlsrc206).  It takes no project or solution, `.sql` path, `--project`, `--database` or `--watch`.  See [running in the build](online-build.md#running-in-the-build) |
 | `--online <auto\|true>` | For the build's use, with `--manifest`: takes a `--manifest`, `--log` or `--env-file` path that holds `=` or `;`, as the build's own may, and prints and logs it in full, writes each error on one line, writes no log for `SQLSOURCE_LOG`, and under `auto` says it is offline, and exits with `0`, when no database with a query to describe has a connection.  See [running in the build](online-build.md#running-in-the-build) |
 | `--watch` | Describes once, then again each time a file of the run changes, until stopped: see [describe on save](describing.md#describe-on-save).  Not with `--check` or `--manifest` |
 
@@ -180,6 +182,7 @@ postgres (postgres): 1 described, 0 skipped, 0 failed
   - `--connection`;
   - the name of a variable;
   - for a connection from a [`.env` file](connections.md#env-file), the variable and the file, as `connection from SQLSOURCE_CONNECTION_BILLING in /work/.env`.
+- **The line of a project with several target frameworks names each framework that uses SqlSource**, as `net8.0;net10.0, 2 .sql files`.  It counts a `.sql` file that two frameworks include once.
 - **Under `--watch`, `--verbose` says the same of each pass, and nothing more.**
 - **Without `--verbose`, the tool prints its errors and the summary.**  It also prints the line that ends a failed run, or the line that says that no project uses SqlSource.
 
@@ -269,17 +272,3 @@ A name given to `--database` that no query of the run has gets a line of zeros, 
 - **If it is not, the line says `--database at position <n>`**, with the position of the value on the command line.  A value typed after `--database` by mistake can be a secret.
 
 If no project of a solution uses SqlSource, a run on the solution prints `sqlsource: no project of '<path>' uses SqlSource`, and no summary.
-
-<a id="limits"></a>
-
-## Limits
-
-<a id="limit-path-through-a-symbolic-link"></a>
-
-### SQLSRC207 or SQLSRC212 for a path through a symbolic link
-
-**What you see.**  A project path or a `.sql` path through a symbolic link is not found, though the file is there.  For `--project`, the tool reports [SQLSRC207](../diagnostics.md#sqlsrc207).  For a `.sql` path, it reports [SQLSRC212](../diagnostics.md#sqlsrc212).  The message shows both spellings of the path.
-
-**Why.**  The current folder is reached through a symbolic link, and you give a full path that goes through the link.  The tool compares that path with the real path, and finds no match.
-
-**What to do.**  Give the path relative to the current folder, or give the full real path.
