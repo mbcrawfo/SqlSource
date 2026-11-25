@@ -34,12 +34,17 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// column the server answers not null keeps its answer and asks nothing.
 /// </para>
 /// <para>
-/// A column whose row says <see cref="SqlServerColumnRow.PersistedNotNull" /> is proved by the catalog, with the
-/// <c>nullableSource</c> <c>catalog</c>, only when its item is a column alone or the one <c>*</c>, the <c>FROM</c> is
-/// one table alone (<see cref="SelectBody.IsOneTable" />) and the <c>GROUP BY</c> has no grouping set: then every row
-/// of the result is a row of that table, which the constraint keeps not null.  Through an outer join the column is
-/// <c>NULL</c> while the server still names it as the source, so nothing else proves it.  A <c>*</c> gets no proof of
-/// a form and asks no operand: this is the one proof it can have.
+/// A computed column of a table is read as a row of that table only in a query of one <c>SELECT</c> whose
+/// <c>GROUP BY</c> has no grouping set and none of <c>ALL</c>, by an item that is a column alone of one table alone
+/// (<see cref="SelectBody.IsOneTable" />) or of a table no join makes <c>NULL</c>
+/// (<see cref="FilteredRows.IsOfATableNoJoinMakesNull" />), or by the one <c>*</c> of one table alone or <c>q.*</c> of
+/// such a table.  Through an outer join the column is <c>NULL</c> while the server still names it as the source, so
+/// nothing else is such a row.  One whose row says <see cref="SqlServerColumnRow.PersistedNotNull" /> is then proved
+/// by the catalog, with the <c>nullableSource</c> <c>catalog</c>.  Any other, of no CLR type, with its
+/// <see cref="SqlServerColumnRow.ComputedDefinition" />, is proved with the <c>nullableSource</c> <c>expression</c>
+/// when <see cref="ComputedProofs.Proves" /> holds of its definition over the rows of <c>table</c> for its table, which
+/// <see cref="ComputedTables" /> names.  A <c>*</c> gets no proof of a form and asks no operand: these are the proofs
+/// it can have.
 /// </para>
 /// </remarks>
 internal sealed class ColumnProofs
@@ -54,7 +59,8 @@ internal sealed class ColumnProofs
     // The proof of each column, by its place, or null for a column that has none.
     private readonly IReadOnlyList<Proof?> _proofs;
 
-    // Whether the catalog proves each column, by its place: a PERSISTED NOT NULL column read from its one table.
+    // Whether the catalog proves each column, by its place: a PERSISTED NOT NULL column read from a table no join makes
+    // NULL.
     private readonly IReadOnlyList<bool> _catalog;
 
     // Whether each column, by its place, is answered not null and may hold a CLR type's Null, so that it is nullable
@@ -64,6 +70,9 @@ internal sealed class ColumnProofs
     // Whether each column, by its place, may hold a CLR type's Null and is read from a view or an inline function,
     // whose column "origins" may show passes a stored column on.
     private readonly IReadOnlyList<bool> _asksOrigin;
+
+    // The computed column of a table that each column, by its place, is read as a row of and may be proved by, or null.
+    private readonly IReadOnlyList<ComputedColumn?> _computed;
 
     // The CTE columns the proofs read.
     private readonly CteProofs _ctes;
@@ -75,6 +84,7 @@ internal sealed class ColumnProofs
         IReadOnlyList<bool> clrNull,
         IReadOnlyList<bool> asksOrigin,
         IReadOnlyList<OperandQuery> operandQueries,
+        IReadOnlyList<ComputedColumn?>? computed = null,
         CteProofs? ctes = null
     )
     {
@@ -83,8 +93,13 @@ internal sealed class ColumnProofs
         _catalog = catalog;
         _clrNull = clrNull;
         _asksOrigin = asksOrigin;
+        _computed = computed ?? [];
         _ctes = ctes ?? CteProofs.None;
         OperandQueries = operandQueries;
+        ComputedTables =
+        [
+            .. _computed.OfType<ComputedColumn>().Select(static column => (column.Schema, column.Table)).Distinct(),
+        ];
     }
 
     /// <summary>
@@ -99,6 +114,12 @@ internal sealed class ColumnProofs
     /// is read from a view or an inline function, which may pass a stored column on.
     /// </summary>
     public bool AsksOrigins => _asksOrigin.Any(static asks => asks);
+
+    /// <summary>
+    /// The tables to ask <c>table</c> for, each once, in the order of the columns: each of a computed column that a
+    /// column is read as a row of, whose definition its rows may prove.  <see cref="Apply" /> reads their answers.
+    /// </summary>
+    public IReadOnlyList<(string Schema, string Table)> ComputedTables { get; }
 
     /// <summary>
     /// Whether each column, by its place, is a stored column of a table in the answer of <c>origins</c>, which names
@@ -159,15 +180,22 @@ internal sealed class ColumnProofs
 
         var body = statement.Body;
         var isOneSelect = statement.Branches.Count == 1;
-        if (isOneSelect && body.Items is [{ IsStar: true }])
+        if (isOneSelect && body.Items is [{ IsStar: true } star])
         {
+            var readsATable =
+                IsOfGroupsOfRows(body)
+                && (
+                    body.IsOneTable
+                    || FilteredRows.Read(tokens, body, statement.Ctes).IsOfATableNoJoinMakesNull(star.Expression)
+                );
             return new ColumnProofs(
                 columns,
                 [],
-                [.. visible.Select(row => IsProvedByTheCatalog(body, row))],
+                [.. visible.Select(row => readsATable && IsProvedByTheCatalog(row))],
                 clrNull,
                 asksOrigin,
-                []
+                [],
+                [.. visible.Select(row => readsATable ? ComputedOf(row) : null)]
             );
         }
 
@@ -191,13 +219,26 @@ internal sealed class ColumnProofs
 
         var parts = new List<Proof>?[visible.Count];
         var catalog = new bool[visible.Count];
+        var computed = new ComputedColumn?[visible.Count];
         for (var index = 0; index < visible.Count; index++)
         {
-            if (isOneSelect && body.Items[index].IsColumn(tokens) && IsProvedByTheCatalog(body, visible[index]))
+            var readsATable =
+                isOneSelect
+                && IsOfGroupsOfRows(body)
+                && body.Items[index].IsColumn(tokens)
+                && (body.IsOneTable || branches[0].Filtered.IsOfATableNoJoinMakesNull(body.Items[index].Expression));
+            if (readsATable && IsProvedByTheCatalog(visible[index]))
             {
                 catalog[index] = true;
+                continue;
             }
-            else if (SqlServerColumns.NullableAsRecorded(visible[index]) && !SqlServerTypes.MayBeClr(visible[index]))
+
+            if (readsATable)
+            {
+                computed[index] = ComputedOf(visible[index]);
+            }
+
+            if (SqlServerColumns.NullableAsRecorded(visible[index]) && !SqlServerTypes.MayBeClr(visible[index]))
             {
                 parts[index] = [.. branches.Select(branch => branch.Proofs.Of(branch.Body.Items[index].Expression))];
             }
@@ -220,39 +261,35 @@ internal sealed class ColumnProofs
             )
             .ToList();
 
-        // Each branch numbers its operands from 0, and the answers are one list, so a proof moves by the operands of
-        // the branches before its own.
+        // Each branch numbers its operands from 0, and the answers are one list, so a proof moves to the places of its
+        // operands' answers, after the operands of the branches before its own.
         var queries = new List<OperandQuery>();
-        var offsets = new int[branches.Count];
+        var places = new Func<int, int>[branches.Count];
         var asked = 0;
         for (var at = 0; at < branches.Count; at++)
         {
-            offsets[at] = asked;
-            var operands = branches[at].Proofs.Operands;
-            if (operands.Count > 0)
-            {
-                queries.Add(
-                    new OperandQuery(
-                        OperandsQuery.Text(
-                            sql,
-                            tokens,
-                            statement.With,
-                            branches[at].Body,
-                            operands,
-                            branches[at].Filtered.Cuts
-                        ),
-                        operands.Count
-                    )
-                );
-                asked += operands.Count;
-            }
+            var (calls, of) = OperandsQuery.Calls(
+                sql,
+                tokens,
+                statement.With,
+                branches[at].Body,
+                branches[at].Proofs,
+                branches[at].Filtered,
+                branches[at].Filtered.Cuts
+            );
+            var before = asked;
+            places[at] = index => before + of[index];
+            queries.AddRange(calls);
+            asked += calls.Sum(static call => call.Count);
         }
 
         var proofs = parts
             .Select(of =>
                 of is null
                     ? null
-                    : ExpressionProofs.AllOf(of.Select((part, at) => WithGuard(part, guards[at]).Shifted(offsets[at])))
+                    : ExpressionProofs.AllOf(
+                        of.Select((part, at) => WithGuard(part, guards[at]).Renumbered(places[at]))
+                    )
             )
             .ToList();
         var ctes = CteProofs.Read(sql, tokens, statement, proofs.OfType<Proof>(), asked);
@@ -263,6 +300,7 @@ internal sealed class ColumnProofs
             clrNull,
             asksOrigin,
             [.. queries, .. ctes.OperandQueries],
+            computed,
             ctes
         );
     }
@@ -280,14 +318,20 @@ internal sealed class ColumnProofs
     /// <param name="origins">
     /// The answer of <c>origins</c> as <see cref="OriginsOf" /> reads it, or null when it was not asked or shows none.
     /// </param>
+    /// <param name="tables">
+    /// The rows of <c>table</c> for each table of <see cref="ComputedTables" /> that it answered with rows, the hidden
+    /// ones included; a table it was not asked for, or that it answered with an error or error rows, proves nothing.
+    /// </param>
     public IReadOnlyList<BuiltColumn> Apply(
         IReadOnlyList<OperandFacts>? answers,
-        IReadOnlyList<bool>? origins = null
-    ) => [.. _columns.Select((column, index) => Applied(column, index, answers, origins))];
+        IReadOnlyList<bool>? origins = null,
+        IReadOnlyDictionary<(string Schema, string Table), IReadOnlyList<SqlServerColumnRow>>? tables = null
+    ) => [.. _columns.Select((column, index) => Applied(column, index, answers, origins, tables))];
 
     /// <summary>
-    /// The rows of <c>table</c>, each the catalog proves not nullable, as for the columns of a query whose one item is
-    /// <c>*</c> of the table alone, which is what <c>table</c> describes, and each that may hold a CLR type's Null
+    /// The rows of <c>table</c>, each the catalog or its definition over these rows proves not nullable, as for the
+    /// columns of a query whose one item is <c>*</c> of the table alone, which is what <c>table</c> describes, and each
+    /// that may hold a CLR type's Null
     /// nullable, as for any column, unless the query's column of that origin is answered not null; every other row as
     /// it came.  So the table match compares a corrected query with a corrected table.
     /// </summary>
@@ -302,11 +346,18 @@ internal sealed class ColumnProofs
     public static IReadOnlyList<SqlServerColumnRow> TableRows(
         IReadOnlyList<SqlServerColumnRow> rows,
         IReadOnlyList<SidecarColumn> columns
-    ) => [.. rows.Select(row => TableRow(row, columns))];
+    ) => [.. rows.Select(row => TableRow(row, rows, columns))];
 
-    private static SqlServerColumnRow TableRow(SqlServerColumnRow row, IReadOnlyList<SidecarColumn> columns)
+    private static SqlServerColumnRow TableRow(
+        SqlServerColumnRow row,
+        IReadOnlyList<SqlServerColumnRow> rows,
+        IReadOnlyList<SidecarColumn> columns
+    )
     {
-        if (IsPersistedNotNull(row))
+        if (
+            IsPersistedNotNull(row)
+            || (ComputedOf(row) is { } computed && ComputedProofs.Proves(computed.Definition, rows))
+        )
         {
             return row with { IsNullable = false };
         }
@@ -336,13 +387,30 @@ internal sealed class ColumnProofs
         && !SqlServerColumns.IsStored(row)
         && !IsPersistedNotNull(row);
 
-    // True when the catalog proves the column of the row, whose item is a column alone or the one *, in the body: its
-    // row says PERSISTED NOT NULL, the FROM is its one table, and no grouping set gives a total row.
-    private static bool IsProvedByTheCatalog(SelectBody body, SqlServerColumnRow row) =>
-        SqlServerColumns.NullableAsRecorded(row)
-        && IsPersistedNotNull(row)
-        && body.IsOneTable
-        && body.Grouping is SelectGrouping.None or SelectGrouping.Plain;
+    // True when the catalog proves the column of the row, read as a row of its table: its row says PERSISTED NOT NULL.
+    private static bool IsProvedByTheCatalog(SqlServerColumnRow row) =>
+        SqlServerColumns.NullableAsRecorded(row) && IsPersistedNotNull(row);
+
+    // True when each row of the body is a group of its rows, or one of them: no grouping set gives a total's row, and
+    // GROUP BY ALL no group of rows its WHERE left out.
+    private static bool IsOfGroupsOfRows(SelectBody body) =>
+        body.Grouping is SelectGrouping.None or SelectGrouping.Plain;
+
+    // The computed column of a table, of no CLR type, that the server answers nullable, with its definition; or null.
+    private static ComputedColumn? ComputedOf(SqlServerColumnRow row) =>
+        row
+            is {
+                IsHidden: false,
+                IsComputedColumn: true,
+                SourceType: SqlServerColumns.Table,
+                SourceSchema: { } schema,
+                SourceTable: { } table,
+                ComputedDefinition: { } definition,
+            }
+        && SqlServerColumns.NullableAsRecorded(row)
+        && !SqlServerTypes.MayBeClr(row)
+            ? new ComputedColumn(schema, table, definition)
+            : null;
 
     // The row's source is a table of the session's database whose column is PERSISTED NOT NULL.  The SQL of "columns"
     // already asks for a table, and SourceType says so again, for a capture made by hand.
@@ -350,16 +418,27 @@ internal sealed class ColumnProofs
         row is { PersistedNotNull: true, SourceType: SqlServerColumns.Table };
 
     // The nullableSource that proves the column in the place not null, or null when nothing does.
-    private string? SourceOf(int index, IReadOnlyList<OperandFacts>? answers)
+    private string? SourceOf(
+        int index,
+        IReadOnlyList<OperandFacts>? answers,
+        IReadOnlyDictionary<(string Schema, string Table), IReadOnlyList<SqlServerColumnRow>>? tables
+    )
     {
         if (index < _catalog.Count && _catalog[index])
         {
             return SidecarValues.NullableSource.Catalog;
         }
 
-        return index < _proofs.Count && _proofs[index] is { } proof && _ctes.Holds(proof, answers)
-            ? SidecarValues.NullableSource.Expression
-            : null;
+        var isProved =
+            (index < _proofs.Count && _proofs[index] is { } proof && _ctes.Holds(proof, answers))
+            || (
+                index < _computed.Count
+                && _computed[index] is { } computed
+                && tables is not null
+                && tables.TryGetValue((computed.Schema, computed.Table), out var rows)
+                && ComputedProofs.Proves(computed.Definition, rows)
+            );
+        return isProved ? SidecarValues.NullableSource.Expression : null;
     }
 
     // The column as the proofs answer it.
@@ -367,7 +446,8 @@ internal sealed class ColumnProofs
         BuiltColumn column,
         int index,
         IReadOnlyList<OperandFacts>? answers,
-        IReadOnlyList<bool>? origins
+        IReadOnlyList<bool>? origins,
+        IReadOnlyDictionary<(string Schema, string Table), IReadOnlyList<SqlServerColumnRow>>? tables
     )
     {
         if (index < _clrNull.Count && _clrNull[index])
@@ -387,7 +467,7 @@ internal sealed class ColumnProofs
                 };
         }
 
-        return SourceOf(index, answers) is { } source ? NotNull(column, source) : column;
+        return SourceOf(index, answers, tables) is { } source ? NotNull(column, source) : column;
     }
 
     private static BuiltColumn NotNull(BuiltColumn column, string source) =>
@@ -398,6 +478,9 @@ internal sealed class ColumnProofs
 
     private static Proof WithGuard(Proof part, Proof guard) =>
         part is Proof.Always or Proof.Never ? part : ExpressionProofs.AllOf([part, guard]);
+
+    // A computed column of a table: its schema, its table and its definition, as the catalog holds them.
+    private sealed record ComputedColumn(string Schema, string Table, string Definition);
 
     // True when every branch has an item for each column and none is a star, whose columns are not read.  The server
     // takes a set operator's names from its first branch alone.

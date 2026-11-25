@@ -165,6 +165,7 @@ internal static class SqlServerFields
             Add(method, Row("sourceTable"), FieldRule.Name(NameClass.Table));
             Add(method, Row(SourceColumn), FieldRule.Name(NameClass.Column));
             Add(method, Row("sourceType"), FieldRule.Closed);
+            Add(method, Row("computedDefinition"), new FieldRule(FieldRuleKind.Sql, NameClass.Column));
         }
 
         foreach (var type in EntryRenamer.TypeRecords)

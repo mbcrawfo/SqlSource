@@ -299,6 +299,134 @@ public sealed class SqlServerSessionProofTests
             AssemblyQualifiedTypeName = "Microsoft.SqlServer.Types.SqlGeometry, Microsoft.SqlServer.Types",
         };
 
+    // A computed column read from the preserved side of a RIGHT JOIN: "table" is asked for its table after "operands",
+    // and its definition over those rows proves it.  No column list is one table's, so the match asks nothing more.
+    [Fact]
+    public async Task DescribeAsync_ComputedColumnOfATableNoJoinMakesNull_AsksItsTableAfterOperands()
+    {
+        const string Sql =
+            "SELECT p.sale_price, COALESCE(p.discount_pct, 0) AS discount FROM dbo.categories AS c "
+            + "RIGHT JOIN dbo.products AS p ON p.category_id = c.id";
+        var operands = new SqlServerColumnsRequest(
+            "SELECT p.discount_pct\nAS [1]\n"
+                + "FROM dbo.categories AS c RIGHT JOIN dbo.products AS p ON p.category_id = c.id",
+            null
+        );
+        var script = Script(Sql, [SalePriceColumn(1), ExpressionRow(2, "discount")])
+            .Operands(operands, new SqlServerColumnsAnswer([StoredOperand(OperandRow(1, true))], null, null))
+            .Table(Products, new SqlServerColumnsAnswer(ProductRows, null, null));
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        asked.ShouldBe([
+            Call(Calls.Parameters, new SqlServerParametersRequest(Sql, null, null)),
+            Call(Calls.Columns, new SqlServerColumnsRequest(Sql, null)),
+            Call(Calls.Operands, operands),
+            Call(Calls.Table, Products),
+        ]);
+        Nullability(described)
+            .ShouldBe([
+                (false, SidecarValues.NullableSource.Expression),
+                (false, SidecarValues.NullableSource.Expression),
+            ]);
+    }
+
+    // The match of a query of the table alone takes the answer the proof was given, and asks "table" no second time:
+    // the corrected column matches the corrected table's row.
+    [Fact]
+    public async Task DescribeAsync_ComputedColumnOfTheMatchedTable_AsksTableOnce()
+    {
+        const string Sql = "SELECT id, list_price, discount_pct, sale_price FROM dbo.products";
+        var script = Script(Sql, ProductRows).Table(Products, new SqlServerColumnsAnswer(ProductRows, null, null));
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        asked.Select(static call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns, Calls.Table]);
+        Nullability(described)[3].ShouldBe((false, SidecarValues.NullableSource.Expression));
+        described.Value.ShouldNotBeNull().TableMatch.ShouldBe(SidecarValues.TableMatch.Matched);
+    }
+
+    // A "table" that fails for the computed column's table proves nothing and fails nothing, unless the match needs
+    // that very table, which it would have asked all the same.
+    [Theory]
+    [InlineData("lost", false)]
+    [InlineData("error rows", false)]
+    [InlineData("lost", true)]
+    public async Task DescribeAsync_TableOfAComputedColumnFails_ProvesNothing(string how, bool matchNeedsIt)
+    {
+        var sql = matchNeedsIt
+            ? "SELECT p.sale_price FROM dbo.products AS p"
+            : "SELECT p.sale_price, c.id FROM dbo.categories AS c RIGHT JOIN dbo.products AS p ON p.category_id = c.id";
+        var answer =
+            how == "lost"
+                ? new SqlServerColumnsAnswer(null, null, Lost)
+                : new SqlServerColumnsAnswer(null, [new SqlServerDescribeError(208, 7, "Invalid object name.")], null);
+        IReadOnlyList<SqlServerColumnRow> rows = matchNeedsIt
+            ? [SalePriceColumn(1)]
+            : [SalePriceColumn(1), IdColumn with { ColumnOrdinal = 2, SourceTable = "categories" }];
+        var script = Script(sql, rows).Table(Products, answer);
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, sql));
+
+        asked.Select(static call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns, Calls.Table]);
+        if (matchNeedsIt)
+        {
+            _ = described.Failure.ShouldNotBeNull();
+        }
+        else
+        {
+            Nullability(described)[0].ShouldBe((true, SidecarValues.NullableSource.Server));
+        }
+    }
+
+    private static readonly SqlServerTableRequest Products = new("dbo", "products");
+
+    // dbo.products of the realistic schema as "table" describes it: list_price NOT NULL, discount_pct NULL and
+    // sale_price computed from them, which the server answers nullable.
+    private static readonly IReadOnlyList<SqlServerColumnRow> ProductRows =
+    [
+        IdColumn with
+        {
+            SourceTable = "products",
+        },
+        IdColumn with
+        {
+            ColumnOrdinal = 2,
+            Name = "list_price",
+            SourceTable = "products",
+            SourceColumn = "list_price",
+            IsIdentityColumn = false,
+        },
+        IdColumn with
+        {
+            ColumnOrdinal = 3,
+            Name = "discount_pct",
+            IsNullable = true,
+            SourceTable = "products",
+            SourceColumn = "discount_pct",
+            IsIdentityColumn = false,
+        },
+        SalePriceColumn(4),
+        Rowstat with
+        {
+            ColumnOrdinal = 5,
+        },
+    ];
+
+    // dbo.products.sale_price, AS (list_price * (1 - ISNULL(discount_pct, 0) / 100)), in the place given.
+    private static SqlServerColumnRow SalePriceColumn(int ordinal) =>
+        IdColumn with
+        {
+            ColumnOrdinal = ordinal,
+            Name = "sale_price",
+            IsNullable = true,
+            SourceTable = "products",
+            SourceColumn = "sale_price",
+            IsIdentityColumn = false,
+            IsComputedColumn = true,
+            ComputedDefinition = "([list_price]*((1)-isnull([discount_pct],(0))/(100)))",
+        };
+
     // The row, answered as a stored column of a table.
     private static SqlServerColumnRow StoredOperand(SqlServerColumnRow row) =>
         row with

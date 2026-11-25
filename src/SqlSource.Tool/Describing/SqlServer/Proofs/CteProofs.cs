@@ -69,7 +69,11 @@ internal sealed class CteProofs
         int asked
     )
     {
-        var read = new SortedDictionary<int, (IReadOnlyList<SelectBody> Bodies, List<ExpressionProofs> Proofs)>();
+        var read =
+            new SortedDictionary<
+                int,
+                (IReadOnlyList<SelectBody> Bodies, List<FilteredRows> Filtered, List<ExpressionProofs> Proofs)
+            >();
         var parts = new Dictionary<int, Dictionary<int, IReadOnlyList<Proof>>>();
         var work = new Queue<Proof.CteColumn>(proofs.SelectMany(ColumnsIn));
         while (work.TryDequeue(out var column))
@@ -78,15 +82,17 @@ internal sealed class CteProofs
             {
                 var ctes = statement.Ctes.Take(column.Cte + 1).ToList();
                 var bodies = statement.Ctes[column.Cte].Branches!;
+                List<FilteredRows> filtered =
+                [
+                    .. bodies.Select(body => FilteredRows.Read(tokens, body, ctes, makesJoinsInner: false)),
+                ];
                 cte = (
                     bodies,
+                    filtered,
                     [
-                        .. bodies.Select(body => new ExpressionProofs(
-                            tokens,
-                            body,
-                            FilteredRows.Read(tokens, body, ctes, makesJoinsInner: false),
-                            asksLoneLeaf: true
-                        )),
+                        .. bodies.Select(
+                            (body, at) => new ExpressionProofs(tokens, body, filtered[at], asksLoneLeaf: true)
+                        ),
                     ]
                 );
                 read[column.Cte] = cte;
@@ -109,34 +115,35 @@ internal sealed class CteProofs
             }
         }
 
-        // Each branch numbers its operands from 0, and the answers are one list, so a proof moves by the operands of
-        // the calls before its own.
+        // Each branch numbers its operands from 0, and the answers are one list, so a proof moves to the places of its
+        // operands' answers, after the operands of the calls before its own.
         var queries = new List<ColumnProofs.OperandQuery>();
         var columns = new Dictionary<int, IReadOnlyDictionary<int, IReadOnlyList<Proof>>>();
         foreach (var (place, cte) in read)
         {
             var with = new TokenRange(statement.With.Start, statement.Ctes[place].Close + 1);
-            var offsets = new int[cte.Bodies.Count];
+            var places = new Func<int, int>[cte.Bodies.Count];
             for (var at = 0; at < cte.Bodies.Count; at++)
             {
-                offsets[at] = asked;
-                var operands = cte.Proofs[at].Operands;
-                if (operands.Count > 0)
-                {
-                    queries.Add(
-                        new ColumnProofs.OperandQuery(
-                            OperandsQuery.Text(sql, tokens, with, cte.Bodies[at], operands),
-                            operands.Count
-                        )
-                    );
-                    asked += operands.Count;
-                }
+                var (calls, of) = OperandsQuery.Calls(
+                    sql,
+                    tokens,
+                    with,
+                    cte.Bodies[at],
+                    cte.Proofs[at],
+                    cte.Filtered[at],
+                    cuts: null
+                );
+                var before = asked;
+                places[at] = index => before + of[index];
+                queries.AddRange(calls);
+                asked += calls.Sum(static call => call.Count);
             }
 
             columns[place] = parts[place]
                 .ToDictionary(
                     static pair => pair.Key,
-                    IReadOnlyList<Proof> (pair) => [.. pair.Value.Select((part, at) => part.Shifted(offsets[at]))]
+                    IReadOnlyList<Proof> (pair) => [.. pair.Value.Select((part, at) => part.Renumbered(places[at]))]
                 );
         }
 

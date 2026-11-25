@@ -8,6 +8,7 @@ using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Describing.SqlServer.Columns;
+using SqlSource.Tool.Describing.SqlServer.Proofs;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 
@@ -350,6 +351,62 @@ public sealed class ColumnTests(SqlServerDatabases sqlServer)
             .Where(static row => !row.IsHidden)
             .Select(static row => row.PersistedNotNull)
             .ShouldBe([.. expected.Select(static flag => (bool?)flag)]);
+
+    // The tool's computed_definition is the catalog's definition of a computed column of a table, persisted or not, as
+    // the server writes it, and null for a stored column, an expression and a column of a view, whose source is the
+    // view: the proofs read it only of a table.
+    [Fact]
+    public async Task ColumnsAsync_ComputedDefinition_IsReadOfAComputedColumnOfATable()
+    {
+        await sqlServer.ExecuteAsync("DROP VIEW IF EXISTS dbo.user_name_lengths");
+        await sqlServer.ExecuteAsync("CREATE VIEW dbo.user_name_lengths AS SELECT name_len FROM dbo.users");
+        try
+        {
+            (await ColumnsAsync("SELECT name_len, name_len_p, id, 1 AS one FROM dbo.users"))
+                .Where(static row => !row.IsHidden)
+                .Select(static row => row.ComputedDefinition)
+                .ShouldBe(["(len([name]))", "(CONVERT([int],len([name])))", null, null]);
+            (await ColumnsAsync("SELECT name_len FROM dbo.user_name_lengths"))
+                .Single(static row => !row.IsHidden)
+                .ComputedDefinition.ShouldBeNull();
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP VIEW dbo.user_name_lengths");
+        }
+    }
+
+    // The realistic schema's dbo.products.sale_price, as the server writes its definition, which the proofs read as
+    // not null over the rows of "table" for its table: list_price is NOT NULL, and ISNULL replaces discount_pct's NULL.
+    [Fact]
+    public async Task ColumnsAsync_RealisticSalePrice_IsProvedOverItsTable()
+    {
+        await sqlServer.ExecuteAsync("DROP TABLE IF EXISTS dbo.computed_prices");
+        await sqlServer.ExecuteAsync(
+            "CREATE TABLE dbo.computed_prices (id int IDENTITY PRIMARY KEY, list_price decimal(10, 2) NOT NULL, "
+                + "discount_pct decimal(5, 2) NULL, sale_price AS (list_price * (1 - ISNULL(discount_pct, 0) / 100)))"
+        );
+        try
+        {
+            var row = (await ColumnsAsync("SELECT sale_price FROM dbo.computed_prices")).Single(static row =>
+                !row.IsHidden
+            );
+            await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+            var table = await new SqlServerLive(session.Connection).TableAsync(
+                new SqlServerTableRequest("dbo", "computed_prices"),
+                TestContext.Current.CancellationToken
+            );
+
+            (row.IsNullable, row.ComputedDefinition).ShouldBe(
+                (true, "([list_price]*((1)-isnull([discount_pct],(0))/(100)))")
+            );
+            ComputedProofs.Proves(row.ComputedDefinition!, table.Rows.ShouldNotBeNull()).ShouldBeTrue();
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP TABLE dbo.computed_prices");
+        }
+    }
 
     // A view is its columns' source under mode 2, so its column of name_len_p, read through a LEFT JOIN that makes it
     // NULL, is not the table's: persisted_not_null is false, as sys.tables holds no view.

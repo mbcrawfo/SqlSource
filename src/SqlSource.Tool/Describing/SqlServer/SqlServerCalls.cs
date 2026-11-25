@@ -270,6 +270,11 @@ internal sealed record SqlServerColumnsAnswer(
 /// the server's <c>is_nullable</c> does not show; false otherwise.  Null in a capture recorded before it.  Only
 /// <c>ColumnProofs</c> may act on it, since a row of the result read through an outer join is no row of the table.
 /// </param>
+/// <param name="ComputedDefinition">
+/// The tool's own column too: the <c>definition</c> of the source column in <c>sys.computed_columns</c>, under the
+/// condition of <paramref name="PersistedNotNull" />, persisted or not, nullable or not; null for any other row, and in
+/// a capture recorded before it.  Only <c>ColumnProofs</c> may act on it, for the same reason.
+/// </param>
 internal sealed record SqlServerColumnRow(
     bool IsHidden,
     int ColumnOrdinal,
@@ -290,7 +295,8 @@ internal sealed record SqlServerColumnRow(
     bool? IsIdentityColumn,
     bool? IsComputedColumn,
     string? SourceType,
-    bool? PersistedNotNull = null
+    bool? PersistedNotNull = null,
+    string? ComputedDefinition = null
 ) : ISqlServerTypeRow;
 
 /// <summary>

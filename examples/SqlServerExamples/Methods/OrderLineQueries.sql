@@ -6,8 +6,7 @@
 
 -- name: ListOrderLines -> many
 -- summary: The lines of one order, in order.
--- A parameter is no column of a table, so its marker gives it the type OrderId.  order_id comes last: the table's
--- columns in its own order would give the rows the table's model, OrderLinesDto.
+-- A parameter is no column of a table, so its marker gives it the type OrderId.
 -- param: @orderId -> OrderId
 SELECT
     line_number,

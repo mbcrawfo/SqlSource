@@ -236,6 +236,50 @@ public sealed partial class CteProofsTests
             ]);
     }
 
+    // A branch's COALESCE over each side of a FULL JOIN asks each side alone, behind the WITH clause cut after its CTE,
+    // and holds only when each side's call answers its column not null.
+    [Fact]
+    public void Apply_BranchCoalesceOfEachSideOfAFullJoin_ProvedByEachSidesCall()
+    {
+        const string With =
+            "WITH q (n) AS (SELECT COALESCE(a.x, b.y) FROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id "
+            + "UNION ALL SELECT 1)";
+        var proofs = Read($"{With} SELECT n FROM q", Rows("n"));
+
+        proofs
+            .OperandQueries.Skip(1)
+            .Select(static query => query.Sql)
+            .ShouldBe([
+                $"{With}\nSELECT a.x\nAS [1],\nb.y\nAS [2]\nFROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id",
+                $"{With}\nSELECT a.x\nAS [1]\nFROM dbo.a AS a",
+                $"{With}\nSELECT b.y\nAS [1]\nFROM\ndbo.b AS b",
+            ]);
+        Nullability(proofs.Apply(SideFacts(proofs, sidesNotNull: true))).ShouldBe([Proved]);
+        Nullability(proofs.Apply(SideFacts(proofs, sidesNotNull: false))).ShouldBe([Server]);
+    }
+
+    // The branch's rows' call asks a.z after a.x and b.y, before the sides' calls, though the proofs number it last:
+    // each item reads its own operands' answers, not the answers at its operands' indexes.
+    [Fact]
+    public void Apply_BranchItemAfterAFullJoinPair_ReadsItsOwnAnswer()
+    {
+        const string With =
+            "WITH q (n, m) AS (SELECT COALESCE(a.x, b.y), a.z + 1 FROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id "
+            + "UNION ALL SELECT 1, 2)";
+        var proofs = Read($"{With} SELECT n, m FROM q", Rows("n", "m"));
+
+        proofs
+            .OperandQueries.Skip(1)
+            .Select(static query => query.Sql)
+            .ShouldBe([
+                $"{With}\nSELECT a.x\nAS [1],\nb.y\nAS [2],\na.z\nAS [3]\n"
+                    + "FROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id",
+                $"{With}\nSELECT a.x\nAS [1]\nFROM dbo.a AS a",
+                $"{With}\nSELECT b.y\nAS [1]\nFROM\ndbo.b AS b",
+            ]);
+        Nullability(proofs.Apply(SideFacts(proofs, sidesNotNull: true))).ShouldBe([Proved, Server]);
+    }
+
     // A CTE that no proof reads asks nothing.
     [Fact]
     public void Read_CteNotRead_AsksNothingOfIt()
@@ -258,6 +302,24 @@ public sealed partial class CteProofsTests
         [
             .. OperandTexts(proofs)
                 .Select(text => new OperandFacts(!nullable.Contains(text) && !OwnColumn().IsMatch(text), NotClr: true)),
+        ];
+
+    // The answers of the calls, every operand stored and of a type that is no CLR type: nullable in a call whose text
+    // holds the FULL JOIN or reads the CTE, and as given in a call of one side of it.
+    private static IReadOnlyList<OperandFacts> SideFacts(ColumnProofs proofs, bool sidesNotNull) =>
+        [
+            .. proofs.OperandQueries.SelectMany(query =>
+                Enumerable.Repeat(
+                    new OperandFacts(
+                        sidesNotNull
+                            && !query.Sql.EndsWith("ON b.id = a.id", StringComparison.Ordinal)
+                            && !query.Sql.EndsWith("FROM q", StringComparison.Ordinal),
+                        NotClr: true,
+                        Stored: true
+                    ),
+                    query.Count
+                )
+            ),
         ];
 
     // The text of each operand the calls ask, in the order of the answers.

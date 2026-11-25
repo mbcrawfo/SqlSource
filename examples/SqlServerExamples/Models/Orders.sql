@@ -43,6 +43,27 @@ FROM orders
 WHERE shipped_on IS NOT NULL
 ORDER BY shipped_on;
 
+-- name: ListUsersAndOrders
+-- summary: Every user and every order, matched by the order's user, with the user's id from either side.
+SELECT
+    u.name,
+    o.id AS order_id,
+    COALESCE(u.id, o.user_id) AS user_id
+FROM users AS u
+FULL JOIN orders AS o ON u.id = o.user_id
+ORDER BY user_id, order_id;
+
+-- name: ListOrderLineTotals
+-- summary: The total of each line of each order, with the time the order was placed.
+SELECT
+    o.id,
+    o.placed_at,
+    l.line_number,
+    l.line_total
+FROM orders AS o
+INNER JOIN order_lines AS l ON o.id = l.order_id
+ORDER BY o.id, l.line_number;
+
 -- name: ListOrderMonths
 -- summary: Each order with the first day of the month it was placed in.
 -- column: month_start not null
