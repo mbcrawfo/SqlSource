@@ -76,12 +76,17 @@ internal static class ProjectEvaluator
     /// <param name="host">The processes, the environment and the temporary directory.</param>
     /// <param name="projects">The full paths of the project files.</param>
     /// <param name="solution">The full path of the solution the projects are of, or null for a project alone.</param>
+    /// <param name="configuration">
+    /// The configuration to evaluate the projects in, as <c>dotnet build -c</c> gives it, or null for the one each
+    /// project takes by default, which the environment can set.
+    /// </param>
     /// <param name="cancellationToken">Ends the run: no further process is started.</param>
     /// <returns>One evaluation for each project, in the order of <paramref name="projects" />.</returns>
     public static async Task<ImmutableArray<ProjectEvaluation>> EvaluateAsync(
         ToolHost host,
         IReadOnlyList<string> projects,
         string? solution,
+        string? configuration,
         CancellationToken cancellationToken
     )
     {
@@ -96,7 +101,13 @@ internal static class ProjectEvaluator
             .FullName;
         try
         {
-            var solutionSwitches = SolutionSwitches(solution);
+            // What every run of MSBuild is given, the evaluation's and the target's: a property given on the command
+            // line is global, and holds in each framework too.
+            ImmutableArray<string> globalSwitches =
+            [
+                .. SolutionSwitches(solution),
+                .. ConfigurationSwitches(configuration),
+            ];
             var evaluations = new ProjectEvaluation[projects.Count];
             var options = new ParallelOptions
             {
@@ -112,7 +123,7 @@ internal static class ProjectEvaluator
                     evaluations[index] = await EvaluateOneAsync(
                         host,
                         projects[index],
-                        solutionSwitches,
+                        globalSwitches,
                         manifestFile,
                         token
                     );
@@ -140,7 +151,7 @@ internal static class ProjectEvaluator
     private static async Task<ProjectEvaluation> EvaluateOneAsync(
         ToolHost host,
         string project,
-        ImmutableArray<string> solutionSwitches,
+        ImmutableArray<string> globalSwitches,
         string manifestFile,
         CancellationToken cancellationToken
     )
@@ -152,7 +163,7 @@ internal static class ProjectEvaluator
             return Failed(project, "the project file does not exist", new ProcessResult(0, "", ""));
         }
 
-        var evaluate = EvaluateArguments(project, solutionSwitches);
+        var evaluate = EvaluateArguments(project, globalSwitches);
         var result = await RunAsync(host, project, evaluate, cancellationToken);
         if (!TryReadAnswer(result, out var answer, out var reason))
         {
@@ -168,7 +179,7 @@ internal static class ProjectEvaluator
         {
             var state = StateOf(answer, assetsFile);
             return state == ProjectState.UsesSqlSource
-                ? await RunTargetAsync(host, project, manifestFile, [], solutionSwitches, assetsFile, cancellationToken)
+                ? await RunTargetAsync(host, project, manifestFile, [], globalSwitches, assetsFile, cancellationToken)
                 : new ProjectEvaluation(project, state, AssetsFile: assetsFile);
         }
 
@@ -177,7 +188,7 @@ internal static class ProjectEvaluator
             project,
             frameworks,
             evaluate,
-            solutionSwitches,
+            globalSwitches,
             manifestFile,
             assetsFile,
             cancellationToken
@@ -190,7 +201,7 @@ internal static class ProjectEvaluator
         string project,
         ImmutableArray<string> frameworks,
         ImmutableArray<string> evaluate,
-        ImmutableArray<string> solutionSwitches,
+        ImmutableArray<string> globalSwitches,
         string manifestFile,
         string? assetsFile,
         CancellationToken cancellationToken
@@ -230,7 +241,7 @@ internal static class ProjectEvaluator
                 project,
                 file,
                 frameworkSwitch,
-                solutionSwitches,
+                globalSwitches,
                 assetsFile,
                 cancellationToken
             );
@@ -252,7 +263,7 @@ internal static class ProjectEvaluator
         string project,
         string manifestFile,
         ImmutableArray<string> frameworkSwitch,
-        ImmutableArray<string> solutionSwitches,
+        ImmutableArray<string> globalSwitches,
         string? assetsFile,
         CancellationToken cancellationToken
     )
@@ -261,7 +272,7 @@ internal static class ProjectEvaluator
             host,
             project,
             manifestFile,
-            [.. frameworkSwitch, .. solutionSwitches],
+            [.. frameworkSwitch, .. globalSwitches],
             cancellationToken
         );
         var evaluation = target.Succeeded
@@ -278,7 +289,7 @@ internal static class ProjectEvaluator
             : Path.GetFullPath(answer.ProjectAssetsFile, Path.GetDirectoryName(project) ?? "");
 
     // Evaluates the project and runs no target.
-    private static ImmutableArray<string> EvaluateArguments(string project, ImmutableArray<string> solutionSwitches) =>
+    private static ImmutableArray<string> EvaluateArguments(string project, ImmutableArray<string> globalSwitches) =>
         [
             "msbuild",
             project,
@@ -288,7 +299,7 @@ internal static class ProjectEvaluator
             "-getProperty:TargetFrameworks",
             "-getProperty:ProjectAssetsFile",
             "-getItem:PackageReference",
-            .. solutionSwitches,
+            .. globalSwitches,
         ];
 
     // Runs the target of the package that writes the manifest, to the file the tool named.
@@ -371,6 +382,11 @@ internal static class ProjectEvaluator
     // The dotnet that started the tool, when it said which; else the one on the path.
     internal static string DotnetOf(Func<string, string?> getEnvironmentVariable) =>
         getEnvironmentVariable("DOTNET_HOST_PATH") is { Length: > 0 } path ? path : "dotnet";
+
+    // What "dotnet build -c" gives a project: Configuration as a global property, which the environment's variable of
+    // that name does not override.  None without it, so that the project's default holds.
+    private static ImmutableArray<string> ConfigurationSwitches(string? configuration) =>
+        configuration is null ? [] : [MSBuildProperty.Switch("Configuration", configuration)];
 
     // What "dotnet build" of the solution gives each project.  A project that imports a file through
     // $(SolutionDir) evaluates with these as it does in a build.

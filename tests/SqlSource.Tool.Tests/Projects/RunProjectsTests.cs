@@ -76,6 +76,7 @@ public sealed class RunProjectsTests : IDisposable
         RunProjects.FindAsync(
             unit,
             named,
+            configuration: null,
             new RunContext(
                 Hosts.Create(_folder.Path, _runner, _folder.CreateFolder("tmp")),
                 new Reporter(_error),

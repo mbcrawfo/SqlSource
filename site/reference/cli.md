@@ -48,11 +48,11 @@ The `sqlsource` command describes your queries: see [the step that describes you
 dotnet sqlsource describe [<path>...] [--project <path>]... [--database <name>]...
                           [--connection <name>=<connection string>]...
                           [--env-file <path>] [--force | --check] [--verbose]
-                          [--log <path>] [--watch]
+                          [--log <path>] [--watch] [--configuration <name>]
 dotnet sqlsource diagnose --query <file>:<name> [<path>] [--project <path>]...
                           [--connection <name>=<connection string>]...
                           [--env-file <path>] --out <path> [--no-obfuscate]
-                          [--verbose] [--log <path>]
+                          [--verbose] [--log <path>] [--configuration <name>]
 dotnet sqlsource diagnose --scrub <bundle> --out <path>
 dotnet sqlsource replay <bundle> [--verbose] [--log <path>]
 ```
@@ -115,9 +115,10 @@ The rule holds for every place a path goes: the path of `describe` or `diagnose`
 | `--check` | Describes every query of the run, compares with the sidecars, writes nothing: see [check in CI](describing.md#check-in-ci).  With `--force` too, it is `--check` |
 | `--verbose` | Prints what the run decides as it goes: see [`--verbose`](#verbose) |
 | `--log <path>` | Writes a record of the run to a file; a path that holds `=` or `;` is refused: see [logs](#logs) |
-| `--manifest <path>` | For the build's use: describes the project that the build's record of it names, without reading the project again.  May be given once for each target framework of the project; records of two projects are [SQLSRC206](../diagnostics.md#sqlsrc206).  It takes no project or solution, `.sql` path, `--project`, `--database` or `--watch`.  See [running in the build](online-build.md#running-in-the-build) |
+| `--manifest <path>` | For the build's use: describes the project that the build's record of it names, without reading the project again.  May be given once for each target framework of the project; records of two projects are [SQLSRC206](../diagnostics.md#sqlsrc206).  It takes no project or solution, `.sql` path, `--project`, `--database`, `--configuration` or `--watch`.  See [running in the build](online-build.md#running-in-the-build) |
 | `--online <auto\|true>` | For the build's use, with `--manifest`: takes a `--manifest`, `--log` or `--env-file` path that holds `=` or `;`, as the build's own may, and prints and logs it in full, writes each error on one line, writes no log for `SQLSOURCE_LOG`, and under `auto` says it is offline, and exits with `0`, when no database with a query to describe has a connection.  See [running in the build](online-build.md#running-in-the-build) |
 | `--watch` | Describes once, then again each time a file of the run changes, until stopped: see [describe on save](describing.md#describe-on-save).  Not with `--check` or `--manifest` |
+| `--configuration <name>` | Of `describe` and `diagnose`: reads the projects in this configuration, as `dotnet build -c` does, so that a `[SqlSourceGenerate]` inside `#if` is read with that configuration's constants.  Without it, each project's default, `Debug` unless the variable `Configuration` names another.  A name that holds `=` or `;` is refused.  Not with `--manifest`, whose build chose its configuration.  See [`Source` written as text](attributes.md#limit-source-written-as-text) |
 
 If a run has `--project`, `--database` or a `.sql` path, it writes only the sidecars of the files whose queries it selected.  It deletes no sidecar.
 

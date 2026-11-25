@@ -104,6 +104,38 @@ public sealed class ManifestTargetTests : IDisposable
         constants.ShouldContain("NET10_0");
     }
 
+    // The SDK makes a Using item a global using only on the way to a compile, in a file under obj that no Compile line
+    // names, so the manifest lists each with an alias, last.  A namespace or a static import is no alias.
+    [Fact]
+    public async Task WriteManifest_UsingItemsWithAnAlias_AreListedLast()
+    {
+        var project = _fixtures.Copy("Single");
+        var text = await File.ReadAllTextAsync(project, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(
+            project,
+            text.Replace(
+                "</PropertyGroup>",
+                """
+                </PropertyGroup>
+                <ItemGroup>
+                    <Using Include="SqlSource.SqlSourceGenerateAttribute" Alias="Gen" />
+                    <Using Include="System.Text" />
+                    <Using Include="System.Math" Static="true" />
+                    <Using Include="System.Text.Json" Alias="Json" />
+                </ItemGroup>
+                """,
+                StringComparison.Ordinal
+            ),
+            TestContext.Current.CancellationToken
+        );
+
+        var lines = await _fixtures.WriteManifestAsync(project);
+
+        lines[^2..]
+            .ShouldBe(["UsingAlias=Gen=SqlSource.SqlSourceGenerateAttribute", "UsingAlias=Json=System.Text.Json"]);
+        lines.Count(line => line.StartsWith("UsingAlias=", StringComparison.Ordinal)).ShouldBe(2);
+    }
+
     [Fact]
     public async Task WriteManifest_NoFileNamed_WritesOneUnderObj()
     {

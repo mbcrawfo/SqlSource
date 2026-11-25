@@ -16,7 +16,8 @@ namespace SqlSource.Tool;
 /// database and no project.  <see cref="DiagnoseRun" /> runs both.
 /// </summary>
 /// <remarks>
-/// Its project, connections, <c>.env</c>, <c>--verbose</c> and <c>--log</c> are those of <see cref="SharedOptions" />,
+/// Its project, connections, <c>.env</c>, configuration, <c>--verbose</c> and <c>--log</c> are those of
+/// <see cref="SharedOptions" />,
 /// which <c>describe</c> takes too, read by the same rules.  <c>--out</c> is required with both forms, and
 /// <c>--scrub</c> takes no other option.  A value of <c>--out</c> is held to the rule of <c>--log</c>, so the path it
 /// gives is always printed.
@@ -55,8 +56,8 @@ internal static class DiagnoseCommand
 
     public static Command Create()
     {
-        // The rules of SharedOptions hold, and --project, --connection, --verbose, --log and --env-file are the ones
-        // of SharedOptions, with their names and their rules.
+        // The rules of SharedOptions hold, and --project, --connection, --verbose, --log, --env-file and
+        // --configuration are the ones of SharedOptions, with their names and their rules.
         var path = new Argument<string>(PathArgument)
         {
             Description =
@@ -98,6 +99,7 @@ internal static class DiagnoseCommand
         );
         var log = SharedOptions.LogOption();
         var envFile = SharedOptions.EnvFileOption();
+        var configuration = SharedOptions.ConfigurationOption();
 
         var scrub = new Option<string>(ScrubOption)
         {
@@ -123,6 +125,7 @@ internal static class DiagnoseCommand
             log,
             envFile,
             scrub,
+            configuration,
         };
     }
 
@@ -135,8 +138,9 @@ internal static class DiagnoseCommand
     /// <c>--scrub</c> takes nothing but <c>--out</c>.  A value of <c>--query</c> is a file, a colon and a name, the
     /// colon the last one so that a Windows path reads, and its file is a <c>.sql</c> path.  The argument is the unit,
     /// of which there is one, and never a <c>.sql</c> path, which <c>--query</c> names.  A value of <c>--out</c> or
-    /// <c>--log</c> is held to <c>--log</c>'s rule, and one of <c>--env-file</c>, <c>--connection</c>, and an
-    /// argument beside one, to the rules of <see cref="SharedOptions" />.
+    /// <c>--log</c> is held to <c>--log</c>'s rule, and one of <c>--env-file</c>, <c>--connection</c>,
+    /// <c>--configuration</c>, and an argument beside a <c>--connection</c>, to the rules of
+    /// <see cref="SharedOptions" />.
     /// </remarks>
     public static IReadOnlyList<string> CheckUsage(Usage usage)
     {
@@ -207,6 +211,7 @@ internal static class DiagnoseCommand
             SharedOptions.Log => SharedOptions.ProblemOfLogPath(value, isOnline: false),
             SharedOptions.EnvFile => SharedOptions.ProblemOfEnvFile(value, isOnline: false),
             SharedOptions.Connection => SharedOptions.ProblemOfConnection(value, connections),
+            SharedOptions.Configuration => SharedOptions.ProblemOfConfiguration(value),
             _ => null,
         };
 
@@ -226,8 +231,8 @@ internal static class DiagnoseCommand
 
     /// <summary>
     /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--connection</c>,
-    /// <c>--log</c>, <c>--env-file</c>, <c>--query</c>, <c>--out</c> and <c>--scrub</c> the same values, in the same
-    /// order.  True for a command other than <c>diagnose</c>.
+    /// <c>--log</c>, <c>--env-file</c>, <c>--configuration</c>, <c>--query</c>, <c>--out</c> and <c>--scrub</c> the
+    /// same values, in the same order.  True for a command other than <c>diagnose</c>.
     /// </summary>
     public static bool ReadsValuesAs(Usage usage, ParseResult parsed) =>
         usage.Command.Name != Name
@@ -236,6 +241,7 @@ internal static class DiagnoseCommand
             && SharedOptions.ReadsAs(usage, parsed, SharedOptions.Connection)
             && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.Log)
             && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.EnvFile)
+            && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.Configuration)
             && SharedOptions.ReadsAsOne(usage, parsed, QueryOption)
             && SharedOptions.ReadsAsOne(usage, parsed, OutOption)
             && SharedOptions.ReadsAsOne(usage, parsed, ScrubOption)

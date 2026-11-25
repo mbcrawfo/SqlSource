@@ -97,6 +97,53 @@ public sealed class GeneratorParityTests : IDisposable
             ],
             ["Repo/UserRepository.sql", "Repo/Orders.sql"]
         ),
+        ["an alias of the file, of a namespace and of the project"] = new(
+            3,
+            [
+                ("Usings.cs", "global using Gen = SqlSource.SqlSourceGenerateAttribute;\n"),
+                ("Repo/A.cs", "[Gen(Source = \"A.sql\")]\ninternal partial class A;\n"),
+                (
+                    "Repo/B.cs",
+                    "using Own = global::SqlSource.SqlSourceGenerateAttribute;\n"
+                        + "[Own(Source = \"B.sql\")]\ninternal partial class B;\n"
+                ),
+                (
+                    "Repo/C.cs",
+                    "namespace App\n{\n    using CAttribute = SqlSource.SqlSourceGenerateAttribute;\n"
+                        + "    [C(Source = \"C.sql\")]\n    internal partial class C;\n}\n"
+                ),
+            ],
+            ["Repo/A.sql", "Repo/B.sql", "Repo/C.sql", "Repo/D.sql"]
+        ),
+        // The compiler rejects the second attribute, and each side reads the first in the order of the files.
+        ["the attribute on two parts of a partial type"] = new(
+            2,
+            [
+                (
+                    "Repo/First.cs",
+                    "namespace App.Data;\n"
+                        + Using
+                        + "[SqlSourceGenerate(Source = \"A.sql\")]\ninternal partial class Q;\n"
+                ),
+                (
+                    "Repo/Second.cs",
+                    Using
+                        + "namespace App { namespace Data {\n"
+                        + "[SqlSourceGenerate(Source = \"B.sql\")]\ninternal partial class Q; } }\n"
+                        + "[SqlSourceGenerate(Source = \"C.sql\")]\ninternal partial class Q<T>;\n"
+                ),
+            ],
+            ["Repo/A.sql", "Repo/B.sql", "Repo/C.sql"]
+        ),
+        // The first declaration of the type has no attribute, and the claim is the next one's.
+        ["the attribute on the second part of a partial type"] = new(
+            1,
+            [
+                ("Repo/First.cs", "// SqlSourceGenerate\ninternal partial class Q { }\n"),
+                ("Repo/Second.cs", Using + "[SqlSourceGenerate(Source = \"B.sql\")]\ninternal partial class Q;\n"),
+            ],
+            ["Repo/A.sql", "Repo/B.sql"]
+        ),
         ["the default with no file"] = new(
             1,
             [("Repo/Missing.cs", Using + "[SqlSourceGenerate]\ninternal partial class Missing;\n")],
