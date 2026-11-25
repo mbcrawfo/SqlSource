@@ -95,6 +95,7 @@ MySQL and MariaDB have SQL modes that change how a string is read.  If your serv
 | A `/*` inside a block comment needs its own `*/` | Yes | Yes | Yes | Yes | No | No | No | No |
 | `--` is a comment with no white space after it | Yes | Yes | Yes | Yes | No | No | Yes | Yes |
 | `#` starts a comment | No | No | No | No | Yes | Yes | No | No |
+| A carriage return with no line feed after it ends a line, and so a `--` or `#` comment | Yes | Yes | Yes | No | No | No | No | Yes |
 | Kept as hints, besides `/*+ ... */` and `/*! ... */` | | | | | | `/*M! ... */` | | `--+ ...` |
 | A name declared with `DECLARE @name` is a local variable, not a parameter ([declared variables](parameters.md#declared-variables)) | No | Yes | No | No | No | No | No | No |
 
@@ -124,7 +125,6 @@ SqlSource reads these differently from the database, whatever the dialect:
 |----|----|----|
 | A versioned comment whose body holds a string that contains `*/`, such as `/*!50700 SELECT '*/' */` | MySQL, MariaDB | The comment ends at the first `*/`, so the quote after it opens a string that is never closed: the error [SQLSRC101](../diagnostics.md#sqlsrc101).  Where the server ends the comment depends on the server's version |
 | A block comment that is still open at the end of the file | SQLite | The error [SQLSRC102](../diagnostics.md#sqlsrc102).  SQLite accepts it, but it would take every later query of the file with it |
-| A file whose lines end with a carriage return alone, with no line feed | MySQL, SQLite, CockroachDB | A line ends there, as in every dialect.  These databases end a `--` comment only at a line feed |
 | A client command that is not SQL: `DELIMITER`, `GO`, SQL*Plus `PROMPT` and `REM`, a psql `\` command | All | As SQL, so a quote in it can open a string |
 | A name that is not a parameter to the database: a user variable, `@x` for an absolute value, the parameter of a procedure that the SQL creates | MySQL, MariaDB, PostgreSQL, SQL Server | As a parameter: see [names that are read as parameters](parameters.md#names-read-as-parameters) |
 

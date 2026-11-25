@@ -1,7 +1,7 @@
 {
   "fileName": "MySqlCarriageReturnAlone.sql",
   "settings": [],
-  "input": "-- dialect: mysql\n-- name: A\nSELECT {{t:users}} -- c\r, {{u:x}}\nFROM t\r  WHERE id = @id\r\n\r-- name: B\nSELECT 1\n",
+  "input": "-- dialect: mysql\n-- name: A\nSELECT {{t:users}} -- c\r, {{u:x}}\nFROM t\r  WHERE id = @id\n\r-- name: B\nSELECT 1\n",
   "expected": {
     "startDialect": "ansi",
     "startOptions": [],
@@ -15,16 +15,16 @@
       ["LineComment", 48, 62],
       ["Text", 62, 83],
       ["Parameter", 83, 86],
-      ["Text", 86, 89],
-      ["LineComment", 89, 99],
-      ["Text", 99, 109]
+      ["Text", 86, 88],
+      ["LineComment", 88, 98],
+      ["Text", 98, 108]
     ],
     "spans": [
       { "kind": "markerComment", "start": 0, "end": 17, "name": null, "default": null },
       { "kind": "markerComment", "start": 18, "end": 28, "name": null, "default": null },
       { "kind": "token", "start": 36, "end": 47, "name": "t", "default": "users" },
       { "kind": "parameter", "start": 83, "end": 86, "name": "id", "default": null },
-      { "kind": "markerComment", "start": 89, "end": 99, "name": null, "default": null }
+      { "kind": "markerComment", "start": 88, "end": 98, "name": null, "default": null }
     ],
     "error": null,
     "hasOtherErrors": false
