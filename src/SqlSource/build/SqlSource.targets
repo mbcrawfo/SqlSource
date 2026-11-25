@@ -604,7 +604,9 @@
         own, and every framework would otherwise write its manifest to that one file, so that the tool read the last
         one's twice; each other framework writes its own under its obj folder.  Without that property the calls name
         the configurations the build asked for SqlSourceOnlineFramework.  A project with no TargetFrameworks runs the
-        tool in its build, and this target is skipped.
+        tool in its build, and this target is skipped.  A project whose TargetFrameworks holds the run's framework alone
+        has no other, and calls nothing: MSBuild runs a task batched over an empty list once, with the metadata empty,
+        which would call the project with TargetFramework empty, its outer build.
     -->
     <Target Name="SqlSourceWriteFrameworkManifests" Condition="'$(TargetFrameworks)' != ''">
         <ItemGroup>
@@ -616,6 +618,7 @@
             Properties="TargetFramework=%(SqlSourceOtherFramework.Identity);SqlSourceOnlineRun=true"
             RemoveProperties="SqlSourceManifestFile"
             SkipNonexistentTargets="true"
+            Condition="'@(SqlSourceOtherFramework)' != ''"
         >
             <Output TaskParameter="TargetOutputs" ItemName="SqlSourceFrameworkInput" />
         </MSBuild>

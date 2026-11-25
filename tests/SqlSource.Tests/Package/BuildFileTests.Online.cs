@@ -362,7 +362,8 @@ public sealed partial class BuildFileTests
     // In a multi-targeted project the run asks each other framework of TargetFrameworks, in their order, in that
     // framework's configuration of its own, for its manifest and inputs, and a framework without SqlSource gives
     // nothing.  A manifest's name given as a global property is the run's alone, so each other framework writes its
-    // own.  A project with no TargetFrameworks skips it.
+    // own.  A project with no TargetFrameworks skips it, and one with no other framework calls nothing, since MSBuild
+    // runs a task batched over an empty list once.
     [Fact]
     public void Targets_WriteFrameworkManifests_AsksEveryOtherFrameworkForItsManifest()
     {
@@ -392,6 +393,7 @@ public sealed partial class BuildFileTests
                     ["Properties"] = "TargetFramework=%(SqlSourceOtherFramework.Identity);SqlSourceOnlineRun=true",
                     ["RemoveProperties"] = "SqlSourceManifestFile",
                     ["SkipNonexistentTargets"] = "true",
+                    ["Condition"] = "'@(SqlSourceOtherFramework)' != ''",
                 }
             );
         AttributesOf(call.Elements().ShouldHaveSingleItem())

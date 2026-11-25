@@ -6,7 +6,8 @@
 
         Under OnlineMultiSecondFile, Second/ holds a .sql file and a C# file that net10.0 lists alone; otherwise neither
         framework lists them.  Under OnlineMultiSecondOnly, build/ is imported into net10.0 alone, as a PackageReference
-        under a condition on the framework imports it.
+        under a condition on the framework imports it.  OnlineMultiFrameworks, when set, is the project's
+        TargetFrameworks, unescaped, so that a test gives it a ; as %3B.
     -->
     <PropertyGroup>
         <OnlineMultiUsesSqlSource>false</OnlineMultiUsesSqlSource>
@@ -19,6 +20,8 @@
     </ImportGroup>
     <PropertyGroup>
         <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(OnlineMultiFrameworks)' != ''"
+            >$([MSBuild]::Unescape($(OnlineMultiFrameworks)))</TargetFrameworks>
     </PropertyGroup>
     <ItemGroup Condition="'$(OnlineMultiSecondFile)' != 'true' or '$(TargetFramework)' != 'net10.0'">
         <AdditionalFiles Remove="Second/**" />

@@ -131,55 +131,81 @@ public sealed class OnlineMultiTargetTests : IDisposable
 
     // A sidecar the run created for a .sql file that the second framework alone lists goes to that framework's
     // compiler, and to no other: the first framework's build does not list the file.  A build of every framework
-    // evaluates its inner builds after the run, so its patterns list the sidecar; a build of one framework evaluates
-    // it before the run, and is given the sidecar from what the run created.
-    [Theory]
-    [InlineData("every framework")]
-    [InlineData("-f net10.0")]
-    public async Task Build_AFileOfTheSecondFrameworkAlone_GivesItsCreatedSidecarToThatCompiler(string way)
+    // evaluates its inner builds after the run, so its patterns list the sidecar.
+    [Fact]
+    public async Task Build_EveryFrameworkWithAFileOfTheSecondAlone_GivesItsCreatedSidecarToThatCompilerAlone()
     {
         StandIn.Tell(_folder, create: new() { ["Queries/Users.sql.json"] = "{}", ["Second/Second.sql.json"] = "{}" });
         var second = Path.Combine(_folder, "Second", "Second.sql.json");
 
-        string[] arguments = way == "every framework" ? [] : ["-f", "net10.0"];
-
-        await BuildOnlineAsync(["-p:OnlineMultiSecondFile=true", .. arguments]);
+        await BuildOnlineAsync("-p:OnlineMultiSecondFile=true");
 
         RanOnceForTheFirstFramework();
         CompiledItems("net10.0").Count(item => item == second).ShouldBe(1);
-        if (way == "every framework")
-        {
-            CompiledItems("net8.0").ShouldNotContain(second);
-        }
+        CompiledItems("net8.0").ShouldNotContain(second);
+    }
+
+    // A build of the second framework alone is evaluated before the run, which runs in the first framework's
+    // configuration of its own, and is given the sidecar of a file it alone lists from what the run created.
+    [Fact]
+    public async Task Build_TheSecondFrameworkAloneWithAFileOfItsOwn_GivesItTheSidecarTheRunCreated()
+    {
+        StandIn.Tell(_folder, create: new() { ["Queries/Users.sql.json"] = "{}", ["Second/Second.sql.json"] = "{}" });
+        var second = Path.Combine(_folder, "Second", "Second.sql.json");
+
+        await BuildOnlineAsync("-p:OnlineMultiSecondFile=true", "-f", "net10.0");
+
+        RanOnceForTheFirstFramework();
+        CompiledItems("net10.0").Count(item => item == second).ShouldBe(1);
     }
 
     // A project whose first framework has no SqlSource, as a PackageReference under a condition on the framework
-    // gives, runs the tool once, in the first framework that has it, on that framework's manifest alone.  A build of
-    // a framework without SqlSource runs nothing of it.
+    // gives, runs the tool once, in the first framework that has it, on that framework's manifest alone, whether
+    // every framework is built or that one alone.
     [Theory]
-    [InlineData("every framework")]
-    [InlineData("-f net10.0")]
-    [InlineData("-f net8.0")]
-    public async Task Build_SqlSourceForTheSecondFrameworkAlone_RunsTheToolOnceForIt(string way)
+    [InlineData]
+    [InlineData("-f", "net10.0")]
+    public async Task Build_SqlSourceForTheSecondFrameworkAlone_RunsTheToolOnceForIt(params string[] arguments)
     {
-        string[] arguments = way switch
-        {
-            "every framework" => [],
-            "-f net10.0" => ["-f", "net10.0"],
-            _ => ["-f", "net8.0"],
-        };
-
         await BuildOnlineAsync(["-p:OnlineMultiSecondOnly=true", .. arguments]);
-
-        if (way == "-f net8.0")
-        {
-            StandIn.RunsIn(_folder).ShouldBeEmpty();
-            return;
-        }
 
         var run = StandIn.RunsIn(_folder).ShouldHaveSingleItem();
         run.Manifests.ShouldHaveSingleItem().ShouldContain("TargetFramework=net10.0");
         run.Arguments[2].ShouldContain("net10.0");
+        CompiledItems("net10.0").ShouldContain(Sidecar);
+    }
+
+    // A build of the framework without SqlSource alone has none of its targets, and runs nothing of it.
+    [Fact]
+    public async Task Build_TheFrameworkWithoutSqlSourceAlone_RunsNothing()
+    {
+        await BuildOnlineAsync("-p:OnlineMultiSecondOnly=true", "-f", "net8.0");
+
+        StandIn.RunsIn(_folder).ShouldBeEmpty();
+    }
+
+    // A TargetFrameworks that holds the run's framework alone, however it is written, gives the run no other
+    // framework to ask: MSBuild would run the call batched over an empty list once, with the framework empty, and
+    // call the project's outer build.  The SDK refuses a framework listed twice, and NuGet a list with none.
+    [Theory]
+    [InlineData("net10.0")]
+    [InlineData("net10.0;")]
+    [InlineData(" net10.0 ")]
+    public async Task Build_OneFrameworkInTargetFrameworks_AsksNoOtherFrameworkForItsManifest(string frameworks)
+    {
+        var (exitCode, output) = await FixtureProjects.BuildAsync(
+            _project,
+            NoVariables,
+            StandIn.CommandSwitch,
+            "-p:SqlSourceOnline=true",
+            FixtureProjects.PropertySwitch("OnlineMultiFrameworks", frameworks),
+            "-v:d"
+        );
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldNotContain("(SqlSourceFrameworkOnlineInputs target(s))");
+        var run = StandIn.RunsIn(_folder).ShouldHaveSingleItem();
+        run.Manifests.ShouldHaveSingleItem().ShouldContain("TargetFramework=net10.0");
         CompiledItems("net10.0").ShouldContain(Sidecar);
     }
 
