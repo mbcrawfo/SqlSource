@@ -18,9 +18,10 @@
 #   the end-to-end queries under tests/DatabaseTests/SqlServer/EndToEnd/Queries, EndToEnd/NodaTime/Queries,
 #   EndToEnd/NetTopologySuite/Queries and EndToEnd/Json/Queries, against the databases "realistic", "app" and
 #   "billing", each made from the schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/, with
-#   EndToEnd/app/new-types.sql after the seed of "app".  It then writes the sidecars of examples/SqlServerExamples the
-#   same way, against a database "examples" made from its schema.sql, and runs after a change to a query or to the
-#   schema of those examples too.
+#   EndToEnd/app/new-types.sql after the seed of "app", and of EndToEnd/UserClr/Queries against "user_clr", made from
+#   the net48 build of tests/DatabaseTests/SqlServer.ClrType and the schema.sql and seed.sql of EndToEnd/user_clr/.
+#   It then writes the sidecars of examples/SqlServerExamples the same way, against a database "examples" made from its
+#   schema.sql, and runs after a change to a query or to the schema of those examples too.
 # It runs the tool as a project, where the other recording scripts run a test: a test project does not build until its
 # sidecars are current.  Each image is the default image of its engine's tests, which the sidecars are recorded on, so
 # SQLSOURCE_TESTS_POSTGRES_IMAGE and SQLSOURCE_TESTS_SQLSERVER_IMAGE are ignored.  It needs Docker.
@@ -45,6 +46,11 @@ SQLSERVER_END_TO_END="$SQLSERVER_PROJECT/EndToEnd"
 SQLSERVER_REALISTIC="$SQLSERVER_PROJECT/Realistic"
 SQLSERVER_DATABASES=(realistic app billing)
 SQLSERVER_EXAMPLES='examples/SqlServerExamples'
+# The database of a CLR type of a user's own assembly, and the project whose net48 build is that assembly, under the
+# name of its manifest.
+SQLSERVER_CLR_DATABASE='user_clr'
+SQLSERVER_CLR_PROJECT='tests/DatabaseTests/SqlServer.ClrType'
+SQLSERVER_CLR_ASSEMBLY='SqlSource.DatabaseTests.SqlServer.ClrType'
 # The password of sa, which SQL Server refuses unless it has three kinds of character and eight of them.
 SQLSERVER_PASSWORD='Describe-End-To-End-1'
 # The image's sqlcmd: -C trusts the server's own certificate, -I sets QUOTED_IDENTIFIER on, as SqlClient does, and -b
@@ -188,7 +194,7 @@ describe_postgres() {
 }
 
 describe_sqlserver() {
-    local image port deadline database folder file files connection connections=()
+    local image port deadline database folder file files connection connections=() bits
     image="$(default_image SqlServer)"
 
     # The image is built for x64 alone, which an arm64 host runs under emulation.  Keep --platform linux/amd64.
@@ -233,9 +239,39 @@ describe_sqlserver() {
         connections+=(--connection "$database=$connection;Database=$database")
     done
 
+    # The database of a CLR type of a user's own assembly, by the steps of UserClrDatabase of the SQL Server project:
+    # CLR enabled on the server, the net48 build trusted by its hash, since clr strict security is on, and created in
+    # the database from its bytes, then the schema and seed of its folder.
+    printf 'Creating the database %s ... ' "$SQLSERVER_CLR_DATABASE"
+    dotnet build "$SQLSERVER_CLR_PROJECT" -f net48 -c Release >/dev/null
+    bits="0x$(od -An -v -tx1 "$SQLSERVER_CLR_PROJECT/bin/Release/net48/$SQLSERVER_CLR_ASSEMBLY.dll" | tr -d ' \n')"
+    run_docker exec -i "$sqlserver_container" "${SQLCMD[@]}" -i /dev/stdin >/dev/null <<SQL
+EXEC sys.sp_configure N'show advanced options', 1;
+RECONFIGURE;
+EXEC sys.sp_configure N'clr enabled', 1;
+RECONFIGURE;
+GO
+DECLARE @bits varbinary(max) = $bits;
+DECLARE @hash varbinary(64) = HASHBYTES('SHA2_512', @bits);
+IF NOT EXISTS (SELECT 1 FROM sys.trusted_assemblies WHERE hash = @hash)
+    EXEC sys.sp_add_trusted_assembly @hash, N'$SQLSERVER_CLR_ASSEMBLY';
+GO
+CREATE DATABASE [$SQLSERVER_CLR_DATABASE];
+GO
+SQL
+    run_docker exec -i "$sqlserver_container" "${SQLCMD[@]}" -d "$SQLSERVER_CLR_DATABASE" -i /dev/stdin >/dev/null <<SQL
+CREATE ASSEMBLY [$SQLSERVER_CLR_ASSEMBLY] FROM $bits WITH PERMISSION_SET = SAFE;
+SQL
+    for file in schema.sql seed.sql; do
+        run_docker exec -i "$sqlserver_container" "${SQLCMD[@]}" -d "$SQLSERVER_CLR_DATABASE" -f 65001 -i /dev/stdin \
+            <"$SQLSERVER_END_TO_END/$SQLSERVER_CLR_DATABASE/$file" >/dev/null
+    done
+    echo 'done'
+    connections+=(--connection "$SQLSERVER_CLR_DATABASE=$connection;Database=$SQLSERVER_CLR_DATABASE")
+
     find "$SQLSERVER_END_TO_END/Queries" "$SQLSERVER_END_TO_END/NodaTime/Queries" \
         "$SQLSERVER_END_TO_END/NetTopologySuite/Queries" "$SQLSERVER_END_TO_END/Json/Queries" \
-        "$SQLSERVER_REALISTIC/Cases" -name '*.sql.json' -type f -delete
+        "$SQLSERVER_END_TO_END/UserClr/Queries" "$SQLSERVER_REALISTIC/Cases" -name '*.sql.json' -type f -delete
 
     dotnet run --project src/SqlSource.Tool -- \
         describe --force "$SQLSERVER_PROJECT/SqlServer.csproj" "${connections[@]}"
