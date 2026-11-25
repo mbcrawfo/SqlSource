@@ -25,21 +25,32 @@ internal sealed record RunFilters(ImmutableArray<FileFilter> Files, ImmutableArr
     /// <summary>
     /// The filters of a command line.  A path is resolved against the working directory and compared as the
     /// generator compares paths, so another case, <c>./</c>, <c>..</c> and either separator name the same file.  A
-    /// file that several paths name is named by the first.  A path whose <c>..</c> climbs above the root is kept with
+    /// path that names a listed file only through a symbolic link, on either side, takes that file's normalised path.
+    /// A file that several paths name is named by the first.  A path whose <c>..</c> climbs above the root is kept with
     /// no normalised path, once by its full path ignoring case, so that the planner reports it and it selects no file.
     /// </summary>
+    /// <param name="sqlPaths">The <c>.sql</c> paths, as they were typed.</param>
+    /// <param name="databases">The values of <c>--database</c>.</param>
+    /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
+    /// <param name="listedFiles">The full paths of the manifests' <c>.sql</c> files, as MSBuild gives them.</param>
     public static RunFilters Create(
         IEnumerable<UsageValue> sqlPaths,
         IEnumerable<UsageValue> databases,
-        string workingDirectory
+        string workingDirectory,
+        IReadOnlyCollection<string> listedFiles
     )
     {
         var files = ImmutableArray.CreateBuilder<FileFilter>();
         var seen = new HashSet<string>(SqlPath.Comparer);
+        var listed = new ListedThroughLinks(listedFiles);
         foreach (var given in sqlPaths)
         {
             var path = Path.GetFullPath(given.Text, workingDirectory);
             var normalized = SqlPath.Normalize(path);
+            if (normalized is not null)
+            {
+                normalized = listed.NormalizedPathOf(path, normalized);
+            }
 
             // A full path that Normalize cannot place holds a backslash, which a normalised path never does, so the
             // two kinds of key never meet.
@@ -57,4 +68,44 @@ internal sealed record RunFilters(ImmutableArray<FileFilter> Files, ImmutableArr
 
     /// <summary>Whether <c>--database</c> names this database, ignoring case.</summary>
     public bool NamesDatabase(string name) => Databases.Any(value => DatabaseName.Comparer.Equals(value.Text, name));
+
+    // The listed .sql files, which the disk is asked about only for a path that names none of them as text.
+    private sealed class ListedThroughLinks(IReadOnlyCollection<string> listedFiles)
+    {
+        private HashSet<string>? _normalized;
+        private Dictionary<string, string>? _byRealPath;
+
+        // The normalised path of the listed file that the path names, through a symbolic link or not, or its own.
+        public string NormalizedPathOf(string fullPath, string normalized)
+        {
+            _normalized ??= new HashSet<string>(
+                listedFiles.Select(SqlPath.Normalize).OfType<string>(),
+                SqlPath.Comparer
+            );
+            if (_normalized.Contains(normalized))
+            {
+                return normalized;
+            }
+
+            _byRealPath ??= ByRealPath();
+            return SqlPath.Normalize(RealPath.Of(fullPath)) is { } real && _byRealPath.TryGetValue(real, out var listed)
+                ? listed
+                : normalized;
+        }
+
+        // Of two listed files that resolve alike, the first.
+        private Dictionary<string, string> ByRealPath()
+        {
+            var byRealPath = new Dictionary<string, string>(SqlPath.Comparer);
+            foreach (var file in listedFiles)
+            {
+                if (SqlPath.Normalize(file) is { } normalized && SqlPath.Normalize(RealPath.Of(file)) is { } real)
+                {
+                    _ = byRealPath.TryAdd(real, normalized);
+                }
+            }
+
+            return byRealPath;
+        }
+    }
 }

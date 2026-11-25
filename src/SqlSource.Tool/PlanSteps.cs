@@ -136,7 +136,8 @@ internal static class PlanSteps
             RunFilters.Create(
                 ArgumentsOf(usage).Where(static path => SqlPath.IsSqlFile(path.Text)),
                 SharedOptions.ValuesOf(usage, DescribeCommand.DatabaseOption),
-                context.Host.WorkingDirectory
+                context.Host.WorkingDirectory,
+                [.. manifests.SelectMany(static manifest => manifest.Files)]
             ),
             (_, error) => isOnline && IsReportedByTheCompiler(error),
             context

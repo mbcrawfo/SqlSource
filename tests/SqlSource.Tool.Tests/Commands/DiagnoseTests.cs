@@ -344,6 +344,25 @@ public sealed class DiagnoseTests : IDisposable
         );
     }
 
+    // A shell's $PWD keeps the spelling of a link to the working directory, which MSBuild's paths do not.
+    [Fact]
+    public async Task Diagnose_AFileByItsFullPathThroughALink_IsThatFile()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
+        _ = _scene.AddCase(_scene.Case(Plain));
+        _ = Directory.CreateSymbolicLink(_scene.PathOf("Link"), _scene.Run.Folder.Path);
+
+        var result = await _scene.DiagnoseAsync(
+            "--query",
+            _scene.PathOf("Link/" + Query),
+            "--out",
+            "raw.zip",
+            "--no-obfuscate"
+        );
+
+        result.ShouldBe(new CliResult(0, _scene.WrittenRaw("raw.zip"), ""));
+    }
+
     // A file that no type claims is describe's error for a .sql path, and the run's only error.
     [Fact]
     public async Task Diagnose_AFileThatNoTypeClaims_IsSQLSRC212()
