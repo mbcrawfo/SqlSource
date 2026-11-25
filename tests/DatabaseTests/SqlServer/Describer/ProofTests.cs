@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -27,6 +28,16 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
 
     private const string NewFunctionsReason =
         "GREATEST, LEAST, JSON_OBJECT, JSON_ARRAY and WINDOW are new in SQL Server 2022";
+
+    // A column of a CTE of one branch, whose arithmetic the server answers nullable, is proved by its branch: a is not
+    // null in every row, and ISNULL replaces the NULL of the SUM of a group that the LEFT JOIN finds no row for.
+    private const string OneBranchCte =
+        "WITH q AS (SELECT r.id, r.a - ISNULL(SUM(o.id), 0) AS x FROM dbo.proof_rows AS r "
+        + "LEFT JOIN dbo.proof_other AS o ON o.rows_id = r.id GROUP BY r.id, r.a)";
+
+    private const string Catalog = SidecarValues.NullableSource.Catalog;
+
+    private const string Expression = SidecarValues.NullableSource.Expression;
 
     // A UNION ALL of proof_shapes' solid, a geometry never NULL, and its wkt, a string, which geometry parses as its
     // Null where it is 'NULL' or 'Null'.
@@ -1225,6 +1236,135 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     public Task DescribeAsync_TextThatTurnsAnsiNullsOff_StaysNullable(string sql) =>
         WithRowsAsync(() => ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server));
 
+    // The columns of an INSERT, an UPDATE or a DELETE with OUTPUT that are proved, with the nullableSource of each: a
+    // pseudo-table's PERSISTED NOT NULL column, by the catalog; a pseudo-table's column that the WHERE keeps from NULL,
+    // deleted's whatever the SET writes and inserted's where the SET does not write it; the value that the SET writes,
+    // a literal or a CONCAT of a column that is NULL in some rows; and a column of a CTE of one branch, which its
+    // branch proves.
+    public static TheoryData<string, string> ProvedOutputs =>
+        new()
+        {
+            { "INSERT INTO dbo.proof_computed (id) OUTPUT inserted.c VALUES (10), (11)", Catalog },
+            { "UPDATE dbo.proof_computed SET id = id + 100 OUTPUT inserted.c", Catalog },
+            { "UPDATE dbo.proof_computed SET id = id + 100 OUTPUT deleted.c", Catalog },
+            { "DELETE FROM dbo.proof_computed OUTPUT deleted.c", Catalog },
+            { "UPDATE dbo.proof_rows SET a = a + 1 OUTPUT inserted.b WHERE b IS NOT NULL", Expression },
+            {
+                "UPDATE r SET r.a = 0 OUTPUT inserted.b FROM dbo.proof_rows AS r "
+                    + "JOIN dbo.proof_other AS o ON o.rows_id = r.id WHERE r.b > 0",
+                Expression
+            },
+            { "UPDATE dbo.proof_rows SET b = NULL OUTPUT deleted.b WHERE b IS NOT NULL", Expression },
+            {
+                "UPDATE r SET r.b = NULL OUTPUT deleted.b FROM dbo.proof_rows AS r "
+                    + "JOIN dbo.proof_other AS o ON o.rows_id = r.id WHERE r.b > 0",
+                Expression
+            },
+            { "DELETE FROM dbo.proof_rows OUTPUT deleted.b WHERE b IS NOT NULL", Expression },
+            {
+                "DELETE r OUTPUT deleted.b FROM dbo.proof_rows AS r JOIN dbo.proof_other AS o ON o.rows_id = r.id "
+                    + "WHERE r.b > 0",
+                Expression
+            },
+            { "UPDATE dbo.proof_rows SET b = 1 OUTPUT inserted.b", Expression },
+            {
+                "UPDATE d SET d.zone_or_null = CONCAT(d.zone_or_null, N'/x') OUTPUT inserted.zone_or_null "
+                    + "FROM dbo.proof_dates AS d",
+                Expression
+            },
+            {
+                $"{OneBranchCte} UPDATE r SET r.b = q.x OUTPUT q.x FROM dbo.proof_rows AS r JOIN q ON q.id = r.id",
+                Expression
+            },
+        };
+
+    // The cases of the review, each NULL in some row that the statement changes: a SET that writes the filtered
+    // column, by any spelling; a target that is a view, a CTE or a derived table whose x is the table's b under another
+    // name; a filter on another source's column of the same name; a pseudo-table inside an expression; and a MERGE,
+    // whose inserted is NULL in a row it deletes.
+    public static TheoryData<string> BreakingOutputs =>
+        [
+            "UPDATE o SET o.b = NULL OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL",
+            "UPDATE o SET B = NULL OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL",
+            "UPDATE o SET @v = b = NULL OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL",
+            "UPDATE o SET b = DEFAULT OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL",
+            "UPDATE dbo.proof_rows SET b = DEFAULT OUTPUT inserted.b WHERE b IS NOT NULL",
+            "UPDATE dbo.proof_rows SET b = NULL OUTPUT inserted.b WHERE b IS NOT NULL",
+            "UPDATE dbo.proof_rows_twice SET x = NULL OUTPUT inserted.b WHERE b IS NOT NULL",
+            "WITH v AS (SELECT id, b AS x, b FROM dbo.proof_rows) UPDATE v SET x = NULL OUTPUT inserted.b "
+                + "WHERE b IS NOT NULL",
+            "UPDATE v SET x = NULL OUTPUT inserted.b FROM (SELECT id, b AS x, b FROM dbo.proof_rows) AS v "
+                + "WHERE v.b IS NOT NULL",
+            "UPDATE o SET a = 0 OUTPUT inserted.b FROM dbo.proof_rows AS o JOIN dbo.proof_rows AS u ON u.id = o.id + 1 "
+                + "WHERE u.b IS NOT NULL",
+            "DELETE o OUTPUT deleted.b FROM dbo.proof_rows AS o JOIN dbo.proof_rows AS u ON u.id = o.id + 1 "
+                + "WHERE u.b IS NOT NULL",
+            "UPDATE o SET a = 0 OUTPUT inserted.b + p.id AS c FROM dbo.proof_rows AS o "
+                + "JOIN dbo.proof_other AS p ON p.rows_id = o.id",
+            "MERGE dbo.proof_rows AS o USING (SELECT DISTINCT rows_id FROM dbo.proof_other) AS u ON u.rows_id = o.id "
+                + "WHEN MATCHED AND o.b IS NOT NULL THEN UPDATE SET a = 0 "
+                + "WHEN NOT MATCHED BY SOURCE THEN DELETE OUTPUT inserted.b;",
+        ];
+
+    [Fact]
+    public Task DescribeAsync_ColumnOfACteOfOneBranch_NotNullAndNoNullRow() =>
+        WithRowsAsync(async () =>
+        {
+            var select = "SELECT x AS c FROM q";
+            await ShouldDescribeColumnAsync($"{OneBranchCte} {select}", false, Expression);
+            (await RowsAsync(select, OneBranchCte)).ShouldBeGreaterThan(0);
+            (await NullRowsAsync(select, OneBranchCte)).ShouldBe(0);
+        });
+
+    [Theory]
+    [MemberData(nameof(ProvedOutputs))]
+    public Task DescribeAsync_ProvedOutput_NotNullAndNoNullRow(string sql, string source) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync(sql, false, source);
+            var (rows, nulls) = await OutputRowsAsync(sql);
+            rows.ShouldBeGreaterThan(0, sql);
+            nulls.ShouldBe(0, sql);
+        });
+
+    [Theory]
+    [MemberData(nameof(BreakingOutputs))]
+    public Task DescribeAsync_BreakingOutput_NullableAndNullRow(string sql) =>
+        WithRowsTwiceAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server);
+            (await OutputRowsAsync(sql)).Nulls.ShouldBeGreaterThan(0, sql);
+        });
+
+    // Cases of the review that no row can show NULL, so the describe alone is held: a target named by its table and
+    // not by the alias of the FROM, which this server binds to the alias's rows, though the reader cannot tell it from
+    // another instance of the table, and a SET that adds to the filtered column, whose rows the filter keeps from NULL.
+    [Theory]
+    [InlineData("UPDATE proof_rows SET a = 0 OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL")]
+    [InlineData("UPDATE dbo.proof_rows SET a = 0 OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL")]
+    [InlineData("UPDATE o SET b += 1 OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL")]
+    public Task DescribeAsync_OutputNoRowShowsNull_StaysNullable(string sql) =>
+        WithRowsAsync(() => ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server));
+
+    // A pseudo-table inside an expression asks nothing, so the call that proves the other item does not fail, and the
+    // item keeps the server's answer, nullable though COALESCE's 0 is never NULL.
+    [Fact]
+    public Task DescribeAsync_PseudoTableInsideAnExpression_KeepsTheServersAnswer() =>
+        WithRowsAsync(async () =>
+        {
+            var sql =
+                "UPDATE o SET a = 0 OUTPUT COALESCE(inserted.b, 0) AS c, p.id + 1 AS d "
+                + "FROM dbo.proof_rows AS o JOIN dbo.proof_other AS p ON p.rows_id = o.id";
+            var description = await Sessions.ShouldDescribeAsync(
+                sqlServer.ConnectionString,
+                Of(SqlDialectRules.SqlServer, sql)
+            );
+            description
+                .Columns.ShouldNotBeNull()
+                .Select(static column => (column.Nullable, column.NullableSource))
+                .ShouldBe([(true, SidecarValues.NullableSource.Server), (false, Expression)]);
+        });
+
     // The tables of the proofs and their rows, made for the body and dropped after it.  g and b are NULL in some rows
     // and a in none; proof_other and proof_computed find no row for the rows 3 to 5 of proof_rows.  dbo.COUNT is a
     // user's function that is NULL for every row, which a bare COUNT never calls.  proof_shapes holds a point and
@@ -1364,12 +1504,23 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             await body();
         });
 
+    // The tables of the proofs, and dbo.proof_rows_twice, a view of proof_rows whose x and b are both its b.
+    private Task WithRowsTwiceAsync(Func<Task> body) =>
+        WithRowsAsync(async () =>
+        {
+            await sqlServer.ExecuteAsync(
+                "CREATE VIEW dbo.proof_rows_twice AS SELECT id, b AS x, b FROM dbo.proof_rows"
+            );
+            await body();
+        });
+
     private Task DropAsync() =>
         sqlServer.ExecuteAsync(
             "DROP SYNONYM IF EXISTS dbo.proof_far; "
                 + "DROP FUNCTION IF EXISTS dbo.proof_flip, dbo.[COUNT], dbo.proof_shapes_mix_fn, "
                 + "dbo.proof_shapes_plain_fn; "
-                + "DROP VIEW IF EXISTS dbo.proof_random, dbo.proof_volatile_view, dbo.proof_shapes_mix_of, "
+                + "DROP VIEW IF EXISTS dbo.proof_rows_twice, dbo.proof_random, dbo.proof_volatile_view, "
+                + "dbo.proof_shapes_mix_of, "
                 + "dbo.proof_shapes_mix, dbo.proof_shapes_plain_of, dbo.proof_shapes_plain, dbo.proof_shapes_same; "
                 + "DROP TABLE IF EXISTS dbo.proof_priced, dbo.proof_many, dbo.proof_volatile, dbo.proof_dates, "
                 + "dbo.proof_shapes, dbo.proof_computed, dbo.proof_other, dbo.proof_rows"
@@ -1404,6 +1555,44 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         }
 
         return Convert.ToInt32(await command.ExecuteScalarAsync(token), CultureInfo.InvariantCulture);
+    }
+
+    // The rows that the statement's OUTPUT returns and those of them whose first column is NULL, run in a transaction
+    // that is rolled back, so the tables keep their rows; @v, where the statement names it, is a variable it assigns.
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "The SQL is the test's own constants."
+    )]
+    private async Task<(int Rows, int Nulls)> OutputRowsAsync(string sql)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = sqlServer.SourceOf(SqlServerDatabases.Database);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = sql;
+        if (sql.Contains("@v", StringComparison.Ordinal))
+        {
+            _ = command.Parameters.Add(new SqlParameter("@v", SqlDbType.Int) { Value = DBNull.Value });
+        }
+
+        var (rows, nulls) = (0, 0);
+        await using (var reader = await command.ExecuteReaderAsync(token))
+        {
+            while (await reader.ReadAsync(token))
+            {
+                rows++;
+                if (await reader.IsDBNullAsync(0, token))
+                {
+                    nulls++;
+                }
+            }
+        }
+
+        await transaction.RollbackAsync(token);
+        return (rows, nulls);
     }
 
     // One value from a connection of the test's own that no pool keeps, so a SET in the batch dies with it.
