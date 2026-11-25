@@ -41,6 +41,7 @@ _ALLOWED_IN_QUERY = frozenset(
         MarkerKind.TOKEN,
         MarkerKind.TOKEN_IGNORE,
         MarkerKind.PARAM,
+        MarkerKind.VARIABLE,
         MarkerKind.COLUMN,
         MarkerKind.DATABASE,
         MarkerKind.OUTPUT,

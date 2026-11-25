@@ -492,6 +492,59 @@ public sealed class SqlLexerTests
         result.Lexemes.Count.ShouldBe(0);
     }
 
+    // A versioned comment of MySQL or MariaDB, as MySQL 8.4 and MariaDB 11.4 read one: its body is SQL when the
+    // server runs it, so a string or a comment there does not end it, and a comment that ends at its first */ when the
+    // server does not run it, or when the version of the server is not known.
+    [Theory]
+    [InlineData("MySql", 80400, "/*!50700 , '*/' */ x", "Hint:/*!50700 , '*/' */ | Text: x")]
+    [InlineData("MySql", 50600, "/*!50700 a */ b */", "Hint:/*!50700 a */ | Text: b */")]
+    [InlineData("MySql", 0, "/*!50700 a */ b */", "Hint:/*!50700 a */ | Text: b */")]
+    [InlineData("MySql", 0, "/*! , '*/' */ x", "Hint:/*! , '*/' */ | Text: x")]
+    [InlineData("MySql", 0, "/*!123 '*/' */ x", "Hint:/*!123 '*/' */ | Text: x")]
+    [InlineData("MySql", 80400, "/*!080400 '*/' */ x", "Hint:/*!080400 '*/' */ | Text: x")]
+    [InlineData("MySql", 80400, "/*!100100 a */ b */", "Hint:/*!100100 a */ | Text: b */")]
+    [InlineData("MySql", 80400, "/*!100100, '*/' */ x", "Hint:/*!100100, '*/' */ | Text: x")]
+    [InlineData("MySql", 80400, "/*!50600 # */\n */ x", "Hint:/*!50600 # */\n */ | Text: x")]
+    [InlineData("MySql", 80400, "/*!50600 -- */\r */\n */ x", "Hint:/*!50600 -- */\r */\n */ | Text: x")]
+    [InlineData("MySql", 80400, "/*!50600 --*/ x", "Hint:/*!50600 --*/ | Text: x")]
+    [InlineData("MySql", 80400, "/*!50600 /* c */ , 2 */ x", "Hint:/*!50600 /* c */ , 2 */ | Text: x")]
+    [InlineData("MySql", 80400, "/*!50600 \"*/\" `*/` */ x", "Hint:/*!50600 \"*/\" `*/` */ | Text: x")]
+    [InlineData("MySql", 80400, "/*!50600 'a\\'*/' */ x", "Hint:/*!50600 'a\\'*/' */ | Text: x")]
+    [InlineData("MySql+NoBackslashEscapes", 80400, "/*!50600 'a\\'*/ x", "Hint:/*!50600 'a\\'*/ | Text: x")]
+    [InlineData("MySql", 80400, "/*!50600 @p */ x", "Hint:/*!50600 @p */ | Text: x")]
+    [InlineData("MySql", 80400, "/*M!50600 a */ b */", "BlockComment:/*M!50600 a */ | Text: b */")]
+    [InlineData("MariaDb", 110400, "/*!50700 a */ b */", "Hint:/*!50700 a */ | Text: b */")]
+    [InlineData("MariaDb", 110400, "/*!99999 a */ b */", "Hint:/*!99999 a */ | Text: b */")]
+    [InlineData("MariaDb", 110400, "/*!50600 '*/' */ x", "Hint:/*!50600 '*/' */ | Text: x")]
+    [InlineData("MariaDb", 110400, "/*!080400 a */ b */", "Hint:/*!080400 a */ | Text: b */")]
+    [InlineData("MariaDb", 110400, "/*!100100, '*/' */ x", "Hint:/*!100100, '*/' */ | Text: x")]
+    [InlineData("MariaDb", 110400, "/*!5060000 a */ b */", "Hint:/*!5060000 a */ | Text: b */")]
+    [InlineData("MariaDb", 110400, "/*M!50700 '*/' */ x", "Hint:/*M!50700 '*/' */ | Text: x")]
+    [InlineData("MariaDb", 110400, "/*M!999999 a */ b */", "Hint:/*M!999999 a */ | Text: b */")]
+    [InlineData("MariaDb", 0, "/*M! '*/' */ x", "Hint:/*M! '*/' */ | Text: x")]
+    [InlineData("MariaDb", 0, "/*M!100100 a */ b */", "Hint:/*M!100100 a */ | Text: b */")]
+    public void Lex_VersionedComment_IsReadAsTheServerReadsIt(
+        string dialect,
+        int version,
+        string text,
+        string expected
+    ) => string.Join(" | ", Lex(text, Rules(dialect, version))).ShouldBe(expected);
+
+    // A versioned comment that runs is open when its body is: at the opener of the string or comment that is not
+    // closed, or at its own opener.
+    [Theory]
+    [InlineData("/*!50600 , 2", nameof(SqlParseErrorKind.UnterminatedBlockComment), 0, 2)]
+    [InlineData("x /*!50600 'a */", nameof(SqlParseErrorKind.UnterminatedQuote), 11, 1)]
+    [InlineData("/*!50600 /* a", nameof(SqlParseErrorKind.UnterminatedBlockComment), 9, 2)]
+    [InlineData("/*!50600 # */", nameof(SqlParseErrorKind.UnterminatedBlockComment), 0, 2)]
+    public void Lex_VersionedCommentThatRunsAndIsOpen_ReportsWhatIsOpen(string text, string kind, int start, int length)
+    {
+        var result = SqlLexer.Lex(text, Rules("MySql", 80400));
+
+        result.Error.ShouldBe(SqlParseError.Create(Enum.Parse<SqlParseErrorKind>(kind), new TextSpan(start, length)));
+        result.Lexemes.Count.ShouldBe(0);
+    }
+
     // SQLite itself accepts a block comment that runs to the end of the input.  It would take every later query of
     // the file with it, so it is an error here, as in every dialect.
     [Fact]
@@ -842,14 +895,14 @@ public sealed class SqlLexerTests
         string.Concat(lexemes.Select(lexeme => Text.Substring(lexeme.Span.Start, lexeme.Span.Length))).ShouldBe(Text);
     }
 
-    private static SqlDialectRules Rules(string choice)
+    private static SqlDialectRules Rules(string choice, int serverVersion = 0)
     {
         var parts = choice.Split('+');
         var options = parts
             .Skip(1)
             .Aggregate(SqlDialectOptions.None, (all, option) => all | Enum.Parse<SqlDialectOptions>(option));
 
-        return SqlDialectRules.For(new SqlDialectChoice(Enum.Parse<SqlDialect>(parts[0]), options));
+        return SqlDialectRules.For(new SqlDialectChoice(Enum.Parse<SqlDialect>(parts[0]), options, serverVersion));
     }
 
     private static string[] Lex(string text) => Lex(text, SqlDialectRules.Ansi);

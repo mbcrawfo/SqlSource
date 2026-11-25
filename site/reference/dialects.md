@@ -126,7 +126,7 @@ SqlSource reads these differently from the database, whatever the dialect:
 | A versioned comment whose body holds a string that contains `*/`, such as `/*!50700 SELECT '*/' */` | MySQL, MariaDB | The comment ends at the first `*/`, so the quote after it opens a string that is never closed: the error [SQLSRC101](../diagnostics.md#sqlsrc101).  Where the server ends the comment depends on the server's version |
 | A block comment that is still open at the end of the file | SQLite | The error [SQLSRC102](../diagnostics.md#sqlsrc102).  SQLite accepts it, but it would take every later query of the file with it |
 | A client command that is not SQL: `DELIMITER`, `GO`, SQL*Plus `PROMPT` and `REM`, a psql `\` command | All | As SQL, so a quote in it can open a string |
-| A name that is not a parameter to the database: a user variable, `@x` for an absolute value, the parameter of a procedure that the SQL creates | MySQL, MariaDB, PostgreSQL, SQL Server | As a parameter: see [names that are read as parameters](parameters.md#names-read-as-parameters) |
+| A name that is not a parameter to the database: a user variable, `@x` for an absolute value, the parameter of a procedure that the SQL creates | MySQL, MariaDB, PostgreSQL, SQL Server | As a parameter, unless a [`-- variable:` marker](parameters.md#variable-marker) names it: see [names that are read as parameters](parameters.md#names-read-as-parameters) |
 
 A misread has one of two results:
 

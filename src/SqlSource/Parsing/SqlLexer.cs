@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing.Quoting;
@@ -222,6 +223,12 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
 
     private void ReadBlockComment(int start)
     {
+        if (IsBlockHint(start) && Rules.RunsVersionedComment(text, start, out var bodyStart))
+        {
+            ReadRunComment(start, bodyStart);
+            return;
+        }
+
         var depth = 1;
         var index = start + 2;
         while (index < text.Length && depth > 0)
@@ -249,6 +256,56 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
         }
 
         Add(IsBlockHint(start) ? SqlLexemeKind.Hint : SqlLexemeKind.BlockComment, start, index);
+    }
+
+    // A versioned comment that the server runs: its body is SQL, so a string or a comment in it does not end it, and
+    // the first */ outside them does.  A comment in the body ends at its first */, since these servers nest none.
+    // The hint is kept whole, so nothing in it is a lexeme of its own.
+    private void ReadRunComment(int start, int bodyStart)
+    {
+        var index = bodyStart;
+        while (index < text.Length)
+        {
+            var current = text[index];
+            if (current == '*' && SqlText.CharAt(text, index + 1) == '/')
+            {
+                Add(SqlLexemeKind.Hint, start, index + 2);
+                return;
+            }
+
+            if ((current == '-' && IsDashComment(index)) || (current == '#' && Rules.HashComments))
+            {
+                index = Rules.FindLineEnd(text, index, text.Length);
+            }
+            else if (current == '/' && SqlText.CharAt(text, index + 1) == '*')
+            {
+                var close = text.IndexOf("*/", index + 2, StringComparison.Ordinal);
+                if (close < 0)
+                {
+                    _error = SqlParseError.Create(SqlParseErrorKind.UnterminatedBlockComment, new TextSpan(index, 2));
+                    return;
+                }
+
+                index = close + 2;
+            }
+            else if (Rules.ReaderFor(current) is { } reader)
+            {
+                var end = reader.FindEnd(text, index);
+                if (end == QuoteReader.Unterminated)
+                {
+                    _error = SqlParseError.Create(SqlParseErrorKind.UnterminatedQuote, new TextSpan(index, 1));
+                    return;
+                }
+
+                index = end == QuoteReader.NotAQuote ? index + 1 : end;
+            }
+            else
+            {
+                index++;
+            }
+        }
+
+        _error = SqlParseError.Create(SqlParseErrorKind.UnterminatedBlockComment, new TextSpan(start, 2));
     }
 
     private void ReadQuoted(QuoteReader reader, int start)

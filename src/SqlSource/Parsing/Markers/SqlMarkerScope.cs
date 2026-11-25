@@ -42,6 +42,8 @@ internal sealed class SqlMarkerScope(
 
     private List<SqlParameterDeclaration>? _declarations;
 
+    private List<TextSpan>? _variables;
+
     private List<SqlColumnDeclaration>? _columns;
 
     private OutputKind? _output;
@@ -122,6 +124,12 @@ internal sealed class SqlMarkerScope(
         _declarations ?? (IReadOnlyList<SqlParameterDeclaration>)[];
 
     /// <summary>
+    /// Where each name that the scope's <c>-- variable:</c> markers give is in the file's text, without its prefix,
+    /// in marker order.  A name may be here twice.
+    /// </summary>
+    public IReadOnlyList<TextSpan> Variables => _variables ?? (IReadOnlyList<TextSpan>)[];
+
+    /// <summary>
     /// What the scope's <c>-- column:</c> markers say of its query's result, in marker order.  A column has a second
     /// marker only when it says what the first does not: the type where the first sets the nullability, or the
     /// nullability where the first sets the type.
@@ -160,6 +168,9 @@ internal sealed class SqlMarkerScope(
                 break;
             case SqlMarkerKind.Param:
                 ReadParam(marker);
+                break;
+            case SqlMarkerKind.Variable:
+                ReadVariable(marker);
                 break;
             case SqlMarkerKind.Column:
                 ReadColumn(marker);
@@ -248,6 +259,7 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.Token
                 or SqlMarkerKind.TokenIgnore
                 or SqlMarkerKind.Param
+                or SqlMarkerKind.Variable
                 or SqlMarkerKind.Column
                 or SqlMarkerKind.Database
                 or SqlMarkerKind.Output
@@ -583,6 +595,27 @@ internal sealed class SqlMarkerScope(
 
         _ignoredTokens ??= [];
         _ = _ignoredTokens.Add(name);
+    }
+
+    // "@name", one name as the SQL writes it, and nothing after it.
+    private void ReadVariable(SqlMarker marker)
+    {
+        var start = marker.ValueSpan.Start;
+        var end = marker.ValueSpan.End;
+        if (start == end || text[start] != rules.ParameterPrefix)
+        {
+            AddInvalid(marker);
+            return;
+        }
+
+        var nameEnd = rules.FindParameterNameEnd(text, start + 1, end);
+        if (nameEnd == start + 1 || nameEnd != end)
+        {
+            AddInvalid(marker);
+            return;
+        }
+
+        (_variables ??= []).Add(TextSpan.FromBounds(start + 1, nameEnd));
     }
 
     // "@name [type] [null | not null] [-> [json] CSharpType]", the name ended by white space or by the arrow.  The

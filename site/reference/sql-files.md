@@ -39,6 +39,7 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- dialect:` | The dialect of the file, which you set to your database: `postgres` or `mssql`.  The other names, the options and the reading rules are on [the dialects page](dialects.md#choosing-a-dialect) | yes | no | [Dialect](settings.md#setting-dialect) |
 | `-- generator:` | Generator parameters | yes | yes | [Generator parameters](generator-parameters.md#setting-generator-parameters) |
 | `-- param:` | Gives a query parameter its database type, whether it can be null, and, after `->`, a C# type of your choice: `-- param: @id int -> UserId`, or `-> json OrderMetadata` for a parameter of a string type that holds JSON | no | yes | [Giving a parameter a type](parameters.md#param-marker), [the JSON opt-in](library-types-and-json.md#json-opt-in) |
+| `-- variable:` | Names a variable of the query, such as a MySQL user variable, which is then not a query parameter: `-- variable: @n` | no | yes | [Variables](parameters.md#variable-marker) |
 | `-- token:` | Gives a token a default | no | yes | [Defaults](tokens.md#token-marker) |
 | `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Text that looks like a token](tokens.md#token-ignore) |
 | `-- database:` | The logical database a query belongs to | yes | yes | [Database](settings.md#setting-database) |

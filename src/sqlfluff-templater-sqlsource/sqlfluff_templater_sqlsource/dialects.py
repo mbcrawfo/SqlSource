@@ -36,10 +36,12 @@ class DialectOptions(enum.Flag):
 
 @dataclass(frozen=True)
 class DialectChoice:
-    """What a dialect setting names: a dialect, and the options of that dialect that are on."""
+    """What a dialect setting names: a dialect, the options of that dialect that are on, and the version of its server,
+    zero when none is given, as a versioned comment writes it: `80036` for 8.0.36."""
 
     dialect: Dialect
     options: DialectOptions = DialectOptions.NONE
+    server_version: int = 0
 
 
 # Each name and alias, with its dialect: the first name of a dialect is its canonical one.

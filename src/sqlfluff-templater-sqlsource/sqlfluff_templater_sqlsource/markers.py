@@ -39,6 +39,7 @@ class MarkerKind(enum.Enum):
     MEMBER_LOCATION = "MemberLocation"
     VISIBILITY = "Visibility"
     NESTED_CLASS = "NestedClass"
+    VARIABLE = "Variable"
 
 
 # Each keyword with its colon, in the order they are tried.
@@ -66,6 +67,7 @@ _KEYWORDS: tuple[tuple[str, MarkerKind], ...] = (
     ("member-location:", MarkerKind.MEMBER_LOCATION),
     ("visibility:", MarkerKind.VISIBILITY),
     ("nested-class:", MarkerKind.NESTED_CLASS),
+    ("variable:", MarkerKind.VARIABLE),
 )
 
 

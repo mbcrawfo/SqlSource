@@ -89,6 +89,7 @@ internal sealed partial class TokenCheck
                 Name(value, NameClass.Database, place);
                 break;
             case SqlMarkerKind.Param:
+            case SqlMarkerKind.Variable:
             case SqlMarkerKind.Token:
                 Sql(value, place, queryFile: false);
                 break;

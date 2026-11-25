@@ -1435,7 +1435,7 @@ The value of a marker is not valid.  The cause is one of these:
 - What follows a name in a `-- name:` marker is not a shape.
 - A `-- dialect:` marker does not name a dialect.
 - A marker that holds a setting has a value that the setting does not take.  Examples are `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` and `-- library-types:`.
-- A `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
+- A `-- token:`, `-- token-ignore:`, `-- param:`, `-- variable:` or `-- column:` marker does not hold what it needs.
 
 The values that each marker takes follow.
 
@@ -1495,6 +1495,8 @@ A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else.  A quote or a block comment inside the default must close there.
 
 A `-- param:` marker starts with the query parameter as the SQL writes it, `@name`.  The parameter stands alone, or a space or `->` follows it.  What follows its `->` is a C# type, written as the type of a type override is.  It is never `default`, since nothing below a query maps a parameter: `-- param: @author -> default` is this error.
+
+A `-- variable:` marker holds one variable as the SQL writes it, `@name`, and nothing else: `-- variable: @a, @b` is this error.
 
 Inside a query, a `-- column:` marker holds the name of a column, then one of these, or both in this order:
 
@@ -1688,6 +1690,7 @@ A file with no `-- name:` line is one query, and takes every marker.
 | `-- dialect:` | yes | no |
 | `-- generator:` | yes | yes |
 | `-- param:` | no | yes |
+| `-- variable:` | no | yes |
 | `-- token:` | no | yes |
 | `-- token-ignore:` | no | yes |
 | `-- database:` | yes | yes |

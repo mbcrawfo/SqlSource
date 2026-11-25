@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using SqlSource.Parsing.Quoting;
 
 namespace SqlSource.Parsing;
@@ -46,6 +47,9 @@ internal sealed class SqlDialectRules
 
     private static readonly SqlDialectRules[] MariaDbByOptions = CreateMySqlFamily(isMariaDb: true);
 
+    // The rules of MySQL and MariaDB with a server's version, made on first use: a project names few versions.
+    private static readonly ConcurrentDictionary<SqlDialectChoice, SqlDialectRules> ByServerVersion = new();
+
     private readonly QuoteReader?[] _readers = new QuoteReader?[TableSize];
 
     // Every character that can start something other than plain text: a comment in any dialect, a parameter, or a
@@ -67,6 +71,25 @@ internal sealed class SqlDialectRules
             _readers[opener] = reader;
             _starters[CommentStarters.Length + 1 + index] = opener;
         }
+    }
+
+    // The rules of source with the server's version that a versioned comment is read by.
+    private SqlDialectRules(SqlDialectRules source, int serverVersion)
+    {
+        ParameterPrefix = source.ParameterPrefix;
+        _readers = source._readers;
+        _starters = source._starters;
+        Dialect = source.Dialect;
+        DeclaredVariables = source.DeclaredVariables;
+        NestedComments = source.NestedComments;
+        DashNeedsWhitespace = source.DashNeedsWhitespace;
+        HashComments = source.HashComments;
+        LineHints = source.LineHints;
+        MariaDbHints = source.MariaDbHints;
+        CarriageReturnEndsLine = source.CarriageReturnEndsLine;
+        StringContinuation = source.StringContinuation;
+        NamesHoldAtAndHash = source.NamesHoldAtAndHash;
+        ServerVersion = serverVersion;
     }
 
     /// <summary>The rules of the default dialect, used when no dialect is set.</summary>
@@ -153,6 +176,12 @@ internal sealed class SqlDialectRules
     public bool CarriageReturnEndsLine { get; private init; } = true;
 
     /// <summary>
+    /// The version of the server, as a versioned comment writes it: <c>80036</c> for 8.0.36, <c>101106</c> for
+    /// 10.11.6.  Zero when it is not known, and under every dialect but MySQL and MariaDB.
+    /// </summary>
+    public int ServerVersion { get; }
+
+    /// <summary>
     /// Whether a string goes on after a gap with a line break, and what the gap may hold.  It matters after a
     /// string whose reader names a continuation: the part after the gap is then read by that reader.
     /// </summary>
@@ -160,9 +189,17 @@ internal sealed class SqlDialectRules
 
     /// <summary>
     /// The rules of <paramref name="choice" />.  One shared instance for each choice.  Options that the dialect
-    /// does not have are ignored: a name never gives them.
+    /// does not have are ignored, and so is a server's version: a name never gives them.
     /// </summary>
     public static SqlDialectRules For(SqlDialectChoice choice) =>
+        choice.ServerVersion != 0 && choice.Dialect is SqlDialect.MySql or SqlDialect.MariaDb
+            ? ByServerVersion.GetOrAdd(
+                choice,
+                static key => new SqlDialectRules(For(key with { ServerVersion = 0 }), key.ServerVersion)
+            )
+            : WithoutServerVersion(choice);
+
+    private static SqlDialectRules WithoutServerVersion(SqlDialectChoice choice) =>
         choice.Dialect switch
         {
             SqlDialect.Ansi => Ansi,
@@ -303,6 +340,69 @@ internal sealed class SqlDialectRules
     /// one search.
     /// </summary>
     public int FindStarter(string text, int start) => text.IndexOfAny(_starters, start);
+
+    /// <summary>
+    /// Whether the server runs the body of the versioned comment that starts at <paramref name="start" />, so that
+    /// its body is SQL, in which a string or a comment does not end it.  Only MySQL and MariaDB run one: <c>/*!</c>,
+    /// and under MariaDB <c>/*M!</c>.  <paramref name="bodyStart" /> is where the body starts, after the version.
+    /// </summary>
+    /// <remarks>
+    /// As MySQL 8.4 and MariaDB 11.4 read one.  A comment without a version, or with fewer than five digits, which
+    /// are then part of the body, always runs.  Under MySQL, six digits followed by white space or the comment's end
+    /// are a version <c>MMmmrr</c>, and otherwise the first five are one, <c>Mmmrr</c>.  Under MariaDB, six digits
+    /// are a version whatever follows them, and a <c>/*!</c> version from 50700 to 99999 never runs.  A versioned
+    /// comment runs when its version is not above <see cref="ServerVersion" />, and is a comment that ends at its
+    /// first <c>*/</c> when that is not known.
+    /// </remarks>
+    public bool RunsVersionedComment(string text, int start, out int bodyStart)
+    {
+        bodyStart = start;
+        var index = start + 2;
+        var isMariaDbs = MariaDbHints && SqlText.CharAt(text, index) == 'M';
+        if (isMariaDbs)
+        {
+            index++;
+        }
+
+        if (Dialect is not (SqlDialect.MySql or SqlDialect.MariaDb) || SqlText.CharAt(text, index) != '!')
+        {
+            return false;
+        }
+
+        index++;
+        var digits = 0;
+        while (digits < 6 && SqlText.CharAt(text, index + digits) is >= '0' and <= '9')
+        {
+            digits++;
+        }
+
+        if (digits < 5)
+        {
+            bodyStart = index;
+            return true;
+        }
+
+        var length = digits == 6 && (MariaDbHints || EndsVersion(text, index + 6)) ? 6 : 5;
+        var version = 0;
+        for (var digit = 0; digit < length; digit++)
+        {
+            version = (version * 10) + (text[index + digit] - '0');
+        }
+
+        bodyStart = index + length;
+        if (MariaDbHints && !isMariaDbs && version is >= 50700 and <= 99999)
+        {
+            return false;
+        }
+
+        return ServerVersion != 0 && version <= ServerVersion;
+    }
+
+    // What MySQL wants after six digits for them to be a version: white space or the end of the comment.
+    private static bool EndsVersion(string text, int index) =>
+        index >= text.Length
+        || char.IsWhiteSpace(text[index])
+        || (text[index] == '*' && SqlText.CharAt(text, index + 1) == '/');
 
     /// <summary>
     /// The reader of the quoted region that <paramref name="opener" /> opens, or null when it opens none.

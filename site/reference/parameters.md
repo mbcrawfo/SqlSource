@@ -107,6 +107,25 @@ Under the `mssql` dialect, a name that the query declares with `DECLARE` is a lo
 - **If a name is taken for a variable and is a query parameter, a `-- param:` marker with its type makes it one.**  The marker without a type is [SQLSRC117](../diagnostics.md#sqlsrc117).
 - **Under every other dialect, `DECLARE @n int` declares nothing for SqlSource**, and `@n` is a query parameter.
 
+<a id="variable-marker"></a>
+
+## Variables the SQL sets: `-- variable:`
+
+```sql mysql
+-- name: OrdersAfterLast
+-- variable: @last
+SET @last = (SELECT MAX(id) FROM orders WHERE customer_id = @customer);
+SELECT * FROM orders WHERE id > @last - 10;
+```
+
+A `-- variable:` marker inside a query says that a name is a variable of the query, and not a query parameter.  The only query parameter of this query is `@customer`.  `@last` is a user variable that the SQL sets.
+
+- **The marker names one variable as the SQL writes it**: `@` and a name, and nothing after it.  Anything else, `-- variable: @a, @b` included, is [SQLSRC111](../diagnostics.md#sqlsrc111).  Write one marker for each variable.
+- **The name is not a query parameter wherever the query writes it**, in any spelling, and in a token's default too.  So the query's input model has no property for it, and its method sends no value for it.
+- **It works under every dialect.**  Use it for a user variable of MySQL or MariaDB, and for the parameter of a procedure that the SQL creates.
+- **The marker goes inside a query, under its `-- name:` line.**  In the file header it is [SQLSRC116](../diagnostics.md#sqlsrc116).
+- **MySqlConnector sends a query that writes a user variable only when the connection string sets `AllowUserVariables=true`.**  Without it, MySqlConnector takes `@last` for a parameter that the command lacks, and the query fails when it runs.
+
 <a id="names-read-as-parameters"></a>
 
 ## Names that are read as query parameters
@@ -116,8 +135,8 @@ SqlSource finds query parameters by how the SQL is written, not by what the data
 | Database | SQL | How SqlSource reads it | What to do |
 |----|----|----|----|
 | PostgreSQL | `@x`, written for the absolute value of `x` | As the parameter `x`.  Npgsql reads it the same way | Write `abs(x)`, or `@ x` with a space |
-| MySQL, MariaDB | A user variable, `SET @n := 1` | As a parameter, at each place it is written | No marker says that a name is a variable.  A MySQL or MariaDB query is not described, so it has the output `sql`, and the parameter changes no generated code |
-| SQL Server | The parameter of a procedure that the SQL creates, `CREATE PROCEDURE p @id int AS ...` | As a parameter of the query | Give the query `-- output: sql`: SQL Server does not describe a statement that creates a procedure ([SQLSRC225](../diagnostics.md#sqlsrc225)), and with that output the parameter changes no generated code |
+| MySQL, MariaDB | A user variable, `SET @n := 1` | As a parameter, at each place it is written | Name it in a [`-- variable:` marker](#variable-marker) |
+| SQL Server | The parameter of a procedure that the SQL creates, `CREATE PROCEDURE p @id int AS ...` | As a parameter of the query | Name it in a [`-- variable:` marker](#variable-marker), and give the query `-- output: sql`: SQL Server does not describe a statement that creates a procedure ([SQLSRC225](../diagnostics.md#sqlsrc225)) |
 
 Under `mssql`, the opposite can happen too: SqlSource takes a name for a variable when it is a query parameter.  See [limits](#limit-parameter-taken-for-a-variable).
 

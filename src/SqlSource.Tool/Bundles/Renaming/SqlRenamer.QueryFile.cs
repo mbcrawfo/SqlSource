@@ -27,6 +27,7 @@ internal sealed partial class SqlRenamer
                 SqlMarkerKind.Dialect => SqlDialectMarker.TryRead(text, marker, out _) ? value : null,
                 SqlMarkerKind.Database => DatabaseMarker(value),
                 SqlMarkerKind.Param => ParamMarker(marker),
+                SqlMarkerKind.Variable => VariableMarker(marker),
                 SqlMarkerKind.Token => TokenMarker(marker),
                 SqlMarkerKind.TokenIgnore => TokenIgnoreMarker(marker),
                 SqlMarkerKind.Summary
@@ -123,6 +124,12 @@ internal sealed partial class SqlRenamer
                 declaration.Nullable
             );
         }
+
+        // "@name": a variable's name, renamed as the SQL's parameters and variables are.
+        private string? VariableMarker(SqlMarker marker) =>
+            BundleQueryFile.ReadMarker(text, renamer._rules, marker, static scope => scope.Variables) is [var name]
+                ? renamer._rules.ParameterPrefix + renamer.ParameterName(text.Substring(name.Start, name.Length))
+                : null;
 
         // "{{name:default}}": the name a token's, quoted, since the generator compares it as written, and the default
         // renamed as SQL.

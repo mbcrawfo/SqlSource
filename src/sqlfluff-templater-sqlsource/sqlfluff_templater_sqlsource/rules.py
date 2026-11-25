@@ -8,6 +8,7 @@ where dialects differ by a setting, a reader where they differ by how a quoted r
 the SQL users get.
 """
 
+import copy
 import enum
 import re
 
@@ -24,7 +25,7 @@ from sqlfluff_templater_sqlsource.quoting import (
     is_name_character_of_postgresql,
     is_name_character_of_sql_server,
 )
-from sqlfluff_templater_sqlsource.text import find_line_end, is_letter_or_digit, is_white_space
+from sqlfluff_templater_sqlsource.text import char_at, find_line_end, is_letter_or_digit, is_white_space
 
 
 class StringContinuation(enum.Enum):
@@ -88,6 +89,8 @@ class DialectRules:
         # end a line only at a line feed.  A carriage return and a line feed end a line at the carriage return in every
         # dialect.
         self.carriage_return_ends_line = carriage_return_ends_line
+        # The version of the server, as a versioned comment writes it, or zero when it is not known.
+        self.server_version = 0
         # Whether a name may hold @ and #, and of the characters above U+007F only those T-SQL takes.  A parameter's
         # name is read by the same rule; otherwise it takes letters, digits and _.
         self._names_hold_at_and_hash = names_hold_at_and_hash
@@ -98,10 +101,40 @@ class DialectRules:
 
     @staticmethod
     def for_choice(choice: DialectChoice) -> "DialectRules":
-        """The rules of `choice`: one shared instance for each.  Options that the dialect does not have are ignored."""
-        if choice.dialect in (Dialect.MYSQL, Dialect.MARIADB):
-            return _BY_DIALECT_AND_OPTIONS[(choice.dialect, choice.options)]
-        return _BY_DIALECT_AND_OPTIONS[(choice.dialect, DialectOptions.NONE)]
+        """The rules of `choice`: one shared instance for each.  Options that the dialect does not have are ignored, and
+        so is a server's version."""
+        if choice.dialect not in (Dialect.MYSQL, Dialect.MARIADB):
+            return _BY_DIALECT_AND_OPTIONS[(choice.dialect, DialectOptions.NONE)]
+        rules = _BY_DIALECT_AND_OPTIONS[(choice.dialect, choice.options)]
+        if choice.server_version == 0:
+            return rules
+        key = (choice.dialect, choice.options, choice.server_version)
+        if key not in _BY_SERVER_VERSION:
+            versioned = copy.copy(rules)
+            versioned.server_version = choice.server_version
+            _BY_SERVER_VERSION[key] = versioned
+        return _BY_SERVER_VERSION[key]
+
+    def runs_versioned_comment(self, text: str, start: int) -> int | None:
+        """Where the body of the versioned comment at `start` starts, when the server runs it, so that its body is SQL;
+        else None.  As `RunsVersionedComment`, whose remarks give the rules of MySQL 8.4 and MariaDB 11.4."""
+        index = start + 2
+        is_mariadbs = self.mariadb_hints and char_at(text, index) == "M"
+        if is_mariadbs:
+            index += 1
+        if self.dialect.dialect not in (Dialect.MYSQL, Dialect.MARIADB) or char_at(text, index) != "!":
+            return None
+        index += 1
+        digits = 0
+        while digits < 6 and "0" <= char_at(text, index + digits) <= "9":
+            digits += 1
+        if digits < 5:
+            return index
+        length = 6 if digits == 6 and (self.mariadb_hints or _ends_version(text, index + 6)) else 5
+        version = int(text[index : index + length])
+        if self.mariadb_hints and not is_mariadbs and 50700 <= version <= 99999:
+            return None
+        return index + length if self.server_version != 0 and version <= self.server_version else None
 
     def is_name_character(self, value: str) -> bool:
         """True for a character of a name in this dialect: as SQL Server reads it there, as PostgreSQL does
@@ -156,6 +189,11 @@ class DialectRules:
     def reader_for(self, opener: str) -> QuoteReader | None:
         """The reader of the quoted region that `opener` opens, or None when it opens none."""
         return self._readers.get(opener)
+
+
+# What MySQL wants after six digits for them to be a version: white space or the end of the comment.
+def _ends_version(text: str, index: int) -> bool:
+    return index >= len(text) or is_white_space(text[index]) or (text[index] == "*" and char_at(text, index + 1) == "/")
 
 
 _DOUBLED = DoubledQuoteReader()
@@ -237,3 +275,6 @@ _BY_DIALECT_AND_OPTIONS: dict[tuple[Dialect, DialectOptions], DialectRules] = {
     **{(rules.dialect.dialect, rules.dialect.options): rules for rules in _create_mysql_family(Dialect.MYSQL)},
     **{(rules.dialect.dialect, rules.dialect.options): rules for rules in _create_mysql_family(Dialect.MARIADB)},
 }
+
+# The rules of MySQL and MariaDB with a server's version, made on first use.
+_BY_SERVER_VERSION: dict[tuple[Dialect, DialectOptions, int], DialectRules] = {}

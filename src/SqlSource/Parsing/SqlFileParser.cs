@@ -406,9 +406,15 @@ internal static class SqlFileParser
             var tokens = SqlTokenList.Create(text, sql, scanned.Occurrences, tokenDefaults, _errors);
 
             // A variable is written in the SQL where it is declared, so SQL without parameters declares none, and has
-            // no use to classify.
+            // no use to classify.  A -- variable: marker names one in any dialect.
             var variables =
-                sql.Parameters.Length == 0 ? null : SqlDeclaredVariables.Find(text, lexemes, start, end, rules);
+                sql.Parameters.Length == 0
+                    ? null
+                    : SqlDeclaredVariables.With(
+                        SqlDeclaredVariables.Find(text, lexemes, start, end, rules),
+                        text,
+                        scope?.Variables ?? []
+                    );
             // Where each list stands is read for SQL Server alone: a list there that no NOT reaches is sent empty as
             // one NULL, which SQL Server takes where it refuses a subquery.
             var places = ImmutableArray<SqlListPlace>.Empty;

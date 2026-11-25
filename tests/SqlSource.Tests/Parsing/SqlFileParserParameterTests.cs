@@ -153,6 +153,106 @@ public sealed class SqlFileParserParameterTests
             )
             .ShouldBe(["a:<none>:<unsaid>", "n:int:<unsaid>:declared"]);
 
+    // A -- variable: marker names a variable in every dialect, such as a user variable of MySQL, which no DECLARE
+    // finds.
+    [Theory]
+    [InlineData(nameof(SqlDialect.Ansi))]
+    [InlineData(nameof(SqlDialect.SqlServer))]
+    [InlineData(nameof(SqlDialect.PostgreSql))]
+    [InlineData(nameof(SqlDialect.CockroachDb))]
+    [InlineData(nameof(SqlDialect.MySql))]
+    [InlineData(nameof(SqlDialect.MariaDb))]
+    [InlineData(nameof(SqlDialect.Sqlite))]
+    [InlineData(nameof(SqlDialect.Oracle))]
+    public void Parse_NameAVariableMarkerGives_IsNotAParameterWhereverItIsWritten(string dialect)
+    {
+        const string Sql = "SET @n = @start;\nSELECT @N, @end WHERE x > @n";
+
+        var block = Blocks("-- name: Q\n-- variable: @n\n" + Sql + "\n", dialect: Enum.Parse<SqlDialect>(dialect))
+            .ShouldHaveSingleItem();
+
+        Parameters(block).ShouldBe(["start:<none>:<unsaid>", "end:<none>:<unsaid>"]);
+        block.DeclaredVariables.ShouldBe(["n"]);
+        ParseOf.Sql(block).ShouldBe(Sql);
+    }
+
+    [Fact]
+    public void Parse_VariableMarkersBesideADeclare_AreDeclaredVariablesAfterTheDeclaredOnes() =>
+        Blocks(
+                "-- name: Q\n-- variable: @p\nDECLARE @n int = 1;\nCREATE PROCEDURE x @p int AS SELECT @n, @p, @a\n",
+                dialect: SqlDialect.SqlServer
+            )
+            .ShouldHaveSingleItem()
+            .DeclaredVariables.ShouldBe(["n", "p"]);
+
+    [Fact]
+    public void Parse_VariableMarkerOfAQuery_LeavesTheNameAParameterOfAnotherQuery()
+    {
+        var blocks = Blocks(
+            "-- name: A\n-- variable: @n\nSELECT @n\n-- name: B\nSELECT @n\n",
+            dialect: SqlDialect.MySql
+        );
+
+        blocks
+            .Select(Parameters)
+            .ShouldBe([
+                [],
+                ["n:<none>:<unsaid>"],
+            ]);
+    }
+
+    [Fact]
+    public void Parse_VariableInATokensDefault_NeedsNoParamMarker() =>
+        Blocks("-- name: Q\n-- variable: @n\n-- token: {{g:LIMIT @n}}\nSELECT @n {{f:OFFSET @N}} {{g}}\n")
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldBeEmpty();
+
+    [Fact]
+    public void Parse_VariableMarkerInAFileWithoutNameMarker_IsAllowed() =>
+        Blocks("-- variable: @n\nSELECT @n, @a\n")
+            .ShouldHaveSingleItem()
+            .Parameters.Select(static p => p.Name)
+            .ShouldBe(["a"]);
+
+    [Theory]
+    [InlineData("q1")]
+    [InlineData("@")]
+    [InlineData("@ n")]
+    [InlineData("@n int")]
+    [InlineData("@n,@m")]
+    [InlineData("@n -- c")]
+    [InlineData("@@n")]
+    public void Parse_VariableMarkerThatIsNotOnePrefixedName_IsInvalid(string value)
+    {
+        var text = "-- name: Q\n-- variable: " + value + "\nSELECT @n\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    TextSpans.Of(text, value),
+                    "variable: " + value,
+                    ""
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_VariableMarkerWithoutAValue_IsInvalid()
+    {
+        const string Text = "-- name: Q\n-- variable:\nSELECT @n\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    TextSpans.Of(Text, "-- variable:"),
+                    "variable:",
+                    ""
+                ),
+            ]);
+    }
+
     private static string[] Parameters(SqlBlock block) =>
         [
             .. block.Parameters.Select(static parameter =>

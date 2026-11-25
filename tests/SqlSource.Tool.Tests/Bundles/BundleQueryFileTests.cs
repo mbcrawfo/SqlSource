@@ -43,6 +43,7 @@ public sealed class BundleQueryFileTests
         [SqlMarkerKind.MemberLocation] = "-- member-location: nested-class",
         [SqlMarkerKind.Visibility] = "-- visibility: public",
         [SqlMarkerKind.NestedClass] = "-- nested-class: Users",
+        [SqlMarkerKind.Variable] = "-- variable: @n",
     };
 
     // By name, since the enum is internal.
@@ -134,6 +135,7 @@ public sealed class BundleQueryFileTests
         SqlMarkerKind.Param,
         SqlMarkerKind.Token,
         SqlMarkerKind.TokenIgnore,
+        SqlMarkerKind.Variable,
     ];
 
     [Theory]

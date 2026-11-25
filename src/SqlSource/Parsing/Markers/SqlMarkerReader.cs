@@ -33,6 +33,7 @@ internal static class SqlMarkerReader
         ("member-location:", SqlMarkerKind.MemberLocation),
         ("visibility:", SqlMarkerKind.Visibility),
         ("nested-class:", SqlMarkerKind.NestedClass),
+        ("variable:", SqlMarkerKind.Variable),
     ];
 
     /// <summary>
