@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -178,7 +179,13 @@ public sealed class NullabilityWalkExpressionTests
             new PlanInstancesCache(root, null),
             columns,
             origins,
-            new WalkScope(false, false, catalogFunctionsFirst, PostgresTables.Of(TableA, TableB, ReservationsR), [])
+            new WalkScope(
+                false,
+                OldAndNewNames.None,
+                catalogFunctionsFirst,
+                PostgresTables.Of(TableA, TableB, ReservationsR),
+                []
+            )
         );
     }
 
