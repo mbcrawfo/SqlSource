@@ -107,6 +107,52 @@ public sealed class ExplainTests(PostgresDatabases postgres)
         connection.InDescribe.ShouldBeTrue();
     }
 
+    private async Task<PostgresExplainAnswer> ExplainPartitionedAsync(PostgresConnection connection, string sql)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
+        var live = new PostgresLive(connection);
+        var prepared = await live.PrepareAsync(new PostgresPrepareRequest(Statement, sql, ["unknown"]), token);
+        prepared.Error.ShouldBeNull(prepared.Error?.Message);
+        return await live.ExplainAsync(new PostgresExplainRequest(Statement, 1, []), token);
+    }
+
+    // The executor prunes every partition for the NULL of the parameter, and the plan is asked again without pruning,
+    // in place of the one the statement cached: every member shows, and the settings end with the call.
+    [Theory]
+    [InlineData("SELECT p.id, p.note FROM scratch_parts p WHERE p.kind = $1")]
+    [InlineData("SELECT p.id, p.note FROM scratch_parts p WHERE p.kind = extract(dow FROM now())::integer + $1")]
+    public async Task ExplainAsync_KeyThatTheExecutorPrunes_AnswersThePlanOfEveryPartition(string sql)
+    {
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+
+        var answer = await ExplainPartitionedAsync(connection, sql);
+
+        answer.Error.ShouldBeNull(answer.Error?.Message);
+        var root = PlanNode.Read(answer.Plan.ShouldNotBeNull()).ShouldNotBeNull();
+        root.NodeType.ShouldBe("Append");
+        root.SubplansRemoved.ShouldBe(0);
+        root.Plans.Select(static member => member.RelationName).ShouldBe(["scratch_parts_1", "scratch_parts_2"]);
+        (await ShowAsync(connection, "enable_partition_pruning")).ShouldBe("on");
+        (await ShowAsync(connection, "plan_cache_mode")).ShouldBe("auto");
+    }
+
+    // The planner prunes for a constant, and prints no count: the plan with pruning is the answer, a scan of the one
+    // partition left under the query's alias, where a plan without pruning would show both.
+    [Fact]
+    public async Task ExplainAsync_ConstantOfThePartitionKey_AnswersThePlanWithPruning()
+    {
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+
+        var answer = await ExplainPartitionedAsync(
+            connection,
+            "SELECT p.id, p.note FROM scratch_parts p WHERE p.kind = 1 AND p.id = $1"
+        );
+
+        var root = PlanNode.Read(answer.Plan.ShouldNotBeNull()).ShouldNotBeNull();
+        (root.NodeType, root.Alias, root.RelationName).ShouldBe(("Seq Scan", "p", "scratch_parts_1"));
+    }
+
     // An UPDATE is planned and not executed: its row is unchanged.
     [Fact]
     public async Task ExplainAsync_Update_ChangesNoRow()

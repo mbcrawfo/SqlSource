@@ -6,6 +6,7 @@ using Shouldly;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
+using static SqlSource.Tool.Tests.PostgresPlans;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
@@ -43,15 +44,44 @@ public sealed class PostgresLiveTests
             .ShouldBe("EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE sqlsource_7(NULL, NULL)");
 
     [Fact]
-    public void SetTexts_RequestWithSettings_ForcesTheGenericPlanWithoutPruningThenSetsEach() =>
+    public void SetTexts_RequestWithSettings_ForcesTheGenericPlanWithPruningThenSetsEach() =>
         PostgresLive
             .SetTexts(new PostgresExplainRequest("sqlsource_1", 0, ["enable_nestloop=off", "enable_hashjoin=off"]))
             .ShouldBe([
                 "SET LOCAL plan_cache_mode = force_generic_plan",
-                "SET LOCAL enable_partition_pruning = off",
+                "SET LOCAL enable_partition_pruning = on",
                 "SET LOCAL enable_nestloop = off",
                 "SET LOCAL enable_hashjoin = off",
             ]);
+
+    // The plan the first EXPLAIN cached in the statement would answer the second, whatever its settings.
+    [Fact]
+    public void AgainTexts_OfAPrunedPlan_TurnPruningOffAndDiscardTheCachedPlan() =>
+        PostgresLive.AgainTexts.ShouldBe(["SET LOCAL enable_partition_pruning = off", "DISCARD PLANS"]);
+
+    public static TheoryData<string?, bool> PrunedPlans =>
+        new()
+        {
+            { Text(Append() with { SubplansRemoved = 2 }), true },
+            // Under a join, a subquery or any other node, as an UPDATE of a partitioned target prints it.
+            { Text(Join("Left", Scan("u", "u.id"), Append() with { SubplansRemoved = 1 })), true },
+            { Text(Over("ModifyTable", Append(Member("p_1", "t_1")) with { SubplansRemoved = 1 })), true },
+            // A planner's pruning prints no count, and the members left are every partition that may hold a row.
+            { Text(Append(Member("p_1", "t_1"), Member("p_2", "t_2"))), false },
+            { Text(Scan("p", "p.id")), false },
+            // A text that is no plan is answered as it is: the session reads it as unreadable.
+            { /*lang=json,strict*/
+                """[{"Plan": {"Node Type": "Append", "Subplans Removed": "2"}}]""",
+                false
+            },
+            { "not a plan", false },
+            { null, false },
+        };
+
+    [Theory]
+    [MemberData(nameof(PrunedPlans))]
+    public void PrunedByTheExecutor_Plan_IsWhetherANodePrintsSubplansRemoved(string? plan, bool expected) =>
+        PostgresLive.PrunedByTheExecutor(plan).ShouldBe(expected);
 
     [Fact]
     public void SetTexts_SettingOutsideTheList_Throws() =>

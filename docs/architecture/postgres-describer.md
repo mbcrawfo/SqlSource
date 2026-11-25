@@ -164,7 +164,7 @@ The catalog calls run on the describe's connection, under the user's `search_pat
 | `types` | The closure of the types |
 | `spellings` | `format_type` of each pair of a type and a modifier |
 | `check` | Npgsql's describe of the SQL as written |
-| `explain` | The generic plan, under the describe's savepoint, which it rolls back to |
+| `explain` | The generic plan with partition pruning, and again without it when the executor pruned, under the describe's savepoint, which it rolls back to |
 | `partitions` | The ancestors of each relation an `Append` may scan as a partition |
 | `relations` | The relations a plan scans that `tables` did not answer, by schema and name, answered as `tables` answers |
 | `overloads` | Which of the function and operator names a plan prints a schema other than `pg_catalog` holds, or `pg_catalog` holds as an object that is not built in (an OID of `16384` or more) |

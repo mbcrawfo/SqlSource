@@ -44,6 +44,8 @@ The connection is for the [logical database](../../connections.md#connections) o
 
 The tool describes each query in a transaction, and then rolls the transaction back.  Before the end, the tool frees the statement that it prepared.  The session settings that the tool changed end with the transaction.
 
+For some queries over a partitioned table, the tool also sends `DISCARD PLANS`, which the rollback does not undo.  PostgreSQL then works out again how to run each statement prepared on that connection, the next time the statement runs.  The results of those statements do not change.  If a pooler shares the connection with your application, this includes your application's prepared statements.
+
 While the tool describes a query, a migration waits until the tool has finished with that query, if the migration runs one of these:
 
 - a `DROP TABLE` of a table that the query reads;
@@ -165,8 +167,8 @@ Npgsql then cannot read the types of the database when it connects.  The connect
 
 ### Describing is slow on a table with thousands of partitions
 
-**What you see.**  A query over a table with many partitions is slow to describe.  On a table of thousands of partitions, each such query takes longer to describe, and the [log](../../cli.md#logs) of the run grows.
+**What you see.**  A query is slow to describe when it compares the partition key of a table with many partitions to a query parameter or to `now()`, as `WHERE placed_at >= @from` does.  On a table of thousands of partitions, each such query takes longer to describe, and the [log](../../cli.md#logs) of the run grows.
 
-**Why.**  To work out which columns can be null, the tool looks at every partition of a partitioned table, whatever the conditions of the query.
+**Why.**  To work out which columns can be null, the tool looks at every partition of the table for such a query, two times.  A query that compares the partition key only to constants is described with only the partitions that those constants leave.
 
 **What to do.**  Nothing needs to change.  Only describing is slower; nothing else is affected.

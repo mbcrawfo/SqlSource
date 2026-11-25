@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Npgsql;
 using Npgsql.Schema;
 using SqlSource.Tool.Describing.Postgres.Statements;
+using SqlSource.Tool.Describing.Postgres.Walk;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -866,23 +867,38 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
     private const string ForceGenericPlanSql = "SET LOCAL plan_cache_mode = force_generic_plan";
 
+    private const string PartitionPruningSql = "SET LOCAL enable_partition_pruning = on";
+
     private const string NoPartitionPruningSql = "SET LOCAL enable_partition_pruning = off";
+
+    private const string DiscardPlansSql = "DISCARD PLANS";
 
     /// <summary>
     /// Asks <c>explain</c>: the generic plan of the prepared statement, under the describe's savepoint, which it rolls
-    /// back to afterwards.
+    /// back to afterwards.  The plan is asked with partition pruning, and again without it when the executor pruned
+    /// (<see cref="PrunedByTheExecutor" />).
     /// </summary>
     /// <remarks>
     /// <c>EXPLAIN</c> without <c>ANALYZE</c> plans the statement and does not execute it.  Planning evaluates an
     /// immutable function whose arguments are constants, inside the describe's transaction, which is rolled back: a
     /// function wrongly marked immutable runs, and an effect outside the transaction, a sequence's for one, remains
     /// (TD-0047).  Under <c>force_generic_plan</c> the <c>NULL</c> of a parameter is not folded into the plan, so
-    /// <c>id = $1</c> stays a condition.  Partition pruning is off: the executor would prune every partition for the
-    /// <c>NULL</c> of a parameter when it starts, and the plan would show an <c>Append</c> with no member, from
-    /// which the walk cannot tell a partitioned table from a set operation (TD-0052).  Each setting is a
-    /// <c>SET LOCAL</c>, which the rollback to the savepoint ends, after the plan or, through
+    /// <c>id = $1</c> stays a condition.
+    /// <para>
+    /// Partition pruning is on, so a plan holds no partition that a constant rules out.  The planner prunes by
+    /// immutable values alone, and a partition it pruned holds no row for any execution of the plan.  It leaves a
+    /// condition on a parameter or a stable function to the executor, which prunes when it starts: for the
+    /// <c>NULL</c> of a parameter, every partition, and the plan shows an <c>Append</c> with no member and
+    /// <c>Subplans Removed</c>, from which the walk cannot tell a partitioned table from a set operation.  Such a plan
+    /// is asked again without pruning, which shows every member (TD-0052).  The first <c>EXPLAIN</c> cached the
+    /// generic plan in the prepared statement, and a setting does not end a cached plan, so <c>DISCARD PLANS</c> goes
+    /// before the second: it makes every cached plan of the backend plan again when next used, and is sent only here.
+    /// </para>
+    /// <para>
+    /// Each setting is a <c>SET LOCAL</c>, which the rollback to the savepoint ends, after the plan or, through
     /// <see cref="InDescribeAsync{TAnswer}" />, after a failure at any step, so no setting reaches a later call.  The
     /// texts hold a name the tool made, settings of a closed list and nothing of a user's.
+    /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// No describe's transaction is held: outside one, a <c>SET LOCAL</c> would change nothing.
@@ -897,16 +913,12 @@ internal sealed class PostgresLive(PostgresConnection connection)
         return InDescribeAsync(
             async () =>
             {
-                foreach (var text in SetTexts(asked))
+                await SendAsync(SetTexts(asked), token);
+                var plan = await PlanAsync(asked, token);
+                if (PrunedByTheExecutor(plan))
                 {
-                    await using var set = await connection.CommandAsync(text, token);
-                    _ = await set.ExecuteNonQueryAsync(token);
-                }
-
-                string? plan;
-                await using (var command = await connection.CommandAsync(ExplainText(asked), token))
-                {
-                    plan = await command.ExecuteScalarAsync(token) as string;
+                    await SendAsync(AgainTexts, token);
+                    plan = await PlanAsync(asked, token);
                 }
 
                 await connection.RestoreDescribeAsync(token);
@@ -919,17 +931,47 @@ internal sealed class PostgresLive(PostgresConnection connection)
         );
     }
 
+    private async Task SendAsync(IReadOnlyList<string> texts, CancellationToken token)
+    {
+        foreach (var text in texts)
+        {
+            await using var command = await connection.CommandAsync(text, token);
+            _ = await command.ExecuteNonQueryAsync(token);
+        }
+    }
+
+    private async Task<string?> PlanAsync(PostgresExplainRequest asked, CancellationToken token)
+    {
+        await using var command = await connection.CommandAsync(ExplainText(asked), token);
+        return await command.ExecuteScalarAsync(token) as string;
+    }
+
     /// <summary>The text <c>explain</c> sends for the plan.</summary>
     public static string ExplainText(PostgresExplainRequest asked) =>
         "EXPLAIN (VERBOSE, FORMAT JSON) " + ExecuteText(asked.Statement, asked.Parameters);
 
     /// <summary>
-    /// What <c>explain</c> sets for its transaction, in order: the generic plan, no partition pruning, then each
-    /// setting.
+    /// What <c>explain</c> sets for its transaction, in order: the generic plan, partition pruning, then each setting.
     /// </summary>
     /// <exception cref="ArgumentException">A setting is not of <see cref="PlannerSettings" />.</exception>
     public static IReadOnlyList<string> SetTexts(PostgresExplainRequest asked) =>
-        [ForceGenericPlanSql, NoPartitionPruningSql, .. asked.Settings.Select(PlannerSettings.SetText)];
+        [ForceGenericPlanSql, PartitionPruningSql, .. asked.Settings.Select(PlannerSettings.SetText)];
+
+    /// <summary>
+    /// What <c>explain</c> sends, in order, before it asks again for a plan the executor pruned: no partition pruning,
+    /// and <c>DISCARD PLANS</c>, without which the statement would keep the plan it cached.
+    /// </summary>
+    public static IReadOnlyList<string> AgainTexts { get; } = [NoPartitionPruningSql, DiscardPlansSql];
+
+    /// <summary>
+    /// Whether a plan asked with partition pruning is asked again without it: when it is a plan that
+    /// <see cref="PlanNode.Read" /> reads and a node of it prints <c>Subplans Removed</c> above 0, the members the
+    /// executor pruned when it started.  A text that is no plan is answered as it is.
+    /// </summary>
+    public static bool PrunedByTheExecutor(string? plan) =>
+        plan is not null
+        && PlanNode.Read(plan) is { } root
+        && root.SelfAndDescendants().Any(static node => node.SubplansRemoved > 0);
 
     /// <summary>
     /// Asks <c>deallocate</c>: frees the statement inside the describe's transaction, on the backend that prepared it,
