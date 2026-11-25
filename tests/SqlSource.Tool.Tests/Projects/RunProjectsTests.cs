@@ -462,6 +462,36 @@ public sealed class RunProjectsTests : IDisposable
     }
 
     [Fact]
+    public async Task Find_ProjectWithSeveralFrameworks_GivesTheManifestOfEachConsecutively()
+    {
+        _runner.Projects[_a] = new FakeProject { TargetFrameworks = "net8.0;net10.0" };
+
+        var manifests = await FindInSolutionAsync();
+
+        manifests
+            .Select(manifest => (Path.GetFileName(manifest.ProjectPath), manifest.TargetFramework))
+            .ShouldBe([
+                ("A.csproj", "net8.0"),
+                ("A.csproj", "net10.0"),
+                ("B.csproj", "net10.0"),
+                ("C.csproj", "net10.0"),
+            ]);
+    }
+
+    [Fact]
+    public async Task Find_ProjectWithSqlSourceForASecondFrameworkAlone_IsInTheRunOfASolution()
+    {
+        var project = new FakeProject { TargetFrameworks = "net8.0;net10.0" };
+        project.ImportedByFramework["net8.0"] = "";
+        _runner.Projects[_a] = project;
+
+        var manifests = await FindInSolutionAsync();
+
+        manifests.Select(manifest => manifest.ProjectPath).ShouldBe([_a, _b, _c]);
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Find_ProjectAsTheUnitAndAnotherNamed_IsSqlsrc207AndNothingIsRead()
     {
         (await FindInProjectAsync(_b)).ShouldBeEmpty();

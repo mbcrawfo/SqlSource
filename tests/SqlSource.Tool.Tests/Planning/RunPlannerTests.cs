@@ -266,7 +266,134 @@ public sealed class RunPlannerTests : IDisposable
         var result = Plans.Result(first, second);
 
         result.Plan.Files.Count(file => file.Path == shared).ShouldBe(1);
-        result.Unclaimed.ShouldBe([0, 1]);
+        result.Unclaimed.ShouldBe([(first.ProjectPath, 0), (second.ProjectPath, 1)]);
+    }
+
+    // The two manifests of one project, written for net8.0 and for net10.0, with no settings file of their own.
+    private (TestProject Net8, TestProject Net10) TwoFrameworks()
+    {
+        var net8 = new TestProject(_folder) { TargetFramework = "net8.0" };
+        var net10 = new TestProject(_folder) { TargetFramework = "net10.0" };
+        return (net8, net10);
+    }
+
+    private string WriteSettings(string relativePath, string json) => _folder.WriteFile(relativePath, json);
+
+    [Fact]
+    public void Plan_FileClaimedForTheSecondFrameworkAlone_IsPlanned()
+    {
+        var (net8, net10) = TwoFrameworks();
+        var root = WriteSettings(
+            "App/sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres"}"""
+        );
+        net8.ListSettings(root);
+        net10.ListSettings(root);
+        _ = net8.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
+        _ = net10.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
+        _ = net10.AddSource("Extra.cs", Plans.TypeNamed("Extra", "Source = \"Extra\""));
+        var extra = net10.AddSql("Extra/Y.sql", "SELECT 1;");
+
+        var result = Plans.Result(net8, net10);
+
+        result.Errors.ShouldBeEmpty();
+        var file = result.Plan.Files.ShouldHaveSingleItem();
+        file.Path.ShouldBe(extra);
+        file.ProjectPath.ShouldBe(net10.ProjectPath);
+    }
+
+    // The settings file of net10.0 gives the folder an output that needs an entry, and net8.0's chain does not.
+    [Fact]
+    public void Plan_QueryNeedsAnEntryForOneFrameworkAlone_NeedsAnEntry()
+    {
+        var (net8, net10) = TwoFrameworks();
+        var root = WriteSettings(
+            "App/sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres", "output": "sql"}"""
+        );
+        var folder = WriteSettings(
+            "App/Q/sqlsource.json", /*lang=json,strict*/
+            """{"output": "models"}"""
+        );
+        net8.ListSettings(root);
+        net10.ListSettings(root);
+        net10.ListSettings(folder);
+        _ = net8.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"Q\""));
+        _ = net10.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"Q\""));
+        net8.ListSql(net8.AddSql("Q/One.sql", "SELECT 1;"));
+        net10.ListSql(net8.PathOf("Q/One.sql"));
+
+        var query = Plans.Result(net8, net10).Plan.Files.ShouldHaveSingleItem().Queries.ShouldHaveSingleItem();
+
+        query.NeedsEntry.ShouldBeTrue();
+        query.Database.ShouldBe("postgres");
+    }
+
+    [Fact]
+    public void Plan_FileListedByBothFrameworks_IsPlannedOnceWithEachClaimOnce()
+    {
+        var (net8, net10) = TwoFrameworks();
+        var root = WriteSettings(
+            "App/sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres"}"""
+        );
+        foreach (var project in new[] { net8, net10 })
+        {
+            project.ListSettings(root);
+            _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
+        }
+
+        _ = net8.AddSql("One.sql", "SELECT 1;");
+        net10.ListSql(net8.PathOf("One.sql"));
+
+        var file = Plans.Result(net8, net10).Plan.Files.ShouldHaveSingleItem();
+
+        file.Claims.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Plan_SourceNotALiteralInAFileOfBothFrameworks_ReportsSQLSRC208Once()
+    {
+        var (net8, net10) = TwoFrameworks();
+        var root = WriteSettings(
+            "App/sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres"}"""
+        );
+        var source = net8.AddSource("A.cs", Plans.TypeNamed("A", "Source = Folder"));
+        net10.ListSource(source);
+        net8.ListSettings(root);
+        net10.ListSettings(root);
+
+        var result = Plans.Result(net8, net10);
+
+        result.Errors.Count(error => error.Descriptor.Id == "SQLSRC208").ShouldBe(1);
+    }
+
+    [Fact]
+    public void Plan_UnclaimedFiles_AreCountedOncePerProject()
+    {
+        var (net8, net10) = TwoFrameworks();
+        var root = WriteSettings(
+            "App/sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres"}"""
+        );
+        net8.ListSettings(root);
+        net10.ListSettings(root);
+        _ = net8.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"Claimed\""));
+        _ = net10.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"Claimed\""));
+        _ = net10.AddSource("Late.cs", Plans.TypeNamed("Late", "Source = \"Late\""));
+        var neither = net8.AddSql("Neither/N.sql", "SELECT 1;");
+        var both = net8.AddSql("Claimed/C.sql", "SELECT 1;");
+        var late = net8.AddSql("Late/L.sql", "SELECT 1;");
+        foreach (var path in new[] { neither, both, late })
+        {
+            net10.ListSql(path);
+        }
+
+        var result = Plans.Result(net8, net10);
+
+        // Late/L.sql is claimed by net10.0 alone, Neither/N.sql by neither.
+        result.Unclaimed.ShouldBe([(net8.ProjectPath, 1)]);
     }
 
     [Fact]

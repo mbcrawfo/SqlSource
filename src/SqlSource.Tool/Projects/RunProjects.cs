@@ -82,11 +82,7 @@ internal static class RunProjects
             switch (evaluation.State)
             {
                 case ProjectState.UsesSqlSource:
-                    if (evaluation.Manifest is { } manifest)
-                    {
-                        manifests.Add(manifest);
-                    }
-
+                    manifests.AddRange(evaluation.Manifests);
                     break;
 
                 case ProjectState.DoesNotUseSqlSource:
@@ -129,16 +125,22 @@ internal static class RunProjects
     /// <summary>
     /// The manifest of a run that the build started: read from the file the build wrote, with no question to MSBuild.
     /// A file that does not exist or cannot be read, or that is no manifest, is reported at its full path, and gives
-    /// none.  A token of <c>--manifest</c> that may not be printed is named by its position instead, and the build's
-    /// own path, under <c>--online</c>, is always printed.
+    /// none.  The event of the project is the caller's, once every manifest is read.  A token of <c>--manifest</c>
+    /// that may not be printed is named by its position instead, and the build's own path, under <c>--online</c>, is
+    /// always printed.
     /// </summary>
     /// <param name="manifestPath">The full path of the manifest file.</param>
     /// <param name="given">The token of <c>--manifest</c>.</param>
     /// <param name="context">What reads the file, where the error goes, and what ends the run.</param>
+    /// <param name="firstProject">
+    /// The full path of the project of the first manifest of the run, when this is a later one: a manifest of another
+    /// project is reported as one that cannot be read, and gives none.
+    /// </param>
     public static Task<ImmutableArray<ProjectManifest>> FromManifestAsync(
         string manifestPath,
         UsageValue given,
-        RunContext context
+        RunContext context,
+        string? firstProject = null
     )
     {
         var (host, reporter, cancellationToken) = context;
@@ -166,11 +168,18 @@ internal static class RunProjects
             return Task.FromResult(Unreadable(manifestPath, given, read.Failure, reporter));
         }
 
-        RunEvents.Project(
-            reporter.Trace,
-            read.Value.ProjectPath,
-            new ProjectEvaluation(read.Value.ProjectPath, ProjectState.UsesSqlSource, read.Value)
-        );
+        if (firstProject is not null && !PathComparer.Equals(read.Value.ProjectPath, firstProject))
+        {
+            return Task.FromResult(
+                Unreadable(
+                    manifestPath,
+                    given,
+                    $"it is of '{read.Value.ProjectPath}', and the first manifest is of '{firstProject}'",
+                    reporter
+                )
+            );
+        }
+
         return Task.FromResult<ImmutableArray<ProjectManifest>>([read.Value]);
     }
 

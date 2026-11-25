@@ -54,7 +54,7 @@ public sealed class FixtureProjectTests : IDisposable
         var evaluation = await EvaluateAsync(project);
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
-        var manifest = evaluation.Manifest.ShouldNotBeNull();
+        var manifest = evaluation.Manifests.ShouldHaveSingleItem();
         manifest.ProjectPath.ShouldBe(project);
         manifest.TargetFramework.ShouldBe("net10.0");
         manifest.LangVersion.ShouldBe("14.0");
@@ -70,7 +70,7 @@ public sealed class FixtureProjectTests : IDisposable
 
     // Evaluated with no framework, this project has nothing of the package, as one that NuGet restored.
     [Fact]
-    public async Task Evaluate_ProjectWithSeveralFrameworks_GivesTheManifestOfTheFirst()
+    public async Task Evaluate_ProjectWithSeveralFrameworks_GivesAManifestForEach()
     {
         var project = _fixtures.Copy("Multi");
         var folder = Path.GetDirectoryName(project)!;
@@ -78,26 +78,33 @@ public sealed class FixtureProjectTests : IDisposable
         var evaluation = await EvaluateAsync(project);
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
-        var manifest = evaluation.Manifest.ShouldNotBeNull();
-        manifest.TargetFramework.ShouldBe("net8.0");
-        manifest.DefineConstants.ShouldContain("NET8_0");
-        manifest.DefineConstants.ShouldNotContain("NET10_0");
-        // TD-0026: Later/ is the second framework's alone.
-        manifest.Files.ShouldBe([Path.Combine(folder, "Queries", "Users.sql")]);
-        manifest.CompileFiles.ShouldBe([Path.Combine(folder, "Queries.cs")]);
+        evaluation.Manifests.Length.ShouldBe(2);
+        var first = evaluation.Manifests[0];
+        first.TargetFramework.ShouldBe("net8.0");
+        first.DefineConstants.ShouldContain("NET8_0");
+        first.DefineConstants.ShouldNotContain("NET10_0");
+        first.Files.ShouldBe([Path.Combine(folder, "Queries", "Users.sql")]);
+        first.CompileFiles.ShouldBe([Path.Combine(folder, "Queries.cs")]);
+        // Later/ is the second framework's alone.
+        var second = evaluation.Manifests[1];
+        second.TargetFramework.ShouldBe("net10.0");
+        second.DefineConstants.ShouldContain("NET10_0");
+        second.Files.ShouldContain(Path.Combine(folder, "Later", "OnlyLater.sql"));
+        second.CompileFiles.ShouldContain(Path.Combine(folder, "Later", "OnlyLater.cs"));
         Directory.Exists(Path.Combine(folder, "obj")).ShouldBeFalse();
     }
 
-    // TD-0026: the project uses SqlSource for its second framework, and the tool reads the first.
+    // The package is referenced for the second framework alone, as a PackageReference under a condition gives.
     [Fact]
-    public async Task Evaluate_ProjectWithSqlSourceForItsSecondFrameworkAlone_DoesNotUseSqlSource()
+    public async Task Evaluate_ProjectWithSqlSourceForItsSecondFrameworkAlone_GivesThatFrameworksManifest()
     {
         var project = _fixtures.Copy("SecondOnly");
         Restore(project);
 
         var evaluation = await EvaluateAsync(project);
 
-        evaluation.State.ShouldBe(ProjectState.DoesNotUseSqlSource, Failure(evaluation));
+        evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
+        evaluation.Manifests.ShouldHaveSingleItem().TargetFramework.ShouldBe("net10.0");
     }
 
     // The path of the assets file comes in the JSON that MSBuild prints.  On Windows the code page of a console is
@@ -147,7 +154,7 @@ public sealed class FixtureProjectTests : IDisposable
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
         // Shared.props, which the project imports through SolutionDir, sets it.
-        evaluation.Manifest.ShouldNotBeNull().DefineConstants.ShouldContain("FROM_SOLUTION");
+        evaluation.Manifests.ShouldHaveSingleItem().DefineConstants.ShouldContain("FROM_SOLUTION");
     }
 
     [Fact]
@@ -174,7 +181,7 @@ public sealed class FixtureProjectTests : IDisposable
         var evaluation = await EvaluateAsync(project);
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
-        var manifest = evaluation.Manifest.ShouldNotBeNull();
+        var manifest = evaluation.Manifests.ShouldHaveSingleItem();
         manifest.Files.ShouldBe([Path.Combine(folder, "a;b=c%41 'é.sql")]);
         manifest.CompileFiles.ShouldBe([Path.Combine(folder, "a;b=c%41 'é.cs")]);
     }
@@ -186,7 +193,7 @@ public sealed class FixtureProjectTests : IDisposable
         var evaluation = await EvaluateAsync(_fixtures.Copy("Constants"));
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
-        var constants = evaluation.Manifest.ShouldNotBeNull().DefineConstants;
+        var constants = evaluation.Manifests.ShouldHaveSingleItem().DefineConstants;
         constants.ShouldContain("TRACE");
         constants.ShouldContain("FEATURE_A");
         constants.ShouldContain("FEATURE_B");
@@ -230,7 +237,7 @@ public sealed class FixtureProjectTests : IDisposable
         var evaluation = await EvaluateAsync(project);
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
-        evaluation.Manifest.ShouldNotBeNull().LangVersion.ShouldBe("12.0");
+        evaluation.Manifests.ShouldHaveSingleItem().LangVersion.ShouldBe("12.0");
     }
 
     // A solution may list a project that is not on the disk, as after a branch was switched: the file alone is
