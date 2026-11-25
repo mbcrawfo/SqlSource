@@ -70,4 +70,24 @@ public sealed class UnicodeEscapeTests
     [InlineData("\\D83D\\D83D")]
     public void TryRead_AnythingElse_IsFalse(string text) =>
         UnicodeEscape.TryRead(text.AsSpan(), 0, out _, out _, out _).ShouldBeFalse();
+
+    // A UESCAPE clause chooses another escape character, which stands for itself when doubled.
+    [Theory]
+    [InlineData("!0041", 'A', 5)]
+    [InlineData("!!", '!', 2)]
+    [InlineData("!+000041", 'A', 8)]
+    public void TryRead_OtherEscapeCharacter_ReadsItsEscapes(string text, char expected, int next)
+    {
+        UnicodeEscape.TryRead(text.AsSpan(), 0, '!', out var first, out var second, out var after).ShouldBeTrue();
+
+        first.ShouldBe(expected);
+        second.ShouldBe('\0');
+        after.ShouldBe(next);
+    }
+
+    [Theory]
+    [InlineData("\\0041")]
+    [InlineData("!zzzz")]
+    public void TryRead_OtherEscapeCharacter_ReadsNoBackslash(string text) =>
+        UnicodeEscape.TryRead(text.AsSpan(), 0, '!', out _, out _, out _).ShouldBeFalse();
 }

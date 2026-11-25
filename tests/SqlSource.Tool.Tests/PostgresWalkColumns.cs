@@ -3,6 +3,7 @@ using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Columns;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Types;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -77,21 +78,16 @@ internal static class PostgresWalkColumns
     public static (bool? Nullable, string? Source)[] AnswersOf(WalkOutcome outcome) =>
         Of(outcome.Columns.Select(static walked => walked.Column));
 
-    public static WalkOutcome Run(PlanNode root, params Asked[] asked) => Run(root, false, asked);
+    public static WalkOutcome Run(PlanNode root, params Asked[] asked) => Run(root, OldAndNewNames.None, asked);
 
-    public static WalkOutcome Run(PlanNode root, bool oldAndNewMayBeNamed, params Asked[] asked)
+    public static WalkOutcome Run(PlanNode root, OldAndNewNames oldAndNew, params Asked[] asked)
     {
         var (columns, origins) = Built(asked);
-        return NullabilityWalk.Run(
-            new PlanInstancesCache(root, null),
-            columns,
-            origins,
-            Scope(true, oldAndNewMayBeNamed)
-        );
+        return NullabilityWalk.Run(new PlanInstancesCache(root, null), columns, origins, Scope(true, oldAndNew));
     }
 
-    public static WalkScope Scope(bool gated, bool oldAndNewMayBeNamed = false, bool catalogFunctionsFirst = true) =>
-        new(gated, oldAndNewMayBeNamed, catalogFunctionsFirst, Tables, []);
+    public static WalkScope Scope(bool gated, OldAndNewNames? oldAndNew = null, bool catalogFunctionsFirst = true) =>
+        new(gated, oldAndNew ?? OldAndNewNames.None, catalogFunctionsFirst, Tables, []);
 
     public static WalkOutcome RunAs(WalkScope scope, PlanNode root, params Asked[] asked)
     {
@@ -132,7 +128,7 @@ internal static class PostgresWalkColumns
             new PlanInstancesCache(root, null),
             columns,
             origins,
-            new WalkScope(false, false, true, PostgresTables.Of(TableA, OrdersO), [])
+            new WalkScope(false, OldAndNewNames.None, true, PostgresTables.Of(TableA, OrdersO), [])
         );
     }
 

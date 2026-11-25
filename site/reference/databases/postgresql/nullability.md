@@ -30,7 +30,7 @@ SqlSource can tell that a column is never null when the column is one of these:
   - The value comes from a `UNION`, an `INTERSECT` or an `EXCEPT`.
   - The table has a `DO ALSO` rule on `INSERT`.
   - The table is partitioned, on PostgreSQL 15 or earlier.
-  - The query holds the word `OLD` or `NEW`, or the quoted name `"old"` or `"new"`, in any case.
+  - On PostgreSQL 18, the query holds the word `OLD` or `NEW` in any case, or the quoted name `"old"` or `"new"`.
 - **A constant** other than `NULL`, such as `1` or `'active'`.
 - **A test**: `IS NULL` or `IS NOT NULL`.
 - **Arithmetic or a comparison of values that are never null**, in one of these forms:
@@ -142,7 +142,7 @@ SqlSource treats a column as one that can be null when one of these is true:
   - in a condition that a `WHERE`, an `ON`, a `HAVING` or a `CASE WHEN` reads, alone or with `AND` and `OR`;
   - in the query's own select list, `ORDER BY`, `GROUP BY`, `RETURNING` or `SET`.
 
-  A word counts in any case, anywhere outside a string, a comment or a quoted name.  It counts even as the name of a function, such as `left(name, 3)` in a query whose joins are all inner.  Two quoted names count as `OLD` and `NEW`: `"old"` and `"new"`, in any case.  So does a name written `U&"..."`.
+  A word counts in any case, anywhere outside a string, a comment or a quoted name.  `LEFT`, `RIGHT`, `FULL` and `OUTER` do not count where `(` follows them, as the name of a function such as `left(name, 3)`.  Two quoted names count as `OLD` and `NEW`: `"old"` and `"new"`, in lower case, as PostgreSQL compares a quoted name.  A name written with escapes, `U&"..."`, counts when it is one of the two.
 - **The column comes from a materialized view, or from a view that the rules above do not prove it of.**  PostgreSQL does not record whether a view's column can be null.  A query of a view's whole column list counts as such a query.
 - **The column comes from a foreign table.**  PostgreSQL does not enforce `NOT NULL` on its remote rows.
 - **It is `NULL`, or an expression that is not in the list above.**  For example:
@@ -163,7 +163,12 @@ SqlSource treats a column as one that can be null when one of these is true:
 
   SqlSource can treat such a column as one that can be null even when the list above says it is never null.
 - **The query has `ROLLUP`, `CUBE` or `GROUPING SETS`.**  SqlSource treats every column of such a query as one that can be null, except a `count(...)` without `OVER` or a `grouping(...)` that is the whole column.
-- **The query names `OLD` or `NEW`, and the column is a subquery, an `IN (SELECT ...)`, an `= ANY (SELECT ...)`, or an expression that a subquery in `FROM` or a `WITH` query computes.**  This holds even for one that the list above says is never null.
+- **On PostgreSQL 18, the query names `OLD` or `NEW`, and the column is a subquery, an `IN (SELECT ...)`, an `= ANY (SELECT ...)`, or an expression that a subquery in `FROM` or a `WITH` query computes.**  This holds even for one that the list above says is never null.
+- **On PostgreSQL 18, the query names `OLD` or `NEW`, and a column of its `RETURNING` list is one of these:**
+  - a column of a table aliased `old` or `new`, or by a name that `RETURNING WITH (OLD AS ..., NEW AS ...)` gives, unless the table is the one the statement changes;
+  - an expression over a column written without its table's name, in an `UPDATE` or a `DELETE` of one table.
+
+  SqlSource does not tell such a column from one of the old or the new row, which is null where the row does not exist.
 - **The search path of the connection puts another schema before `pg_catalog`, and the column is one of these.**  This holds even for one that the list above says is never null:
   - `count(*)`, `count(x)`, a ranking, `array_agg`, a JSON builder, or a range constructor or intersection;
   - arithmetic, a comparison, a function, a cast, an aggregate or a subquery;

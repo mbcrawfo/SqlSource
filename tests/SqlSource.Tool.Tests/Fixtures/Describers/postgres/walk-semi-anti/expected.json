@@ -5,7 +5,7 @@
   "toolVersion": "fixture",
   "queries": {
     "WalkSemiAnti": {
-      "hash": "c05e27615485f4a70c19dd422324dd6fd8a5678ccd4098df27164b055aea7228",
+      "hash": "e2c43236c66ea7b1b694a5c82926f38c3e474ac4c8f5808aa8437e8817483057",
       "toolVersion": "fixture",
       "database": "postgres",
       "engine": "postgres",

@@ -125,7 +125,7 @@ internal static partial class NullabilityWalk
         var scope = plans.Scope;
         var instances = plans.InstancesOf(root);
         var branches = new SetOperations(plans);
-        var onlyAlias = plans.OnlyAliasOf(root);
+        var targetAlias = plans.TargetAliasOf(root);
         var source = instances.HasSetOperation
             ? SidecarValues.NullableSource.SetOperation
             : SidecarValues.NullableSource.Expression;
@@ -147,7 +147,7 @@ internal static partial class NullabilityWalk
                         origin,
                         entry,
                         instances,
-                        onlyAlias,
+                        targetAlias,
                         plans
                     ),
                     _ => Kept(columns[index], entry),
@@ -400,7 +400,7 @@ internal static partial class NullabilityWalk
                 return false;
             }
 
-            var expressions = new Expressions(plans, node, instances, plans.OnlyAliasOf(node));
+            var expressions = new Expressions(plans, node, instances, plans.TargetAliasOf(node));
             var entry = output[ordinal];
             if (OutputReference.Parse(entry) is { } reference)
             {

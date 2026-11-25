@@ -25,7 +25,7 @@ internal static partial class NullabilityWalk
         Plans plans,
         PlanNode root,
         PlanInstances instances,
-        string? onlyAlias,
+        string? targetAlias,
         int plansFollowed = 0
     )
     {
@@ -68,7 +68,7 @@ internal static partial class NullabilityWalk
         /// of a type that cannot reach it (<see cref="WalkScope.NoCastAcrossFamilies" />).
         /// </summary>
         public bool ProvedThroughScan(OutputReference reference, long columnType) =>
-            !_scope.OldAndNewMayBeNamed
+            !_scope.OldAndNew.MayBeNamed
             && plansFollowed < Plans.MaxDepth
             && columnType != TotalFunctions.UnknownType
             && InstanceOf(reference) is { Instance: { Kind: InstanceKind.Plan, NullExtended: false, Child: { } child } }
@@ -78,7 +78,7 @@ internal static partial class NullabilityWalk
         private bool ScannedPlanProves(PlanNode child, long columnType) =>
             child.Output is { Count: > 0 } entries
             && plans.InstancesOf(child) is { Reason: null, HasSetOperation: false } scanned
-            && new Expressions(plans, child, scanned, plans.OnlyAliasOf(child), plansFollowed + 1).EveryEntryProves(
+            && new Expressions(plans, child, scanned, plans.TargetAliasOf(child), plansFollowed + 1).EveryEntryProves(
                 entries,
                 columnType
             );
@@ -290,7 +290,7 @@ internal static partial class NullabilityWalk
         // The plan found by the key, read once as a plan of its own, or null for one that is not read.
         private Expressions? PlanNamed(string key, Func<PlanNode?> find)
         {
-            if (plansFollowed >= Plans.MaxDepth || _scope.OldAndNewMayBeNamed)
+            if (plansFollowed >= Plans.MaxDepth || _scope.OldAndNew.MayBeNamed)
             {
                 return null;
             }
@@ -300,7 +300,7 @@ internal static partial class NullabilityWalk
                 found =
                     find() is { } subRoot
                     && plans.InstancesOf(subRoot) is { Reason: null, HasSetOperation: false } subInstances
-                        ? new Expressions(plans, subRoot, subInstances, plans.OnlyAliasOf(subRoot), plansFollowed + 1)
+                        ? new Expressions(plans, subRoot, subInstances, plans.TargetAliasOf(subRoot), plansFollowed + 1)
                         : null;
                 _subPlans[key] = found;
             }
@@ -581,7 +581,7 @@ internal static partial class NullabilityWalk
         // The alias a reference names and its instance: a bare name is the plan's one relation's, unless the
         // statement may name OLD or NEW, and only the plan's one alias where it has one.
         private (string Alias, PlanInstance Instance)? InstanceOf(OutputReference reference) =>
-            plans.InstanceOf(reference, instances, onlyAlias, BareNames.OfTheOneRelationUnlessOldOrNew);
+            plans.InstanceOf(reference, instances, targetAlias, BareNames.OfTheOneRelationUnlessOldOrNew);
 
         // The type of the column of the name through the instance's rows, when each proves it, all of one type.
         private long? ProvedTypeThrough(PlanInstance instance, string column) =>

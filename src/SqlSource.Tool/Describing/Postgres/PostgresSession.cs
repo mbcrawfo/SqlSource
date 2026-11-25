@@ -277,7 +277,7 @@ internal sealed partial class PostgresSession : DescriberSession
                 new WalkInput(statement, arguments, built.Value, origins),
                 new WalkScope(
                     gated,
-                    OuterJoinGate.NamesOldOrNew(request.Sql),
+                    OldAndNewNames.Of(request.Sql, Versions.LeadingMajor(Server.Version)),
                     PostgresSearchPath.PutsCatalogFirst(SettingOf("search_path")),
                     tables.Value,
                     ColumnTypes: [.. columns.Select(static column => column.TypeOid)],

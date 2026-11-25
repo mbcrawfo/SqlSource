@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -24,7 +25,7 @@ public sealed class NullabilityWalkNameTests
             Output = ["COALESCE(old.id, NULL::integer)", "COALESCE(t.id, NULL::integer)"],
         };
 
-        AnswersOf(RunAs(Scope(true, oldAndNewMayBeNamed: true), plan, Expression, Expression))
+        AnswersOf(RunAs(Scope(true, oldAndNew: OldAndNewNames.Unknown), plan, Expression, Expression))
             .ShouldBe([UnknownNoOrigin, NotNullExpression]);
     }
 
@@ -128,12 +129,47 @@ public sealed class NullabilityWalkNameTests
 
     [Fact]
     public void Run_AliasAtAModifyTableThatIsNotTheTargetsWhereOldOrNewMayBeNamed_KeepsTheHeuristic() =>
-        AnswersOf(Run(ModifyOverOld, true, NotNull, NotNull)).ShouldBe([NullableHeuristic, NotNullCatalog]);
+        AnswersOf(Run(ModifyOverOld, OldAndNewNames.Unknown, NotNull, NotNull))
+            .ShouldBe([NullableHeuristic, NotNullCatalog]);
 
     // The flag is what decides: without it the same plan maps the alias.
     [Fact]
     public void Run_AliasAtAModifyTableThatIsNotTheTargetsWhereNeitherIsNamed_TakesTheCatalogsAnswer() =>
-        AnswersOf(Run(ModifyOverOld, false, NotNull, NotNull)).ShouldBe([NotNullCatalog, NotNullCatalog]);
+        AnswersOf(Run(ModifyOverOld, OldAndNewNames.None, NotNull, NotNull)).ShouldBe([NotNullCatalog, NotNullCatalog]);
+
+    // With the names read from the SQL, the old row's name keeps the heuristic, as an inner scope's alias of that name
+    // must, and an alias that no row may have is mapped: here the FROM table of an UPDATE.
+    [Fact]
+    public void Run_AliasAtAModifyTableThatNoRowMayHave_IsMapped()
+    {
+        var names = OldAndNewNames.Of("UPDATE t SET v = 1 FROM s RETURNING old.id, s.id", 18);
+        var plan = Over("ModifyTable", Join("Inner", Scan("t"), Scan("s"))) with
+        {
+            Alias = "t",
+            Output = ["old.id", "s.id", "t.id"],
+        };
+
+        AnswersOf(Run(ModifyOverOld, names, NotNull, NotNull)).ShouldBe([NullableHeuristic, NotNullCatalog]);
+        AnswersOf(Run(plan, names, NotNull, NotNull, NotNull))
+            .ShouldBe([NullableHeuristic, NotNullCatalog, NotNullCatalog]);
+        AnswersOf(Run(plan, OldAndNewNames.Unknown, NotNull, NotNull, NotNull))
+            .ShouldBe([NullableHeuristic, NullableHeuristic, NotNullCatalog]);
+    }
+
+    // A name a WITH gives is the row's, and the target's own alias is always the target, old though it is: the server
+    // gives the target the name.
+    [Fact]
+    public void Run_NameAWithGivesAndATargetAliasedOld_AreTheRowAndTheTarget()
+    {
+        var names = OldAndNewNames.Of("UPDATE t AS old SET v = 1 FROM s RETURNING WITH (NEW AS s2) s2.id", 18);
+        var plan = Over("ModifyTable", Join("Inner", Scan("old"), Scan("s2"))) with
+        {
+            Alias = "old",
+            Output = ["s2.id", "old.id"],
+        };
+
+        AnswersOf(Run(plan, names, NotNull, NotNull)).ShouldBe([NullableHeuristic, NotNullCatalog]);
+    }
 
     // A single-target UPDATE or DELETE prints bare names on every major, and the flag is a word of the SQL: a bare
     // name with the flag on is still the target's column.
@@ -142,7 +178,7 @@ public sealed class NullabilityWalkNameTests
     {
         var plan = Over("ModifyTable", Scan("orders")) with { Alias = "orders", Output = ["id"] };
 
-        AnswersOf(Run(plan, true, NotNull)).ShouldBe([NotNullCatalog]);
+        AnswersOf(Run(plan, OldAndNewNames.Unknown, NotNull)).ShouldBe([NotNullCatalog]);
     }
 
     // An expression reads no bare name where OLD or NEW may be named, though it proves the same one qualified, and
@@ -158,14 +194,15 @@ public sealed class NullabilityWalkNameTests
             Output = ["GREATEST(id, opt)", "GREATEST(a.id, a.opt)"],
         };
 
-        AnswersOf(RunAs(Scope(true, oldAndNewMayBeNamed: true), plan, Expression, Expression))
+        AnswersOf(RunAs(Scope(true, oldAndNew: OldAndNewNames.Unknown), plan, Expression, Expression))
             .ShouldBe([UnknownNoOrigin, NotNullExpression]);
     }
 
     // The old and the new row are a RETURNING list's alone.
     [Fact]
     public void Run_RootThatIsNoModifyTable_IsNotAffectedByOldOrNew() =>
-        AnswersOf(Run(LeftJoin("a.id", "b.id"), true, NotNull, NotNull)).ShouldBe([NotNullCatalog, NullableOuterJoin]);
+        AnswersOf(Run(LeftJoin("a.id", "b.id"), OldAndNewNames.Unknown, NotNull, NotNull))
+            .ShouldBe([NotNullCatalog, NullableOuterJoin]);
 
     [Fact]
     public void Run_QuotedAlias_NamesTheInstanceOfThatName()

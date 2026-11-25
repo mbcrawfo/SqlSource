@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -74,7 +75,7 @@ public sealed class NullabilityWalkPartitionTests
             new PlanInstancesCache(plan, Partitions),
             columns,
             origins,
-            new WalkScope(false, false, true, PostgresTables.Of(rows), [])
+            new WalkScope(false, OldAndNewNames.None, true, PostgresTables.Of(rows), [])
         );
     }
 
