@@ -49,6 +49,11 @@ def dialect_names() -> tuple[list[tuple[str, str]], list[tuple[str, int]]]:
     return [tuple(entry) for entry in data["names"]], [tuple(entry) for entry in data["options"]]
 
 
+def version_option() -> str:
+    """`SqlDialectName.VersionOption`, the word of the option that gives a server's version."""
+    return json.loads(DIALECT_NAMES_PATH.read_text(encoding="utf-8"))["versionOption"]
+
+
 def diagnostic_titles() -> dict[str, str]:
     """The title of each error that stops a plan, by its code, as the C# diagnostic descriptors give it."""
     data = json.loads(DIAGNOSTIC_TITLES_PATH.read_text(encoding="utf-8"))

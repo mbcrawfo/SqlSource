@@ -16,9 +16,7 @@ from sqlfluff_templater_sqlsource.quoting import NOT_A_QUOTE, UNTERMINATED, Quot
 from sqlfluff_templater_sqlsource.rules import DialectRules, StringContinuation
 from sqlfluff_templater_sqlsource.text import (
     char_at,
-    find_line_end,
     is_control,
-    is_line_terminator,
     is_white_space,
     trim,
 )
@@ -128,10 +126,10 @@ class Lexer:
         if current == "-" and self._is_dash_comment(start):
             is_hint = self._is_line_hint(start)
             kind = LexemeKind.HINT if is_hint else LexemeKind.LINE_COMMENT
-            self._add(kind, start, find_line_end(text, start, len(text)))
+            self._add(kind, start, rules.find_line_end(text, start, len(text)))
             self._pass_gap(not is_hint and rules.string_continuation == StringContinuation.ACROSS_LINE_COMMENTS)
         elif current == "#" and rules.hash_comments:
-            self._add(LexemeKind.LINE_COMMENT, start, find_line_end(text, start, len(text)))
+            self._add(LexemeKind.LINE_COMMENT, start, rules.find_line_end(text, start, len(text)))
             self._pass_gap(allowed=False)
         elif current == "/" and char_at(text, start + 1) == "*":
             self._read_block_comment(start)
@@ -167,7 +165,7 @@ class Lexer:
             if not is_white_space(value):
                 self._continuation = None
                 return
-            self._gap_has_line_break |= is_line_terminator(value)
+            self._gap_has_line_break |= self.rules.is_line_terminator(value)
         self._gap_start = end
 
     # What was just read stood after a string.  The string can still go on only if its gap may hold that.
@@ -214,6 +212,9 @@ class Lexer:
 
     def _read_block_comment(self, start: int) -> None:
         text = self._text
+        if self._is_block_hint(start) and (body_start := self.rules.runs_versioned_comment(text, start)) is not None:
+            self._read_run_comment(start, body_start)
+            return
         nested = self.rules.nested_comments
         depth = 1
         index = start + 2
@@ -232,6 +233,34 @@ class Lexer:
             return
 
         self._add(LexemeKind.HINT if self._is_block_hint(start) else LexemeKind.BLOCK_COMMENT, start, index)
+
+    # A versioned comment that the server runs: its body is SQL, so a string or a comment in it does not end it, and the
+    # first */ outside them does.  A comment in the body ends at its first */, since these servers nest none.
+    def _read_run_comment(self, start: int, body_start: int) -> None:
+        text = self._text
+        index = body_start
+        while index < len(text):
+            current = text[index]
+            if current == "*" and char_at(text, index + 1) == "/":
+                self._add(LexemeKind.HINT, start, index + 2)
+                return
+            if (current == "-" and self._is_dash_comment(index)) or (current == "#" and self.rules.hash_comments):
+                index = self.rules.find_line_end(text, index, len(text))
+            elif current == "/" and char_at(text, index + 1) == "*":
+                close = text.find("*/", index + 2)
+                if close < 0:
+                    self._error = ParseError(UNTERMINATED_BLOCK_COMMENT, index, index + 2)
+                    return
+                index = close + 2
+            elif (reader := self.rules.reader_for(current)) is not None:
+                end = reader.find_end(text, index)
+                if end == UNTERMINATED:
+                    self._error = ParseError(UNTERMINATED_QUOTE, index, index + 1)
+                    return
+                index = index + 1 if end == NOT_A_QUOTE else end
+            else:
+                index += 1
+        self._error = ParseError(UNTERMINATED_BLOCK_COMMENT, start, start + 2)
 
     def _read_quoted(self, reader: QuoteReader, start: int) -> None:
         text = self._text

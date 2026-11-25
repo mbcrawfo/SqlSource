@@ -9,7 +9,8 @@ import enum
 from dataclasses import dataclass
 
 from sqlfluff_templater_sqlsource.lexer import Lexeme, LexemeKind
-from sqlfluff_templater_sqlsource.text import equals_ascii_ignoring_case, is_line_terminator, is_white_space, trim
+from sqlfluff_templater_sqlsource.rules import DialectRules
+from sqlfluff_templater_sqlsource.text import equals_ascii_ignoring_case, is_white_space, trim
 
 
 class MarkerKind(enum.Enum):
@@ -38,6 +39,7 @@ class MarkerKind(enum.Enum):
     MEMBER_LOCATION = "MemberLocation"
     VISIBILITY = "Visibility"
     NESTED_CLASS = "NestedClass"
+    VARIABLE = "Variable"
 
 
 # Each keyword with its colon, in the order they are tried.
@@ -65,6 +67,7 @@ _KEYWORDS: tuple[tuple[str, MarkerKind], ...] = (
     ("member-location:", MarkerKind.MEMBER_LOCATION),
     ("visibility:", MarkerKind.VISIBILITY),
     ("nested-class:", MarkerKind.NESTED_CLASS),
+    ("variable:", MarkerKind.VARIABLE),
 )
 
 
@@ -80,12 +83,13 @@ class Marker:
     value_end: int
 
 
-def read_marker(text: str, lexeme: Lexeme) -> Marker | None:
+def read_marker(text: str, lexeme: Lexeme, rules: DialectRules) -> Marker | None:
     """The marker that `lexeme` is, or None.
 
     A marker is a line comment that is the first thing on its line and reads `--`, optional blanks, a keyword, a colon.
+    `rules` say what ends a line: they are those the lexeme was read by.
     """
-    if not _is_dash_comment(text, lexeme) or not _starts_line(text, lexeme.start):
+    if not _is_dash_comment(text, lexeme) or not _starts_line(text, lexeme.start, rules):
         return None
 
     found = _find_keyword(text, lexeme.start, lexeme.end)
@@ -147,8 +151,8 @@ def _find_keyword(text: str, start: int, end: int) -> tuple[MarkerKind, int] | N
 
 # Only blanks may come before the comment on its line.  The lexer guarantees that a line break found this way is not
 # inside a quoted region or a block comment: those end with their closing delimiter, never with a blank.
-def _starts_line(text: str, start: int) -> bool:
+def _starts_line(text: str, start: int, rules: DialectRules) -> bool:
     index = start - 1
     while index >= 0 and text[index] in (" ", "\t"):
         index -= 1
-    return index < 0 or is_line_terminator(text[index])
+    return index < 0 or rules.is_line_terminator(text[index])

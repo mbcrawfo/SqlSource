@@ -60,6 +60,7 @@ public sealed class SqlDialectRulesTests
             rules.HashComments.ShouldBeTrue(choice.ToString());
             rules.LineHints.ShouldBeFalse(choice.ToString());
             rules.MariaDbHints.ShouldBe(isMariaDb, choice.ToString());
+            rules.CarriageReturnEndsLine.ShouldBeFalse(choice.ToString());
             (rules.ReaderFor('$') is null).ShouldBe(isMariaDb, choice.ToString());
             _ = rules.ReaderFor('\'').ShouldNotBeNull(choice.ToString());
             _ = rules.ReaderFor('"').ShouldNotBeNull(choice.ToString());
@@ -139,6 +140,39 @@ public sealed class SqlDialectRulesTests
     [InlineData("CockroachDb", "AcrossWhitespace")]
     public void StringContinuation_OfEachDialect_IsTheRowOfTheTable(string dialect, string expected) =>
         SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect)).StringContinuation.ToString().ShouldBe(expected);
+
+    [Theory]
+    [InlineData("Ansi", true)]
+    [InlineData("SqlServer", true)]
+    [InlineData("PostgreSql", true)]
+    [InlineData("MySql", false)]
+    [InlineData("MariaDb", false)]
+    [InlineData("Sqlite", false)]
+    [InlineData("Oracle", true)]
+    [InlineData("CockroachDb", false)]
+    public void CarriageReturnEndsLine_OfEachDialect_IsTheRowOfTheTable(string dialect, bool expected)
+    {
+        var rules = SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect));
+
+        rules.CarriageReturnEndsLine.ShouldBe(expected);
+        rules.IsLineTerminator('\r').ShouldBe(expected);
+        rules.IsLineTerminator('\n').ShouldBeTrue();
+        rules.IsLineTerminator(' ').ShouldBeFalse();
+    }
+
+    // The end is the offset of the line terminator, or of the carriage return of a pair, and no further than the end
+    // given: a line feed at the end itself, or past it, is not found.
+    [Theory]
+    [InlineData("Ansi", "ab\rc\nd", 0, 6, 2)]
+    [InlineData("MySql", "ab\rc\nd", 0, 6, 4)]
+    [InlineData("MySql", "ab\r\nd", 0, 5, 2)]
+    [InlineData("MySql", "a\r\r\nd", 0, 5, 2)]
+    [InlineData("MySql", "\r\nd", 1, 3, 1)]
+    [InlineData("MySql", "ab\rc", 0, 4, 4)]
+    [InlineData("MySql", "ab\nc", 0, 2, 2)]
+    [InlineData("MySql", "a\nb\nc", 2, 5, 3)]
+    public void FindLineEnd_Range_GivesWhereItsFirstLineEnds(string dialect, string text, int start, int end, int at) =>
+        SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect)).FindLineEnd(text, start, end).ShouldBe(at);
 
     // T-SQL takes "@", "#" and "$" in a name and refuses other currency signs, such as "€"; the others read every
     // character above U+007F as a letter, and take only "$" of the three.

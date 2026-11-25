@@ -6,6 +6,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Testing;
+using SqlSource.Testing.Generator;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
@@ -67,11 +68,38 @@ public sealed class RunPlannerTests : IDisposable
                 SqlDialect.PostgreSql,
                 getUser.Query.Segments,
                 getUser.Query.Tokens,
-                getUser.Query.Parameters
+                getUser.Query.Parameters,
+                getUser.Query.MarkedVariables
             )
         );
         getUser.Hash!.Length.ShouldBe(64);
         file.Queries[1].Hash.ShouldBeNull();
+    }
+
+    // The plan hashes a query as the generator checks it: with the names of its -- variable: markers, which take names
+    // out of its parameters.
+    [Fact]
+    public void Plan_QueryWithAVariableMarker_HashesItsNamesAsTheGeneratorDoes()
+    {
+        var project = Postgres();
+        project.Settings["output"] = "models";
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"Queries\""));
+        const string WithoutMarker = "-- name: ListPosts\nSELECT id FROM posts WHERE author_id = @author;\n";
+        const string WithMarker =
+            "-- name: ListPosts\n-- variable: @author\nSELECT id FROM posts WHERE author_id = @author;\n";
+        _ = project.AddSql("Queries/Posts.sql", WithMarker);
+
+        var result = Plans.Result(project);
+
+        result.Errors.ShouldBeEmpty();
+        var query = result.Plan.Files.ShouldHaveSingleItem().Queries.ShouldHaveSingleItem();
+        query.Query.MarkedVariables.ShouldBe(["author"]);
+        query.Hash.ShouldBe(
+            Sidecars.HashOf(new SqlFile("Queries/Posts.sql", WithMarker), "ListPosts", SqlDialect.PostgreSql)
+        );
+        query.Hash.ShouldNotBe(
+            Sidecars.HashOf(new SqlFile("Queries/Posts.sql", WithoutMarker), "ListPosts", SqlDialect.PostgreSql)
+        );
     }
 
     [Fact]

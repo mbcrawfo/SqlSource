@@ -175,7 +175,7 @@ class _Parser:
         name_markers = [
             (index, marker)
             for index, lexeme in enumerate(self._lexemes)
-            if (marker := read_marker(self._text, lexeme)) is not None and marker.kind == MarkerKind.NAME
+            if (marker := read_marker(self._text, lexeme, self._rules)) is not None and marker.kind == MarkerKind.NAME
         ]
         if name_markers:
             self._read_named_blocks(name_markers)
@@ -213,7 +213,7 @@ class _Parser:
         sql_reported = False
         for index in range(end):
             lexeme = self._lexemes[index]
-            marker = read_marker(self._text, lexeme)
+            marker = read_marker(self._text, lexeme, self._rules)
             if marker is not None:
                 if marker.kind == MarkerKind.DIALECT:
                     self._read_dialect(marker)
@@ -245,7 +245,7 @@ class _Parser:
     def _read_block_markers(self, kind: ScopeKind, start: int, end: int, last_content: int) -> MarkerScope | None:
         scope = None
         for index in range(start, end):
-            marker = read_marker(self._text, self._lexemes[index])
+            marker = read_marker(self._text, self._lexemes[index], self._rules)
             if marker is None:
                 continue
 
@@ -265,7 +265,7 @@ class _Parser:
     # The SQL without comments is what the query is: its tokens and its parameters come from it.
     def _build_query(self, scope: MarkerScope | None, start: int, end: int) -> None:
         text = self._text
-        sql = build(text, self._lexemes, start, end)
+        sql = build(text, self._rules, self._lexemes, start, end)
         occurrences, scan_errors = scan(sql.text, set() if scope is None else scope.ignored_tokens)
         for found in scan_errors:
             self._errors.append(ParseError(found.code, *sql.to_source_span(found.start, found.end)))

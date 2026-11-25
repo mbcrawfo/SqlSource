@@ -41,7 +41,7 @@ def read_dialect_header(lexer: Lexer, text: str) -> DialectHeader:
     named: DialectChoice | None = None
     invalid: ParseError | None = None
     while (comment := lexer.try_read_leading_comment()) is not None:
-        marker = read_marker(text, comment)
+        marker = read_marker(text, comment, lexer.rules)
         if marker is None:
             continue
 

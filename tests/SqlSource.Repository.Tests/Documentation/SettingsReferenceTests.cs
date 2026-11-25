@@ -44,6 +44,7 @@ public sealed partial class SettingsReferenceTests
         SqlMarkerKind.Param,
         SqlMarkerKind.Token,
         SqlMarkerKind.TokenIgnore,
+        SqlMarkerKind.Variable,
     ];
 
     // The MSBuild properties a project sets for SqlSource.  The properties the package sets for itself are left out on

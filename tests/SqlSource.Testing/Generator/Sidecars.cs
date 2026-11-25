@@ -55,7 +55,13 @@ internal static class Sidecars
             .Select(name =>
             {
                 var block = BlockOf(sqlFile, name, dialect, out var effective);
-                var hash = SqlQueryHash.Compute(effective, block.Segments, block.Tokens, block.Parameters);
+                var hash = SqlQueryHash.Compute(
+                    effective,
+                    block.Segments,
+                    block.Tokens,
+                    block.Parameters,
+                    block.MarkedVariables
+                );
                 var parameters = block
                     .Parameters.Select(
                         (parameter, ordinal) =>
@@ -94,8 +100,13 @@ internal static class Sidecars
                 );
                 if (
                     block is null
-                    || SqlQueryHash.Compute(result.Dialect, block.Segments, block.Tokens, block.Parameters)
-                        != entry.Hash
+                    || SqlQueryHash.Compute(
+                        result.Dialect,
+                        block.Segments,
+                        block.Tokens,
+                        block.Parameters,
+                        block.MarkedVariables
+                    ) != entry.Hash
                 )
                 {
                     continue;
@@ -133,7 +144,7 @@ internal static class Sidecars
     private static string HashOf(SqlFile sqlFile, string queryName, SqlDialect dialect, out SqlDialect effective)
     {
         var block = BlockOf(sqlFile, queryName, dialect, out effective);
-        return SqlQueryHash.Compute(effective, block.Segments, block.Tokens, block.Parameters);
+        return SqlQueryHash.Compute(effective, block.Segments, block.Tokens, block.Parameters, block.MarkedVariables);
     }
 
     private static SqlBlock BlockOf(SqlFile sqlFile, string queryName, SqlDialect dialect, out SqlDialect effective)

@@ -15,10 +15,12 @@ namespace SqlSource.Parsing;
 internal static class SqlTextBuilder
 {
     /// <summary>
-    /// Builds the SQL of the lexemes from <paramref name="start" /> up to <paramref name="end" />.
+    /// Builds the SQL of the lexemes from <paramref name="start" /> up to <paramref name="end" />, which
+    /// <paramref name="rules" /> read: they say what ends a line.
     /// </summary>
     public static SqlBlockText Build(
         string text,
+        SqlDialectRules rules,
         EquatableArray<SqlLexeme> lexemes,
         int start,
         int end,
@@ -34,7 +36,7 @@ internal static class SqlTextBuilder
         var buffer = ArrayPool<char>.Shared.Rent(lexemes[end - 1].Span.End - lexemes[start].Span.Start);
         try
         {
-            var writer = new Writer(text, keepComments, buffer);
+            var writer = new Writer(text, rules, keepComments, buffer);
             for (var index = start; index < end; index++)
             {
                 writer.Append(lexemes[index]);
@@ -51,7 +53,7 @@ internal static class SqlTextBuilder
     // The buffer holds the finished output, then the line breaks that would join the next line to it, then the line
     // being written.  A line is judged when it ends: kept with its trailing blanks trimmed, or dropped by moving back
     // to the end of the finished output.
-    private sealed class Writer(string source, bool keepComments, char[] buffer)
+    private sealed class Writer(string source, SqlDialectRules rules, bool keepComments, char[] buffer)
     {
         private readonly List<(int Output, int Source)> _runs = [];
 
@@ -77,7 +79,7 @@ internal static class SqlTextBuilder
             {
                 AppendProtected(lexeme);
             }
-            else if (SqlMarkerReader.Read(source, lexeme) is not null)
+            else if (SqlMarkerReader.Read(source, lexeme, rules) is not null)
             {
                 _isMarkerLine = true;
             }
@@ -110,14 +112,15 @@ internal static class SqlTextBuilder
             );
         }
 
-        // Text and kept comments: a line terminator ends the output line.
+        // Text and kept comments: a line terminator ends the output line.  A carriage return that ends no line in the
+        // dialect is copied as written, so that a kept comment never ends early.
         private void AppendLines(SqlLexeme lexeme)
         {
             var index = lexeme.Span.Start;
             var end = lexeme.Span.End;
             while (index < end)
             {
-                var lineEnd = SqlText.FindLineEnd(source, index, end);
+                var lineEnd = rules.FindLineEnd(source, index, end);
                 Copy(index, lineEnd);
                 ExtendContent(index, lineEnd);
                 if (lineEnd < end)
@@ -140,7 +143,7 @@ internal static class SqlTextBuilder
             var end = lexeme.Span.End;
             while (index < end)
             {
-                var lineEnd = SqlText.FindLineEnd(source, index, end);
+                var lineEnd = rules.FindLineEnd(source, index, end);
                 Copy(index, lineEnd);
                 if (lineEnd < end)
                 {
