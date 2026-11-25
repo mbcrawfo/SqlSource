@@ -289,7 +289,8 @@ public sealed class AttributeReaderTests : IDisposable
             .Claims.ShouldHaveSingleItem()
             .Source.ShouldBe("A");
 
-    // A declaration of the type with no attribute, first in the order of the files, takes nothing from the one after it.
+    // A declaration of the type with no attribute, first in the order of the files, takes nothing from the one after
+    // it.
     [Fact]
     public void Read_PartialDeclarationWithoutTheAttributeFirst_IsNoClaimAndTheNextIs() =>
         ReadFiles(
