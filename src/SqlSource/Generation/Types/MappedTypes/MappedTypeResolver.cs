@@ -504,9 +504,11 @@ internal static class MappedTypeResolver
         };
 
     // The type with the name's ranks around it, from the last rank written in, and a ? where the name writes one: the
-    // first rank's before the element, or the argument's after the whole.
+    // first rank's before the element, or the argument's after the whole.  A model is #nullable enable, so a reference
+    // type written without a ? cannot be null, where a symbol looked up is oblivious.
     private static ITypeSymbol AsWritten(Compilation compilation, ITypeSymbol type, ClrTypeName name, Use use)
     {
+        type = AsNotNullable(type);
         if (name.Ranks.Count > 0)
         {
             if (name.Ranks[0].NullableElement)
@@ -516,12 +518,17 @@ internal static class MappedTypeResolver
 
             for (var index = name.Ranks.Count - 1; index >= 0; index--)
             {
-                type = compilation.CreateArrayTypeSymbol(type, name.Ranks[index].Dimensions);
+                type = AsNotNullable(
+                    compilation.CreateArrayTypeSymbol(type, name.Ranks[index].Dimensions, type.NullableAnnotation)
+                );
             }
         }
 
         return use == Use.NullableArgument ? AsNullable(compilation, type) : type;
     }
+
+    private static ITypeSymbol AsNotNullable(ITypeSymbol type) =>
+        type.IsValueType ? type : type.WithNullableAnnotation(NullableAnnotation.NotAnnotated);
 
     // System.Nullable<T> of a value type, and a reference type annotated as one that can be null.
     private static ITypeSymbol AsNullable(Compilation compilation, ITypeSymbol type) =>

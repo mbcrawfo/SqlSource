@@ -15,8 +15,8 @@ namespace SqlSource.Generation.Types.MappedTypes;
 /// The checks are the <c>class</c>, <c>struct</c>, <c>unmanaged</c>, <c>notnull</c> and <c>new()</c> constraints, and
 /// each constraint type, with the arguments put for its type parameters, by an identity, implicit reference or boxing
 /// conversion.  A model is <c>#nullable enable</c>, so an argument that can be null, written with a <c>?</c>, fails a
-/// constraint that forbids null, whose break is a warning there; the nullability inside an argument is not checked
-/// (TD-0067).
+/// constraint that forbids null, whose break is a warning there, and so does a <c>?</c> inside an argument that the
+/// constraint type's arguments do not take, by the variance of each type parameter on the way (CS8631).
 /// </remarks>
 internal static class GenericConstraints
 {
@@ -83,7 +83,7 @@ internal static class GenericConstraints
             for (var constraint = 0; constraint < constraints.Length; constraint++)
             {
                 var substituted = Substitute(compilation, constraints[constraint], constructed);
-                if (!Converts(compilation, argument, substituted))
+                if (!Converts(compilation, argument, substituted) || !KeepsInnerNullability(argument, substituted))
                 {
                     return false;
                 }
@@ -157,8 +157,166 @@ internal static class GenericConstraints
         return conversion.IsIdentity || (conversion.IsImplicit && (conversion.IsReference || conversion.IsBoxing));
     }
 
+    // Whether a type that converts to another, nullability aside, keeps the nullability of the other's type arguments
+    // and array elements, as the compiler's conversion does with nullability: a pair at an invariant type parameter,
+    // or a value type at a variant one, has the same nullability all through; at an out parameter the source's
+    // converts to the target's, and at an in parameter the reverse.  An argument whose base types and interfaces have
+    // none of the target's definition keeps it, since the conversion is then not by a type argument.
+    private static bool KeepsInnerNullability(ITypeSymbol source, ITypeSymbol target)
+    {
+        switch (target)
+        {
+            case IArrayTypeSymbol targetArray:
+                if (source is not IArrayTypeSymbol sourceArray)
+                {
+                    return true;
+                }
+
+                return sourceArray.ElementType.IsValueType
+                    ? SameNullability(sourceArray.ElementType, targetArray.ElementType)
+                    : ConvertsWithNullability(sourceArray.ElementType, targetArray.ElementType);
+            case INamedTypeSymbol targetNamed when IsGeneric(targetNamed):
+                var candidates = TypeAndBaseTypes(source)
+                    .Concat(source.AllInterfaces)
+                    .Where(candidate =>
+                        SymbolEqualityComparer.Default.Equals(
+                            candidate.OriginalDefinition,
+                            targetNamed.OriginalDefinition
+                        )
+                    )
+                    .ToList();
+                return candidates.Count == 0
+                    || candidates.Exists(candidate => ArgumentsKeepNullability(candidate, targetNamed));
+            default:
+                return true;
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> TypeAndBaseTypes(ITypeSymbol type)
+    {
+        for (var current = type as INamedTypeSymbol; current is not null; current = current.BaseType)
+        {
+            yield return current;
+        }
+    }
+
+    // The type arguments of two types of one definition, those of their containing types too, which are invariant.
+    private static bool ArgumentsKeepNullability(INamedTypeSymbol source, INamedTypeSymbol target)
+    {
+        var own = true;
+        for (
+            INamedTypeSymbol? from = source, to = target;
+            from is not null && to is not null;
+            from = from.ContainingType, to = to.ContainingType, own = false
+        )
+        {
+            var parameters = to.TypeParameters;
+            var equatable = own && IsEquatable(to);
+            for (var index = 0; index < parameters.Length; index++)
+            {
+                var variance = VarianceKind.None;
+                if (own)
+                {
+                    variance = equatable ? VarianceKind.In : parameters[index].Variance;
+                }
+                if (!ArgumentKeepsNullability(from.TypeArguments[index], to.TypeArguments[index], variance))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // System.IEquatable<T>, whose T the compiler takes as in for nullability alone, so that string, an
+    // IEquatable<string?>, meets IEquatable<string>.
+    private static bool IsEquatable(INamedTypeSymbol type) =>
+        type is { Name: "IEquatable", Arity: 1, ContainingType: null }
+        && type.ContainingNamespace is { Name: "System", ContainingNamespace.IsGlobalNamespace: true };
+
+    // A variance converts a reference type alone; a value type needs an identity.
+    private static bool ArgumentKeepsNullability(ITypeSymbol argument, ITypeSymbol constraint, VarianceKind variance)
+    {
+        if (argument.IsValueType)
+        {
+            return SameNullability(argument, constraint);
+        }
+
+        return variance switch
+        {
+            VarianceKind.Out => ConvertsWithNullability(argument, constraint),
+            VarianceKind.In => ConvertsWithNullability(constraint, argument),
+            VarianceKind.None or _ => SameNullability(argument, constraint),
+        };
+    }
+
+    // An implicit reference conversion with nullability: a source that can be null does not convert to a target that
+    // cannot.
+    private static bool ConvertsWithNullability(ITypeSymbol source, ITypeSymbol target) =>
+        !(
+            source.NullableAnnotation == NullableAnnotation.Annotated
+            && target.NullableAnnotation == NullableAnnotation.NotAnnotated
+        ) && KeepsInnerNullability(source, target);
+
+    // An identity conversion with nullability: two types, the same nullability aside, whose reference types inside
+    // are annotated alike.  An oblivious annotation matches any.
+    private static bool SameNullability(ITypeSymbol source, ITypeSymbol target)
+    {
+        if (
+            !source.IsValueType
+            && source.NullableAnnotation != NullableAnnotation.None
+            && target.NullableAnnotation != NullableAnnotation.None
+            && source.NullableAnnotation != target.NullableAnnotation
+        )
+        {
+            return false;
+        }
+
+        switch (source, target)
+        {
+            case (IArrayTypeSymbol sourceArray, IArrayTypeSymbol targetArray):
+                return SameNullability(sourceArray.ElementType, targetArray.ElementType);
+            case (INamedTypeSymbol sourceNamed, INamedTypeSymbol targetNamed):
+                for (
+                    INamedTypeSymbol? from = sourceNamed, to = targetNamed;
+                    from is not null && to is not null;
+                    from = from.ContainingType, to = to.ContainingType
+                )
+                {
+                    for (var index = 0; index < from.TypeArguments.Length; index++)
+                    {
+                        if (!SameNullability(from.TypeArguments[index], to.TypeArguments[index]))
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    // A named type with a type argument, its own or a containing type's.
+    private static bool IsGeneric(INamedTypeSymbol type)
+    {
+        for (var current = type; current is not null; current = current.ContainingType)
+        {
+            if (current.Arity > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // The type with the arguments of the constructed type and its containing types put for their type parameters.
-    // A type with no type parameter in it is itself.
+    // A type with no type parameter in it is itself.  A type parameter used with a ?, T?, is its argument with a ?
+    // when that is a reference type, and an argument used where nullable annotations are off is oblivious, as the
+    // compiler substitutes them.
     private static ITypeSymbol Substitute(Compilation compilation, ITypeSymbol type, INamedTypeSymbol constructed)
     {
         switch (type)
@@ -172,7 +330,7 @@ internal static class GenericConstraints
                 {
                     if (SymbolEqualityComparer.Default.Equals(level.OriginalDefinition, declaring.OriginalDefinition))
                     {
-                        return level.TypeArguments[parameter.Ordinal];
+                        return WithUseAnnotation(level.TypeArguments[parameter.Ordinal], type.NullableAnnotation);
                     }
                 }
 
@@ -181,7 +339,9 @@ internal static class GenericConstraints
                 var element = Substitute(compilation, array.ElementType, constructed);
                 return ReferenceEquals(element, array.ElementType)
                     ? type
-                    : compilation.CreateArrayTypeSymbol(element, array.Rank);
+                    : compilation
+                        .CreateArrayTypeSymbol(element, array.Rank, element.NullableAnnotation)
+                        .WithNullableAnnotation(array.NullableAnnotation);
             case INamedTypeSymbol named:
                 var definition = named.ConstructedFrom;
                 if (named.ContainingType is { } containing)
@@ -194,21 +354,23 @@ internal static class GenericConstraints
                     }
                 }
 
+                var changed = !ReferenceEquals(definition, named.ConstructedFrom);
                 if (named.Arity == 0)
                 {
-                    return definition;
+                    return changed ? definition.WithNullableAnnotation(type.NullableAnnotation) : type;
                 }
 
                 var arguments = named.TypeArguments;
                 var substituted = new ITypeSymbol[arguments.Length];
-                var changed = !ReferenceEquals(definition, named.ConstructedFrom);
                 for (var index = 0; index < arguments.Length; index++)
                 {
                     substituted[index] = Substitute(compilation, arguments[index], constructed);
                     changed |= !ReferenceEquals(substituted[index], arguments[index]);
                 }
 
-                return changed ? definition.Construct(substituted) : type;
+                return changed
+                    ? definition.Construct(substituted).WithNullableAnnotation(type.NullableAnnotation)
+                    : type;
             default:
                 return type;
         }
@@ -276,6 +438,22 @@ internal static class GenericConstraints
                     .AttributeClass?.ToDisplayString()
                     .Equals(SetsRequiredMembersAttributeFullName, StringComparison.Ordinal) == true
             );
+
+    // The argument put for a type parameter used with the annotation: annotated when either is, else oblivious when
+    // either is.  A value type keeps its own, since T? of an unconstrained T is T itself for one.
+    private static ITypeSymbol WithUseAnnotation(ITypeSymbol argument, NullableAnnotation use)
+    {
+        if (
+            argument.IsValueType
+            || argument.NullableAnnotation == NullableAnnotation.Annotated
+            || use == NullableAnnotation.NotAnnotated
+        )
+        {
+            return argument;
+        }
+
+        return argument.WithNullableAnnotation(use);
+    }
 
     // A reference type written with a ?, or System.Nullable<T>.
     private static bool IsNullable(ITypeSymbol type) =>

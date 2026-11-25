@@ -185,7 +185,63 @@ public sealed class MappedTypeResolverTests
                 public sealed class Inner<U>
                     where U : T;
             }
+
+            // Constraints with a nullability inside: through a covariant, a contravariant and an invariant type
+            // parameter, and through a type parameter used with a ?.
+            public sealed class Names<T>
+                where T : System.Collections.Generic.IEnumerable<string>;
+
+            public sealed class MaybeNames<T>
+                where T : System.Collections.Generic.IEnumerable<string?>;
+
+            public sealed class Sorted<T>
+                where T : System.Collections.Generic.IComparer<string>;
+
+            public sealed class MaybeSorted<T>
+                where T : System.Collections.Generic.IComparer<string?>;
+
+            public sealed class Listed<T>
+                where T : System.Collections.Generic.IList<string>;
+
+            public sealed class Based<T>
+                where T : System.Collections.Generic.List<string>;
+
+            public sealed class MaybeItems<T, U>
+                where U : System.Collections.Generic.IEnumerable<T?>;
+
+            // The compiler takes the T of System.IEquatable<T> as contravariant for nullability, so string, an
+            // IEquatable<string?>, meets IEquatable<string>.
+            public sealed class SameBox<T>
+                where T : System.IEquatable<T>;
+
+            public sealed class MaybeSame<T>
+                where T : System.IEquatable<string?>;
+
+            public sealed class PlainSame : System.IEquatable<string>
+            {
+                public bool Equals(string? other) => false;
+            }
+
+            public sealed class NullableWords : System.Collections.Generic.List<string?>;
+
+            public readonly struct WordRun : System.Collections.Generic.IEnumerable<string?>
+            {
+                public System.Collections.Generic.IEnumerator<string?> GetEnumerator() =>
+                    throw new System.NotSupportedException();
+
+                System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() =>
+                    throw new System.NotSupportedException();
+            }
         }
+
+        #nullable disable
+        namespace MyApp
+        {
+            // The same constraint as Names<T>'s, written where nullable annotations are off.
+            public sealed class OldNames<T>
+                where T : System.Collections.Generic.IEnumerable<string>;
+        }
+        #nullable enable
 
         namespace Common
         {
@@ -598,6 +654,43 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::System.Collections.Generic.List<global::System.Collections.Generic.IEnumerable<string>>")]
     [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsShape>")]
     [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsDefault>")]
+    [InlineData("global::MyApp.Names<global::System.Collections.Generic.List<string>>")]
+    [InlineData("global::MyApp.Names<string[]>")]
+    [InlineData("global::MyApp.MaybeNames<global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.MaybeNames<global::System.Collections.Generic.List<string>>")]
+    [InlineData("global::MyApp.MaybeNames<global::MyApp.NullableWords>")]
+    [InlineData("global::MyApp.MaybeNames<global::MyApp.WordRun>")]
+    [InlineData("global::MyApp.MaybeNames<string?[]>")]
+    [InlineData("global::MyApp.Sorted<global::System.Collections.Generic.Comparer<string?>>")]
+    [InlineData("global::MyApp.MaybeSorted<global::System.Collections.Generic.Comparer<string?>>")]
+    [InlineData("global::MyApp.Listed<global::System.Collections.Generic.List<string>>")]
+    [InlineData("global::MyApp.Based<global::System.Collections.Generic.List<string>>")]
+    [InlineData("global::MyApp.MaybeItems<string, global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.MaybeItems<string?, global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.MaybeItems<int, global::System.Collections.Generic.List<int>>")]
+    [InlineData("global::MyApp.OldNames<global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.SameBox<string>")]
+    [InlineData("global::MyApp.SameBox<int>")]
+    [InlineData("global::MyApp.SameBox<global::System.Uri>")]
+    [InlineData("global::MyApp.MaybeSame<string>")]
+    [InlineData("global::MyApp.PairBox<string?[], string[]>")]
+    [InlineData("global::MyApp.PairBox<object?[], string[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Func<string?>, global::System.Func<string>>")]
+    [InlineData("global::MyApp.PairBox<global::System.Action<string>, global::System.Action<string?>>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<object?>, "
+            + "global::System.Collections.Generic.List<string>>"
+    )]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<"
+            + "global::System.Collections.Generic.IEnumerable<string?>>, "
+            + "global::System.Collections.Generic.List<string[]>>"
+    )]
+    [InlineData("global::MyApp.PairBox<global::MyApp.Holder<string?>.Item, global::MyApp.Holder<string?>.Item>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.KeyValuePair<string?, int>?, "
+            + "global::System.Collections.Generic.KeyValuePair<string?, int>?>"
+    )]
     public void Resolve_GenericNameWhoseArgumentsMeetTheConstraints_IsFound(string name)
     {
         CompilerReports(name).ShouldBeEmpty();
@@ -645,6 +738,44 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::MyApp.PairBox<int[], int?[]>")]
     [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsMakes>")]
     [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsMixed>")]
+    [InlineData("global::MyApp.Names<global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.Names<global::MyApp.NullableWords>")]
+    [InlineData("global::MyApp.Names<global::MyApp.WordRun>")]
+    [InlineData("global::MyApp.Names<string?[]>")]
+    [InlineData("global::MyApp.Names<global::System.Collections.Generic.IEnumerable<string?>>")]
+    [InlineData("global::MyApp.MaybeSorted<global::System.Collections.Generic.Comparer<string>>")]
+    [InlineData("global::MyApp.MaybeSame<global::MyApp.PlainSame>")]
+    [InlineData("global::MyApp.Listed<global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.Based<global::MyApp.NullableWords>")]
+    [InlineData("global::MyApp.MaybeItems<int?, global::System.Collections.Generic.List<int>>")]
+    [InlineData("global::MyApp.PairBox<string[], string?[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Func<string>, global::System.Func<string?>>")]
+    [InlineData("global::MyApp.PairBox<global::System.Action<string?>, global::System.Action<string>>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.List<string>, "
+            + "global::System.Collections.Generic.List<string?>>"
+    )]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<"
+            + "global::System.Collections.Generic.IEnumerable<string>>, "
+            + "global::System.Collections.Generic.List<string?[]>>"
+    )]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.List<"
+            + "global::System.Collections.Generic.IEnumerable<string>>, "
+            + "global::System.Collections.Generic.List<"
+            + "global::System.Collections.Generic.IEnumerable<string?>>>"
+    )]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<"
+            + "global::System.Collections.Generic.KeyValuePair<string, int>>, "
+            + "global::System.Collections.Generic.List<global::System.Collections.Generic.KeyValuePair<string?, int>>>"
+    )]
+    [InlineData("global::MyApp.PairBox<global::MyApp.Holder<string>.Item, global::MyApp.Holder<string?>.Item>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.KeyValuePair<string, int>?, "
+            + "global::System.Collections.Generic.KeyValuePair<string?, int>?>"
+    )]
     public void Resolve_GenericNameWhoseArgumentsBreakAConstraint_IsNotAPropertyType(string name)
     {
         CompilerReports(name).ShouldNotBeEmpty();
