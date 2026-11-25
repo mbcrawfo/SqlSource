@@ -492,18 +492,20 @@ public sealed class ColumnProofsTests
             ]);
     }
 
-    // The column through a join, a derived table or a CTE, under a grouping set, as an operand of an expression or of
-    // a scalar subquery, in parentheses, which IsColumn does not take for a column alone, or by a * that is not the
-    // one item of one table: the server's answer stands, since a row of the result may be no row of the table (an
-    // outer join gives NULL).
+    // The column through an outer join's optional side, a derived table or a CTE, under a grouping set, as an operand
+    // of an expression or of a scalar subquery, in parentheses, which IsColumn does not take for a column alone, or by
+    // a * that is not the one item of one table: the server's answer stands, since a row of the result may be no row
+    // of the table (an outer join gives NULL).
     [Theory]
     [InlineData("SELECT o.id, u.name_len_p FROM dbo.orders AS o LEFT JOIN dbo.users AS u ON u.id = o.user_id")]
-    [InlineData("SELECT o.id, u.name_len_p FROM dbo.orders AS o JOIN dbo.users AS u ON u.id = o.user_id")]
     [InlineData("SELECT u.id, u.name_len_p FROM (SELECT * FROM dbo.users) AS u")]
     [InlineData("WITH users AS (SELECT * FROM dbo.users) SELECT id, name_len_p FROM users")]
     [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY ROLLUP (id, name_len_p)")]
     [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY GROUPING SETS ((id, name_len_p), ())")]
     [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY ALL id, name_len_p")]
+    [InlineData("SELECT * FROM dbo.users GROUP BY ROLLUP (id, name_len_p)")]
+    [InlineData("SELECT * FROM dbo.users GROUP BY GROUPING SETS ((id, name_len_p), ())")]
+    [InlineData("SELECT * FROM dbo.users GROUP BY ALL id, name_len_p")]
     [InlineData("SELECT id, CAST(name_len_p AS bigint) AS name_len_p FROM dbo.users")]
     [InlineData("SELECT id, (SELECT name_len_p FROM dbo.users WHERE id = 0) AS name_len_p FROM dbo.users")]
     [InlineData("SELECT id, (name_len_p) AS name_len_p FROM dbo.users")]
@@ -828,6 +830,113 @@ public sealed class ColumnProofsTests
             .ShouldBe(true);
         NullableOf(ColumnProofs.TableRows([view], [kept with { Origin = new SidecarOrigin("dbo", "other", "shape") }]))
             .ShouldBe(true);
+    }
+
+    // The query of the realistic case invoices-full-join-payments: its COALESCE reads a column of each side of the
+    // FULL JOIN, which the rows' call names as stored and each side's call answers over that side's rows alone.
+    [Fact]
+    public void Apply_CoalesceOfEachSideOfAFullJoin_ProvedByEachSidesCall()
+    {
+        const string With =
+            "WITH issued AS (\n    SELECT\n        i.id,\n        i.number,\n        i.issued_at,\n        i.amount\n"
+            + "    FROM billing.invoices AS i\n    WHERE\n        i.issued_at >= @from\n        AND i.issued_at < @to\n"
+            + "        AND i.voided_at IS NULL\n),\n\nreceived AS (\n    SELECT\n        p.id,\n        p.invoice_id,\n"
+            + "        p.paid_at,\n        p.amount,\n        p.method\n    FROM billing.payments AS p\n    WHERE\n"
+            + "        p.paid_at >= @from\n        AND p.paid_at < @to\n)";
+        var proofs = Read(
+            With
+                + "\n\nSELECT\n    COALESCE(iss.id, rec.invoice_id) AS invoice_id,\n    iss.number AS invoice_number,\n"
+                + "    iss.issued_at,\n    iss.amount AS invoiced,\n    rec.id AS payment_id,\n    rec.paid_at,\n"
+                + "    rec.amount AS paid,\n    rec.method\nFROM issued AS iss\n"
+                + "FULL JOIN received AS rec ON rec.invoice_id = iss.id\n"
+                + "ORDER BY COALESCE(iss.issued_at, CAST(rec.paid_at AS date)), invoice_id, rec.paid_at;",
+            ExpressionRow(1, "invoice_id"),
+            ExpressionRow(2, "invoice_number"),
+            ExpressionRow(3, "issued_at"),
+            ExpressionRow(4, "invoiced"),
+            ExpressionRow(5, "payment_id"),
+            ExpressionRow(6, "paid_at"),
+            ExpressionRow(7, "paid"),
+            ExpressionRow(8, "method")
+        );
+
+        proofs.OperandQueries.ShouldBe([
+            new ColumnProofs.OperandQuery(
+                With
+                    + "\nSELECT iss.id\nAS [1],\nrec.invoice_id\nAS [2]\nFROM issued AS iss\n"
+                    + "FULL JOIN received AS rec ON rec.invoice_id = iss.id",
+                2
+            ),
+            new ColumnProofs.OperandQuery(With + "\nSELECT iss.id\nAS [1]\nFROM issued AS iss", 1),
+            new ColumnProofs.OperandQuery(With + "\nSELECT rec.invoice_id\nAS [1]\nFROM\nreceived AS rec", 1),
+        ]);
+        var server = Enumerable.Repeat((true, SidecarValues.NullableSource.Server), 7).ToList();
+        Nullability(
+                proofs.Apply([
+                    new OperandFacts(false, true, Stored: true),
+                    new OperandFacts(false, true, Stored: true),
+                    new OperandFacts(true, true, Stored: true),
+                    new OperandFacts(true, true, Stored: true),
+                ])
+            )
+            .ShouldBe([(false, SidecarValues.NullableSource.Expression), .. server]);
+        Nullability(
+                proofs.Apply([
+                    new OperandFacts(false, true, Stored: true),
+                    new OperandFacts(false, true, Stored: true),
+                    new OperandFacts(false, true, Stored: true),
+                    new OperandFacts(true, true, Stored: true),
+                ])
+            )
+            .ShouldBe([(true, SidecarValues.NullableSource.Server), .. server]);
+        Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server), .. server]);
+    }
+
+    // A side's call reads the chain before the last FULL JOIN whole, with the joins that make its source optional, and
+    // never the WHERE or a LEFT that the WHERE makes inner for the rows' call.
+    [Theory]
+    [InlineData(
+        "SELECT COALESCE(a.x, c.y) AS n FROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id "
+            + "FULL JOIN dbo.c AS c ON c.id = b.id",
+        "SELECT a.x\nAS [1]\nFROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id",
+        "SELECT c.y\nAS [1]\nFROM\ndbo.c AS c"
+    )]
+    [InlineData(
+        "SELECT COALESCE(l.x, b.y) AS n FROM dbo.a AS a LEFT JOIN dbo.l AS l ON l.id = a.id "
+            + "FULL JOIN dbo.b AS b ON b.id = a.id WHERE l.z > 0",
+        "SELECT l.x\nAS [1]\nFROM dbo.a AS a LEFT JOIN dbo.l AS l ON l.id = a.id",
+        "SELECT b.y\nAS [1]\nFROM\ndbo.b AS b"
+    )]
+    public void Read_CoalesceOverAFullJoin_AsksEachSideOverItsOwnJoins(string sql, string left, string right)
+    {
+        var proofs = Read(sql, ExpressionRow(1, "n"));
+
+        proofs.OperandQueries.Skip(1).Select(static query => query.Sql).ShouldBe([left, right]);
+    }
+
+    // The rows' call asks a.z after a.x and b.y, before the sides' calls, though the proofs number it last: each item
+    // reads its own operands' answers, not the answers at its operands' indexes.
+    [Fact]
+    public void Apply_ItemAfterAFullJoinPair_ReadsItsOwnAnswer()
+    {
+        var proofs = Read(
+            "SELECT COALESCE(a.x, b.y) AS c1, a.z + 1 AS c2 FROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id",
+            ExpressionRow(1, "c1"),
+            ExpressionRow(2, "c2")
+        );
+
+        proofs.OperandQueries.ShouldBe([
+            new ColumnProofs.OperandQuery(
+                "SELECT a.x\nAS [1],\nb.y\nAS [2],\na.z\nAS [3]\nFROM dbo.a AS a FULL JOIN dbo.b AS b ON b.id = a.id",
+                3
+            ),
+            new ColumnProofs.OperandQuery("SELECT a.x\nAS [1]\nFROM dbo.a AS a", 1),
+            new ColumnProofs.OperandQuery("SELECT b.y\nAS [1]\nFROM\ndbo.b AS b", 1),
+        ]);
+        var nullable = new OperandFacts(false, true, Stored: true);
+        var notNull = new OperandFacts(true, true, Stored: true);
+        Nullability(proofs.Apply([nullable, nullable, nullable, notNull, notNull]))
+            .ShouldBe([(false, SidecarValues.NullableSource.Expression), (true, SidecarValues.NullableSource.Server)]);
     }
 
     // A geometry column that the server answers not null and names no source for.

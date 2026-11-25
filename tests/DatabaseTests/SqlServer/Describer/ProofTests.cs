@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
@@ -31,6 +32,10 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     // Null where it is 'NULL' or 'Null'.
     private const string ShapesMix =
         "(SELECT solid AS c FROM dbo.proof_shapes UNION ALL SELECT wkt FROM dbo.proof_shapes)";
+
+    // A FULL JOIN of proof_rows and proof_other, each with rows that find a match and rows that find none.
+    private const string RowsFullJoinOther =
+        "FROM dbo.proof_rows AS r FULL JOIN dbo.proof_other AS o ON o.rows_id = r.id";
 
     // NULL or 1 at random, each time it is evaluated.
     private const string Flip = "CASE WHEN ABS(CHECKSUM(NEWID())) % 2 = 0 THEN 1 END";
@@ -82,6 +87,13 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             { 0, "SELECT COALESCE(CAST(AVG(b) AS int), 0) AS c FROM dbo.proof_rows GROUP BY g" },
             { 0, "SELECT COALESCE(q.b, 0) AS c FROM (SELECT b FROM dbo.proof_rows) AS q" },
             { 0, $"SELECT COALESCE(a, {Flip}) AS c FROM dbo.proof_rows" },
+            // ISNULL, which reads its first argument once, by either argument proved, beside one that changes too; and
+            // by a column of each side of a FULL JOIN, whose rows have one side or the other.
+            { 0, "SELECT ISNULL(b, a + 1) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT ISNULL(a + 0, b) AS c FROM dbo.proof_rows" },
+            { 0, $"SELECT ISNULL(a + 0, {Flip}) AS c FROM dbo.proof_rows" },
+            { 0, $"SELECT ISNULL(r.id, o.id) AS c {RowsFullJoinOther}" },
+            { 0, $"SELECT ISNULL(o.id, r.id) AS c {RowsFullJoinOther} WHERE COALESCE(r.a, -1) <> 30" },
             { 0, "SELECT CAST(a AS bigint) AS c FROM dbo.proof_rows" },
             { 0, "SELECT CONVERT(bigint, a) AS c FROM dbo.proof_rows" },
             { 0, "SELECT CONVERT(varchar(30), CAST(a AS money), 1) AS c FROM dbo.proof_rows" },
@@ -213,6 +225,19 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             { 0, "SELECT CONVERT(varchar(30), SYSDATETIME(), @style) AS c FROM dbo.proof_rows" },
             { 0, "SELECT TRY_CAST(N'x' + CAST(a AS nvarchar(10)) AS int) AS c FROM dbo.proof_rows" },
             { 0, "SELECT COALESCE(b, NULL) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT ISNULL(b, NULL) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT ISNULL(b, g) AS c FROM dbo.proof_rows" },
+            { 0, $"SELECT ISNULL(r.id, o.rows_id) AS c {RowsFullJoinOther}" },
+            {
+                0,
+                $"SELECT ISNULL(r.id, o.id) AS c {RowsFullJoinOther} "
+                    + "FULL JOIN dbo.proof_computed AS p ON p.id = o.id + 100"
+            },
+            {
+                0,
+                "SELECT ISNULL(p.id, o.id) AS c FROM dbo.proof_rows AS r "
+                    + "LEFT JOIN dbo.proof_computed AS p ON p.id = r.id FULL JOIN dbo.proof_other AS o ON o.id = r.id"
+            },
             { 0, "SELECT dbo.COUNT(a) AS c FROM dbo.proof_rows" },
             { 0, "SELECT [dbo].[COUNT](a) AS c FROM dbo.proof_rows" },
             {
@@ -782,17 +807,97 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
             (await NullRowsAsync(select, with)).ShouldBeGreaterThan(0, select);
         });
 
-    // Read from its one table, c is a row of that table, which the constraint keeps not null, though the server calls
-    // its expression nullable (it answers "(1) PERSISTED NOT NULL" not null itself, design fact 5); through an outer
-    // join that finds no row, or in the total of a ROLLUP, it is NULL, and the server still names it as the source.
+    // COALESCE over a column of each side of a FULL JOIN of proof_rows and proof_other, whose rows 3 to 5 of proof_rows
+    // and row 4 of proof_other find no match, beside rows that do: every row has its left or its right side, each
+    // column is not null over its side's rows alone, which "operands" asks the server, and each is a stored column.
+    [Theory]
+    [InlineData("", $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther}")]
+    [InlineData(
+        "",
+        "SELECT COALESCE(o.id, r.id) AS c FROM dbo.proof_rows AS r "
+            + "FULL OUTER JOIN dbo.proof_other AS o ON o.rows_id = r.id"
+    )]
+    [InlineData("", $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} WHERE COALESCE(r.a, -1) <> 30")]
+    [InlineData("", $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} JOIN dbo.proof_computed AS p ON p.id = 1")]
+    [InlineData(
+        "",
+        $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} LEFT JOIN dbo.proof_computed AS p ON p.id = o.id"
+    )]
+    [InlineData(
+        "",
+        "SELECT COALESCE(d.id, o.id) AS c FROM dbo.proof_rows AS r JOIN dbo.proof_dates AS d ON d.id = r.id "
+            + "FULL JOIN dbo.proof_other AS o ON o.rows_id = r.id"
+    )]
+    [InlineData(
+        "",
+        "SELECT COALESCE(r.id, o.id) AS c FROM (SELECT id FROM dbo.proof_rows) AS r "
+            + "FULL JOIN (SELECT id, rows_id FROM dbo.proof_other) AS o ON o.rows_id = r.id"
+    )]
+    [InlineData(
+        "WITH l AS (SELECT id FROM dbo.proof_rows WHERE a > 0), m AS (SELECT id, rows_id FROM dbo.proof_other)",
+        "SELECT COALESCE(l.id, m.id) AS c FROM l FULL JOIN m ON m.rows_id = l.id"
+    )]
+    [InlineData("", $"SELECT SUM(COALESCE(r.id, o.id)) AS c {RowsFullJoinOther} GROUP BY ROLLUP (r.g)")]
+    // The proof reads no ON: a row of a FULL JOIN has one side or the other, whether no row matches or an OR does.
+    [InlineData(
+        "",
+        "SELECT COALESCE(r.id, o.id) AS c FROM dbo.proof_rows AS r FULL JOIN dbo.proof_other AS o ON 1 = 0"
+    )]
+    [InlineData(
+        "",
+        "SELECT COALESCE(r.id, o.id) AS c FROM dbo.proof_rows AS r "
+            + "FULL JOIN dbo.proof_other AS o ON o.rows_id = r.id OR o.id = r.id + 1"
+    )]
+    public Task DescribeAsync_CoalesceOverAFullJoin_NotNullAndNoNullRow(string with, string select) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync($"{with} {select}".Trim(), false, SidecarValues.NullableSource.Expression);
+            (await RowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+            (await NullRowsAsync(select, with)).ShouldBe(0, select);
+        });
+
+    // A column that is NULL in a row of its side, a row that has neither column through a third source, a later FULL
+    // or RIGHT JOIN, a left side whose source a LEFT JOIN makes optional, and a grouping set's total.
+    [Theory]
+    [InlineData($"SELECT COALESCE(r.id, o.rows_id) AS c {RowsFullJoinOther}")]
+    [InlineData(
+        $"SELECT COALESCE(r.id, p.id) AS c {RowsFullJoinOther} FULL JOIN dbo.proof_computed AS p ON p.id = o.id"
+    )]
+    [InlineData(
+        $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} FULL JOIN dbo.proof_computed AS p ON p.id = o.id + 100"
+    )]
+    [InlineData(
+        $"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} RIGHT JOIN dbo.proof_computed AS p ON p.id = o.id + 100"
+    )]
+    [InlineData(
+        "SELECT COALESCE(p.id, o.id) AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_computed AS p ON p.id = r.id "
+            + "FULL JOIN dbo.proof_other AS o ON o.id = r.id"
+    )]
+    [InlineData($"SELECT COALESCE(r.id, o.id) AS c {RowsFullJoinOther} GROUP BY ROLLUP (COALESCE(r.id, o.id))")]
+    public Task DescribeAsync_CoalesceOverAFullJoinThatLetsANullThrough_NullableAndNullRow(string sql) =>
+        WithRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync(sql, true, SidecarValues.NullableSource.Server);
+            (await NullRowsAsync(sql)).ShouldBeGreaterThan(0, sql);
+        });
+
+    // Read from its one table, or through an inner join, c is a row of that table, which the constraint keeps not
+    // null, though the server calls its expression nullable (it answers "(1) PERSISTED NOT NULL" not null itself,
+    // design fact 5); through an outer join that finds no row, or in the total of a ROLLUP, it is NULL, and the server
+    // still names it as the source.
     [Fact]
-    public Task DescribeAsync_PersistedNotNull_OnlyFromOneTable() =>
+    public Task DescribeAsync_PersistedNotNull_OnlyFromATableNoJoinMakesNull() =>
         WithRowsAsync(async () =>
         {
             var alone = "SELECT c FROM dbo.proof_computed";
             await ShouldDescribeColumnAsync(alone, false, SidecarValues.NullableSource.Catalog);
             (await RowsAsync(alone)).ShouldBeGreaterThan(0);
             (await NullRowsAsync(alone)).ShouldBe(0);
+
+            var inner = "SELECT pc.c FROM dbo.proof_rows AS r JOIN dbo.proof_computed AS pc ON pc.id = r.id";
+            await ShouldDescribeColumnAsync(inner, false, SidecarValues.NullableSource.Catalog);
+            (await RowsAsync(inner)).ShouldBeGreaterThan(0);
+            (await NullRowsAsync(inner)).ShouldBe(0);
 
             var joined = "SELECT pc.c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_computed AS pc ON pc.id = r.id";
             await ShouldDescribeColumnAsync(joined, true, SidecarValues.NullableSource.Server);
@@ -811,6 +916,69 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
                 await ShouldDescribeColumnAsync(aliased, true, SidecarValues.NullableSource.Server);
                 (await NullRowsAsync(aliased)).ShouldBeGreaterThan(0);
             }
+        });
+
+    // A computed column that is not persisted, whose definition reads list_price, NOT NULL, and ISNULL of
+    // discount_pct, read from proof_priced where no join can make it NULL: from the table alone, through an inner join,
+    // as the first source of a LEFT JOIN and the preserved side of a RIGHT JOIN, whose rows of proof_rows with no
+    // match the server still names it the source of.
+    [Theory]
+    [InlineData("", "SELECT sale_price AS c FROM dbo.proof_priced")]
+    [InlineData("", "SELECT p.sale_price AS c FROM dbo.proof_priced AS p JOIN dbo.proof_rows AS r ON r.id = p.rows_id")]
+    [InlineData(
+        "",
+        "SELECT p.sale_price AS c FROM dbo.proof_priced AS p LEFT JOIN dbo.proof_rows AS r ON r.id = p.rows_id"
+    )]
+    [InlineData(
+        "",
+        "SELECT p.sale_price AS c FROM dbo.proof_rows AS r RIGHT JOIN dbo.proof_priced AS p ON p.rows_id = r.id"
+    )]
+    [InlineData("WITH q AS (SELECT 1 AS one)", "SELECT p.* FROM dbo.proof_priced AS p CROSS JOIN q")]
+    public Task DescribeAsync_ComputedColumnOfATableNoJoinMakesNull_NotNullAndNoNullRow(string with, string select) =>
+        WithPricedRowsAsync(async () =>
+        {
+            var sql = $"{with} {select}".Trim();
+            if (select.Contains('*', StringComparison.Ordinal))
+            {
+                var description = await Sessions.ShouldDescribeAsync(
+                    sqlServer.ConnectionString,
+                    Of(SqlDialectRules.SqlServer, sql)
+                );
+                var column = description.Columns.ShouldNotBeNull().Single(static column => column.Name == "sale_price");
+                (column.Nullable, column.NullableSource).ShouldBe((false, SidecarValues.NullableSource.Expression));
+                (
+                    await RowsAsync($"SELECT sale_price AS c FROM ({select}) AS s WHERE sale_price IS NULL", with)
+                ).ShouldBe(0);
+                return;
+            }
+
+            await ShouldDescribeColumnAsync(sql, false, SidecarValues.NullableSource.Expression);
+            (await RowsAsync(select, with)).ShouldBeGreaterThan(0, select);
+            (await NullRowsAsync(select, with)).ShouldBe(0, select);
+        });
+
+    // The same column from the optional side of a LEFT JOIN, through a derived table or a CTE over one, which the
+    // server names proof_priced the source of all the same, and a computed column of a nullable operand.
+    [Theory]
+    [InlineData(
+        "",
+        "SELECT p.sale_price AS c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_priced AS p ON p.rows_id = r.id"
+    )]
+    [InlineData(
+        "",
+        "SELECT q.sale_price AS c FROM (SELECT p.sale_price FROM dbo.proof_rows AS r "
+            + "LEFT JOIN dbo.proof_priced AS p ON p.rows_id = r.id) AS q"
+    )]
+    [InlineData(
+        "WITH q AS (SELECT p.sale_price FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_priced AS p ON p.rows_id = r.id)",
+        "SELECT q.sale_price AS c FROM q"
+    )]
+    [InlineData("", "SELECT loose AS c FROM dbo.proof_priced")]
+    public Task DescribeAsync_ComputedColumnThatCanBeNull_NullableAndNullRow(string with, string select) =>
+        WithPricedRowsAsync(async () =>
+        {
+            await ShouldDescribeColumnAsync($"{with} {select}".Trim(), true, SidecarValues.NullableSource.Server);
+            (await NullRowsAsync(select, with)).ShouldBeGreaterThan(0, select);
         });
 
     // NTILE of a parameter proves nothing: run with @n NULL it raises error 4116 (design fact 7), so there is no NULL
@@ -1155,6 +1323,24 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         }
     }
 
+    // The tables of the proofs, and dbo.proof_priced, whose sale_price is computed, not persisted, from list_price,
+    // never NULL, and discount_pct, NULL in some rows, and whose loose is computed from discount_pct alone.  Its rows 1
+    // and 2 match rows of proof_rows, and its row 3 none, as the rows 3 to 5 of proof_rows match none of it.
+    private Task WithPricedRowsAsync(Func<Task> body) =>
+        WithRowsAsync(async () =>
+        {
+            await sqlServer.ExecuteAsync(
+                "CREATE TABLE dbo.proof_priced (id int NOT NULL PRIMARY KEY, rows_id int NULL, "
+                    + "list_price decimal(10, 2) NOT NULL, discount_pct decimal(5, 2) NULL, "
+                    + "sale_price AS (list_price * (1 - ISNULL(discount_pct, 0) / 100)), loose AS (discount_pct * 2))"
+            );
+            await sqlServer.ExecuteAsync(
+                "INSERT INTO dbo.proof_priced (id, rows_id, list_price, discount_pct) "
+                    + "VALUES (1, 1, 10.00, NULL), (2, 2, 20.00, 10.00), (3, NULL, 30.00, NULL)"
+            );
+            await body();
+        });
+
     // The tables of the proofs, and dbo.proof_many, whose 2,000 rows hold b and d NULL in every other row, beside
     // dbo.proof_flip, a user's function that gives its argument or NULL at random through a view over NEWID().
     private Task WithManyRowsAsync(Func<Task> body) =>
@@ -1185,8 +1371,8 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
                 + "dbo.proof_shapes_plain_fn; "
                 + "DROP VIEW IF EXISTS dbo.proof_random, dbo.proof_volatile_view, dbo.proof_shapes_mix_of, "
                 + "dbo.proof_shapes_mix, dbo.proof_shapes_plain_of, dbo.proof_shapes_plain, dbo.proof_shapes_same; "
-                + "DROP TABLE IF EXISTS dbo.proof_many, dbo.proof_volatile, dbo.proof_dates, dbo.proof_shapes, "
-                + "dbo.proof_computed, dbo.proof_other, dbo.proof_rows"
+                + "DROP TABLE IF EXISTS dbo.proof_priced, dbo.proof_many, dbo.proof_volatile, dbo.proof_dates, "
+                + "dbo.proof_shapes, dbo.proof_computed, dbo.proof_other, dbo.proof_rows"
         );
 
     // The query's one column, described in a session of its own, must be as expected.

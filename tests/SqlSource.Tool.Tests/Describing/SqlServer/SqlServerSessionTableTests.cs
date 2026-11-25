@@ -105,12 +105,13 @@ public sealed class SqlServerSessionTableTests
         description.MatchesTable.ShouldBe(new SidecarTable("dbo", "users"));
     }
 
-    // Through a join the column cannot be proved and keeps the server's answer, while the table's row is corrected: the
-    // query no longer has the table's nullability.
+    // Through an outer join that can make it NULL the column cannot be proved and keeps the server's answer, while the
+    // table's row is corrected: the query no longer has the table's nullability.
     [Fact]
-    public async Task DescribeAsync_PersistedNotNullThroughAJoin_NullabilityDiffers()
+    public async Task DescribeAsync_PersistedNotNullThroughAnOuterJoin_NullabilityDiffers()
     {
-        const string Sql = "SELECT u.id, u.name_len_p FROM dbo.users AS u JOIN dbo.orders AS o ON o.user_id = u.id";
+        const string Sql =
+            "SELECT u.id, u.name_len_p FROM dbo.users AS u RIGHT JOIN dbo.orders AS o ON o.user_id = u.id";
         var rows = new SqlServerColumnsAnswer(
             [IdColumn, PersistedColumn(2), Rowstat with { ColumnOrdinal = 3 }],
             null,
