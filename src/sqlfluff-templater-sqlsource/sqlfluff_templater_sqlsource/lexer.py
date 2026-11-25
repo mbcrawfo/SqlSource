@@ -16,9 +16,7 @@ from sqlfluff_templater_sqlsource.quoting import NOT_A_QUOTE, UNTERMINATED, Quot
 from sqlfluff_templater_sqlsource.rules import DialectRules, StringContinuation
 from sqlfluff_templater_sqlsource.text import (
     char_at,
-    find_line_end,
     is_control,
-    is_line_terminator,
     is_white_space,
     trim,
 )
@@ -128,10 +126,10 @@ class Lexer:
         if current == "-" and self._is_dash_comment(start):
             is_hint = self._is_line_hint(start)
             kind = LexemeKind.HINT if is_hint else LexemeKind.LINE_COMMENT
-            self._add(kind, start, find_line_end(text, start, len(text)))
+            self._add(kind, start, rules.find_line_end(text, start, len(text)))
             self._pass_gap(not is_hint and rules.string_continuation == StringContinuation.ACROSS_LINE_COMMENTS)
         elif current == "#" and rules.hash_comments:
-            self._add(LexemeKind.LINE_COMMENT, start, find_line_end(text, start, len(text)))
+            self._add(LexemeKind.LINE_COMMENT, start, rules.find_line_end(text, start, len(text)))
             self._pass_gap(allowed=False)
         elif current == "/" and char_at(text, start + 1) == "*":
             self._read_block_comment(start)
@@ -167,7 +165,7 @@ class Lexer:
             if not is_white_space(value):
                 self._continuation = None
                 return
-            self._gap_has_line_break |= is_line_terminator(value)
+            self._gap_has_line_break |= self.rules.is_line_terminator(value)
         self._gap_start = end
 
     # What was just read stood after a string.  The string can still go on only if its gap may hold that.

@@ -39,7 +39,10 @@ internal static class BundleQueryFile
         var lexer = new SqlLexer(fileText, SqlDialectRules.For(dialect));
         _ = SqlDialectMarker.Apply(lexer, fileText);
         var lexed = lexer.ReadToEnd();
-        if (lexed.Error is not null || RegionOf(query, fileText, lexed.Lexemes) is not (var name, var start, var end))
+        if (
+            lexed.Error is not null
+            || RegionOf(query, fileText, lexed.Lexemes, lexer.Rules) is not (var name, var start, var end)
+        )
         {
             throw NotTheFile(query, nameof(fileText));
         }
@@ -63,7 +66,7 @@ internal static class BundleQueryFile
             if (
                 lexeme.Span.Start < start
                 || lexeme.Span.End > end
-                || SqlMarkerReader.Read(fileText, lexeme) is not { } found
+                || SqlMarkerReader.Read(fileText, lexeme, rules) is not { } found
                 || found.Kind is SqlMarkerKind.Token or SqlMarkerKind.TokenIgnore
             )
             {
@@ -93,12 +96,13 @@ internal static class BundleQueryFile
     private static (SqlMarker? Name, int Start, int End)? RegionOf(
         PlannedQuery query,
         string text,
-        EquatableArray<SqlLexeme> lexemes
+        EquatableArray<SqlLexeme> lexemes,
+        SqlDialectRules rules
     )
     {
         var nameSpan = query.Query.NameLocation.Span;
         var names = lexemes
-            .Select(lexeme => SqlMarkerReader.Read(text, lexeme))
+            .Select(lexeme => SqlMarkerReader.Read(text, lexeme, rules))
             .Where(static marker => marker is { Kind: SqlMarkerKind.Name })
             .Select(static marker => marker.GetValueOrDefault())
             .ToList();

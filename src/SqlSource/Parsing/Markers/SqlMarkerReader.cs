@@ -37,11 +37,12 @@ internal static class SqlMarkerReader
 
     /// <summary>
     /// Returns the marker that <paramref name="lexeme" /> is, or null.  A marker is a line comment that is the first
-    /// thing on its line and reads <c>--</c>, optional blanks, a keyword, a colon.
+    /// thing on its line and reads <c>--</c>, optional blanks, a keyword, a colon.  <paramref name="rules" /> say what
+    /// ends a line: they are those the lexeme was read by.
     /// </summary>
-    public static SqlMarker? Read(string text, SqlLexeme lexeme)
+    public static SqlMarker? Read(string text, SqlLexeme lexeme, SqlDialectRules rules)
     {
-        if (!IsDashComment(text, lexeme) || !StartsLine(text, lexeme.Span.Start))
+        if (!IsDashComment(text, lexeme) || !StartsLine(text, lexeme.Span.Start, rules))
         {
             return null;
         }
@@ -145,7 +146,7 @@ internal static class SqlMarkerReader
 
     // Only blanks may come before the comment on its line.  The lexer guarantees that a line break found this way is
     // not inside a quoted region or a block comment: those end with their closing delimiter, never with a blank.
-    private static bool StartsLine(string text, int start)
+    private static bool StartsLine(string text, int start, SqlDialectRules rules)
     {
         var index = start - 1;
         while (index >= 0 && text[index] is ' ' or '\t')
@@ -153,6 +154,6 @@ internal static class SqlMarkerReader
             index--;
         }
 
-        return index < 0 || SqlText.IsLineTerminator(text[index]);
+        return index < 0 || rules.IsLineTerminator(text[index]);
     }
 }

@@ -64,7 +64,7 @@ public sealed class BundleQueryFileTests
         var rules = SqlDialectRules.For(file.Dialect);
         var lexed = new SqlLexer(written, rules).ReadToEnd();
         var held = lexed.Lexemes.Any(lexeme =>
-            SqlMarkerReader.Read(written, lexeme) is { } found && found.Kind == kind
+            SqlMarkerReader.Read(written, lexeme, rules) is { } found && found.Kind == kind
         );
 
         var engine = new FakeEngineRenaming(SqlDialect.PostgreSql);

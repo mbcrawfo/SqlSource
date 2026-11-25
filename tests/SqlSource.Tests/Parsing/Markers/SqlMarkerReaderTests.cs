@@ -122,6 +122,14 @@ public sealed class SqlMarkerReaderTests
     }
 
     // Oracle's line hint is kept in the SQL, so it is never a marker.
+    // A carriage return alone ends no line under MySQL, so a comment after it does not start its line.
+    [Theory]
+    [InlineData(nameof(SqlDialect.Ansi), "Name:A")]
+    [InlineData(nameof(SqlDialect.MySql), "")]
+    [InlineData(nameof(SqlDialect.Sqlite), "")]
+    public void Read_CommentAfterACarriageReturnAlone_IsAMarkerWhereThatEndsALine(string dialect, string expected) =>
+        string.Join(" ", Markers("SELECT 1 /* x */\r-- name: A", RulesOf(dialect))).ShouldBe(expected);
+
     [Fact]
     public void Read_LineHintOfOracle_IsNotAMarker() =>
         Markers("--+ name: A\nSELECT 1", SqlDialectRules.Oracle).ShouldBeEmpty();
@@ -132,7 +140,7 @@ public sealed class SqlMarkerReaderTests
         const string Text = "SELECT 1\n  -- name:  GetUser  \nSELECT 2";
         var lexeme = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes[1];
 
-        var marker = SqlMarkerReader.Read(Text, lexeme);
+        var marker = SqlMarkerReader.Read(Text, lexeme, SqlDialectRules.Ansi);
 
         _ = marker.ShouldNotBeNull();
         marker.Value.Span.ShouldBe(lexeme.Span);
@@ -160,7 +168,11 @@ public sealed class SqlMarkerReaderTests
     [InlineData("-- dialect:   ", "dialect:")]
     public void Describe_Marker_IsItsWordAndItsValue(string text, string expected)
     {
-        var marker = SqlMarkerReader.Read(text, SqlLexer.Lex(text, SqlDialectRules.Ansi).Lexemes[0]);
+        var marker = SqlMarkerReader.Read(
+            text,
+            SqlLexer.Lex(text, SqlDialectRules.Ansi).Lexemes[0],
+            SqlDialectRules.Ansi
+        );
 
         _ = marker.ShouldNotBeNull();
         SqlMarkerReader.Describe(text, marker.Value).ShouldBe(expected);
@@ -175,11 +187,13 @@ public sealed class SqlMarkerReaderTests
         return
         [
             .. lexed
-                .Lexemes.Select(lexeme => SqlMarkerReader.Read(text, lexeme))
+                .Lexemes.Select(lexeme => SqlMarkerReader.Read(text, lexeme, rules))
                 .OfType<SqlMarker>()
                 .Select(marker => $"{marker.Kind}:{text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length)}"),
         ];
     }
+
+    private static SqlDialectRules RulesOf(string dialect) => SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect));
 
     [Theory]
     [InlineData("GetUser", "GetUser", -1)]

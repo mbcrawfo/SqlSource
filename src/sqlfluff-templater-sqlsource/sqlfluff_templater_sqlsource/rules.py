@@ -24,7 +24,7 @@ from sqlfluff_templater_sqlsource.quoting import (
     is_name_character_of_postgresql,
     is_name_character_of_sql_server,
 )
-from sqlfluff_templater_sqlsource.text import is_letter_or_digit, is_white_space
+from sqlfluff_templater_sqlsource.text import find_line_end, is_letter_or_digit, is_white_space
 
 
 class StringContinuation(enum.Enum):
@@ -66,6 +66,7 @@ class DialectRules:
         mariadb_hints: bool = False,
         string_continuation: StringContinuation = StringContinuation.NONE,
         names_hold_at_and_hash: bool = False,
+        carriage_return_ends_line: bool = True,
     ) -> None:
         self.dialect = dialect
         self.parameter_prefix = _AT_SIGN
@@ -83,6 +84,10 @@ class DialectRules:
         self.mariadb_hints = mariadb_hints
         # Whether a string goes on after a gap with a line break, and what the gap may hold.
         self.string_continuation = string_continuation
+        # Whether a carriage return with no line feed after it ends a line.  MySQL, MariaDB, SQLite and CockroachDB
+        # end a line only at a line feed.  A carriage return and a line feed end a line at the carriage return in every
+        # dialect.
+        self.carriage_return_ends_line = carriage_return_ends_line
         # Whether a name may hold @ and #, and of the characters above U+007F only those T-SQL takes.  A parameter's
         # name is read by the same rule; otherwise it takes letters, digits and _.
         self._names_hold_at_and_hash = names_hold_at_and_hash
@@ -127,6 +132,20 @@ class DialectRules:
         while index < end and self.is_parameter_name_character(text[index]):
             index += 1
         return index
+
+    def is_line_terminator(self, value: str) -> bool:
+        """Whether `value` ends a line in this dialect: `\\n`, and `\\r` where `carriage_return_ends_line`."""
+        return value == "\n" or (value == "\r" and self.carriage_return_ends_line)
+
+    def find_line_end(self, text: str, start: int, end: int) -> int:
+        """The offset where the first line from `start` ends, no further than `end`: at its line terminator, or at the
+        `\\r` of a `\\r\\n`, or `end` when no line ends before it."""
+        if self.carriage_return_ends_line:
+            return find_line_end(text, start, end)
+        line_feed = text.find("\n", start, end)
+        if line_feed < 0:
+            return end
+        return line_feed - 1 if line_feed > start and text[line_feed - 1] == "\r" else line_feed
 
     def find_starter(self, text: str, start: int) -> int:
         """The offset of the first character from `start` on that can start a comment, a parameter or a quoted
@@ -173,6 +192,7 @@ def _create_mysql_family(dialect: Dialect) -> list[DialectRules]:
                 dash_needs_whitespace=True,
                 hash_comments=True,
                 mariadb_hints=dialect == Dialect.MARIADB,
+                carriage_return_ends_line=False,
             )
         )
     return family
@@ -202,10 +222,12 @@ _BY_DIALECT_AND_OPTIONS: dict[tuple[Dialect, DialectOptions], DialectRules] = {
         {"'": _BYTES_ESCAPE_STRING, '"': _DOUBLED, "$": _DOLLAR},
         nested_comments=True,
         string_continuation=StringContinuation.ACROSS_WHITESPACE,
+        carriage_return_ends_line=False,
     ),
     (Dialect.SQLITE, DialectOptions.NONE): DialectRules(
         DialectChoice(Dialect.SQLITE),
         {"'": _DOUBLED, '"': _DOUBLED, "`": _DOUBLED, "[": _BRACKET},
+        carriage_return_ends_line=False,
     ),
     (Dialect.ORACLE, DialectOptions.NONE): DialectRules(
         DialectChoice(Dialect.ORACLE),

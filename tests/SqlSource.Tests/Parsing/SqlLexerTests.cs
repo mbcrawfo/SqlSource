@@ -310,6 +310,13 @@ public sealed class SqlLexerTests
     // A dollar sign in a parameter's name.
     [InlineData("SqlServer", "@a$b c", "Parameter:@a$b | Text: c")]
     [InlineData("Ansi,PostgreSql,CockroachDb,MySql,MariaDb,Sqlite,Oracle", "@a$b c", "Parameter:@a | Text:$b c")]
+    // A carriage return alone ends a line only where the database ends one there.  With a line feed after it, it ends
+    // one in every dialect.
+    [InlineData("Ansi,SqlServer,PostgreSql,Oracle", "a -- c\rb", "Text:a  | LineComment:-- c | Text:\rb")]
+    [InlineData("CockroachDb,MySql,MariaDb,Sqlite", "a -- c\rb", "Text:a  | LineComment:-- c\rb")]
+    [InlineData("MySql,MariaDb", "a # c\r\rb\r\nd", "Text:a  | LineComment:# c\r\rb | Text:\r\nd")]
+    [InlineData("Oracle", "a --+ h\rb", "Text:a  | Hint:--+ h | Text:\rb")]
+    [InlineData(AllDialects, "a -- c\r\nb", "Text:a  | LineComment:-- c | Text:\r\nb")]
     public void Lex_Construct_IsReadByTheRulesOfTheDialect(string dialects, string text, string expected)
     {
         foreach (var dialect in dialects.Split(','))
@@ -455,9 +462,9 @@ public sealed class SqlLexerTests
         "E'a'\n-- c\n'b\\' x",
         "Text:E | Quoted:'a' | Text:\n | LineComment:-- c | Text:\n | Quoted:'b\\' | Text: x"
     )]
-    // A reading that differs from the database, which docs/tech-debt/TD-0004 lists.  CockroachDB ends a line only
-    // at a line feed, so to it this gap holds no line break.
-    [InlineData("E'a'\r'b\\'c' x", "Text:E | Quoted:'a' | Text:\r | Quoted:'b\\'c' | Text: x")]
+    // CockroachDB ends a line only at a line feed, so to it a gap with a carriage return alone holds no line break,
+    // and the string does not go on: the next part is a string of its own, which takes no escape.
+    [InlineData("E'a'\r'b\\' x", "Text:E | Quoted:'a' | Text:\r | Quoted:'b\\' | Text: x")]
     public void Lex_StringInCockroachDb_IsReadByItsRules(string text, string expected) =>
         string.Join(" | ", Lex(text, SqlDialectRules.CockroachDb)).ShouldBe(expected);
 

@@ -114,8 +114,8 @@ public sealed class SqlTextBuilderTests
         const string Text = "A\n-- name: X\nB\n";
         var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
 
-        SqlTextBuilder.Build(Text, lexemes, 0, 1, keepComments: false).Text.ShouldBe("A");
-        SqlTextBuilder.Build(Text, lexemes, 2, 3, keepComments: false).Text.ShouldBe("B");
+        SqlTextBuilder.Build(Text, SqlDialectRules.Ansi, lexemes, 0, 1, keepComments: false).Text.ShouldBe("A");
+        SqlTextBuilder.Build(Text, SqlDialectRules.Ansi, lexemes, 2, 3, keepComments: false).Text.ShouldBe("B");
     }
 
     [Theory]
@@ -126,7 +126,7 @@ public sealed class SqlTextBuilderTests
         const string Text = "-- c\r\n/* x */ SELECT {{a}} -- d\r\n\r\n-- summary: s\r\n  FROM {{b}}";
         var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
 
-        var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, keepComments);
+        var built = SqlTextBuilder.Build(Text, SqlDialectRules.Ansi, lexemes, 0, lexemes.Count, keepComments);
 
         foreach (var token in new[] { "{{a}}", "{{b}}" })
         {
@@ -149,7 +149,7 @@ public sealed class SqlTextBuilderTests
             + "\r\n  /*+ h\r\n  i */ FROM t -- d  \r\n   \r\nWHERE {{y}} = $$ z\n $$  \r\n";
         var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
 
-        var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, keepComments);
+        var built = SqlTextBuilder.Build(Text, SqlDialectRules.Ansi, lexemes, 0, lexemes.Count, keepComments);
 
         for (var index = 0; index < built.Text.Length; index++)
         {
@@ -183,7 +183,7 @@ public sealed class SqlTextBuilderTests
     )
     {
         var lexemes = SqlLexer.Lex(text, SqlDialectRules.Ansi).Lexemes;
-        var built = SqlTextBuilder.Build(text, lexemes, 0, lexemes.Count, keepComments: false);
+        var built = SqlTextBuilder.Build(text, SqlDialectRules.Ansi, lexemes, 0, lexemes.Count, keepComments: false);
 
         var output = built.ToOutput(text.IndexOf(at, StringComparison.Ordinal));
 
@@ -194,6 +194,16 @@ public sealed class SqlTextBuilderTests
     [InlineData("SELECT 1 # c\n# d\nFROM t # e", false, "SELECT 1\nFROM t")]
     [InlineData("SELECT 1 # c\n# d\nFROM t # e", true, "SELECT 1 # c\n# d\nFROM t # e")]
     public void Build_HashCommentOfMySql_IsTreatedAsALineComment(string text, bool keepComments, string expected) =>
+        Build(text, keepComments, SqlDialectRules.MySql).ShouldBe(expected);
+
+    // MySQL ends a line only at a line feed, so a carriage return alone stays in the SQL, and a kept comment runs past
+    // it as the server reads it.  A carriage return and a line feed end a line as in every dialect.
+    [Theory]
+    [InlineData("SELECT 1 -- c\r, 2\nFROM t", false, "SELECT 1\nFROM t")]
+    [InlineData("SELECT 1 -- c\r, 2\nFROM t", true, "SELECT 1 -- c\r, 2\nFROM t")]
+    [InlineData("SELECT 1,\r  2  \r\n\r\nFROM t", false, "SELECT 1,\r  2\nFROM t")]
+    [InlineData("SELECT 1 -- c\r\n\r\nFROM t -- d\r\n", true, "SELECT 1 -- c\n\nFROM t -- d")]
+    public void Build_CarriageReturnAloneUnderMySql_EndsNoLine(string text, bool keepComments, string expected) =>
         Build(text, keepComments, SqlDialectRules.MySql).ShouldBe(expected);
 
     [Fact]
@@ -212,7 +222,7 @@ public sealed class SqlTextBuilderTests
         const string Text = "SELECT @a, -- note @x\n    @b /* c */ FROM t\n\nWHERE x = @a;\n";
         var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
 
-        var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, keepComments: false);
+        var built = SqlTextBuilder.Build(Text, SqlDialectRules.Ansi, lexemes, 0, lexemes.Count, keepComments: false);
 
         built.Text.ShouldBe("SELECT @a,\n    @b   FROM t\nWHERE x = @a;");
         built.Parameters.Select(span => built.Text.Substring(span.Start, span.Length)).ShouldBe(["@a", "@b", "@a"]);
@@ -220,8 +230,9 @@ public sealed class SqlTextBuilderTests
 
     private static string Build(string text, bool keepComments = false, SqlDialectRules? rules = null)
     {
-        var lexed = SqlLexer.Lex(text, rules ?? SqlDialectRules.Ansi);
+        rules ??= SqlDialectRules.Ansi;
+        var lexed = SqlLexer.Lex(text, rules);
         lexed.Error.ShouldBeNull();
-        return SqlTextBuilder.Build(text, lexed.Lexemes, 0, lexed.Lexemes.Count, keepComments).Text;
+        return SqlTextBuilder.Build(text, rules, lexed.Lexemes, 0, lexed.Lexemes.Count, keepComments).Text;
     }
 }

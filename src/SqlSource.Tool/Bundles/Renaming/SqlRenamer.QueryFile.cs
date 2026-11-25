@@ -13,7 +13,7 @@ internal sealed partial class SqlRenamer
     {
         private void LineCommentOfQueryFile(SqlLexeme comment)
         {
-            if (SqlMarkerReader.Read(text, comment) is not { } marker)
+            if (SqlMarkerReader.Read(text, comment, renamer._rules) is not { } marker)
             {
                 _into.ReplaceTo(comment.Span.End, "--");
                 return;

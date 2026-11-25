@@ -104,13 +104,13 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
             Add(
                 isHint ? SqlLexemeKind.Hint : SqlLexemeKind.LineComment,
                 start,
-                SqlText.FindLineEnd(text, start, text.Length)
+                Rules.FindLineEnd(text, start, text.Length)
             );
             PassGap(!isHint && Rules.StringContinuation == SqlStringContinuation.AcrossLineComments);
         }
         else if (current == '#' && Rules.HashComments)
         {
-            Add(SqlLexemeKind.LineComment, start, SqlText.FindLineEnd(text, start, text.Length));
+            Add(SqlLexemeKind.LineComment, start, Rules.FindLineEnd(text, start, text.Length));
             PassGap(allowed: false);
         }
         else if (current == '/' && SqlText.CharAt(text, start + 1) == '*')
@@ -162,7 +162,7 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
                 return;
             }
 
-            _gapHasLineBreak |= SqlText.IsLineTerminator(value);
+            _gapHasLineBreak |= Rules.IsLineTerminator(value);
         }
 
         _gapStart = end;

@@ -171,7 +171,7 @@ internal static class SqlFileParser
             var markers = new List<(int Index, SqlMarker Marker)>();
             for (var index = 0; index < lexemes.Count; index++)
             {
-                if (SqlMarkerReader.Read(text, lexemes[index]) is { Kind: SqlMarkerKind.Name } marker)
+                if (SqlMarkerReader.Read(text, lexemes[index], rules) is { Kind: SqlMarkerKind.Name } marker)
                 {
                     markers.Add((index, marker));
                 }
@@ -251,7 +251,7 @@ internal static class SqlFileParser
             for (var index = 0; index < end; index++)
             {
                 var lexeme = lexemes[index];
-                if (SqlMarkerReader.Read(text, lexeme) is { } marker)
+                if (SqlMarkerReader.Read(text, lexeme, rules) is { } marker)
                 {
                     if (marker.Kind == SqlMarkerKind.Dialect)
                     {
@@ -351,7 +351,7 @@ internal static class SqlFileParser
             var summary = new List<string>();
             for (var index = start; index < end; index++)
             {
-                if (SqlMarkerReader.Read(text, lexemes[index]) is not { } marker)
+                if (SqlMarkerReader.Read(text, lexemes[index], rules) is not { } marker)
                 {
                     continue;
                 }
@@ -392,7 +392,7 @@ internal static class SqlFileParser
         // from it.
         private BuiltQuery BuildQuery(SqlMarkerScope? scope, int start, int end)
         {
-            var sql = SqlTextBuilder.Build(text, lexemes, start, end, keepComments: false);
+            var sql = SqlTextBuilder.Build(text, rules, lexemes, start, end, keepComments: false);
             var scanned = TokenScanner.Scan(sql.Text, scope?.IgnoredTokens ?? SqlMarkerScope.NoNames);
             foreach (var error in scanned.Errors)
             {
@@ -563,7 +563,7 @@ internal static class SqlFileParser
             ISet<string> ignoredTokens
         )
         {
-            var kept = SqlTextBuilder.Build(text, lexemes, start, end, keepComments: true);
+            var kept = SqlTextBuilder.Build(text, rules, lexemes, start, end, keepComments: true);
             if (string.Equals(kept.Text, query.Sql.Text, StringComparison.Ordinal))
             {
                 return (null, EquatableArray<SqlParseError>.Empty);

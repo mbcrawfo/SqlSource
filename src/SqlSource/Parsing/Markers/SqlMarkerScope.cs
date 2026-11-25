@@ -529,7 +529,7 @@ internal sealed class SqlMarkerScope(
             return;
         }
 
-        var defaultValue = WithoutComments(defaultText, lexed.Lexemes);
+        var defaultValue = WithoutComments(defaultText, lexed.Lexemes, rules);
 
         _tokenDefaults ??= [];
         foreach (var existing in _tokenDefaults)
@@ -554,13 +554,15 @@ internal sealed class SqlMarkerScope(
 
     // The default as one in the SQL is read: built without comments by the builder of a query's SQL, then trimmed as
     // the token scanner trims it.  A default without a comment is its own text and costs nothing more.
-    private static string WithoutComments(string defaultText, EquatableArray<SqlLexeme> lexemes)
+    private static string WithoutComments(string defaultText, EquatableArray<SqlLexeme> lexemes, SqlDialectRules rules)
     {
         for (var index = 0; index < lexemes.Count; index++)
         {
             if (lexemes[index].Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment)
             {
-                var built = SqlTextBuilder.Build(defaultText, lexemes, 0, lexemes.Count, keepComments: false).Text;
+                var built = SqlTextBuilder
+                    .Build(defaultText, rules, lexemes, 0, lexemes.Count, keepComments: false)
+                    .Text;
                 var trimmed = SqlText.Trim(built, 0, built.Length);
                 return trimmed.Length == built.Length ? built : built.Substring(trimmed.Start, trimmed.Length);
             }

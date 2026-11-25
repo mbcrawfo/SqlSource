@@ -96,6 +96,7 @@ internal sealed class SqlDialectRules
             Dialect = SqlDialect.CockroachDb,
             NestedComments = true,
             StringContinuation = SqlStringContinuation.AcrossWhitespace,
+            CarriageReturnEndsLine = false,
         };
 
     /// <summary>MySQL with no options.  <see cref="For" /> gives the rules of a set of options.</summary>
@@ -105,7 +106,11 @@ internal sealed class SqlDialectRules
     public static SqlDialectRules MariaDb => MariaDbByOptions[(int)SqlDialectOptions.None];
 
     public static SqlDialectRules Sqlite { get; } =
-        new(('\'', Doubled), ('"', Doubled), ('`', Doubled), ('[', Bracket)) { Dialect = SqlDialect.Sqlite };
+        new(('\'', Doubled), ('"', Doubled), ('`', Doubled), ('[', Bracket))
+        {
+            Dialect = SqlDialect.Sqlite,
+            CarriageReturnEndsLine = false,
+        };
 
     public static SqlDialectRules Oracle { get; } =
         new(('\'', QuoteOperator), ('"', Doubled)) { Dialect = SqlDialect.Oracle, LineHints = true };
@@ -139,6 +144,13 @@ internal sealed class SqlDialectRules
 
     /// <summary>Whether a block comment that starts <c>/*M!</c> is a hint, as in MariaDB.</summary>
     public bool MariaDbHints { get; private init; }
+
+    /// <summary>
+    /// Whether a carriage return with no line feed after it ends a line.  MySQL, MariaDB, SQLite and CockroachDB end a
+    /// line only at a line feed, so to them a <c>--</c> comment runs past a carriage return alone.  A carriage return
+    /// and a line feed end a line at the carriage return in every dialect.
+    /// </summary>
+    public bool CarriageReturnEndsLine { get; private init; } = true;
 
     /// <summary>
     /// Whether a string goes on after a gap with a line break, and what the gap may hold.  It matters after a
@@ -184,12 +196,14 @@ internal sealed class SqlDialectRules
                     DashNeedsWhitespace = true,
                     HashComments = true,
                     MariaDbHints = true,
+                    CarriageReturnEndsLine = false,
                 }
                 : new SqlDialectRules(('\'', singleQuote), ('"', doubleQuote), ('`', Doubled), ('$', Dollar))
                 {
                     Dialect = SqlDialect.MySql,
                     DashNeedsWhitespace = true,
                     HashComments = true,
+                    CarriageReturnEndsLine = false,
                 };
         }
 
@@ -253,6 +267,34 @@ internal sealed class SqlDialectRules
         }
 
         return index;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="value" /> ends a line in this dialect: <c>\n</c>, and <c>\r</c> where
+    /// <see cref="CarriageReturnEndsLine" />.  The test for one character, where <see cref="FindLineEnd" /> searches a
+    /// range.  A <c>\r</c> before a <c>\n</c> is not one under the other dialects, but the <c>\n</c> is.
+    /// </summary>
+    public bool IsLineTerminator(char value) => value == '\n' || (value == '\r' && CarriageReturnEndsLine);
+
+    /// <summary>
+    /// The offset where the first line from <paramref name="start" /> ends, no further than <paramref name="end" />:
+    /// at its line terminator, or at the <c>\r</c> of a <c>\r\n</c>, or <paramref name="end" /> when no line ends
+    /// before it.
+    /// </summary>
+    public int FindLineEnd(string text, int start, int end)
+    {
+        if (CarriageReturnEndsLine)
+        {
+            return SqlText.FindLineEnd(text, start, end);
+        }
+
+        var lineFeed = text.IndexOf('\n', start, end - start);
+        if (lineFeed < 0)
+        {
+            return end;
+        }
+
+        return lineFeed > start && text[lineFeed - 1] == '\r' ? lineFeed - 1 : lineFeed;
     }
 
     /// <summary>
