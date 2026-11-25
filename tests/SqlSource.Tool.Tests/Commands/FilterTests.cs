@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
@@ -78,6 +79,59 @@ public sealed class FilterTests : IDisposable
     [InlineData("Q\\Users.sql")]
     public async Task Plan_SqlPathSpelledAnotherWay_SelectsTheFile(string path) =>
         (await SelectedAsync(path)).ShouldBe(["GetUser", "GetInvoice", "Plain"]);
+
+    // A shell's $PWD keeps the spelling of a link to the working directory, which MSBuild's paths do not.
+    [Fact]
+    public async Task Plan_FullSqlPathThroughALinkToTheWorkingDirectory_SelectsTheFile()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
+        _ = Directory.CreateSymbolicLink(_run.Folder.PathOf("Link"), _run.Folder.Path);
+
+        (await SelectedAsync(_run.Folder.PathOf("Link/Q/Users.sql"))).ShouldBe(["GetUser", "GetInvoice", "Plain"]);
+    }
+
+    [Fact]
+    public async Task Plan_FullSqlPathThroughALinkToAFolderAbove_SelectsTheFile()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
+        _ = Directory.CreateSymbolicLink(_run.Folder.PathOf("Up"), Path.GetDirectoryName(_run.Folder.Path)!);
+        var path = Path.Combine(_run.Folder.PathOf("Up"), Path.GetFileName(_run.Folder.Path), "Q", "Users.sql");
+
+        (await SelectedAsync(path)).ShouldBe(["GetUser", "GetInvoice", "Plain"]);
+    }
+
+    [Fact]
+    public async Task Plan_SqlPathThroughALinkAndItsRealPath_SelectTheFileOnce()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
+        _ = Directory.CreateSymbolicLink(_run.Folder.PathOf("Link"), _run.Folder.PathOf("Q"));
+
+        var (plan, result) = await _run.PlanAsync("describe", "Link/Users.sql", "Q/Users.sql");
+
+        result.ShouldBe(new CliResult(0, "", ""));
+        plan.ShouldNotBeNull()
+            .Filters.Files.ShouldHaveSingleItem()
+            .Named.ShouldBe($"'{_run.Folder.PathOf("Link/Users.sql")}'");
+    }
+
+    [Fact]
+    public async Task Plan_UnclaimedSqlPathThroughALink_IsSqlsrc212AsTyped()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
+        _ = Directory.CreateSymbolicLink(_run.Folder.PathOf("Link"), _run.Folder.Path);
+        var path = _run.Folder.PathOf("Link/Unclaimed/Other.sql");
+
+        var (_, result) = await _run.PlanAsync("describe", path);
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                $"sqlsource : error SQLSRC212: '{path}' is not a .sql file that a type of the run claims\n"
+                    + Expected.See("SQLSRC212")
+            )
+        );
+    }
 
     [Fact]
     public async Task Plan_SqlPathInFull_SelectsTheFile() =>

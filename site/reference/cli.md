@@ -78,6 +78,7 @@ $ dotnet sqlsource describe src/App/Queries/Users.sql src/App/Queries/Orders.sql
 - **A path that ends in `.sql` restricts the run to that file.**  You can give several.
 - **Each `.sql` path must be a file that a type of the run claims.**  If it is not, the tool reports [SQLSRC212](../diagnostics.md#sqlsrc212), and the rest of the run goes on.
 - **A relative path starts from the current folder.**
+- **A path through a symbolic link names the file the link leads to.**  This holds for a `.sql` path, the file of `--query` and a `--project` path.  It also holds when you reach the current folder through a link, as in a shell's `$PWD`.
 
 <a id="paths"></a>
 
@@ -269,17 +270,3 @@ A name given to `--database` that no query of the run has gets a line of zeros, 
 - **If it is not, the line says `--database at position <n>`**, with the position of the value on the command line.  A value typed after `--database` by mistake can be a secret.
 
 If no project of a solution uses SqlSource, a run on the solution prints `sqlsource: no project of '<path>' uses SqlSource`, and no summary.
-
-<a id="limits"></a>
-
-## Limits
-
-<a id="limit-path-through-a-symbolic-link"></a>
-
-### SQLSRC207 or SQLSRC212 for a path through a symbolic link
-
-**What you see.**  A project path or a `.sql` path through a symbolic link is not found, though the file is there.  For `--project`, the tool reports [SQLSRC207](../diagnostics.md#sqlsrc207).  For a `.sql` path, it reports [SQLSRC212](../diagnostics.md#sqlsrc212).  The message shows both spellings of the path.
-
-**Why.**  The current folder is reached through a symbolic link, and you give a full path that goes through the link.  The tool compares that path with the real path, and finds no match.
-
-**What to do.**  Give the path relative to the current folder, or give the full real path.
