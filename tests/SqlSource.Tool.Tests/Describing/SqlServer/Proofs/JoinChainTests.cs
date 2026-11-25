@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Describing.SqlServer.Proofs;
@@ -74,6 +75,59 @@ public sealed class JoinChainTests
         string.Join(' ', outer.Select(index => tokens[index].Text)).ShouldBe(words);
     }
 
+    [Fact]
+    public void Read_FullJoin_GivesEachSourceItsReferenceAndJoinStart()
+    {
+        var (chain, sources) = Read("FROM issued AS iss FULL JOIN received AS rec ON rec.invoice_id = iss.id");
+
+        sources.Select(source => Text(chain, source.Reference)).ShouldBe(["issued AS iss", "received AS rec"]);
+        sources[0].JoinStart.ShouldBe(-1);
+        chain.Tokens[sources[1].JoinStart].Text.ShouldBe("FULL");
+        sources.Select(static source => source.IsFull).ShouldBe([false, true]);
+        sources.Select(static source => source.IsDerived).ShouldBe([false, false]);
+    }
+
+    [Fact]
+    public void Read_DerivedTableWithColumns_ReferenceHoldsTheColumnList()
+    {
+        var (chain, sources) = Read("FROM a LEFT JOIN (SELECT 1) AS q (x) ON q.x = a.k");
+
+        Text(chain, sources[1].Reference).ShouldBe("(SELECT 1) AS q (x)");
+        Text(chain, new TokenRange(sources[1].JoinStart, sources[1].Reference.Start)).ShouldBe("LEFT JOIN");
+        sources.Select(static source => source.IsDerived).ShouldBe([false, true]);
+        sources.Select(static source => source.IsFull).ShouldBe([false, false]);
+    }
+
+    [Fact]
+    public void Read_TableHint_ReferenceHoldsTheHint()
+    {
+        var (chain, sources) = Read("FROM dbo.t a WITH (NOLOCK) JOIN b ON b.k = a.k");
+
+        Text(chain, sources[0].Reference).ShouldBe("dbo.t a WITH (NOLOCK)");
+        Text(chain, sources[1].Reference).ShouldBe("b");
+        chain.Tokens[sources[1].JoinStart].Text.ShouldBe("JOIN");
+    }
+
+    [Fact]
+    public void Read_RightJoin_MarksTheSourceItAdds()
+    {
+        var (_, sources) = Read("FROM a FULL JOIN b ON 1 = 1 RIGHT OUTER JOIN c ON 1 = 1 LEFT JOIN d ON 1 = 1");
+
+        sources.Select(static source => source.IsRight).ShouldBe([false, false, true, false]);
+        sources.Select(static source => source.IsFull).ShouldBe([false, true, false, false]);
+    }
+
+    private static (Chain Chain, IReadOnlyList<JoinSource> Sources) Read(string from)
+    {
+        var sql = $"SELECT 1 AS n {from}";
+        var tokens = TsqlTokens.Read(sql);
+        var range = SelectStatement.Read(tokens).ShouldNotBeNull().Body.From.ShouldNotBeNull();
+        return (new Chain(sql, tokens), JoinChain.Read(tokens, range).ShouldNotBeNull());
+    }
+
+    private static string Text(Chain chain, TokenRange range) =>
+        chain.Sql[chain.Tokens[range.Start].Start..chain.Tokens[range.End - 1].End];
+
     private static string Mark(JoinSource source)
     {
         if (source.IsOptionalBesidesItsLeftJoin)
@@ -83,6 +137,8 @@ public sealed class JoinChainTests
 
         return source.IsOptional ? "!" : "";
     }
+
+    private sealed record Chain(string Sql, IReadOnlyList<TsqlToken> Tokens);
 
     private static string Sources(string from)
     {

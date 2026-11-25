@@ -17,10 +17,117 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// aliased <c>[1]</c>, <c>[2]</c>, ..., then its <c>FROM</c> to the end of its <c>WHERE</c>.  Each operand is so
 /// evaluated over the rows the query's <c>FROM</c> and <c>WHERE</c> give, and the server's answer about it holds where
 /// the proof reads it.  The text is sent only as <c>@tsql</c> of <c>sys.dm_exec_describe_first_result_set</c>, as the
-/// query's is.
+/// query's is.  An operand asked over one side of the last <c>FULL JOIN</c> has a call of its own scope, whose text
+/// has that side's pieces of the <c>FROM</c> in place of the <c>FROM</c> through the <c>WHERE</c>.
 /// </remarks>
 internal static class OperandsQuery
 {
+    /// <summary>
+    /// The place of an operand that no call asks: far past the end of the answers, where no answer is, however many
+    /// operands the calls before it ask.
+    /// </summary>
+    public const int Unasked = int.MaxValue / 2;
+
+    // The scopes in the order of their calls.
+    private static readonly OperandScope[] Order = [OperandScope.Rows, OperandScope.LeftSide, OperandScope.RightSide];
+
+    /// <summary>
+    /// The <c>operands</c> calls for the operands a branch's proofs ask, and the place of each operand's answer in the
+    /// answers of these calls joined in order.
+    /// </summary>
+    /// <param name="sql">The query's SQL, which the tokens were read from.</param>
+    /// <param name="tokens">The query's tokens.</param>
+    /// <param name="with">The <c>WITH</c> clause the branch sees, empty when it has none.</param>
+    /// <param name="body">The branch.</param>
+    /// <param name="proofs">The proofs of the branch's items, whose operands and their scopes are asked.</param>
+    /// <param name="filtered">
+    /// What the branch's <c>FROM</c> and <c>WHERE</c> keep, which gives each side's rows.
+    /// </param>
+    /// <param name="cuts">
+    /// The tokens to leave out of the <c>FROM</c> of the rows' call, as <see cref="Text" /> takes them.
+    /// </param>
+    public static (IReadOnlyList<ColumnProofs.OperandQuery> Queries, IReadOnlyList<int> Places) Calls(
+        string sql,
+        IReadOnlyList<TsqlToken> tokens,
+        TokenRange with,
+        SelectBody body,
+        ExpressionProofs proofs,
+        FilteredRows filtered,
+        IReadOnlyList<int>? cuts
+    ) => Calls(sql, tokens, with, body, proofs.Operands, proofs.Scopes, filtered, cuts);
+
+    /// <summary>
+    /// The <c>operands</c> calls for operands, each asked in its scope, and the place of each operand's answer in the
+    /// answers of these calls joined in order.
+    /// </summary>
+    /// <param name="sql">The query's SQL, which the tokens were read from.</param>
+    /// <param name="tokens">The query's tokens.</param>
+    /// <param name="with">The <c>WITH</c> clause the branch sees, empty when it has none.</param>
+    /// <param name="body">The branch.</param>
+    /// <param name="operands">The operands, none empty.</param>
+    /// <param name="scopes">The scope of each operand, by its index.</param>
+    /// <param name="filtered">
+    /// What the branch's <c>FROM</c> and <c>WHERE</c> keep, which gives each side's rows.
+    /// </param>
+    /// <param name="cuts">
+    /// The tokens to leave out of the <c>FROM</c> of the rows' call, as <see cref="Text" /> takes them.
+    /// </param>
+    /// <remarks>
+    /// One call is made for each scope that has operands: <see cref="OperandScope.Rows" /> first, whose text is
+    /// <see cref="Text" />'s, then <see cref="OperandScope.LeftSide" />, then <see cref="OperandScope.RightSide" />,
+    /// each asking its operands in the order of their indexes.  A side's text is the <c>WITH</c> clause,
+    /// <c>SELECT</c> and its operands aliased as <see cref="Text" /> aliases them, then the side's pieces of the
+    /// <c>FROM</c> (<see cref="FilteredRows.FromOf" />), each on a line of its own, and no <c>WHERE</c>.  A side that
+    /// <see cref="FilteredRows.FromOf" /> gives no pieces for gets no call, and its operands' places are
+    /// <see cref="Unasked" />.
+    /// </remarks>
+    public static (IReadOnlyList<ColumnProofs.OperandQuery> Queries, IReadOnlyList<int> Places) Calls(
+        string sql,
+        IReadOnlyList<TsqlToken> tokens,
+        TokenRange with,
+        SelectBody body,
+        IReadOnlyList<TokenRange> operands,
+        IReadOnlyList<OperandScope> scopes,
+        FilteredRows filtered,
+        IReadOnlyList<int>? cuts
+    )
+    {
+        var queries = new List<ColumnProofs.OperandQuery>();
+        var places = Enumerable.Repeat(Unasked, operands.Count).ToArray();
+        var asked = 0;
+        foreach (var scope in Order)
+        {
+            var indexes = Enumerable.Range(0, operands.Count).Where(index => scopes[index] == scope).ToList();
+            if (indexes.Count == 0)
+            {
+                continue;
+            }
+
+            IReadOnlyList<TokenRange> ofScope = [.. indexes.Select(index => operands[index])];
+            string text;
+            if (scope == OperandScope.Rows)
+            {
+                text = Text(sql, tokens, with, body, ofScope, cuts);
+            }
+            else if (filtered.FromOf(scope) is { } from)
+            {
+                text = Built(sql, tokens, with, ofScope, from);
+            }
+            else
+            {
+                continue;
+            }
+
+            queries.Add(new ColumnProofs.OperandQuery(text, ofScope.Count));
+            foreach (var index in indexes)
+            {
+                places[index] = asked++;
+            }
+        }
+
+        return (queries, places);
+    }
+
     /// <summary>The text of <c>operands</c> for a query and the operands its proofs ask.</summary>
     /// <param name="sql">The query's SQL, which the tokens were read from.</param>
     /// <param name="tokens">The query's tokens.</param>
@@ -43,6 +150,15 @@ internal static class OperandsQuery
         SelectBody body,
         IReadOnlyList<TokenRange> operands,
         IReadOnlyList<int>? cuts = null
+    ) => Built(sql, tokens, with, operands, body.FromThroughWhere is { } from ? [.. Uncut(from, cuts ?? [])] : []);
+
+    // The WITH clause, SELECT and the operands aliased, then each piece of the FROM on a line of its own.
+    private static string Built(
+        string sql,
+        IReadOnlyList<TsqlToken> tokens,
+        TokenRange with,
+        IReadOnlyList<TokenRange> operands,
+        IReadOnlyList<TokenRange> from
     )
     {
         var text = new StringBuilder();
@@ -62,9 +178,9 @@ internal static class OperandsQuery
                         + "]"
                 )
             );
-        if (body.FromThroughWhere is { } from)
+        if (from.Count > 0)
         {
-            _ = text.Append('\n').AppendJoin('\n', Uncut(from, cuts ?? []).Select(part => Piece(sql, tokens, part)));
+            _ = text.Append('\n').AppendJoin('\n', from.Select(part => Piece(sql, tokens, part)));
         }
 
         return text.ToString();

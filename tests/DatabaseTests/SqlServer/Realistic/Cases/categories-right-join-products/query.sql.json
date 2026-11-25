@@ -139,8 +139,8 @@
             "precision": 21,
             "scale": 8
           },
-          "nullable": true,
-          "nullableSource": "server",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": {
             "schema": "dbo",
             "table": "products",

@@ -4,6 +4,19 @@ using System.Linq;
 
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 
+/// <summary>The rows an operand is asked over, each scope in a call of <c>operands</c> of its own.</summary>
+internal enum OperandScope
+{
+    /// <summary>The rows of the branch's <c>FROM</c> through its <c>WHERE</c>.</summary>
+    Rows,
+
+    /// <summary>The rows of the left side of the branch's last <c>FULL JOIN</c> alone.</summary>
+    LeftSide,
+
+    /// <summary>The rows of the right side of the branch's last <c>FULL JOIN</c> alone.</summary>
+    RightSide,
+}
+
 /// <summary>
 /// The proofs that the items of one <c>SELECT</c> cannot be <c>NULL</c>, read from their tokens, and the operands they
 /// leave to ask the server.
@@ -78,14 +91,20 @@ internal sealed partial class ExpressionProofs(
 
     private readonly List<TokenRange> _operands = [];
 
-    // The leaves of the item being proved, which a Proof.Operand indexes until Of numbers the ones its proof keeps.
-    private readonly List<TokenRange> _leaves = [];
+    private readonly List<OperandScope> _scopes = [];
+
+    // The leaves of the item being proved, each with the rows it is asked over, which a Proof.Operand indexes until Of
+    // numbers the ones its proof keeps.
+    private readonly List<(TokenRange Range, OperandScope Scope)> _leaves = [];
 
     /// <summary>
-    /// The operands to ask, each text once, in the order the items' proofs first use them; a
+    /// The operands to ask, each text once in each scope, in the order the items' proofs first use them; a
     /// <see cref="Proof.Operand" /> indexes it.
     /// </summary>
     public IReadOnlyList<TokenRange> Operands => _operands;
+
+    /// <summary>The rows each operand of <see cref="Operands" /> is asked over, by its index.</summary>
+    public IReadOnlyList<OperandScope> Scopes => _scopes;
 
     /// <summary>The proof of an item's expression, in the select's context.</summary>
     /// <remarks>
@@ -103,7 +122,7 @@ internal sealed partial class ExpressionProofs(
 
         _leaves.Clear();
         var proof = Expression(expression, rows: false);
-        return !asksLoneLeaf && proof is Proof.Operand leaf && IsTheWholeItem(_leaves[leaf.Index], expression)
+        return !asksLoneLeaf && proof is Proof.Operand leaf && IsTheWholeItem(_leaves[leaf.Index].Range, expression)
             ? Proof.No
             : Numbered(proof);
     }
@@ -139,7 +158,7 @@ internal sealed partial class ExpressionProofs(
             return Proof.No;
         }
 
-        _leaves.Add(expression);
+        _leaves.Add((expression, OperandScope.Rows));
         return Numbered(new Proof.AllOf([new Proof.Stored(0), new Proof.Clr(0)]));
     }
 
@@ -207,7 +226,7 @@ internal sealed partial class ExpressionProofs(
     private static bool IsOperator(TsqlToken token) =>
         token.Kind == TsqlTokenKind.Symbol && token.Text is "+" or "-" or "*" or "/" or "%";
 
-    // The proof with each leaf it kept numbered as an operand, a text asked before taking its number.
+    // The proof with each leaf it kept numbered as an operand, a text asked before in its scope taking its number.
     private Proof Numbered(Proof proof) =>
         proof switch
         {
@@ -220,15 +239,18 @@ internal sealed partial class ExpressionProofs(
             _ => proof,
         };
 
-    private int OperandIndex(TokenRange range)
+    private int OperandIndex((TokenRange Range, OperandScope Scope) leaf)
     {
-        var index = _operands.FindIndex(operand => IsSameText(operand, range));
-        if (index >= 0)
+        for (var index = 0; index < _operands.Count; index++)
         {
-            return index;
+            if (_scopes[index] == leaf.Scope && IsSameText(_operands[index], leaf.Range))
+            {
+                return index;
+            }
         }
 
-        _operands.Add(range);
+        _operands.Add(leaf.Range);
+        _scopes.Add(leaf.Scope);
         return _operands.Count - 1;
     }
 
@@ -440,7 +462,7 @@ internal sealed partial class ExpressionProofs(
             return Proof.No;
         }
 
-        _leaves.Add(range);
+        _leaves.Add((range, OperandScope.Rows));
         var index = _leaves.Count - 1;
 
         // A filter tests the value and the result reads it again, so what it keeps from NULL holds only of a value

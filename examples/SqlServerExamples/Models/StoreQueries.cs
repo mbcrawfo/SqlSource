@@ -35,6 +35,18 @@ public sealed partial class StoreQueries(DbConnection connection)
     public Task<IEnumerable<ListShippedOrdersDto>> ListShippedOrdersAsync() =>
         connection.QueryAsync<ListShippedOrdersDto>(Sql.ListShippedOrders);
 
+    // UserId is an int and not an int?: each row of the FULL JOIN has a user or an order, and COALESCE takes the id
+    // from whichever it has, so the tool shows it is never null.  Name and OrderId are nullable, since either side
+    // can be missing.
+    public Task<IEnumerable<ListUsersAndOrdersDto>> ListUsersAndOrdersAsync() =>
+        connection.QueryAsync<ListUsersAndOrdersDto>(Sql.ListUsersAndOrders);
+
+    // LineTotal is a decimal and not a decimal?: SQL Server says a computed column that is not persisted can be null,
+    // but quantity * unit_price of columns that are never null is not, and an inner join keeps every line, so the
+    // tool shows it.
+    public Task<IEnumerable<ListOrderLineTotalsDto>> ListOrderLineTotalsAsync() =>
+        connection.QueryAsync<ListOrderLineTotalsDto>(Sql.ListOrderLineTotals);
+
     // MonthStart is a DateOnly and not a DateOnly?, by the query's -- column: marker, which leaves the column's name
     // alone for Dapper: DATEFROMPARTS of parts that are never null is not null, though the tool cannot show it.
     public Task<IEnumerable<ListOrderMonthsDto>> ListOrderMonthsAsync() =>

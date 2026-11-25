@@ -196,6 +196,7 @@ public sealed class SqlServerFieldsTests
             rules[$"{method} answer.rows[].sourceTable"] = FieldRule.Name(NameClass.Table);
             rules[$"{method} answer.rows[].sourceColumn"] = FieldRule.Name(NameClass.Column);
             rules[$"{method} answer.rows[].sourceType"] = FieldRule.Closed;
+            rules[$"{method} answer.rows[].computedDefinition"] = new FieldRule(FieldRuleKind.Sql, NameClass.Column);
         }
 
         foreach (var record in (string[])["parameters[].type.", "columns[].type."])

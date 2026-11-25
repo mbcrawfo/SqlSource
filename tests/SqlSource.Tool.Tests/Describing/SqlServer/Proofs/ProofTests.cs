@@ -67,6 +67,30 @@ public sealed class ProofTests
     [Fact]
     public void Shifted_Clr_MovesItsIndex() => new Proof.Clr(1).Shifted(2).ShouldBe(new Proof.Clr(3));
 
+    // A CTE's column and the proofs of the text alone have no operand to move.
+    [Fact]
+    public void Renumbered_MovesEveryOperandOfEveryKind()
+    {
+        var proof = new Proof.AllOf([
+            new Proof.Operand(0),
+            new Proof.NotClr(1),
+            new Proof.AnyOf([new Proof.Stored(2), new Proof.Clr(3)]),
+            new Proof.CteColumn(0, 1),
+            Proof.Yes,
+            Proof.No,
+        ]);
+
+        var renumbered = proof.Renumbered(static index => (index * 10) + 1).ShouldBeOfType<Proof.AllOf>();
+
+        renumbered.Parts.Count.ShouldBe(6);
+        renumbered.Parts[0].ShouldBe(new Proof.Operand(1));
+        renumbered.Parts[1].ShouldBe(new Proof.NotClr(11));
+        renumbered.Parts[2].ShouldBeOfType<Proof.AnyOf>().Parts.ShouldBe([new Proof.Stored(21), new Proof.Clr(31)]);
+        renumbered.Parts[3].ShouldBe(new Proof.CteColumn(0, 1));
+        renumbered.Parts[4].ShouldBeSameAs(Proof.Yes);
+        renumbered.Parts[5].ShouldBeSameAs(Proof.No);
+    }
+
     [Fact]
     public void Holds_AnyOf_IsTrueWhenOnePartHolds()
     {
