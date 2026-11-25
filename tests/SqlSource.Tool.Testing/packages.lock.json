@@ -265,11 +265,6 @@
           "Microsoft.IdentityModel.Logging": "8.16.0"
         }
       },
-      "Microsoft.SqlServer.Server": {
-        "type": "Transitive",
-        "resolved": "1.0.0",
-        "contentHash": "N4KeF3cpcm1PUHym1RmakkzfkEv3GRMyofVv40uXsQhCQeglr2OHNcUk2WOG51AKpGO8ynGpo9M/kFXSzghwug=="
-      },
       "NetTopologySuite.IO.PostGis": {
         "type": "Transitive",
         "resolved": "2.1.0",
@@ -365,9 +360,9 @@
         "type": "Project",
         "dependencies": {
           "Shouldly": "[4.3.0, )",
-          "SqlSource": "[0.1.0-dev, )",
-          "SqlSource.Repository": "[0.1.0-dev, )",
-          "SqlSource.Testing": "[0.1.0-dev, )",
+          "SqlSource": "[0.2.1-dev, )",
+          "SqlSource.Repository": "[0.2.1-dev, )",
+          "SqlSource.Testing": "[0.2.1-dev, )",
           "Testcontainers.MsSql": "[4.16.0, )",
           "Testcontainers.PostgreSql": "[4.16.0, )",
           "xunit.v3.assert": "[4.0.1, )",
@@ -382,8 +377,8 @@
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Shouldly": "[4.3.0, )",
-          "SqlSource": "[0.1.0-dev, )",
-          "SqlSource.Repository": "[0.1.0-dev, )",
+          "SqlSource": "[0.2.1-dev, )",
+          "SqlSource.Repository": "[0.2.1-dev, )",
           "xunit.v3.extensibility.core": "[4.0.1, )"
         }
       },
@@ -395,7 +390,7 @@
           "Microsoft.VisualStudio.SolutionPersistence": "[1.0.52, )",
           "Npgsql": "[10.0.3, )",
           "Npgsql.NetTopologySuite": "[10.0.3, )",
-          "SqlSource": "[0.1.0-dev, )",
+          "SqlSource": "[0.2.1-dev, )",
           "System.CommandLine": "[2.0.12, )"
         }
       },
@@ -423,6 +418,12 @@
           "System.Security.Cryptography.Pkcs": "9.0.18",
           "System.Threading.RateLimiting": "9.0.18"
         }
+      },
+      "Microsoft.SqlServer.Server": {
+        "type": "CentralTransitive",
+        "requested": "[1.0.0, )",
+        "resolved": "1.0.0",
+        "contentHash": "N4KeF3cpcm1PUHym1RmakkzfkEv3GRMyofVv40uXsQhCQeglr2OHNcUk2WOG51AKpGO8ynGpo9M/kFXSzghwug=="
       },
       "Microsoft.VisualStudio.SolutionPersistence": {
         "type": "CentralTransitive",

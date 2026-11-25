@@ -35,6 +35,7 @@ postgres tools/platform.sh
 sqlserver src/SqlSource.Tool/Bundles/Renaming/SqlServer/*
 sqlserver src/SqlSource.Tool/Describing/SqlServer/*
 sqlserver tests/DatabaseTests/SqlServer/*
+sqlserver tests/DatabaseTests/SqlServer.ClrType/*
 sqlserver tests/DatabaseTests/SqlServer.SqlClient61/*
 sqlserver tests/SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/*
 sqlserver tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/*

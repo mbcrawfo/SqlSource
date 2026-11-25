@@ -40,6 +40,7 @@ The eleven test projects, the four libraries they share and a stand-in of the to
 - `tests/DatabaseTests/Postgres.SyncAsync` runs each synchronous query method of the PostgreSQL end-to-end project beside its asynchronous twin and compares what the two do, needs Docker, and is run by the nightly alone.
 - `tests/DatabaseTests/SqlServer.SyncAsync` does the same for SQL Server's end-to-end project, needs Docker, and is run by the nightly alone.
 - `tests/SqlSource.Repository`, `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
+- `tests/DatabaseTests/SqlServer.ClrType` is a CLR type of a user's own assembly, built for .NET Framework 4.8, which `tests/DatabaseTests/SqlServer` loads into a server, and for .NET 10, which SqlClient reads the type through; it holds no tests.
 - `tests/SqlSource.Tool.StandIn` is a stand-in of the `sqlsource` tool, which the tests of the online build in `tests/SqlSource.Tool.Tests` give a real build as its command.
 
 `tools/MutationReport` is a console program that compares the reports of two mutation runs, which [`tools/mutation-test.sh`](tools/README.md#mutation-testing) runs, and prepares [the evidence of a test review](tools/README.md#the-test-reviews-commands); it builds with the solution and is never packed.

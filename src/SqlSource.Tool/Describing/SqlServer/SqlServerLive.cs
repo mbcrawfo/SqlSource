@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.SqlServer;
 
@@ -136,6 +137,7 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             },
             ConnectionErrors.AtOpen,
             static error => new SqlServerOpenAnswer(null, null, null, null, error, null),
+            connection,
             token
         );
 
@@ -171,6 +173,7 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             },
             ConnectionErrors.Of,
             static error => new SqlServerParametersAnswer(null, error),
+            connection,
             token
         );
 
@@ -196,6 +199,7 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             },
             ConnectionErrors.Of,
             static error => new SqlServerProbeAnswer(null, error),
+            connection,
             token
         );
 
@@ -241,6 +245,7 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             },
             ConnectionErrors.Of,
             static error => new SqlServerDeclaredAnswer(null, null, error),
+            connection,
             token
         );
 
@@ -343,6 +348,7 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             },
             ConnectionErrors.Of,
             static error => new SqlServerColumnsAnswer(null, null, error),
+            connection,
             token
         );
 
@@ -420,11 +426,18 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
     /// call.
     /// </param>
     /// <param name="failed">The call's answer that holds an error.</param>
+    /// <param name="session">
+    /// The session's connection, which a <see cref="SqlException" /> that ended the session marks lost, so that every
+    /// later call is refused as lost (<see cref="SqlServerConnection.IsLost" />).  SqlClient's own refusal of a command
+    /// on a connection the server ended, an <see cref="InvalidOperationException" /> that it is not "open and
+    /// available", is the lost connection too, but only once the connection is lost; any other is a bug.
+    /// </param>
     /// <param name="token">The token the call runs under.</param>
     internal static async Task<TAnswer> AnswerAsync<TAnswer>(
         Func<Task<TAnswer>> call,
         Func<SqlException, SqlServerServerError> errorOf,
         Func<SqlServerServerError, TAnswer> failed,
+        SqlServerConnection session,
         CancellationToken token
     )
     {
@@ -438,11 +451,21 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
         }
         catch (SqlException exception)
         {
+            if (ConnectionErrors.EndsTheSession(exception))
+            {
+                session.Lose();
+            }
+
             return failed(errorOf(exception));
         }
         catch (SqlServerConnection.UnusableException exception)
         {
             return failed(ConnectionErrors.Own(exception.Message));
+        }
+        catch (InvalidOperationException) when (session.IsLost)
+        {
+            session.Lose();
+            return failed(ConnectionErrors.Own(ConnectionTexts.LostConnection));
         }
     }
 }
