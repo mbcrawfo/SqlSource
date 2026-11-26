@@ -55,9 +55,11 @@ internal sealed record SelectBody(
     /// <summary>Its <c>WHERE</c> clause, from the word <c>WHERE</c> to its end; null without one.</summary>
     public TokenRange? Where { get; init; }
 
-    // The words that start another statement.  T-SQL needs no ";" between two, so one of them at the select's level
-    // is a batch of several.
-    private static readonly HashSet<string> StatementWords =
+    /// <summary>
+    /// The words that start another statement.  T-SQL needs no <c>;</c> between two, so one of them at a statement's
+    /// level is a batch of several.
+    /// </summary>
+    internal static readonly HashSet<string> StatementWords =
     [
         with(StringComparer.OrdinalIgnoreCase),
         "SELECT",
@@ -228,7 +230,8 @@ internal sealed record SelectBody(
         return token.IsSymbol(")") ? -1 : 0;
     }
 
-    private static bool IsBalanced(IReadOnlyList<TsqlToken> tokens, TokenRange range)
+    /// <summary>True when the range's depth by <see cref="DepthChange" /> ends at zero and is never below it.</summary>
+    internal static bool IsBalanced(IReadOnlyList<TsqlToken> tokens, TokenRange range)
     {
         var depth = 0;
         for (var index = range.Start; index < range.End && depth >= 0; index++)
@@ -408,8 +411,8 @@ internal sealed record SelectBody(
         return null;
     }
 
-    // The items, split at the list's commas, or null when the list or one of its items is empty.
-    private static List<SelectItem>? SplitItems(IReadOnlyList<TsqlToken> tokens, TokenRange list)
+    /// <summary>The items of a list, split at its commas, or null when the list or one of its items is empty.</summary>
+    internal static List<SelectItem>? SplitItems(IReadOnlyList<TsqlToken> tokens, TokenRange list)
     {
         if (list.IsEmpty)
         {
