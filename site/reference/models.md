@@ -221,7 +221,7 @@ This sample is `GetUserDto` as a `class`.
 - **A class has a property with `get` and `set` for each column or parameter**, and no constructor of its own.
 - **In a class, a property of a reference type that cannot be null starts as `default!`.**  So the class compiles under nullable reference types with no warning.  A property of a value type, or a property that can be null, has no initial value.
 - **The type of each property is written as its C# keyword, such as `int` or `string`, or else from `global::`**, as `global::System.DateTime`.  So a model compiles in any namespace, whatever your `using` lines and the names of your own types.  A type that you wrote by its short name is written by its full name.
-- **No generated model gives a compiler warning or error**, but for the [limit](type-mapping.md#limit-nullable-type-argument) of a `?` inside a type argument of a generic type.  This includes an `[Obsolete]` or `[Experimental]` type of your choice.  `[Experimental]` on the assembly or the module of the type counts too.
+- **No generated model gives a compiler warning or error.**  This includes an `[Obsolete]` or `[Experimental]` type of your choice.  `[Experimental]` on the assembly or the module of the type counts too.
 - **A type of one of these kinds is refused as [SQLSRC252](../diagnostics.md#sqlsrc252):**
   - a type marked `[Obsolete]` as an error, which no code can use without an error;
   - a type marked `[Obsolete]` or `[Experimental]` under a diagnostic id that is not an identifier, whose warning a model could not turn off;

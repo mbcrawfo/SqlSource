@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
@@ -35,13 +37,11 @@ public sealed class BundleJsonTests
     [Fact]
     public void Write_Outcome_IsAnObjectWithItsKind()
     {
-        BundleJson.Write(Info).ShouldContain("\"outcome\": {\n    \"kind\": \"entry\"\n  }");
-        BundleJson
-            .Write(Info with { Outcome = BundleOutcome.Failure("SQLSRC226", "describe parameters") })
-            .ShouldContain(
-                "\"outcome\": {\n    \"kind\": \"failure\",\n    \"id\": \"SQLSRC226\",\n"
-                    + "    \"step\": \"describe parameters\"\n  }"
-            );
+        OutcomeMembers(BundleJson.Write(Info)).ShouldBe([("kind", "entry")]);
+        OutcomeMembers(
+                BundleJson.Write(Info with { Outcome = BundleOutcome.Failure("SQLSRC226", "describe parameters") })
+            )
+            .ShouldBe([("kind", "failure"), ("id", "SQLSRC226"), ("step", "describe parameters")], ignoreOrder: true);
     }
 
     [Fact]
@@ -92,9 +92,7 @@ public sealed class BundleJsonTests
     [InlineData(-1)]
     public void Read_BundleVersionBelowOne_IsSqlsrc288(int version)
     {
-        var text = BundleJson
-            .Write(Info)
-            .Replace("\"bundleVersion\": 1,", $"\"bundleVersion\": {version},", System.StringComparison.Ordinal);
+        var text = WrittenWith(json => json["bundleVersion"] = version);
 
         var read = BundleJson.Read(text, BundleInfos.Path);
 
@@ -108,7 +106,7 @@ public sealed class BundleJsonTests
     [Fact]
     public void Read_NoEngine_IsSqlsrc288NamingEngine()
     {
-        var text = BundleJson.Write(Info).Replace("  \"engine\": \"postgres\",\n", "", System.StringComparison.Ordinal);
+        var text = WrittenWith(json => json.Remove("engine").ShouldBeTrue());
 
         var read = BundleJson.Read(text, BundleInfos.Path);
 
@@ -121,9 +119,7 @@ public sealed class BundleJsonTests
     [Fact]
     public void Read_MistypedMember_IsSqlsrc288NamingIt()
     {
-        var text = BundleJson
-            .Write(Info)
-            .Replace("\"renamed\": true", "\"renamed\": \"yes\"", System.StringComparison.Ordinal);
+        var text = WrittenWith(json => json["renamed"] = "yes");
 
         var read = BundleJson.Read(text, BundleInfos.Path);
 
@@ -161,5 +157,22 @@ public sealed class BundleJsonTests
         text.ShouldNotEndWith("\n\n");
         text.ShouldNotContain("\r");
         text.ShouldContain("16.4 <\\\"x\\\">");
+    }
+
+    // The written file with one member changed, so that a test of a bad member does not depend on the layout.
+    private static string WrittenWith(System.Action<JsonObject> change)
+    {
+        var json = JsonNode.Parse(BundleJson.Write(Info)).ShouldNotBeNull().AsObject();
+        change(json);
+        return json.ToJsonString();
+    }
+
+    private static (string Name, string? Value)[] OutcomeMembers(string written)
+    {
+        using var document = JsonDocument.Parse(written);
+        var outcome = document.RootElement.GetProperty("outcome");
+
+        outcome.ValueKind.ShouldBe(JsonValueKind.Object);
+        return [.. outcome.EnumerateObject().Select(member => (member.Name, member.Value.GetString()))];
     }
 }

@@ -503,25 +503,42 @@ internal static class MappedTypeResolver
             _ => compilation.GetSpecialType(SpecialType.System_Object),
         };
 
-    // The type with the name's ranks around it, from the last rank written in, and a ? where the name writes one: the
-    // first rank's before the element, or the argument's after the whole.
+    // The type with the name's ranks around it, and a ? where the name writes one: a rank's before what it holds, or
+    // the argument's after the whole.  C# reads a ? before a later rank as closing the array written before it, so
+    // string[]?[] is an array of string[]?: the ranks are built in groups, each from a ? or the first rank to the next
+    // ?, the first group innermost, and in a group from its last rank in.  A model is #nullable enable, so a reference
+    // type written without a ? cannot be null, where a symbol looked up is oblivious.
     private static ITypeSymbol AsWritten(Compilation compilation, ITypeSymbol type, ClrTypeName name, Use use)
     {
-        if (name.Ranks.Count > 0)
+        type = AsNotNullable(type);
+        for (var start = 0; start < name.Ranks.Count; )
         {
-            if (name.Ranks[0].NullableElement)
+            var end = start + 1;
+            while (end < name.Ranks.Count && !name.Ranks[end].NullableElement)
+            {
+                end++;
+            }
+
+            if (name.Ranks[start].NullableElement)
             {
                 type = AsNullable(compilation, type);
             }
 
-            for (var index = name.Ranks.Count - 1; index >= 0; index--)
+            for (var index = end - 1; index >= start; index--)
             {
-                type = compilation.CreateArrayTypeSymbol(type, name.Ranks[index].Dimensions);
+                type = AsNotNullable(
+                    compilation.CreateArrayTypeSymbol(type, name.Ranks[index].Dimensions, type.NullableAnnotation)
+                );
             }
+
+            start = end;
         }
 
         return use == Use.NullableArgument ? AsNullable(compilation, type) : type;
     }
+
+    private static ITypeSymbol AsNotNullable(ITypeSymbol type) =>
+        type.IsValueType ? type : type.WithNullableAnnotation(NullableAnnotation.NotAnnotated);
 
     // System.Nullable<T> of a value type, and a reference type annotated as one that can be null.
     private static ITypeSymbol AsNullable(Compilation compilation, ITypeSymbol type) =>
