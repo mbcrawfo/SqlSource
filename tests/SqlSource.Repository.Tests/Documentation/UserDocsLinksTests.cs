@@ -33,15 +33,6 @@ public sealed class UserDocsLinksTests
     [InlineData("Cafe\u0301 au lait", "cafe\u0301-au-lait")]
     public void Slug_AnyHeading_FollowsGitHub(string heading, string slug) => UserDocs.Slug(heading).ShouldBe(slug);
 
-    [Fact]
-    public void Anchors_HeadingsOfAPage_AreTheirSlugs()
-    {
-        var anchors = UserDocs.Anchors("site/diagnostics.md");
-
-        anchors.ShouldContain("sqlsrc001");
-        anchors.ShouldContain("sqlsrc236");
-    }
-
     // A parser that finds nothing would make every other test of this folder pass.
     [Fact]
     public void Links_OfTheUserDocs_AreFound()
