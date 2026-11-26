@@ -164,7 +164,7 @@ Counts are of findings.  The guard is **mutation** (the scope's run before and a
 | 72 | [tool-commands-loosen](2026-11-13-test-cleanup-phase-72-tool-commands-loosen-design.md) | `tests/SqlSource.Tool.Tests/Commands` |  |  |  | 6 |  | mutation: `tool-root`; covers and run time for 6 | done |
 | 73 | [tool-bundles-loosen](2026-11-13-test-cleanup-phase-73-tool-bundles-loosen-design.md) | `tests/SqlSource.Tool.Tests/Bundles` |  |  |  | 1 |  | mutation: `tool-bundles` | done |
 | 74 | [tool-describing-mixed](2026-11-13-test-cleanup-phase-74-tool-describing-mixed-design.md) | `tests/SqlSource.Tool.Tests/Describing` | 1 | 2 |  | 2 |  | mutation: `tool-describing`; covers and run time for 1 | done |
-| 75 | [repository-deletes](2026-11-13-test-cleanup-phase-75-repository-deletes-design.md) | `tests/SqlSource.Repository.Tests` | 2 |  |  |  |  | covers and run time | not started |
+| 75 | [repository-deletes](2026-11-13-test-cleanup-phase-75-repository-deletes-design.md) | `tests/SqlSource.Repository.Tests` | 2 |  |  |  |  | covers and run time | done |
 | 76 | [generator-testharness-syncasync-deletes](2026-11-13-test-cleanup-phase-76-generator-testharness-syncasync-deletes-design.md) | `tests/SqlSource.Tests/TestHarness/SyncAsync` | 1 |  |  |  |  | covers and run time | not started |
 | 77 | [repository-strengthen](2026-11-13-test-cleanup-phase-77-repository-strengthen-design.md) | `tests/SqlSource.Repository.Tests` |  |  | 1 |  |  | covers and run time | not started |
 | 78 | [generator-package-mixed](2026-11-13-test-cleanup-phase-78-generator-package-mixed-design.md) | `tests/SqlSource.Tests/Package` | 2 |  | 1 |  |  | covers and run time | not started |
