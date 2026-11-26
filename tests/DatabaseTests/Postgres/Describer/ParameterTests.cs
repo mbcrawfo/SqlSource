@@ -118,6 +118,43 @@ public sealed class ParameterTests(PostgresDatabases postgres)
         }
     }
 
+    // The second PREPARE of "explain", given a text no describe can bring it: the server accepted the first PREPARE of
+    // the text as one statement.  It is sent as one command that the driver does not split, so the server refuses the
+    // whole of it and the table of the second statement is still there.
+    [Fact]
+    public async Task PrepareAgainAsync_TextOfTwoStatements_ThrowsTheServersErrorAndRunsNothing()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using (var create = own.CreateCommand($"CREATE TABLE {Canary} (id int)"))
+        {
+            _ = await create.ExecuteNonQueryAsync(token);
+        }
+
+        try
+        {
+            await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
+            var live = new PostgresLive(session.Connection);
+
+            var error = await Should.ThrowAsync<PostgresException>(() =>
+                live.PrepareAgainAsync(
+                    "sqlsource_canary_unpruned",
+                    new PostgresPrepareRequest("sqlsource_canary", $"SELECT 1; DROP TABLE {Canary}", []),
+                    token
+                )
+            );
+
+            await using var find = own.CreateCommand($"SELECT pg_catalog.to_regclass('{Canary}') IS NOT NULL");
+            (await find.ExecuteScalarAsync(token)).ShouldBe(true, "the call ran the second statement");
+            error.SqlState.ShouldBe("42601");
+        }
+        finally
+        {
+            await using var drop = own.CreateCommand($"DROP TABLE IF EXISTS {Canary}");
+            _ = await drop.ExecuteNonQueryAsync(token);
+        }
+    }
+
     private async Task<DescribeFailure> ShouldFailAsync(DescribeRequest request, string id)
     {
         var described = await DescribeAsync(request);

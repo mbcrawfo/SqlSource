@@ -29,6 +29,31 @@ internal static class ScratchSchema
         """;
 
     /// <summary>
+    /// The schema <c>pruning</c>: a table <c>p</c> partitioned by <c>k</c>, whose <c>n</c> may be <c>NULL</c> but in
+    /// the partition <c>p_kept</c> of <c>k = 1</c>, which makes it <c>NOT NULL</c>, and holds a <c>NULL</c> in the
+    /// partition <c>p_open</c> of <c>k = 2</c>; and a table <c>t</c> to join it with.
+    /// </summary>
+    public const string Pruning = """
+        DROP SCHEMA IF EXISTS pruning CASCADE;
+        CREATE SCHEMA pruning;
+        CREATE TABLE pruning.p (id integer NOT NULL, k integer NOT NULL, n integer) PARTITION BY LIST (k);
+        CREATE TABLE pruning.p_kept PARTITION OF pruning.p (n NOT NULL) FOR VALUES IN (1);
+        CREATE TABLE pruning.p_open PARTITION OF pruning.p FOR VALUES IN (2);
+        INSERT INTO pruning.p VALUES (1, 1, 10), (2, 2, NULL);
+        CREATE TABLE pruning.t (id integer NOT NULL);
+        INSERT INTO pruning.t VALUES (1), (2), (3);
+        """;
+
+    /// <summary>
+    /// On <see cref="Pruning" />, a <c>CHECK</c> of <c>p_open</c> that matches its bound, as the PostgreSQL manual
+    /// advises before <c>ATTACH PARTITION</c>: constraint exclusion reads it whether partition pruning is on or off.
+    /// </summary>
+    public const string PruningChecked = "ALTER TABLE pruning.p_open ADD CONSTRAINT p_open_k CHECK (k = 2)";
+
+    /// <summary>Drops <see cref="Pruning" />.</summary>
+    public const string DropPruning = "DROP SCHEMA IF EXISTS pruning CASCADE";
+
+    /// <summary>
     /// The schema <c>hiding_types</c>, of domains over <c>integer</c> or <c>text</c> named like the built-in types
     /// <c>text</c>, <c>jsonb</c>, <c>json</c>, <c>uuid</c>, <c>bpchar</c>, <c>"char"</c>, <c>"bit"</c>, <c>oid</c> and
     /// <c>int4</c>.  On <see cref="HidingTypesPath" /> each hides the built-in type of its name; on any path that puts
