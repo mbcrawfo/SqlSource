@@ -31,10 +31,31 @@ public sealed partial class StoreQueries(DbConnection connection)
     public Task<IEnumerable<CountShippedOrdersDto>> CountShippedOrdersAsync() =>
         connection.QueryAsync<CountShippedOrdersDto>(Sql.CountShippedOrders);
 
-    // MonthEnd is a DateOnly and not a DateOnly?, by the query's -- column: marker, which leaves the column's name
-    // alone for Dapper: EOMONTH of a time that is never null is not null, though the tool cannot show it.
+    // ShippedOn is a DateOnly and not a DateOnly?: the column can hold null, and the WHERE keeps those rows out.
+    public Task<IEnumerable<ListShippedOrdersDto>> ListShippedOrdersAsync() =>
+        connection.QueryAsync<ListShippedOrdersDto>(Sql.ListShippedOrders);
+
+    // UserId is an int and not an int?: each row of the FULL JOIN has a user or an order, and COALESCE takes the id
+    // from whichever it has, so the tool shows it is never null.  Name and OrderId are nullable, since either side
+    // can be missing.
+    public Task<IEnumerable<ListUsersAndOrdersDto>> ListUsersAndOrdersAsync() =>
+        connection.QueryAsync<ListUsersAndOrdersDto>(Sql.ListUsersAndOrders);
+
+    // LineTotal is a decimal and not a decimal?: SQL Server says a computed column that is not persisted can be null,
+    // but quantity * unit_price of columns that are never null is not, and an inner join keeps every line, so the
+    // tool shows it.
+    public Task<IEnumerable<ListOrderLineTotalsDto>> ListOrderLineTotalsAsync() =>
+        connection.QueryAsync<ListOrderLineTotalsDto>(Sql.ListOrderLineTotals);
+
+    // MonthStart is a DateOnly and not a DateOnly?, by the query's -- column: marker, which leaves the column's name
+    // alone for Dapper: DATEFROMPARTS of parts that are never null is not null, though the tool cannot show it.
     public Task<IEnumerable<ListOrderMonthsDto>> ListOrderMonthsAsync() =>
         connection.QueryAsync<ListOrderMonthsDto>(Sql.ListOrderMonths);
+
+    // CalendarDay and DayNumber are a DateOnly and an int, not nullable: the recursive WITH query starts each order at
+    // a day that is never null and adds a day to it, so the tool shows that no row holds a null.
+    public Task<IEnumerable<ListShippingDaysDto>> ListShippingDaysAsync() =>
+        connection.QueryAsync<ListShippingDaysDto>(Sql.ListShippingDays);
 
     // The OUTPUT clause gives the rows of the statement: the order as the database filled it in.
     public Task<AddOrderDto> AddOrderAsync(int userId) =>

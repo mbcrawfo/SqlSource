@@ -40,18 +40,34 @@ internal static class PlanSteps
     {
         RunUnit unit;
         ImmutableArray<ProjectManifest> manifests;
-        if (SharedOptions.ValuesOf(usage, DescribeCommand.ManifestOption) is [{ } manifestValue])
+        if (SharedOptions.ValuesOf(usage, DescribeCommand.ManifestOption) is { Length: > 0 } given)
         {
-            // The build has evaluated the project, so MSBuild is not asked again, and the project is the unit.
-            manifests = await RunProjects.FromManifestAsync(
-                Path.GetFullPath(manifestValue.Text, context.Host.WorkingDirectory),
-                context
-            );
-            if (manifests.IsEmpty)
+            // The build has evaluated the project, so MSBuild is not asked again.  Each manifest is one of its
+            // frameworks, and the first one's project is the unit.
+            var read = ImmutableArray.CreateBuilder<ProjectManifest>(given.Length);
+            foreach (var manifestValue in given)
             {
-                return null;
+                var one = await RunProjects.FromManifestAsync(
+                    Path.GetFullPath(manifestValue.Text, context.Host.WorkingDirectory),
+                    manifestValue,
+                    context,
+                    read.Count > 0 ? read[0].ProjectPath : null
+                );
+                if (one.IsEmpty)
+                {
+                    // A manifest that is not read, or is of another project, is reported, and the run plans nothing.
+                    return null;
+                }
+
+                read.AddRange(one);
             }
 
+            manifests = read.ToImmutable();
+            RunEvents.Project(
+                context.Reporter.Trace,
+                manifests[0].ProjectPath,
+                new ProjectEvaluation(manifests[0].ProjectPath, ProjectState.UsesSqlSource, manifests)
+            );
             unit = new RunUnit(RunUnitKind.Project, manifests[0].ProjectPath);
             RunEvents.Unit(context.Reporter.Trace, unit, wasGiven: true);
         }
@@ -89,10 +105,18 @@ internal static class PlanSteps
 
     /// <summary>
     /// The projects of the unit that the command line runs, which <c>--project</c> narrows, and their manifests: the
-    /// evaluation of each, and its manifest target.  A project with an error is reported and has no manifest.
+    /// evaluation of each, in the configuration that <c>--configuration</c> names, and its manifest target.  A project
+    /// with an error is reported and has no manifest.
     /// </summary>
     internal static Task<FoundProjects> FindManifestsAsync(RunUnit unit, Usage usage, RunContext context) =>
-        RunProjects.FindAsync(unit, SharedOptions.ValuesOf(usage, SharedOptions.Project), context);
+        RunProjects.FindAsync(
+            unit,
+            SharedOptions.ValuesOf(usage, SharedOptions.Project),
+            SharedOptions.ValuesOf(usage, SharedOptions.Configuration) is [{ } configuration]
+                ? configuration.Text
+                : null,
+            context
+        );
 
     /// <summary>
     /// The plan of the manifests, which <c>--database</c> and the <c>.sql</c> paths narrow, with what is wrong with it
@@ -112,7 +136,8 @@ internal static class PlanSteps
             RunFilters.Create(
                 ArgumentsOf(usage).Where(static path => SqlPath.IsSqlFile(path.Text)),
                 SharedOptions.ValuesOf(usage, DescribeCommand.DatabaseOption),
-                context.Host.WorkingDirectory
+                context.Host.WorkingDirectory,
+                [.. manifests.SelectMany(static manifest => manifest.Files)]
             ),
             (_, error) => isOnline && IsReportedByTheCompiler(error),
             context
@@ -158,9 +183,9 @@ internal static class PlanSteps
         }
 
         var result = RunPlanner.Plan(manifests, filters, context.CancellationToken);
-        for (var index = 0; index < manifests.Length; index++)
+        foreach (var (projectPath, files) in result.Unclaimed)
         {
-            RunEvents.Unclaimed(reporter.Trace, manifests[index].ProjectPath, result.Unclaimed[index]);
+            RunEvents.Unclaimed(reporter.Trace, projectPath, files);
         }
 
         foreach (var file in result.Plan.Files)
@@ -250,7 +275,15 @@ internal static class PlanSteps
     internal static ConnectionSources SourcesOf(Usage usage, RunUnit unit, ToolHost host)
     {
         var unitFolder = UnitFolderOf(unit);
-        return new ConnectionSources(ConnectionsOf(usage), unitFolder, EnvFileOf(usage, unitFolder, host));
+        var envFile = EnvFileOf(usage, unitFolder, host);
+        return new ConnectionSources(ConnectionsOf(usage), unitFolder, envFile)
+        {
+            EnvFileHeldAt =
+                envFile is not null
+                && SharedOptions.ValuesOf(usage, SharedOptions.EnvFile) is [{ MayBePrintedAsPath: false } held]
+                    ? held.Position
+                    : null,
+        };
     }
 
     // The arguments of the command: the unit, and the .sql paths.

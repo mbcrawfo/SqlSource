@@ -318,6 +318,27 @@ public sealed class CaptureJsonTests
         written.Failure.ShouldBe(Refused);
     }
 
+    // A short password, or one that is a word of the run, refuses a capture where it is a password's value, a query's
+    // own text included, and nowhere else: the owner chose the refusal.
+    [Theory]
+    [InlineData("refused Host=other;Password=pg", true)]
+    [InlineData("UPDATE users SET password = 'pg' WHERE id = 1", true)]
+    [InlineData("SELECT \"password\": 'postgres'", true)]
+    [InlineData("relation pg_class, user \"postgres\"", false)]
+    public void Write_ShortOrRunWordPassword_IsRefusedAsAPasswordsValueAlone(string text, bool refused)
+    {
+        var secret = new ConnectionSecret("Host=db;Password=pg", ["pg", "postgres"], ["postgres"]);
+        var capture = WithRequest(new { Sql = text });
+
+        var written = CaptureJson.Write(capture, secret);
+
+        (written.Failure == Refused).ShouldBe(refused);
+        if (!refused)
+        {
+            written.Value.ShouldBe(CaptureJson.Write(capture));
+        }
+    }
+
     [Fact]
     public void Write_PasswordInsideAWord_IsTheFile()
     {

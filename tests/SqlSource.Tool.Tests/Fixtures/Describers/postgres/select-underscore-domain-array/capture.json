@@ -1,0 +1,214 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.6",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "SELECT r.id\nFROM readings AS r\nWHERE $1 IS NOT NULL",
+        "types": [
+          "_reading_level[]"
+        ]
+      },
+      "answer": {
+        "parameterTypes": [
+          16506
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 1
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "id",
+            "typeOid": 23,
+            "tableOid": 16497,
+            "attributeNumber": 1,
+            "length": null,
+            "precision": null,
+            "scale": null,
+            "typeModifier": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "tables",
+      "request": {
+        "oids": [
+          16497
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16497,
+            "relkind": "r",
+            "schema": "public",
+            "name": "readings",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "span",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16490,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "spans",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16488,
+                "notNullValidated": null
+              }
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          23,
+          16506
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 23,
+            "typname": "int4",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "integer",
+            "enumLabels": null,
+            "typtypmod": -1
+          },
+          {
+            "oid": 16506,
+            "typname": "__reading_level",
+            "nspname": "public",
+            "typtype": "b",
+            "typcategory": "A",
+            "typelem": 16507,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "_reading_level[]",
+            "enumLabels": null,
+            "typtypmod": -1
+          },
+          {
+            "oid": 16507,
+            "typname": "_reading_level",
+            "nspname": "public",
+            "typtype": "d",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 23,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "_reading_level",
+            "enumLabels": null,
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "SELECT r.id\nFROM readings AS r\nWHERE @levels IS NOT NULL",
+        "parameters": [
+          {
+            "name": "levels",
+            "dataTypeName": "public.__reading_level"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "id",
+            "typeOid": 23,
+            "dataTypeName": "integer"
+          }
+        ],
+        "error": null,
+        "driverError": null,
+        "sent": {
+          "text": "SELECT r.id\nFROM readings AS r\nWHERE $1 IS NOT NULL",
+          "parameters": [
+            "levels"
+          ]
+        },
+        "textRefused": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}

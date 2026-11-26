@@ -1,6 +1,7 @@
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Columns;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -19,7 +20,7 @@ public sealed class NullabilityWalkWrittenValueTests
     private static WalkOutcome RunOf(
         PlanNode root,
         bool stand = true,
-        bool oldAndNew = false,
+        OldAndNewNames? oldAndNew = null,
         PostgresTableRow? table = null,
         int attnum = 2,
         bool partitionsKeep = true
@@ -37,7 +38,7 @@ public sealed class NullabilityWalkWrittenValueTests
             origins,
             new WalkScope(
                 false,
-                oldAndNew,
+                oldAndNew ?? OldAndNewNames.None,
                 true,
                 tables,
                 [BuiltInTypes.Int4, BuiltInTypes.Int4],
@@ -63,7 +64,7 @@ public sealed class NullabilityWalkWrittenValueTests
 
     [Fact]
     public void Run_StatementThatMayNameOldOrNew_IsNotProved() =>
-        AnswersOf(RunOf(Written, oldAndNew: true))[0].ShouldBe(NullableCatalog);
+        AnswersOf(RunOf(Written, oldAndNew: OldAndNewNames.Unknown))[0].ShouldBe(NullableCatalog);
 
     // ON CONFLICT DO UPDATE may return a row the statement did not write.
     [Fact]
@@ -169,7 +170,7 @@ public sealed class NullabilityWalkWrittenValueTests
             origins,
             new WalkScope(
                 false,
-                false,
+                OldAndNewNames.None,
                 true,
                 PostgresTables.Of(Table),
                 [BuiltInTypes.Int4, BuiltInTypes.Int4],

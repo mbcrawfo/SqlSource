@@ -305,6 +305,56 @@ public sealed class RepositoryInterfaceTests
         methods.ShouldNotContain(" async ");
     }
 
+    // The error names the interface in full, as it is declared beside the type: in a namespace or in none, in the types
+    // the type is nested in, which may be generic, and with the type's own type parameters.
+    [Theory]
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\npublic partial class UserRepository(NpgsqlDataSource dataSource);",
+        "IUserRepository",
+        "UserRepository-Methods.g.cs"
+    )]
+    [InlineData(
+        "namespace App\n{\n    [SqlSourceGenerate(Source = \".\")]\n"
+            + "    public partial class UserRepository<TKey>(NpgsqlDataSource dataSource);\n}",
+        "App.IUserRepository<TKey>",
+        "App.UserRepository-1-Methods.g.cs"
+    )]
+    [InlineData(
+        "namespace App\n{\n    public partial class Outer<U>\n    {\n        [SqlSourceGenerate(Source = \".\")]\n"
+            + "        public partial class UserRepository(NpgsqlDataSource dataSource);\n    }\n}",
+        "App.Outer<U>.IUserRepository",
+        "App.Outer-1.UserRepository-Methods.g.cs"
+    )]
+    [InlineData(
+        "public partial class Outer\n{\n    [SqlSourceGenerate(Source = \".\")]\n"
+            + "    public partial class UserRepository(NpgsqlDataSource dataSource);\n}",
+        "Outer.IUserRepository",
+        "Outer.UserRepository-Methods.g.cs"
+    )]
+    public void Run_PublicMethodNamedLikeTheInterfaceOfAnyDeclaration_NamesTheInterfaceInFull(
+        string declaration,
+        string interfaceName,
+        string methodsFile
+    )
+    {
+        var source = "using Npgsql;\nusing SqlSource;\n\n" + declaration + "\n";
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: IUserRepository -> one-optional\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [GetUserEntry(file, "IUserRepository")], source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,25): The method of the query 'IUserRepository' cannot be "
+                    + "named 'IUserRepository', because it is the name of the interface '"
+                    + interfaceName
+                    + "' that holds the method.  Rename the query.",
+            ]);
+        run.Sources.Keys.ShouldContain(methodsFile);
+    }
+
     // A protected method is no member of the interface, so it can have the interface's name.
     [Fact]
     public void Run_ProtectedMethodNamedLikeTheInterface_IsKept()
@@ -343,6 +393,22 @@ public sealed class RepositoryInterfaceTests
         "App.Outer.Repo",
         "the containing type App.Outer",
         "App.Outer.Repo-Methods.g.cs"
+    )]
+    // A type parameter that is not the first.
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\n    public partial class Repo<TKey, IRepo>(NpgsqlDataSource dataSource);",
+        "App.Repo<TKey, IRepo>",
+        "the type parameter IRepo of App.Repo<TKey, IRepo>",
+        "App.Repo-2-Methods.g.cs"
+    )]
+    // A class of the interface's name and arity beside the type parameter that has it: what the compilation has is said
+    // first.
+    [InlineData(
+        "public class IRepo<T>;\n\n    [SqlSourceGenerate(Source = \".\")]\n"
+            + "    public partial class Repo<IRepo>(NpgsqlDataSource dataSource);",
+        "App.Repo<IRepo>",
+        "the class App.IRepo<T>",
+        "App.Repo-1-Methods.g.cs"
     )]
     public void Run_InterfaceNamedLikeTheTypes_ReportsSqlsrc035AndWritesNone(
         string declaration,

@@ -4,6 +4,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 using Xunit;
@@ -65,7 +66,7 @@ public sealed class NullabilityWalkSetOperationTests
             new PlanInstancesCache(root, null),
             columns,
             origins,
-            new WalkScope(false, false, true, SetTables, types)
+            new WalkScope(false, OldAndNewNames.None, true, SetTables, types)
         );
     }
 
@@ -140,7 +141,7 @@ public sealed class NullabilityWalkSetOperationTests
                     new PlanInstancesCache(root, null),
                     columns,
                     origins,
-                    new WalkScope(false, false, true, SetTables, [IntegerArrayOid], CatalogAlone: alone)
+                    new WalkScope(false, OldAndNewNames.None, true, SetTables, [IntegerArrayOid], CatalogAlone: alone)
                 )
             )
             .ShouldBe([UnknownNoOrigin]);
@@ -691,7 +692,7 @@ public sealed class NullabilityWalkSetOperationTests
             new PlanInstancesCache(root, answered ? partitions : null),
             columns,
             origins,
-            new WalkScope(false, false, true, SetTables, [Int4Oid, TextOid])
+            new WalkScope(false, OldAndNewNames.None, true, SetTables, [Int4Oid, TextOid])
         );
 
         outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
@@ -754,7 +755,7 @@ public sealed class NullabilityWalkSetOperationTests
             new PlanInstancesCache(AppendOf(Scan("u", "u.name"), Scan("o", "o.label")), null),
             columns,
             origins,
-            new WalkScope(false, false, true, SetTables, [])
+            new WalkScope(false, OldAndNewNames.None, true, SetTables, [])
         );
 
         outcome.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
@@ -771,7 +772,7 @@ public sealed class NullabilityWalkSetOperationTests
             new PlanInstancesCache(AppendOf(Scan("u", "u.id", "u.name"), Scan("o", "o.user_id", "o.label")), null),
             columns,
             origins,
-            new WalkScope(true, false, true, SetTables, [Int4Oid, TextOid])
+            new WalkScope(true, OldAndNewNames.None, true, SetTables, [Int4Oid, TextOid])
         );
 
         outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);

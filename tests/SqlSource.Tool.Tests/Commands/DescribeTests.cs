@@ -48,6 +48,7 @@ public sealed class DescribeTests : IDisposable
                 "--log <path>",
                 "--env-file <path>",
                 "--watch",
+                "--configuration <name>",
             }
         )
         {
@@ -145,6 +146,27 @@ public sealed class DescribeTests : IDisposable
         // Two runs of MSBuild for each of the two projects.
         _run.Processes.Requests.Count.ShouldBe(4);
         Directory.EnumerateFileSystemEntries(_run.Folder.PathOf("tmp")).ShouldBeEmpty();
+    }
+
+    // As "dotnet build -c" builds them: every run of MSBuild, for each project of the solution, is in the
+    // configuration.
+    [Fact]
+    public async Task Run_Configuration_EvaluatesEveryProjectInIt()
+    {
+        _ = _run.Folder.WriteFile("A/A.csproj");
+        _ = _run.Folder.WriteFile("B/B.csproj");
+        _ = _run.Folder.WriteFile(
+            "App.slnx",
+            "<Solution><Project Path=\"A/A.csproj\" /><Project Path=\"B/B.csproj\" /></Solution>"
+        );
+
+        var result = await _run.RunAsync("describe", "--configuration", "Release");
+
+        result.ShouldBe(new CliResult(0, "", ""));
+        _run.Processes.Requests.Count.ShouldBe(4);
+        _run.Processes.Requests.ShouldAllBe(request =>
+            FakeProcessRunner.PropertyOf(request, "Configuration") == "Release"
+        );
     }
 
     [Fact]

@@ -128,4 +128,16 @@ internal enum SqlParseErrorKind
     /// as written there; and where it stands, which ends the first sentence's clause.
     /// </summary>
     NegatedListRefusedEmpty,
+
+    /// <summary>
+    /// A name that a <c>-- variable:</c> marker gives is declared by a <c>-- param:</c> marker of the same query.
+    /// Argument: the name, with its prefix, as the variable marker writes it.
+    /// </summary>
+    VariableDeclaredAsParameter,
+
+    /// <summary>
+    /// A name that a <c>-- variable:</c> marker gives is written nowhere in its query, a warning.  Argument: the name,
+    /// with its prefix, as the marker writes it.
+    /// </summary>
+    VariableNotWritten,
 }

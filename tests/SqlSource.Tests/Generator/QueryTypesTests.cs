@@ -227,6 +227,38 @@ public sealed class QueryTypesTests
             ]);
     }
 
+    // A type of the catalog named as an alias, which only a sidecar edited by hand has: the bare name is a key of
+    // another type, int4 or bpchar, so the help names this one with its schema, and that key maps it.
+    [Theory]
+    [InlineData("integer")]
+    [InlineData("character")]
+    public void Run_CompositeOfTheCatalogNamedAsAnAlias_IsSqlsrc246WithTheQualifiedKey(string name)
+    {
+        var type = TestSidecars.Postgres(name: name, kind: SidecarValues.Kind.Composite, internalName: name);
+        var mapped = new SqlFile(
+            GeneratorHarness.UsersPath,
+            $"-- type-override: pg_catalog.{name}=MyApp.Tag\n" + SqlTexts.GetUser
+        );
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("relation", type)])
+        );
+        var mappedRun = Run(
+            [NpgsqlReferences.Npgsql10],
+            mapped,
+            Entry(mapped, "GetUser", [], [Column("relation", type)])
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'relation' has the type '{name}', which SqlSource cannot give a "
+                + $"C# type.  Map it with the type override, as pg_catalog.{name}=<a C# type>.",
+        ]);
+        mappedRun.Diagnostics.ShouldBeEmpty();
+        StepOutputs.ColumnsOf(mappedRun).ShouldHaveSingleItem().Text.ShouldBe("global::MyApp.Tag");
+    }
+
     // The tool never writes record, unknown or void, or a kind this version does not know, so describing again
     // mends the sidecar.
     [Theory]
@@ -276,6 +308,46 @@ public sealed class QueryTypesTests
         ]);
     }
 
+    // Npgsql reads a multirange as an array of its range, so the help maps a user's multirange to an array, which then
+    // builds.
+    [Fact]
+    public void Run_UserDefinedMultirange_IsSqlsrc246WithAnArrayOfTheRange()
+    {
+        var floatMultirange = TestSidecars.Postgres(
+            name: "floatmultirange",
+            kind: SidecarValues.Kind.Multirange,
+            schema: "public",
+            internalName: "floatmultirange",
+            subtype: Catalog("float8")
+        );
+        var mapped = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.floatmultirange=NpgsqlTypes.NpgsqlRange<double>[]\n" + SqlTexts.GetUser
+        );
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("spans", floatMultirange)])
+        );
+        var mappedRun = Run(
+            [NpgsqlReferences.Npgsql10],
+            mapped,
+            Entry(mapped, "GetUser", [], [Column("spans", floatMultirange)])
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'spans' has the type 'floatmultirange', which SqlSource cannot give "
+                + "a C# type.  Map it with the type override, as public.floatmultirange=NpgsqlTypes.NpgsqlRange<T>[] "
+                + "with the data source's EnableUnmappedTypes().",
+        ]);
+        mappedRun.Diagnostics.ShouldBeEmpty();
+        StepOutputs
+            .ColumnsOf(mappedRun)
+            .ShouldHaveSingleItem()
+            .Text.ShouldBe("global::NpgsqlTypes.NpgsqlRange<double>[]");
+    }
+
     // The range's help writes its key as the type override reads it, so a name that needs quotes is given with them.
     [Fact]
     public void Run_UserDefinedRangeWhoseNameNeedsQuotes_HelpQuotesIt()
@@ -299,6 +371,127 @@ public sealed class QueryTypesTests
                 + "type.  Map it with the type override, as \"my schema\".\"FloatRange\"=NpgsqlTypes.NpgsqlRange<T> "
                 + "with the data source's EnableUnmappedTypes().",
         ]);
+    }
+
+    // A composite or a range of the catalog named as an array, which a superuser can move there: its key would be read
+    // as the array, so the help names the markers, and a -- column: marker gives it a C# type.
+    [Theory]
+    [InlineData("_int4", SidecarValues.Kind.Composite)]
+    [InlineData("_foo", SidecarValues.Kind.Composite)]
+    [InlineData("_foo", SidecarValues.Kind.Range)]
+    [InlineData("_foo", SidecarValues.Kind.Multirange)]
+    public void Run_CatalogTypeNamedAsAnArray_IsSqlsrc246NamingTheMarkers(string name, string kind)
+    {
+        var type = TestSidecars.Postgres(name: name, kind: kind, internalName: name, subtype: Catalog("float8"));
+        var marked = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- column: value -> string\nSELECT 1;\n"
+        );
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("value", type)])
+        );
+        var markedRun = Run([NpgsqlReferences.Npgsql10], marked, Entry(marked, "GetUser", [], [Column("value", type)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'value' has the type '{name}', which SqlSource cannot give a C# "
+                + "type.  No type override can name it, since its key would mean an array.  Give a column a C# type "
+                + "with a -- column: marker.  Declare a parameter as text with a -- param: marker, and cast it in the "
+                + "query.",
+        ]);
+        markedRun.Diagnostics.ShouldBeEmpty();
+        StepOutputs.ColumnsOf(markedRun).ShouldHaveSingleItem().Text.ShouldBe("string");
+    }
+
+    // A parameter of such a type cannot take a C# type from its marker, since the driver cannot bind it: the help has
+    // it declared as text and cast in the query.  Only a sidecar edited by hand holds such a parameter.
+    [Fact]
+    public void Run_ParameterOfACatalogTypeNamedAsAnArray_IsSqlsrc246SayingToCastIt()
+    {
+        var type = TestSidecars.Postgres(name: "_foo", kind: SidecarValues.Kind.Composite, internalName: "_foo");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @id;\n");
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            file,
+            Entry(file, "GetUser", [Parameter("id", type)], [Column("id", Catalog("int4"))])
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The parameter 'id' has the type '_foo', which SqlSource cannot give a C# "
+                + "type.  No type override can name it, since its key would mean an array.  Give a column a C# type "
+                + "with a -- column: marker.  Declare a parameter as text with a -- param: marker, and cast it in the "
+                + "query.",
+        ]);
+    }
+
+    // An array of such a type, or a domain over one, has a key of its own: the help names it, and it maps the column.
+    [Theory]
+    [InlineData("array", "_foo[]", "pg_catalog._foo[]", "string[]")]
+    [InlineData("domain", "label", "public.label", "string")]
+    public void Run_TypeOverACatalogTypeNamedAsAnArray_IsSqlsrc246WithItsOwnKey(
+        string form,
+        string typeName,
+        string key,
+        string mappedTo
+    )
+    {
+        var element = TestSidecars.Postgres(name: "_foo", kind: SidecarValues.Kind.Composite, internalName: "_foo");
+        var type = form == "array" ? ArrayOf(element) : DomainOf("label", element);
+        var mapped = new SqlFile(
+            GeneratorHarness.UsersPath,
+            $"-- type-override: {key}={mappedTo}\n" + SqlTexts.GetUser
+        );
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("value", type)])
+        );
+        var mappedRun = Run([NpgsqlReferences.Npgsql10], mapped, Entry(mapped, "GetUser", [], [Column("value", type)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'value' has the type '{typeName}', which SqlSource cannot give a C# "
+                + $"type.  Map it with the type override, as {key}=<a C# type>.",
+        ]);
+        mappedRun.Diagnostics.ShouldBeEmpty();
+        StepOutputs.ColumnsOf(mappedRun).ShouldHaveSingleItem().Text.ShouldBe(mappedTo);
+    }
+
+    // A range of the catalog that the map lacks, which only a sidecar edited by hand has: its bare name is no key, or
+    // is a key of another type, so the help names it with its schema, and that key maps it.
+    [Theory]
+    [InlineData("integer", SidecarValues.Kind.Range, "NpgsqlTypes.NpgsqlRange<T>")]
+    [InlineData("integer", SidecarValues.Kind.Multirange, "NpgsqlTypes.NpgsqlRange<T>[]")]
+    [InlineData("newrange", SidecarValues.Kind.Range, "NpgsqlTypes.NpgsqlRange<T>")]
+    public void Run_RangeOfTheCatalogThatTheMapLacks_IsSqlsrc246WithTheQualifiedKey(
+        string name,
+        string kind,
+        string mappedTo
+    )
+    {
+        var range = TestSidecars.Postgres(name: name, kind: kind, internalName: name, subtype: Catalog("float8"));
+        var mapped = new SqlFile(
+            GeneratorHarness.UsersPath,
+            $"-- type-override: pg_catalog.{name}=MyApp.Tag\n" + SqlTexts.GetUser
+        );
+
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("span", range)])
+        );
+        var mappedRun = Run([NpgsqlReferences.Npgsql10], mapped, Entry(mapped, "GetUser", [], [Column("span", range)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'span' has the type '{name}', which SqlSource cannot give a C# "
+                + $"type.  Map it with the type override, as pg_catalog.{name}={mappedTo} with the data source's "
+                + "EnableUnmappedTypes().",
+        ]);
+        mappedRun.Diagnostics.ShouldBeEmpty();
+        StepOutputs.ColumnsOf(mappedRun).ShouldHaveSingleItem().Text.ShouldBe("global::MyApp.Tag");
     }
 
     // A name of pg_catalog that needs quotes is no key of the map, so the help qualifies it, and a dot inside its

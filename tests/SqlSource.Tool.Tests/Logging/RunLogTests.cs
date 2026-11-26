@@ -406,6 +406,22 @@ public sealed class RunLogTests : IDisposable
             .ShouldBe(["GetUser described", "ListUsers failed"]);
     }
 
+    // A file that a filter left out had none of its queries described, so its sidecar was not checked: no event and no
+    // line says it is the same.
+    [Fact]
+    public async Task Run_CheckWithAFilter_HasNoSidecarEventForAFileItLeftOut()
+    {
+        var other = _scene.Project.AddSql("Zebras.sql", "-- name: GetZebra\nSELECT 5;\n");
+        (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
+
+        var result = await _scene.DescribeAsync("Users.sql", "--check", "--verbose", "--log", "run.log");
+
+        result.ExitCode.ShouldBe(0);
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("same");
+        LogReader.Events(Log, "sidecar").Select(line => Text(line, "path")).ShouldBe([SidecarFormat.PathFor(_users)]);
+        result.Out.ShouldNotContain($"sidecar '{SidecarFormat.PathFor(other)}'");
+    }
+
     // A difference is a difference whatever else failed in the file.
     [Fact]
     public async Task Run_CheckOfAFileWithADifferenceAndAQueryThatFails_HasTheSidecarEventDiffers()
@@ -507,6 +523,32 @@ public sealed class RunLogTests : IDisposable
         Text(open, "name").ShouldBe("postgres");
         Text(open, "error").ShouldBe("SQLSRC999");
         open.TryGetProperty("serverVersion", out _).ShouldBeFalse();
+    }
+
+    // The frameworks list the same files, which count once.
+    [Fact]
+    public async Task Run_ProjectOfTwoFrameworks_HasOneProjectEventThatJoinsThemAndCountsItsFilesOnce()
+    {
+        var frameworks = new Queue<string>(["net8.0", "net10.0"]);
+        _scene.Run.Processes.Projects[_scene.Project.ProjectPath] = new FakeProject
+        {
+            TargetFrameworks = "net8.0;net10.0",
+            ManifestWriter = () =>
+                _scene
+                    .Project.ManifestText()
+                    .Replace(
+                        "TargetFramework=net10.0",
+                        "TargetFramework=" + frameworks.Dequeue(),
+                        StringComparison.Ordinal
+                    ),
+        };
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+
+        var project = LogReader.Events(Log, "project").ShouldHaveSingleItem();
+        Text(project, "targetFramework").ShouldBe("net8.0;net10.0");
+        project.GetProperty("sqlFiles").GetInt32().ShouldBe(1);
+        project.GetProperty("compileFiles").GetInt32().ShouldBe(1);
     }
 
     [Fact]
@@ -616,7 +658,8 @@ public sealed class RunLogTests : IDisposable
             return;
         }
 
-        _ = _scene.Project.AddSource("Plain/Queries.cs", Plans.Type);
+        // A type of its own: a second attribute on the scene's Queries is read as the compiler reads it, not at all.
+        _ = _scene.Project.AddSource("Plain/Queries.cs", Plans.TypeNamed("PlainQueries"));
         var plain = _scene.Project.AddSql("Plain/Plain.sql", SqlTexts.Plain);
         var sidecar = SidecarFormat.PathFor(plain);
         await File.WriteAllTextAsync(sidecar, SidecarFiles.Empty(), TestContext.Current.CancellationToken);

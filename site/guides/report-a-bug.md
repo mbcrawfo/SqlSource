@@ -28,7 +28,7 @@ If a bundle cannot be renamed safely, `diagnose` writes nothing.  Then see [When
 
 **The rules you need.**
 
-- **Run it where you run `describe`**, with the same project or solution, `--project`, connections, `.env` file or `--env-file`, `--verbose` and `--log`.  See [Making a bundle with `diagnose`](../reference/bundles.md#diagnose).
+- **Run it where you run `describe`**, with the same project or solution, `--project`, connections, `.env` file or `--env-file`, `--configuration`, `--verbose` and `--log`.  See [Making a bundle with `diagnose`](../reference/bundles.md#diagnose).
 - **It describes the one query again against your database, whether or not its sidecar is current.**  It writes no sidecar.
 - **`--query` names the `.sql` file, a colon and the name of the query.**  Write the name as the `-- name:` line of the query gives it, letter for letter ([SQLSRC292](../diagnostics.md#sqlsrc292)).
 - **`--out` is required**: the path of the zip.  The mapping is written beside it, with `.mapping.json` added to its name.  A file at either path is overwritten.

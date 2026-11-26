@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -70,6 +71,22 @@ public sealed class CheckTests : IDisposable
         result.Error.ShouldContain("error SQLSRC999: ");
         // A description that is not saved is no error of a check, which saves none.
         result.Error.ShouldNotContain("SQLSRC217");
+        await ShouldBeUntouchedAsync(before);
+    }
+
+    // A check that was cancelled neither passes nor fails: cancelled as the session closes, once every query was
+    // described, it compares nothing, prints nothing and ends as cancelled.
+    [Fact]
+    public async Task Check_CancelledWhileTheSessionCloses_PrintsNothingAndExitsWithOne()
+    {
+        var before = await DescribeFirstAsync();
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        _scene.Describer.OnClose = cancel.Cancel;
+
+        var result = await _scene.Run.RunAsync(cancel.Token, "describe", "--check");
+
+        result.ShouldBe(new CliResult(1, "", ""));
+        _scene.Describer.Described.Count.ShouldBe(4);
         await ShouldBeUntouchedAsync(before);
     }
 

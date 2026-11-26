@@ -48,7 +48,7 @@ internal static class DiagnoseRun
     /// <summary>Describes the query again and writes its bundle, renamed or raw.</summary>
     /// <param name="usage">The command line, which gives the unit, the projects and the connections.</param>
     /// <param name="query">The file and the name of the query.</param>
-    /// <param name="output">The value of <c>--out</c>, which may be printed.</param>
+    /// <param name="output">The value of <c>--out</c>, named by its position when it may not be printed.</param>
     /// <param name="raw">Whether the bundle is written raw, under <c>--no-obfuscate</c>.</param>
     /// <param name="context">What the run takes from outside, where the errors go, and what ends the run.</param>
     public static async Task QueryAsync(
@@ -87,9 +87,9 @@ internal static class DiagnoseRun
         var bundle = DiagnoseBundles.Raw(planned.Query, text, file.Dialect, described, host);
         if (raw)
         {
-            if (Write(outPath, stream => BundleWriter.Write(bundle, stream), context))
+            if (Write(outPath, output, stream => BundleWriter.Write(bundle, stream), context))
             {
-                await host.Out.WriteLineAsync(Cli.LinePrefix + $"raw bundle {UsageValue.Quoted(outPath)} written");
+                await host.Out.WriteLineAsync(Cli.LinePrefix + WrittenLine("raw bundle", outPath, output));
                 await host.Out.WriteLineAsync(
                     Cli.LinePrefix
                         + "this bundle holds your own names and SQL, and must not be posted: open an issue that says a "
@@ -110,18 +110,18 @@ internal static class DiagnoseRun
         );
         if (!describer.Succeeded)
         {
-            reporter.Report(describer.Failure);
+            reporter.Report(ReplayCommand.AsNamed(describer.Failure, output, outPath));
             return;
         }
 
-        await RenameAndWriteAsync(bundle, describer.Value, file.Dialect, outPath, context);
+        await RenameAndWriteAsync(bundle, describer.Value, file.Dialect, outPath, output, context);
     }
 
     /// <summary>
     /// Renames a raw bundle and writes it with its mapping, with no database and no project.
     /// </summary>
     /// <param name="scrub">The value of <c>--scrub</c>: the bundle, a zip or a folder.</param>
-    /// <param name="output">The value of <c>--out</c>, which may be printed.</param>
+    /// <param name="output">The value of <c>--out</c>, named by its position when it may not be printed.</param>
     /// <param name="context">What the run takes from outside, where the errors go, and what ends the run.</param>
     public static async Task ScrubAsync(UsageValue scrub, UsageValue output, RunContext context)
     {
@@ -176,7 +176,7 @@ internal static class DiagnoseRun
             return;
         }
 
-        await RenameAndWriteAsync(bundle, prepared.Value.Describer, prepared.Value.Dialect, outPath, context);
+        await RenameAndWriteAsync(bundle, prepared.Value.Describer, prepared.Value.Dialect, outPath, output, context);
     }
 
     // The plan with the query's file as its one filter, and the query of the file it names, or null when the plan or
@@ -193,7 +193,12 @@ internal static class DiagnoseRun
         }
 
         var manifests = (await PlanSteps.FindManifestsAsync(unit, usage, context)).Manifests;
-        var filters = RunFilters.Create([query.File], [], context.Host.WorkingDirectory);
+        var filters = RunFilters.Create(
+            [query.File],
+            [],
+            context.Host.WorkingDirectory,
+            [.. manifests.SelectMany(static manifest => manifest.Files)]
+        );
         if (
             await PlanSteps.PlanFromAsync(unit, manifests, filters, PlanSteps.IsAtAFileNotNamed, context)
             is not { } plan
@@ -310,6 +315,7 @@ internal static class DiagnoseRun
         IQueryDescriber describer,
         SqlDialect dialect,
         string outPath,
+        UsageValue output,
         RunContext context
     )
     {
@@ -323,25 +329,34 @@ internal static class DiagnoseRun
         );
         if (!renamed.Succeeded)
         {
-            reporter.Report(BundleErrors.CannotBeMadeSafe(outPath, renamed.Failure));
+            reporter.Report(
+                ReplayCommand.AsNamed(BundleErrors.CannotBeMadeSafe(outPath, renamed.Failure), output, outPath)
+            );
             return;
         }
 
         var (bundle, mapping) = renamed.Value;
-        if (!Write(outPath, stream => BundleWriter.Write(bundle, stream), context))
+        if (!Write(outPath, output, stream => BundleWriter.Write(bundle, stream), context))
         {
             return;
         }
 
-        await host.Out.WriteLineAsync(Cli.LinePrefix + $"bundle {UsageValue.Quoted(outPath)} written");
+        await host.Out.WriteLineAsync(Cli.LinePrefix + WrittenLine("bundle", outPath, output));
         var mappingPath = outPath + BundleFiles.MappingSuffix;
         var text = Utf8.GetBytes(MappingFile.Write(mapping));
-        if (!Write(mappingPath, stream => stream.Write(text, 0, text.Length), context))
+        if (!Write(mappingPath, output, stream => stream.Write(text, 0, text.Length), context, isMapping: true))
         {
             return;
         }
 
-        await host.Out.WriteLineAsync(Cli.LinePrefix + $"mapping {UsageValue.Quoted(mappingPath)} written");
+        await host.Out.WriteLineAsync(
+            Cli.LinePrefix
+                + (
+                    output.MayBePrintedAsPath
+                        ? $"mapping {UsageValue.Quoted(mappingPath)} written"
+                        : $"mapping written beside the bundle, with '{BundleFiles.MappingSuffix}' after its name"
+                )
+        );
         await host.Out.WriteLineAsync(
             Cli.LinePrefix
                 + "the mapping holds your own names: keep it private, outside your project's folder, since a build "
@@ -349,11 +364,17 @@ internal static class DiagnoseRun
         );
     }
 
+    // What was written, at its full path, or at the position of an --out that may not be printed.
+    private static string WrittenLine(string what, string path, UsageValue output) =>
+        output.MayBePrintedAsPath
+            ? $"{what} {UsageValue.Quoted(path)} written"
+            : $"{what} written to the path at position {output.Position}";
+
     // The full path of --out, or null when it names a file of the run, which is reported.
     private static string? OutPathOf(UsageValue output, RunContext context)
     {
         var outPath = Path.GetFullPath(output.Text, context.Host.WorkingDirectory);
-        if (RefusedOutOf(outPath) is not { } refused)
+        if (RefusedOutOf(outPath, output) is not { } refused)
         {
             return outPath;
         }
@@ -363,18 +384,25 @@ internal static class DiagnoseRun
     }
 
     // The SQLSRC218 of an --out that names a file of the run, which is refused before anything is described, or null.
-    private static ToolDiagnostic? RefusedOutOf(string outPath) =>
+    private static ToolDiagnostic? RefusedOutOf(string outPath, UsageValue output) =>
         RunLogFile.IsAFileOfTheRun(outPath)
             ? ToolDiagnostic.NotChanged(
                 outPath,
                 "written",
-                "a bundle is not written over a .sql file, a sidecar, a project or a solution"
+                "a bundle is not written over a .sql file, a sidecar, a project or a solution",
+                output
             )
             : null;
 
     // Makes the file, or empties the one that is there, and writes it.  False when the system would not, which is
     // SQLSRC218 at the file.
-    private static bool Write(string path, Action<Stream> write, RunContext context)
+    private static bool Write(
+        string path,
+        UsageValue output,
+        Action<Stream> write,
+        RunContext context,
+        bool isMapping = false
+    )
     {
         try
         {
@@ -384,12 +412,20 @@ internal static class DiagnoseRun
         }
         catch (Exception exception) when (FileErrors.IsPathError(exception))
         {
-            context.Reporter.Report(ToolDiagnostic.NotChanged(path, "written", exception.Message));
+            // A mapping beside a bundle that is named by its position is named by that position too.
+            context.Reporter.Report(
+                isMapping && !output.MayBePrintedAsPath
+                    ? ToolDiagnostic.NotChangedAt(
+                        $"The mapping beside the path at position {output.Position}",
+                        "written"
+                    )
+                    : ToolDiagnostic.NotChanged(path, "written", exception.Message, output)
+            );
             return false;
         }
     }
 
-    // SQLSRC292 at the file, which the message names in full, or by its position when its token holds "=" or ";".
+    // SQLSRC292 at the file, which the message names in full, or by its position when its token may not be printed.
     private static ToolDiagnostic NotInFile(DiagnoseCommand.QueryName query, PlannedFile file, string reason) =>
         query.File.MayBePrintedAsPath
             ? ToolDiagnostic.AtFile(ToolDiagnostics.QueryNotInFile, file.Path, query.Query, file.Path, reason)

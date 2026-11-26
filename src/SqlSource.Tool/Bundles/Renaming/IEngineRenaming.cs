@@ -119,8 +119,9 @@ internal interface IEngineRenaming
     /// <summary>
     /// A string of a <see cref="FieldRuleKind.Own" /> member renamed, such as a plan, an error's message or a
     /// setting's value: every name through the scope, every literal through <see cref="IRenamingScope.Literal" />,
-    /// and nothing of the user's kept.  A string it cannot read safely is refused through the scope, and its return is
-    /// then not used.
+    /// and nothing of the user's kept, but in a member of the entry that <see cref="DeriveEntry" /> makes again, such
+    /// as SQL Server's name of a user's CLR type, which the token check then reads as made.  A string it cannot read
+    /// safely is refused through the scope, and its return is then not used.
     /// </summary>
     string RenameOwn(RenamingField field, IRenamingScope scope);
 
@@ -135,8 +136,23 @@ internal interface IEngineRenaming
     /// <summary>
     /// Derives, once every string of every call is renamed, what the engine's pipeline makes by its own rule and the
     /// renaming must not rename token by token: a list asked in name order sorted again, a position mapped through
-    /// <see cref="RenamedText.MapPosition" />.  It writes into <see cref="RenamingCall.Renamed" /> alone, reading
-    /// <see cref="RenamingCall.Original" />, and refuses through the scope what it cannot derive.
+    /// <see cref="RenamedText.MapPosition" />, a name the pipeline makes from the catalog's rows made again from the
+    /// renamed rows.  It writes into <see cref="RenamingCall.Renamed" /> of <paramref name="call" /> alone, reading
+    /// <see cref="RenamingCall.Original" /> and every call of <paramref name="calls" />, and refuses through the scope
+    /// what it cannot derive.
     /// </summary>
-    void Derive(RenamingCall call, IRenamingScope scope);
+    /// <param name="call">The call to derive in.</param>
+    /// <param name="calls">Every call of the capture, in order, <paramref name="call" /> among them.</param>
+    /// <param name="scope">The scope at the call's place.</param>
+    void Derive(RenamingCall call, IReadOnlyList<RenamingCall> calls, IRenamingScope scope);
+
+    /// <summary>
+    /// Derives in the renamed entry of <c>expected.json</c>, once its every member is renamed and the capture's calls
+    /// are derived, what the pipeline makes by its own rule: a parameter's <c>bindName</c> as the derived request of
+    /// the call that bound it holds it, or SQL Server's name of a user's CLR type made again from the entry's renamed
+    /// user type.  It writes into <paramref name="entry" /> alone.
+    /// </summary>
+    /// <param name="entry">The renamed entry.</param>
+    /// <param name="calls">Every call of the capture, renamed and derived.</param>
+    void DeriveEntry(JsonObject entry, IReadOnlyList<RenamingCall> calls);
 }

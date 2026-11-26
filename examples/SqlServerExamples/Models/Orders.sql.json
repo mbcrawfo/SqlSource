@@ -251,8 +251,217 @@
         }
       ]
     },
+    "ListShippedOrders": {
+      "hash": "df0e908e444e63855b2ff009dcbdddff10ae0037d7821b976c6c54df53d11ce8",
+      "toolVersion": "0.2.1",
+      "database": "mssql",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "shipped_on",
+          "type": {
+            "name": "date",
+            "maxLength": 3,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "shipped_on"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "ListUsersAndOrders": {
+      "hash": "6a937eb701cfa452a2967efd49661d719aeba9ceef763e48ad40d9aa62439098",
+      "toolVersion": "0.2.1",
+      "database": "mssql",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "name",
+          "type": {
+            "name": "nvarchar(100)",
+            "maxLength": 200,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "users",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "order_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "user_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": true
+        }
+      ]
+    },
+    "ListOrderLineTotals": {
+      "hash": "405ca6a9a41436b0bcb2b512f4d1cf6670e5680c5650e509b2eb00c7e559435b",
+      "toolVersion": "0.2.1",
+      "database": "mssql",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "several-tables",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "placed_at",
+          "type": {
+            "name": "datetime2(7)",
+            "maxLength": 8,
+            "precision": 27,
+            "scale": 7
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "placed_at"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "line_number",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "order_lines",
+            "column": "line_number"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 3,
+          "name": "line_total",
+          "type": {
+            "name": "decimal(21,2)",
+            "maxLength": 13,
+            "precision": 21,
+            "scale": 2
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": {
+            "schema": "dbo",
+            "table": "order_lines",
+            "column": "line_total"
+          },
+          "identity": false,
+          "computed": true
+        }
+      ]
+    },
     "ListOrderMonths": {
-      "hash": "2225403b8387a7c92267e1f2ef7e6eb130dd3c7526e5a55dccd94e2f7bd32a41",
+      "hash": "b2d4bf5193a6ff24d7f5d013707eba83d635d52f948386ff3fb2a5b370eba7a0",
       "toolVersion": "0.2.1",
       "database": "mssql",
       "engine": "mssql",
@@ -284,7 +493,7 @@
         },
         {
           "ordinal": 1,
-          "name": "month_end",
+          "name": "month_start",
           "type": {
             "name": "date",
             "maxLength": 3,
@@ -296,6 +505,65 @@
           "origin": null,
           "identity": false,
           "computed": true
+        }
+      ]
+    },
+    "ListShippingDays": {
+      "hash": "1638cdb10f3a454c3f8f11867550e45bf32e7098ca7a49d7a5277b635bcae897",
+      "toolVersion": "0.2.1",
+      "database": "mssql",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "order_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "calendar_day",
+          "type": {
+            "name": "date",
+            "maxLength": 3,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "day_number",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": false
         }
       ]
     },

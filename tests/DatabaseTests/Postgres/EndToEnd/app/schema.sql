@@ -187,3 +187,13 @@ CREATE TABLE json_values (
     camel jsonb,
     text_meta text
 );
+
+-- A range of a user's own and its multirange, which Queries/Ranges.sql reads and sends as NpgsqlRange<double> by the
+-- manual's type override, on a data source that calls EnableUnmappedTypes(), without which Npgsql reads neither.
+CREATE TYPE reading_range AS RANGE (subtype = float8);
+
+CREATE TABLE readings (
+    id integer PRIMARY KEY,
+    span reading_range NOT NULL,
+    spans reading_multirange
+);

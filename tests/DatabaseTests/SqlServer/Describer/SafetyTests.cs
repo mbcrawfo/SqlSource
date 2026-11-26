@@ -11,8 +11,8 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 
 // "columns" of a text that would harm the server if it ran, each in a session of its own: the procedure analyses the
 // text and runs none of it.  The canary of the schema, dbo.victim, must be there afterwards, and the server must
-// answer.  "operands", whose text is the query's own tokens rearranged, is sent the same way, and runs none of it
-// either.
+// answer.  "operands", whose text is the query's own tokens rearranged, and "origins", the query's own text in another
+// browse mode, are sent the same way, and run none of it either.
 [Collection(UsesSqlServer.Name)]
 public sealed class SafetyTests(SqlServerDatabases sqlServer)
 {
@@ -81,6 +81,34 @@ public sealed class SafetyTests(SqlServerDatabases sqlServer)
         finally
         {
             await sqlServer.ExecuteAsync("DROP SEQUENCE dbo.safety_sequence");
+        }
+    }
+
+    // A describe of a geometry column of a view, then a statement that drops the canary: "origins" sends the query's
+    // own text in browse mode 1, and runs none of it.
+    [Fact]
+    public async Task DescribeAsync_ClrColumnOfAViewBeforeADrop_AsksOriginsAndRunsNothing()
+    {
+        await sqlServer.ExecuteAsync("DROP VIEW IF EXISTS dbo.safety_shapes; DROP TABLE IF EXISTS dbo.safety_points");
+        await sqlServer.ExecuteAsync("CREATE TABLE dbo.safety_points (id int NOT NULL, shape geometry NOT NULL)");
+        await sqlServer.ExecuteAsync("CREATE VIEW dbo.safety_shapes AS SELECT shape FROM dbo.safety_points");
+        try
+        {
+            var (described, capture) = await Sessions.DescribeCapturedAsync(
+                sqlServer.ConnectionString,
+                DescribeRequests.Of(
+                    SqlDialectRules.SqlServer,
+                    "SELECT shape FROM dbo.safety_shapes; DROP TABLE dbo.victim"
+                )
+            );
+
+            described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
+            capture.Calls.Select(static call => call.Method).ShouldContain("origins");
+            await ShouldStandAsync();
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP VIEW dbo.safety_shapes; DROP TABLE dbo.safety_points");
         }
     }
 

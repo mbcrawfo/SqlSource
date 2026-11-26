@@ -44,17 +44,19 @@ public sealed class ProjectEvaluatorTests : IDisposable
     private Task<System.Collections.Immutable.ImmutableArray<ProjectEvaluation>> EvaluateAsync(
         IReadOnlyList<string> projects,
         string? solution = null,
-        CancellationToken? cancellationToken = null
+        CancellationToken? cancellationToken = null,
+        string? configuration = null
     ) =>
         ProjectEvaluator.EvaluateAsync(
             Hosts.Create(_folder.Path, _runner, _temp, _processors, _environment),
             projects,
             solution,
+            configuration,
             cancellationToken ?? TestContext.Current.CancellationToken
         );
 
-    private async Task<ProjectEvaluation> EvaluateAsync(string? solution = null) =>
-        (await EvaluateAsync([_project], solution)).ShouldHaveSingleItem();
+    private async Task<ProjectEvaluation> EvaluateAsync(string? solution = null, string? configuration = null) =>
+        (await EvaluateAsync([_project], solution, configuration: configuration)).ShouldHaveSingleItem();
 
     private string[] Projects(int count) =>
         [.. Enumerable.Range(0, count).Select(index => _folder.WriteFile($"P{index}/P{index}.csproj"))];
@@ -66,7 +68,7 @@ public sealed class ProjectEvaluatorTests : IDisposable
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource);
         evaluation.ProjectPath.ShouldBe(_project);
-        evaluation.Manifest.ShouldNotBeNull().ProjectPath.ShouldBe(_project);
+        evaluation.Manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(_project);
         evaluation.Failure.ShouldBeNull();
 
         _runner.Requests.Count.ShouldBe(2);
@@ -79,26 +81,32 @@ public sealed class ProjectEvaluatorTests : IDisposable
     }
 
     [Fact]
-    public async Task Evaluate_ProjectWithSeveralFrameworks_AsksAgainWithTheFirstAndWritesItsManifest()
+    public async Task Evaluate_ProjectWithSeveralFrameworks_EvaluatesEachAndWritesEachManifest()
     {
         _runner.Default = new FakeProject { TargetFrameworks = " net8.0 ; net10.0" };
 
         var evaluation = await EvaluateAsync();
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource);
-        evaluation.Manifest.ShouldNotBeNull().TargetFramework.ShouldBe("net8.0");
-        _runner.Requests.Count.ShouldBe(3);
+        evaluation.Manifests.Select(manifest => manifest.TargetFramework).ShouldBe(["net8.0", "net10.0"]);
+        _runner.Requests.Count.ShouldBe(5);
         _runner.Requests[0].Arguments.ShouldBe(["msbuild", _project, .. Evaluation]);
-        _runner.Requests[1].Arguments.ShouldBe(["msbuild", _project, .. Evaluation, "-p:TargetFramework=net8.0"]);
-        _runner.Requests[2].Arguments[3].ShouldBe("-t:SqlSourceWriteManifest");
-        _runner.Requests[2].Arguments[5].ShouldBe("-p:TargetFramework=net8.0");
-        _runner.Requests[2].Arguments.Length.ShouldBe(6);
+        foreach (var (framework, first) in new[] { ("net8.0", 1), ("net10.0", 3) })
+        {
+            _runner
+                .Requests[first]
+                .Arguments.ShouldBe(["msbuild", _project, .. Evaluation, "-p:TargetFramework=" + framework]);
+            var target = _runner.Requests[first + 1].Arguments;
+            target[3].ShouldBe("-t:SqlSourceWriteManifest");
+            target[5].ShouldBe("-p:TargetFramework=" + framework);
+            target.Length.ShouldBe(6);
+        }
     }
 
     // With no framework, NuGet's condition on TargetFramework keeps the package's props out, so the first
-    // evaluation never has the marker.  The second is the one the table reads.
+    // evaluation never has the marker.  Each framework's evaluation is the one that says.
     [Fact]
-    public async Task Evaluate_ProjectWithSeveralFrameworks_ReadsTheTableFromTheSecondEvaluation()
+    public async Task Evaluate_SqlSourceForTheSecondFrameworkAlone_WritesThatManifestAlone()
     {
         var assets = _folder.WriteFile("App/obj/project.assets.json");
         var project = new FakeProject { TargetFrameworks = "net8.0;net10.0", ProjectAssetsFile = assets };
@@ -107,9 +115,76 @@ public sealed class ProjectEvaluatorTests : IDisposable
 
         var evaluation = await EvaluateAsync();
 
-        // TD-0026: SqlSource for the second framework alone is no SqlSource.
-        evaluation.State.ShouldBe(ProjectState.DoesNotUseSqlSource);
+        evaluation.State.ShouldBe(ProjectState.UsesSqlSource);
+        evaluation.Manifests.ShouldHaveSingleItem().TargetFramework.ShouldBe("net10.0");
+        _runner.Requests.Count.ShouldBe(4);
+        _runner
+            .Requests.Where(request => request.Arguments.Contains("-t:SqlSourceWriteManifest"))
+            .ShouldHaveSingleItem()
+            .Arguments.ShouldContain("-p:TargetFramework=net10.0");
+    }
+
+    [Fact]
+    public async Task Evaluate_OneFrameworksTargetFails_FailsTheProjectWithNoManifest()
+    {
+        var project = new FakeProject { TargetFrameworks = "net8.0;net10.0", Output = "error MSB4057" };
+        _runner.Default = project;
+        _runner.BeforeAnswer = (request, _) =>
+        {
+            if (FakeProcessRunner.PropertyOf(request, "TargetFramework") == "net10.0")
+            {
+                project.TargetExitCode = 1;
+            }
+
+            return Task.CompletedTask;
+        };
+
+        var evaluation = await EvaluateAsync();
+
+        evaluation.State.ShouldBe(ProjectState.Failed);
+        evaluation.Manifests.ShouldBeEmpty();
+        evaluation.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC205");
+    }
+
+    [Fact]
+    public async Task Evaluate_NoFrameworkImportsTheReference_IsNotRestored()
+    {
+        var project = new FakeProject
+        {
+            TargetFrameworks = "net8.0;net10.0",
+            ProjectAssetsFile = _folder.CreateFolder("App/obj") + "/missing.json",
+            Imported = "",
+        };
+        project.PackageReferences.Add("SqlSource");
+        _runner.Default = project;
+
+        var evaluation = await EvaluateAsync();
+
+        evaluation.State.ShouldBe(ProjectState.NotRestored);
+        evaluation.Manifests.ShouldBeEmpty();
+        // The first framework that was not restored settles it: the second is not asked.
         _runner.Requests.Count.ShouldBe(2);
+    }
+
+    // A framework added since the last restore has the reference and none of the package, as NuGet's import under a
+    // condition on the framework gives, and the project is not restored, first or last: a plan of the other frameworks
+    // alone could leave out what only that one needs.
+    [Theory]
+    [InlineData("net8.0")]
+    [InlineData("net10.0")]
+    public async Task Evaluate_OneFrameworkNotRestored_IsNotRestoredWithNoManifest(string notRestored)
+    {
+        var assets = _folder.WriteFile("App/obj/project.assets.json");
+        var project = new FakeProject { TargetFrameworks = "net8.0;net10.0", ProjectAssetsFile = assets };
+        project.PackageReferences.Add("SqlSource");
+        project.ImportedByFramework[notRestored] = "";
+        _runner.Default = project;
+
+        var evaluation = await EvaluateAsync();
+
+        evaluation.State.ShouldBe(ProjectState.NotRestored);
+        evaluation.Manifests.ShouldBeEmpty();
+        evaluation.Failure.ShouldBeNull();
     }
 
     [Fact]
@@ -129,7 +204,7 @@ public sealed class ProjectEvaluatorTests : IDisposable
     }
 
     [Fact]
-    public async Task Evaluate_ProjectOfASolution_GivesBothRunsWhatABuildOfTheSolutionGives()
+    public async Task Evaluate_ProjectOfASolution_GivesEveryRunWhatABuildOfTheSolutionGives()
     {
         var solution = _folder.WriteFile("Acme, Inc;100%/App.slnx");
         var directory = Path.GetDirectoryName(solution) + Path.DirectorySeparatorChar;
@@ -138,7 +213,7 @@ public sealed class ProjectEvaluatorTests : IDisposable
         var evaluation = await EvaluateAsync(solution);
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource);
-        _runner.Requests.Count.ShouldBe(3);
+        _runner.Requests.Count.ShouldBe(5);
         foreach (var request in _runner.Requests)
         {
             // The fake reads a switch as MSBuild does, and throws at a ; or a , that was not escaped.
@@ -151,6 +226,35 @@ public sealed class ProjectEvaluatorTests : IDisposable
                 .Arguments.Single(argument => argument.StartsWith("-p:SolutionDir=", StringComparison.Ordinal))
                 .ShouldEndWith("Acme%2C Inc%3B100%25" + Path.DirectorySeparatorChar);
         }
+    }
+
+    // What "dotnet build -c" gives: the configuration as a global property of every run, each framework's too, escaped
+    // as a path is.
+    [Theory]
+    [InlineData("Release", "Release")]
+    [InlineData("Release;Staging,100%", "Release%3BStaging%2C100%25")]
+    public async Task Evaluate_Configuration_IsGivenToEveryRun(string configuration, string written)
+    {
+        _runner.Default = new FakeProject { TargetFrameworks = "net8.0;net10.0" };
+
+        var evaluation = await EvaluateAsync(configuration: configuration);
+
+        evaluation.State.ShouldBe(ProjectState.UsesSqlSource);
+        _runner.Requests.Count.ShouldBe(5);
+        foreach (var request in _runner.Requests)
+        {
+            FakeProcessRunner.PropertyOf(request, "Configuration").ShouldBe(configuration);
+            request.Arguments.ShouldContain("-p:Configuration=" + written);
+        }
+    }
+
+    // Without it the project's own default holds, which a variable of the environment can set.
+    [Fact]
+    public async Task Evaluate_NoConfiguration_GivesNone()
+    {
+        _ = await EvaluateAsync();
+
+        _runner.Requests.ShouldAllBe(request => FakeProcessRunner.PropertyOf(request, "Configuration") == null);
     }
 
     [Fact]
@@ -217,13 +321,13 @@ public sealed class ProjectEvaluatorTests : IDisposable
         evaluation.Failure.ShouldBeNull();
         // The manifest target is run for a project that uses SqlSource, and for no other.
         _runner.Requests.Count.ShouldBe(expected == ProjectState.UsesSqlSource ? 2 : 1);
-        (evaluation.Manifest is not null).ShouldBe(expected == ProjectState.UsesSqlSource);
+        evaluation.Manifests.IsEmpty.ShouldBe(expected != ProjectState.UsesSqlSource);
     }
 
     private static void ShouldBeSqlsrc205(ProjectEvaluation evaluation, params (string Label, string Text)[] lines)
     {
         evaluation.State.ShouldBe(ProjectState.Failed);
-        evaluation.Manifest.ShouldBeNull();
+        evaluation.Manifests.ShouldBeEmpty();
         var failure = evaluation.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC205");
         failure.Path.ShouldBe(evaluation.ProjectPath);
@@ -253,9 +357,9 @@ public sealed class ProjectEvaluatorTests : IDisposable
         _runner.Requests.Count.ShouldBe(1);
     }
 
-    // The second evaluation of a project with several frameworks fails as the first does, and no target is run.
+    // The evaluation of a framework fails as the first does, and no target is run.
     [Fact]
-    public async Task Evaluate_ProjectWithSeveralFrameworksWhoseSecondEvaluationFails_IsSqlsrc205AndRunsNoTarget()
+    public async Task Evaluate_ProjectWithSeveralFrameworksWhoseFrameworkEvaluationFails_IsSqlsrc205AndRunsNoTarget()
     {
         var project = new FakeProject
         {
@@ -415,7 +519,7 @@ public sealed class ProjectEvaluatorTests : IDisposable
         var evaluation = await EvaluateAsync();
 
         evaluation.State.ShouldBe(ProjectState.Failed);
-        evaluation.Manifest.ShouldBeNull();
+        evaluation.Manifests.ShouldBeEmpty();
         var failure = evaluation.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC206");
         failure.Path.ShouldBe(_project);
@@ -496,7 +600,7 @@ public sealed class ProjectEvaluatorTests : IDisposable
         var evaluations = await run;
 
         evaluations.Select(evaluation => evaluation.ProjectPath).ShouldBe(projects);
-        evaluations.Select(evaluation => evaluation.Manifest.ShouldNotBeNull().ProjectPath).ShouldBe(projects);
+        evaluations.Select(evaluation => evaluation.Manifests.ShouldHaveSingleItem().ProjectPath).ShouldBe(projects);
     }
 
     [Theory]
@@ -594,11 +698,12 @@ public sealed class ProjectEvaluatorTests : IDisposable
     }
 
     [Theory]
-    [InlineData("net8.0;net10.0", "net8.0")]
-    [InlineData(" ; net8.0 ;net10.0", "net8.0")]
-    [InlineData("net10.0", "net10.0")]
-    [InlineData("", null)]
-    [InlineData(" ; ", null)]
-    public void FirstFramework_List_IsItsFirstEntryThatIsNotEmpty(string targetFrameworks, string? expected) =>
-        ProjectEvaluator.FirstFramework(targetFrameworks).ShouldBe(expected);
+    [InlineData("net8.0;net10.0", new[] { "net8.0", "net10.0" })]
+    [InlineData(" ; net8.0 ;net10.0", new[] { "net8.0", "net10.0" })]
+    [InlineData("net8.0;NET8.0;net10.0;net8.0", new[] { "net8.0", "net10.0" })]
+    [InlineData("net10.0", new[] { "net10.0" })]
+    [InlineData("", new string[0])]
+    [InlineData(" ; ", new string[0])]
+    public void Frameworks_List_IsItsEntriesThatAreNotEmptyOrRepeated(string targetFrameworks, string[] expected) =>
+        ProjectEvaluator.Frameworks(targetFrameworks).ShouldBe(expected);
 }

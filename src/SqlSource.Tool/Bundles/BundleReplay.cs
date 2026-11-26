@@ -164,7 +164,13 @@ internal static class BundleReplay
                     query,
                     NeedsEntry: true,
                     query.Markers.Database ?? SqlDialectName.Canonical(parsed.Dialect),
-                    SqlQueryHash.Compute(parsed.Dialect, query.Segments, query.Tokens, query.Parameters)
+                    SqlQueryHash.Compute(
+                        parsed.Dialect,
+                        query.Segments,
+                        query.Tokens,
+                        query.Parameters,
+                        query.MarkedVariables
+                    )
                 ),
                 parsed.Dialect
             )

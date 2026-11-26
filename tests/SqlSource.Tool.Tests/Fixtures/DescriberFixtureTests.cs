@@ -90,6 +90,7 @@ public sealed class DescriberFixtureTests : IDisposable
                     "postgres/match-twice",
                     "postgres/match-two-tables",
                     "postgres/match-view-star",
+                    "postgres/select-cut-array-name",
                     "postgres/select-declared-domain",
                     "postgres/select-domain-parameter",
                     "postgres/select-expressions",
@@ -101,6 +102,8 @@ public sealed class DescriberFixtureTests : IDisposable
                     "postgres/select-range-intersection",
                     "postgres/select-scalar-subquery",
                     "postgres/select-suffix-names",
+                    "postgres/select-underscore-domain-array",
+                    "postgres/select-user-range",
                     "postgres/select-values-list",
                     "postgres/select-view",
                     "postgres/update-array-and-range",
@@ -180,6 +183,7 @@ public sealed class DescriberFixtureTests : IDisposable
                     "mssql/select-table-star",
                     "mssql/select-temporal-all",
                     "mssql/select-view-star",
+                    "mssql/select-view-clr",
                     "mssql/update-copies-agree",
                     "mssql/update-copies-cut",
                     "mssql/update-copies-of-two-parameters",
@@ -212,6 +216,7 @@ public sealed class DescriberFixtureTests : IDisposable
     [InlineData("columns")]
     [InlineData("operands", "select-aggregates")]
     [InlineData("table", "select-table-star")]
+    [InlineData("origins", "select-view-clr")]
     public Task Replay_SqlServerCaptureWithACallRemoved_ThrowsACaptureMiss(
         string method,
         string from = "update-inferred"

@@ -274,7 +274,7 @@ public static class Cli
         }
 
         // Which command the command line runs, once.
-        return new ParsedCommandLine(usage, parsed, RunningOf(parsed));
+        return new ParsedCommandLine(usage.WithPathsJudgedFrom(host.WorkingDirectory), parsed, RunningOf(parsed));
     }
 
     // Which command of the tool a command line runs, if any: the root's help and version, and a command's help, run
@@ -309,7 +309,9 @@ public static class Cli
             return true;
         }
 
-        var opened = RunLogFile.Open(logPath, host.WorkingDirectory, host.CreateFile, host.Time);
+        // Null for a path of SQLSOURCE_LOG, which is no token of the command line.
+        var token = SharedOptions.ValuesOf(commandLine.Usage, SharedOptions.Log) is [{ } value] ? value : null;
+        var opened = RunLogFile.Open(logPath, host.WorkingDirectory, host.CreateFile, host.Time, token);
         if (!opened.Succeeded)
         {
             state.Reporter.Report(opened.Failure);

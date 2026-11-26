@@ -195,6 +195,63 @@ public sealed class RepositoryMethodTests
         run.Sources[MethodsFile].ShouldNotContain(" async ");
     }
 
+    // A connection member of the type's own that the method would take the name of is found as any member is, which is
+    // said first of what the type has: the member is not only the source.
+    [Fact]
+    public void Run_RepositoryMethodNamedLikeItsOwnSource_ReportsTheMemberOfTheType()
+    {
+        const string Source = """
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample
+                {
+                    private NpgsqlDataSource? GetUser { get; }
+                }
+            }
+            """;
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], Source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,17): The method of the query 'GetUser' cannot be named "
+                    + "'GetUser', because 'App.Sample' has a member of that name.  Rename the query.",
+            ]);
+    }
+
+    // A source that the method would hide, and the interface that holds it, of one name: the source is said.
+    [Fact]
+    public void Run_RepositoryMethodNamedLikeItsSourceAndItsInterface_ReportsTheSource()
+    {
+        const string Source = """
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Users(NpgsqlDataSource IUsers);
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: IUsers -> one-optional\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "IUsers", [Parameter("id")], [Column("id")])], Source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,16): The method of the query 'IUsers' cannot be named "
+                    + "'IUsers', because the repository methods of 'App.Users' get their connection from 'IUsers'.  "
+                    + "Rename the query.",
+            ]);
+    }
+
     // The visibility is the query's, and the method stays an instance method.
     [Fact]
     public void Run_ProtectedVisibility_WritesAProtectedInstanceMethod()

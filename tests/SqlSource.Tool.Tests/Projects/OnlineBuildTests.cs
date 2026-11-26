@@ -141,8 +141,9 @@ public sealed class OnlineBuildTests : IDisposable
         var manifest = Path.GetFullPath(run.Arguments[2], _folder);
         manifest.ShouldStartWith(Path.Combine(_folder, "obj") + Path.DirectorySeparatorChar);
         Path.GetFileName(manifest).ShouldBe("App.csproj" + ManifestSuffix);
-        run.Manifest.ShouldNotBeNull().ShouldContain("Project=" + _project);
-        run.Manifest.ShouldContain("File=" + SqlFile);
+        var lines = run.Manifests.ShouldHaveSingleItem();
+        lines.ShouldContain("Project=" + _project);
+        lines.ShouldContain("File=" + SqlFile);
     }
 
     // Under auto the build goes online exactly when the tool, given the command the build gives it, reads a file, and
@@ -705,7 +706,7 @@ public sealed class OnlineBuildTests : IDisposable
         exitCode.ShouldBe(0, output);
         var run = StandIn.RunsIn(folder).ShouldHaveSingleItem();
         Path.GetFileName(run.Arguments[2]).ShouldBe(OddName + ManifestSuffix);
-        run.Manifest.ShouldNotBeNull().ShouldContain("Project=" + odd);
+        run.Manifests.ShouldHaveSingleItem().ShouldContain("Project=" + odd);
         Path.GetFileName(run.Arguments[^1]).ShouldBe(OddName + ".SqlSource.log");
     }
 

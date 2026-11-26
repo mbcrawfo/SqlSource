@@ -34,14 +34,71 @@ LEFT JOIN orders AS o ON u.id = o.user_id
 GROUP BY u.id
 ORDER BY u.id;
 
--- name: ListOrderMonths
--- summary: Each order with the last day of the month it was placed in.
--- column: month_end not null
+-- name: ListShippedOrders
+-- summary: The orders that have shipped, with the day each one shipped.
 SELECT
     id,
-    EOMONTH(placed_at) AS month_end
+    shipped_on
+FROM orders
+WHERE shipped_on IS NOT NULL
+ORDER BY shipped_on;
+
+-- name: ListUsersAndOrders
+-- summary: Every user and every order, matched by the order's user, with the user's id from either side.
+SELECT
+    u.name,
+    o.id AS order_id,
+    COALESCE(u.id, o.user_id) AS user_id
+FROM users AS u
+FULL JOIN orders AS o ON u.id = o.user_id
+ORDER BY user_id, order_id;
+
+-- name: ListOrderLineTotals
+-- summary: The total of each line of each order, with the time the order was placed.
+SELECT
+    o.id,
+    o.placed_at,
+    l.line_number,
+    l.line_total
+FROM orders AS o
+INNER JOIN order_lines AS l ON o.id = l.order_id
+ORDER BY o.id, l.line_number;
+
+-- name: ListOrderMonths
+-- summary: Each order with the first day of the month it was placed in.
+-- column: month_start not null
+SELECT
+    id,
+    DATEFROMPARTS(YEAR(placed_at), MONTH(placed_at), 1) AS month_start
 FROM orders
 ORDER BY id;
+
+-- name: ListShippingDays
+-- summary: Each day from an order's placing to its shipping, numbered from 1.
+WITH days AS (
+    SELECT
+        id AS order_id,
+        CAST(placed_at AS date) AS calendar_day,
+        1 AS day_number,
+        shipped_on
+    FROM orders
+    WHERE shipped_on IS NOT NULL
+    UNION ALL
+    SELECT
+        d.order_id,
+        DATEADD(DAY, 1, d.calendar_day) AS calendar_day,
+        d.day_number + 1 AS day_number,
+        d.shipped_on
+    FROM days AS d
+    WHERE d.calendar_day < d.shipped_on
+)
+
+SELECT
+    order_id,
+    calendar_day,
+    day_number
+FROM days
+ORDER BY order_id, day_number;
 
 -- name: AddOrder
 -- summary: Places a new order for a user, and returns what the database filled in.

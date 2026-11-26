@@ -808,6 +808,31 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor VariableDeclaredAsParameter = new(
+        id: "SQLSRC128",
+        title: "Variable is declared as a parameter",
+        messageFormat: "'{0}' is named by a '-- variable:' marker and declared by a '-- param:' marker of the same "
+            + "query.  A name is a variable or a query parameter, not both: remove it from one of the markers.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc128",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // A warning a project may turn off: a name the query does not write changes nothing, and is most likely misspelled,
+    // so the name the query does write is read as a parameter.
+    public static readonly DiagnosticDescriptor VariableNotWritten = new(
+        id: "SQLSRC129",
+        title: "Variable is not written in its query",
+        messageFormat: "'{0}' is named by a '-- variable:' marker, and the query does not write it.  Correct its "
+            + "spelling, or remove it from the marker.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc129"
+    );
+
     public static readonly DiagnosticDescriptor SidecarMalformed = new(
         id: "SQLSRC237",
         title: "Sidecar cannot be read",
@@ -1505,6 +1530,8 @@ internal static class SqlDiagnostics
             MemberNameTaken,
             ListParameterMisused,
             NegatedListRefusedEmpty,
+            VariableDeclaredAsParameter,
+            VariableNotWritten,
             SidecarMalformed,
             SidecarFormatTooNew,
             SidecarFormatTooOld,
@@ -1581,6 +1608,8 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.ParameterInTwoSpellings => ParameterInTwoSpellings,
             SqlParseErrorKind.ListParameterMisused => ListParameterMisused,
             SqlParseErrorKind.NegatedListRefusedEmpty => NegatedListRefusedEmpty,
+            SqlParseErrorKind.VariableDeclaredAsParameter => VariableDeclaredAsParameter,
+            SqlParseErrorKind.VariableNotWritten => VariableNotWritten,
             _ => throw UnexpectedEnumValueException.Of(kind),
         };
 }

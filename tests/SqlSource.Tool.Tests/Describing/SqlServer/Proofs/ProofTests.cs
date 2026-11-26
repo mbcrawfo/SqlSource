@@ -42,6 +42,56 @@ public sealed class ProofTests
     public void Holds_NotClrWithoutAnswers_DoesNotHold() => new Proof.NotClr(0).Holds(null).ShouldBeFalse();
 
     [Fact]
+    public void Holds_StoredOfAStoredColumn_IsTrueWhateverItsNullability() =>
+        new Proof.Stored(0).Holds([new OperandFacts(NotNull: false, NotClr: false, Stored: true)]).ShouldBeTrue();
+
+    [Fact]
+    public void Holds_StoredOfAnOperandNotNullAndNotStored_IsFalse() =>
+        new Proof.Stored(0).Holds([new OperandFacts(NotNull: true, NotClr: true)]).ShouldBeFalse();
+
+    [Fact]
+    public void Holds_StoredWithoutAnswers_DoesNotHold() => new Proof.Stored(0).Holds(null).ShouldBeFalse();
+
+    [Fact]
+    public void Holds_ClrOfAnOperandOfAClrType_IsTrueWhateverItsNullability() =>
+        new Proof.Clr(0).Holds([new OperandFacts(NotNull: false, NotClr: false, Clr: true)]).ShouldBeTrue();
+
+    [Fact]
+    public void Holds_ClrOfAnOperandOfNoClrType_IsFalse() =>
+        new Proof.Clr(0).Holds([new OperandFacts(NotNull: true, NotClr: true, Stored: true)]).ShouldBeFalse();
+
+    // An operand not answered is never shown of a CLR type, though it may be one.
+    [Fact]
+    public void Holds_ClrWithoutAnswers_DoesNotHold() => new Proof.Clr(0).Holds(null).ShouldBeFalse();
+
+    [Fact]
+    public void Shifted_Clr_MovesItsIndex() => new Proof.Clr(1).Shifted(2).ShouldBe(new Proof.Clr(3));
+
+    // A CTE's column and the proofs of the text alone have no operand to move.
+    [Fact]
+    public void Renumbered_MovesEveryOperandOfEveryKind()
+    {
+        var proof = new Proof.AllOf([
+            new Proof.Operand(0),
+            new Proof.NotClr(1),
+            new Proof.AnyOf([new Proof.Stored(2), new Proof.Clr(3)]),
+            new Proof.CteColumn(0, 1),
+            Proof.Yes,
+            Proof.No,
+        ]);
+
+        var renumbered = proof.Renumbered(static index => (index * 10) + 1).ShouldBeOfType<Proof.AllOf>();
+
+        renumbered.Parts.Count.ShouldBe(6);
+        renumbered.Parts[0].ShouldBe(new Proof.Operand(1));
+        renumbered.Parts[1].ShouldBe(new Proof.NotClr(11));
+        renumbered.Parts[2].ShouldBeOfType<Proof.AnyOf>().Parts.ShouldBe([new Proof.Stored(21), new Proof.Clr(31)]);
+        renumbered.Parts[3].ShouldBe(new Proof.CteColumn(0, 1));
+        renumbered.Parts[4].ShouldBeSameAs(Proof.Yes);
+        renumbered.Parts[5].ShouldBeSameAs(Proof.No);
+    }
+
+    [Fact]
     public void Holds_AnyOf_IsTrueWhenOnePartHolds()
     {
         var proof = new Proof.AnyOf([new Proof.Operand(0), new Proof.Operand(1)]);

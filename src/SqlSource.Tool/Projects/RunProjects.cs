@@ -32,12 +32,20 @@ internal static class RunProjects
     /// <param name="unit">The solution or the project the run is on.</param>
     /// <param name="named">
     /// The paths that <c>--project</c> gave, as they were typed.  Empty when it gave none.  A message names one by
-    /// its position when it holds <c>=</c> or <c>;</c>.
+    /// its position when it may not be printed.
+    /// </param>
+    /// <param name="configuration">
+    /// The configuration that <c>--configuration</c> gave, or null for each project's default.
     /// </param>
     /// <param name="context">
     /// The working directory and what MSBuild is run with, where the errors go, and what ends the run.
     /// </param>
-    public static async Task<FoundProjects> FindAsync(RunUnit unit, IReadOnlyList<UsageValue> named, RunContext context)
+    public static async Task<FoundProjects> FindAsync(
+        RunUnit unit,
+        IReadOnlyList<UsageValue> named,
+        string? configuration,
+        RunContext context
+    )
     {
         var (host, reporter, cancellationToken) = context;
         ImmutableArray<string> projects = [unit.Path];
@@ -70,7 +78,15 @@ internal static class RunProjects
 
         var manifests = ImmutableArray.CreateBuilder<ProjectManifest>();
         var assetsFiles = ImmutableArray.CreateBuilder<(string Project, string AssetsFile)>();
-        foreach (var evaluation in await ProjectEvaluator.EvaluateAsync(host, projects, solution, cancellationToken))
+        foreach (
+            var evaluation in await ProjectEvaluator.EvaluateAsync(
+                host,
+                projects,
+                solution,
+                configuration,
+                cancellationToken
+            )
+        )
         {
             RunEvents.Project(reporter.Trace, evaluation.ProjectPath, evaluation);
             var project = evaluation.ProjectPath;
@@ -82,11 +98,7 @@ internal static class RunProjects
             switch (evaluation.State)
             {
                 case ProjectState.UsesSqlSource:
-                    if (evaluation.Manifest is { } manifest)
-                    {
-                        manifests.Add(manifest);
-                    }
-
+                    manifests.AddRange(evaluation.Manifests);
                     break;
 
                 case ProjectState.DoesNotUseSqlSource:
@@ -129,12 +141,23 @@ internal static class RunProjects
     /// <summary>
     /// The manifest of a run that the build started: read from the file the build wrote, with no question to MSBuild.
     /// A file that does not exist or cannot be read, or that is no manifest, is reported at its full path, and gives
-    /// none.  A path of <c>--manifest</c> that holds <c>=</c> or <c>;</c> was refused before the run unless the run is
-    /// under <c>--online</c>, whose manifest's path the build wrote and is no secret, so the path is always printed.
+    /// none.  The event of the project is the caller's, once every manifest is read.  A token of <c>--manifest</c>
+    /// that may not be printed is named by its position instead, and the build's own path, under <c>--online</c>, is
+    /// always printed.
     /// </summary>
     /// <param name="manifestPath">The full path of the manifest file.</param>
+    /// <param name="given">The token of <c>--manifest</c>.</param>
     /// <param name="context">What reads the file, where the error goes, and what ends the run.</param>
-    public static Task<ImmutableArray<ProjectManifest>> FromManifestAsync(string manifestPath, RunContext context)
+    /// <param name="firstProject">
+    /// The full path of the project of the first manifest of the run, when this is a later one: a manifest of another
+    /// project is reported as one that cannot be read, and gives none.
+    /// </param>
+    public static Task<ImmutableArray<ProjectManifest>> FromManifestAsync(
+        string manifestPath,
+        UsageValue given,
+        RunContext context,
+        string? firstProject = null
+    )
     {
         var (host, reporter, cancellationToken) = context;
         cancellationToken.ThrowIfCancellationRequested();
@@ -145,37 +168,53 @@ internal static class RunProjects
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return Task.FromResult(Unreadable(manifestPath, exception.Message, reporter));
+            // The system's message quotes the path.
+            var reason = given.MayBePrintedAsPath ? exception.Message : "the system would not read it";
+            return Task.FromResult(Unreadable(manifestPath, given, reason, reporter));
         }
 
         if (text is null)
         {
-            return Task.FromResult(Unreadable(manifestPath, "there is no such file", reporter));
+            return Task.FromResult(Unreadable(manifestPath, given, "there is no such file", reporter));
         }
 
         var read = ManifestReader.Read(text);
         if (!read.Succeeded)
         {
-            return Task.FromResult(Unreadable(manifestPath, read.Failure, reporter));
+            return Task.FromResult(Unreadable(manifestPath, given, read.Failure, reporter));
         }
 
-        RunEvents.Project(
-            reporter.Trace,
-            read.Value.ProjectPath,
-            new ProjectEvaluation(read.Value.ProjectPath, ProjectState.UsesSqlSource, read.Value)
-        );
+        if (firstProject is not null && !PathComparer.Equals(read.Value.ProjectPath, firstProject))
+        {
+            return Task.FromResult(
+                Unreadable(
+                    manifestPath,
+                    given,
+                    $"it is of '{read.Value.ProjectPath}', and the first manifest is of '{firstProject}'",
+                    reporter
+                )
+            );
+        }
+
         return Task.FromResult<ImmutableArray<ProjectManifest>>([read.Value]);
     }
 
-    private static ImmutableArray<ProjectManifest> Unreadable(string manifestPath, string reason, Reporter reporter)
+    private static ImmutableArray<ProjectManifest> Unreadable(
+        string manifestPath,
+        UsageValue given,
+        string reason,
+        Reporter reporter
+    )
     {
         reporter.Report(
-            ToolDiagnostic.AtFile(
-                ToolDiagnostics.ManifestCannotBeRead,
-                manifestPath,
-                UsageValue.Quoted(manifestPath),
-                reason
-            )
+            given.MayBePrintedAsPath
+                ? ToolDiagnostic.AtFile(
+                    ToolDiagnostics.ManifestCannotBeRead,
+                    manifestPath,
+                    UsageValue.Quoted(manifestPath),
+                    reason
+                )
+                : ToolDiagnostic.Create(ToolDiagnostics.ManifestCannotBeRead, $"at position {given.Position}", reason)
         );
         return [];
     }
@@ -191,6 +230,7 @@ internal static class RunProjects
     {
         var selected = new HashSet<string>(PathComparer);
         var reported = new HashSet<string>(PathComparer);
+        Dictionary<string, string>? byRealPath = null;
         foreach (var name in named)
         {
             // Path.GetFullPath throws for an empty path, which is what an unset variable of a shell gives.
@@ -198,6 +238,14 @@ internal static class RunProjects
             if (projects.Contains(path, PathComparer))
             {
                 _ = selected.Add(path);
+            }
+            else if (
+                path.Length > 0
+                && (byRealPath ??= ByRealPath(projects)).TryGetValue(RealPath.Of(path), out var project)
+            )
+            {
+                // A path through a symbolic link selects the project by the unit's spelling of it.
+                _ = selected.Add(project);
             }
             else if (reported.Add(path))
             {
@@ -208,5 +256,17 @@ internal static class RunProjects
         }
 
         return [.. projects.Where(selected.Contains)];
+    }
+
+    // The unit's projects by their paths with every symbolic link resolved.  Of two that resolve alike, the first.
+    private static Dictionary<string, string> ByRealPath(ImmutableArray<string> projects)
+    {
+        var byRealPath = new Dictionary<string, string>(PathComparer);
+        foreach (var project in projects)
+        {
+            _ = byRealPath.TryAdd(RealPath.Of(project), project);
+        }
+
+        return byRealPath;
     }
 }

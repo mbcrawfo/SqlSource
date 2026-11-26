@@ -60,7 +60,7 @@ A file with no `-- name:` line is one query.  It takes the markers of the file h
 
 These are not settings, and have no row in [the table of all settings](#all-settings):
 
-- The markers that describe one query's own content: `-- name:`, `-- summary:`, `-- param:`, `-- token:` and `-- token-ignore:`.
+- The markers that describe one query's own content: `-- name:`, `-- summary:`, `-- param:`, `-- variable:`, `-- token:` and `-- token-ignore:`.
 - The keys `root` and `$schema` of a settings file.
 - `[SqlSourceConverter]`, which has no property.
 - The options and environment variables of the `sqlsource` command: see [the command reference](cli.md#command-reference).

@@ -29,7 +29,7 @@ namespace SqlSource.Tool;
 /// exit code <c>1</c>.
 /// </para>
 /// <para>
-/// An error is at the bundle's full path.  When the token of the path holds <c>=</c> or <c>;</c>, the error is at no
+/// An error is at the bundle's full path.  When the token of the path may not be printed, the error is at no
 /// file, a line under it names the path by its position, and every text of the path in its message, as a reason of
 /// the system quotes it, is replaced by that position.
 /// </para>
@@ -275,9 +275,10 @@ internal static class ReplayCommand
     }
 
     /// <summary>
-    /// An error at the bundle as it is printed: at its full path, or, for a token that holds <c>=</c> or <c>;</c>, at
-    /// no file, with the path named by its position, in its text too, where a reason quotes it as written or as
-    /// <see cref="BundleErrors" /> writes it.  <c>diagnose --scrub</c> names its bundle so too.
+    /// An error at the bundle as it is printed: at its full path, or, for a token that may not be printed, at no file,
+    /// with the path named by its position, in its text too, where a reason quotes it as written or as
+    /// <see cref="BundleErrors" /> writes it.  <c>diagnose --scrub</c> names its bundle so too, and the bundle of
+    /// <c>--out</c>.
     /// </summary>
     /// <param name="error">The error at the bundle's full path.</param>
     /// <param name="argument">The token that gave the path.</param>

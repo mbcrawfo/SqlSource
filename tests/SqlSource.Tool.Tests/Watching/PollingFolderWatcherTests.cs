@@ -208,7 +208,7 @@ public sealed class PollingFolderWatcherTests
     [Fact]
     public void Poll_NotRecursiveLinkToAFolderCreated_RaisesCreatedFolderAlone()
     {
-        Assert.SkipWhen(OperatingSystem.IsWindows(), "Making a symbolic link needs a privilege on Windows.");
+        Assert.SkipWhen(OperatingSystem.IsWindows(), SymbolicLinks.SkipReason);
         using var scene = new Scene();
         using var other = new TempFolder();
         _ = other.WriteFile("Users.sql", "SELECT 1");

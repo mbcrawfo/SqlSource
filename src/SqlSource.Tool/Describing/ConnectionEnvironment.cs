@@ -36,7 +36,7 @@ internal sealed class ConnectionEnvironment
     /// <summary>The full path of the file read, or null when the run reads none or finds none there.</summary>
     public string? FilePath => _file.Path;
 
-    /// <summary>The full path of the file the run looks for, or null when it reads none.</summary>
+    /// <summary>How a message names the file the run looks for, or null when it reads none.</summary>
     public string? LookedFor { get; }
 
     /// <summary>The folder of the run's unit.</summary>
@@ -46,7 +46,7 @@ internal sealed class ConnectionEnvironment
     /// <param name="getEnvironmentVariable">The host's.</param>
     /// <param name="file">The run's file.</param>
     /// <param name="unitFolder">The folder of the run's unit.</param>
-    /// <param name="lookedFor">The full path of the file the run looks for, or null when it reads none.</param>
+    /// <param name="lookedFor">How a message names the file the run looks for, or null when it reads none.</param>
     public static ConnectionEnvironment Of(
         Func<string, string?> getEnvironmentVariable,
         DotEnvFile file,
@@ -61,8 +61,16 @@ internal sealed class ConnectionEnvironment
     /// <param name="unitFolder">The folder of the run's unit.</param>
     /// <param name="envFile">The full path of the run's <c>.env</c> file, or null when it reads none.</param>
     /// <param name="host">The environment and the files.</param>
-    public static ConnectionEnvironment Load(string unitFolder, string? envFile, ToolHost host) =>
-        Of(host.GetEnvironmentVariable, DotEnvSearch.Read(envFile, host.ReadTextFile), unitFolder, envFile);
+    /// <param name="heldAt">
+    /// The position of an <c>--env-file</c> token that may not be printed, which then names the file, or null.
+    /// </param>
+    public static ConnectionEnvironment Load(string unitFolder, string? envFile, ToolHost host, int? heldAt) =>
+        Of(
+            host.GetEnvironmentVariable,
+            DotEnvSearch.Read(envFile, host.ReadTextFile, heldAt),
+            unitFolder,
+            heldAt is { } position ? $"the path at position {position}" : envFile
+        );
 
     /// <summary>
     /// The value of a variable and where it came from: the environment's when it is not blank, with the variable as

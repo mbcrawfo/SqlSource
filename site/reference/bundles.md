@@ -54,10 +54,11 @@ The `.sql` file of a bundle leaves out each marker that changes no description, 
   - its other names, such as the system databases `master` and `tempdb` of SQL Server, and the system columns `ctid` and `xmin` of PostgreSQL.
 - **A logical database that is named for its dialect is kept**: `postgres` or `mssql`.
 
-Before `diagnose` writes the bundle, it checks two things:
+Before `diagnose` writes the bundle, it checks three things:
 
 - Every word in the bundle is a new name, a word of the database, a number or punctuation.
 - The query, run from the renamed bundle as `replay` runs it, gives the answer that your database gave.
+- The bundle holds no connection string or password of yours, as [SQLSRC200](../diagnostics.md#sqlsrc200) counts them.  If it would, `diagnose` writes no bundle and reports that error.
 
 So a bundle that `diagnose` writes holds no name, literal or value of yours but the ones that the rules above keep.  And it shows the problem as you saw it.  If a number in your query is a value that you cannot share, such as an account number written into its SQL, take the [private route](../guides/report-a-bug.md#raw-bundle) instead.
 
@@ -76,10 +77,10 @@ $ dotnet sqlsource diagnose --scrub ../report.zip --out ../report-renamed.zip
 | Option | What it does |
 |----|----|
 | `--query <file>:<name>` | The query to report: its `.sql` file, which a type of the run must claim ([SQLSRC212](../diagnostics.md#sqlsrc212)), a colon, and its name as its `-- name:` line gives it ([SQLSRC292](../diagnostics.md#sqlsrc292)).  The last colon ends the file, so `C:\App\Queries\Users.sql:GetUser` reads.  A relative path is taken from the current folder |
-| `--out <path>` | Required, with `--scrub` too.  Where to write the bundle, a zip; its mapping is written beside it, with `.mapping.json` added to its name.  A file there is overwritten, and a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, or holds `=` or `;`, is refused |
+| `--out <path>` | Required, with `--scrub` too.  Where to write the bundle, a zip; its mapping is written beside it, with `.mapping.json` added to its name.  A file there is overwritten, and a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, or holds `=` or `;`, is refused.  A path that may be a secret is named by its position: see [how an error names a path](cli.md#paths) |
 | `--no-obfuscate` | Writes a raw bundle, with your names and SQL as they are, and no mapping: see [when a bundle cannot be made safe](../guides/report-a-bug.md#raw-bundle) |
 | `--scrub <bundle>` | Renames a raw bundle, with no database, no project and no connection, and writes it and its mapping at `--out`.  It takes no other option.  A bundle renamed already is [SQLSRC295](../diagnostics.md#sqlsrc295), and one that cannot be read, or that another version made and that does not answer what this one asks ([SQLSRC290](../diagnostics.md#sqlsrc290)), is an error as for [`replay`](#replay); one whose answer this version does not reproduce is [SQLSRC296](../diagnostics.md#sqlsrc296), and nothing is written |
-| `<path>`, `--project`, `--connection`, `--env-file`, `--verbose`, `--log` | As for `describe`: see [arguments](cli.md#arguments) and [options](cli.md#options).  `<path>` names the project or solution alone, since `--query` names the one `.sql` file |
+| `<path>`, `--project`, `--connection`, `--env-file`, `--configuration`, `--verbose`, `--log` | As for `describe`: see [arguments](cli.md#arguments) and [options](cli.md#options).  `<path>` names the project or solution alone, since `--query` names the one `.sql` file |
 
 - **`diagnose` has none of the other options of `describe`.**
 - **`diagnose` takes its connections from the same places as `describe`.**  See [connections](connections.md#connections).
@@ -136,4 +137,4 @@ If a bundle holds the names and the SQL of the person who made it, `replay` says
 - Inside a quoted value, a control character is written as JSON writes it: `\n` for a line break, and `\t` for a tab.
 - A tab outside a quoted value is printed as it is.
 
-A bundle that cannot be read or replayed is an error, from [SQLSRC288](../diagnostics.md#sqlsrc288) to [SQLSRC291](../diagnostics.md#sqlsrc291).  The error names the bundle at its full path, and the exit code is `1`.  If the path holds `=` or `;`, the error names it as `The path at position <n>` instead, on a line labelled `bundle`.  The tool names each value of the command line that can be a secret in this way.
+A bundle that cannot be read or replayed is an error, from [SQLSRC288](../diagnostics.md#sqlsrc288) to [SQLSRC291](../diagnostics.md#sqlsrc291).  The error names the bundle at its full path, and the exit code is `1`.  If the path may be a secret, the error names it as `The path at position <n>` instead, on a line labelled `bundle`: see [how an error names a path](cli.md#paths).  The tool names each value of the command line that can be a secret in this way.

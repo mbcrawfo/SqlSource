@@ -67,6 +67,22 @@
         <ProjectReference Include="../../SqlSource.Testing/SqlSource.Testing.csproj" />
         <ProjectReference Include="../TestHarness/TestHarness.csproj" />
         <ProjectReference Include="../../SqlSource.Tool.Testing/SqlSource.Tool.Testing.csproj" />
+        <!--
+            The CLR type of a user's own assembly: its net10.0 build, which SqlClient reads and sends the type through,
+            and its net48 build, which UserClrType gives the server from the resource that EmbedServerClrType makes.
+        -->
+        <ProjectReference Include="../SqlServer.ClrType/SqlServer.ClrType.csproj" />
+        <ProjectReference
+            Include="../SqlServer.ClrType/SqlServer.ClrType.csproj"
+            SetTargetFramework="TargetFramework=net48"
+            ReferenceOutputAssembly="false"
+            OutputItemType="ServerClrType"
+        />
     </ItemGroup>
+    <Target Name="EmbedServerClrType" AfterTargets="ResolveProjectReferences">
+        <ItemGroup>
+            <EmbeddedResource Include="@(ServerClrType)" LogicalName="ServerClrType.dll" />
+        </ItemGroup>
+    </Target>
     <Import Project="../../../src/SqlSource/build/SqlSource.targets" />
 </Project>

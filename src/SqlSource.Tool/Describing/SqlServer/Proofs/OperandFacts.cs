@@ -5,5 +5,13 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// <param name="NotClr">
 /// True when its row's type is known and no CLR type (<see cref="Types.SqlServerTypes.MayBeClr" />).
 /// </param>
+/// <param name="Stored">
+/// True when its row names as its source a column of a table that is not computed, so that reading it twice in one row
+/// gives one value.
+/// </param>
+/// <param name="Clr">
+/// True when its row was answered and its type may be a CLR type (<see cref="Types.SqlServerTypes.MayBeClr" />): with
+/// <paramref name="Stored" />, the operand is a column of that type, whose value no conversion made.
+/// </param>
 /// <remarks>The default, an operand not asked or not answered, proves nothing.</remarks>
-internal readonly record struct OperandFacts(bool NotNull, bool NotClr);
+internal readonly record struct OperandFacts(bool NotNull, bool NotClr, bool Stored = false, bool Clr = false);

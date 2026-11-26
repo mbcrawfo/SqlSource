@@ -238,10 +238,6 @@ public sealed class SelectStatementTests
     [InlineData("SELECT a FROM t FOR JSON PATH")]
     [InlineData("SELECT a FROM t FOR XML AUTO")]
     [InlineData("SELECT a FROM t FOR BROWSE")]
-    [InlineData("SELECT a FROM t UNION SELECT b FROM u")]
-    [InlineData("SELECT a FROM t UNION ALL SELECT b FROM u")]
-    [InlineData("SELECT a FROM t EXCEPT SELECT b FROM u")]
-    [InlineData("SELECT a FROM t INTERSECT SELECT b FROM u")]
     [InlineData("SELECT a FROM t; SELECT b FROM u")]
     [InlineData("SELECT a FROM t SELECT b FROM u")]
     [InlineData("SELECT a FROM t UPDATE t SET a = 1")]
@@ -259,7 +255,87 @@ public sealed class SelectStatementTests
     [InlineData("SELECT a FROM t WHERE a = 1 FROM u")]
     [InlineData("SELECT a FROM t ORDER BY a WHERE a = 1")]
     [InlineData("SELECT TOP a FROM t")]
+    // A side of a set operator that is not a SELECT the reader follows refuses the whole query.
+    [InlineData("SELECT a FROM t UNION")]
+    [InlineData("UNION SELECT a FROM t")]
+    [InlineData("SELECT a FROM t UNION UNION SELECT b FROM u")]
+    [InlineData("SELECT a FROM t UNION SELECT b INTO #x FROM u")]
+    [InlineData("SELECT a FROM t UNION SELECT b FROM u FOR JSON PATH")]
+    [InlineData("(SELECT a FROM t) ORDER BY a UNION SELECT b FROM u")]
+    [InlineData("SELECT a FROM t UNION (SELECT b FROM u) ORDER BY 1")]
+    [InlineData("SELECT a FROM t UNION VALUES (1)")]
+    // The FROM of IS [NOT] DISTINCT FROM reads as a clause that comes twice, so such a query is not read.
+    [InlineData("SELECT a FROM t WHERE a IS DISTINCT FROM 1")]
+    [InlineData("SELECT a FROM t WHERE a IS NOT DISTINCT FROM 1")]
     public void Read_Refused_IsNull(string sql) => Read(sql).Statement.ShouldBeNull();
+
+    [Theory]
+    [InlineData("SELECT a FROM t UNION SELECT b FROM u", "a|b")]
+    [InlineData("SELECT a FROM t UNION ALL SELECT b FROM u", "a|b")]
+    [InlineData("SELECT a FROM t EXCEPT SELECT b FROM u", "a|b")]
+    [InlineData("SELECT a FROM t INTERSECT SELECT b FROM u", "a|b")]
+    [InlineData("SELECT a FROM t UNION SELECT b FROM u EXCEPT SELECT c FROM v ORDER BY 1;", "a|b|c")]
+    [InlineData("(SELECT a FROM t) UNION (SELECT b FROM u)", "a|b")]
+    [InlineData("SELECT a FROM t UNION (SELECT b FROM u INTERSECT SELECT c FROM v)", "a|b|c")]
+    [InlineData("WITH q AS (SELECT 1 AS z UNION ALL SELECT 2) SELECT a FROM q UNION SELECT b FROM u", "a|b")]
+    [InlineData("SELECT (SELECT 1 UNION SELECT 2) AS a FROM t", "( SELECT 1 UNION SELECT 2 )")]
+    public void Read_SetOperators_GivesEachBranch(string sql, string items)
+    {
+        var (tokens, statement) = Read(sql);
+
+        string.Join(
+                '|',
+                statement.ShouldNotBeNull().Branches.Select(branch => Text(tokens, branch.Items.Single().Expression))
+            )
+            .ShouldBe(items);
+    }
+
+    [Fact]
+    public void Read_Ctes_GivesTheirNamesColumnsAndBodies()
+    {
+        var (_, statement) = Read(
+            "WITH a (x, y) AS (SELECT 1, 2), b AS (SELECT 3 AS z UNION ALL SELECT 4) SELECT x FROM a"
+        );
+
+        var ctes = statement.ShouldNotBeNull().Ctes;
+        ctes.Select(static cte => cte.Name).ShouldBe(["a", "b"]);
+        ctes[0].Columns.ShouldBe(["x", "y"]);
+        _ = ctes[0].Body.ShouldNotBeNull();
+        ctes[1].Columns.ShouldBeNull();
+        ctes[1].Body.ShouldBeNull();
+        ctes[1].Branches.ShouldNotBeNull().Count.ShouldBe(2);
+    }
+
+    // A recursive CTE is read as the branches of its set operators, its own name among those its FROM reads.
+    [Fact]
+    public void Read_RecursiveCte_GivesEachBranch()
+    {
+        var (tokens, statement) = Read(
+            "WITH t (n) AS (SELECT 1 UNION ALL (SELECT n + 1 FROM t WHERE n < 5 UNION ALL SELECT n FROM t)) "
+                + "SELECT n FROM t"
+        );
+
+        var cte = statement.ShouldNotBeNull().Ctes.ShouldHaveSingleItem();
+        cte.Body.ShouldBeNull();
+        string.Join(
+                '|',
+                cte.Branches.ShouldNotBeNull().Select(branch => Text(tokens, branch.Items.Single().Expression))
+            )
+            .ShouldBe("1|n + 1|n");
+    }
+
+    // A branch the reader cannot follow leaves the whole CTE unread, and the query is still read.
+    [Theory]
+    [InlineData("WITH t (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t FOR XML PATH) SELECT n FROM t")]
+    [InlineData("WITH t (n) AS (SELECT 1 UNION ALL) SELECT n FROM t")]
+    [InlineData("WITH t (n) AS (SELECT 1 UNION ALL (SELECT 2) x) SELECT n FROM t")]
+    public void Read_CteWithABranchNotRead_HasNoBranches(string sql)
+    {
+        var cte = Read(sql).Statement.ShouldNotBeNull().Ctes.ShouldHaveSingleItem();
+
+        cte.Branches.ShouldBeNull();
+        cte.Body.ShouldBeNull();
+    }
 
     // WINDOW is no reserved word, so "window" may be an alias or a column.  A WINDOW clause is only
     // "WINDOW name AS ( ... ) [, name AS ( ... )]..."; any other "window" of the select's level gives null, since a

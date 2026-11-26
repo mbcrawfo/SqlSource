@@ -174,8 +174,8 @@
               "assemblyQualifiedName": "Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91"
             }
           },
-          "nullable": false,
-          "nullableSource": "server",
+          "nullable": true,
+          "nullableSource": "heuristic",
           "origin": null,
           "identity": false,
           "computed": false

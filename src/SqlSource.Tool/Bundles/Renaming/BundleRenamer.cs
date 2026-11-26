@@ -137,7 +137,7 @@ internal static class BundleRenamer
             return Refused(ofCapture);
         }
 
-        var expected = raw.Expected is { } text ? EntryRenamer.Rename(engine, run, text, query, token) : null;
+        var expected = raw.Expected is { } text ? EntryRenamer.Rename(engine, run, text, query, calls, token) : null;
         if (run.Refusal is { } ofEntry)
         {
             return Refused(ofEntry);

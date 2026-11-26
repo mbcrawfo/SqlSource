@@ -64,15 +64,15 @@ internal static class StandIn
     {
         using var document = JsonDocument.Parse(line);
         var root = document.RootElement;
-        var manifest = root.GetProperty("Manifest");
         return new StandInRun(
             Strings(root.GetProperty("Arguments")),
-            manifest.ValueKind == JsonValueKind.Null ? null : Strings(manifest)
+            [.. root.GetProperty("Manifests").EnumerateArray().Select(Strings)]
         );
 
         static string[] Strings(JsonElement array) => [.. array.EnumerateArray().Select(item => item.GetString()!)];
     }
 }
 
-// A run of the stand-in: the arguments it was given, and the lines of the manifest they named, or none.
-internal sealed record StandInRun(IReadOnlyList<string> Arguments, IReadOnlyList<string>? Manifest);
+// A run of the stand-in: the arguments it was given, and the lines of each manifest they named, in the order of their
+// --manifest options.
+internal sealed record StandInRun(IReadOnlyList<string> Arguments, IReadOnlyList<IReadOnlyList<string>> Manifests);

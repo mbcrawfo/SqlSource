@@ -42,6 +42,8 @@ internal sealed class SqlMarkerScope(
 
     private List<SqlParameterDeclaration>? _declarations;
 
+    private List<TextSpan>? _variables;
+
     private List<SqlColumnDeclaration>? _columns;
 
     private OutputKind? _output;
@@ -122,6 +124,12 @@ internal sealed class SqlMarkerScope(
         _declarations ?? (IReadOnlyList<SqlParameterDeclaration>)[];
 
     /// <summary>
+    /// Where each name that the scope's <c>-- variable:</c> markers give is in the file's text, without its prefix,
+    /// in marker order.  A name may be here twice.
+    /// </summary>
+    public IReadOnlyList<TextSpan> Variables => _variables ?? (IReadOnlyList<TextSpan>)[];
+
+    /// <summary>
     /// What the scope's <c>-- column:</c> markers say of its query's result, in marker order.  A column has a second
     /// marker only when it says what the first does not: the type where the first sets the nullability, or the
     /// nullability where the first sets the type.
@@ -160,6 +168,9 @@ internal sealed class SqlMarkerScope(
                 break;
             case SqlMarkerKind.Param:
                 ReadParam(marker);
+                break;
+            case SqlMarkerKind.Variable:
+                ReadVariable(marker);
                 break;
             case SqlMarkerKind.Column:
                 ReadColumn(marker);
@@ -248,6 +259,7 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.Token
                 or SqlMarkerKind.TokenIgnore
                 or SqlMarkerKind.Param
+                or SqlMarkerKind.Variable
                 or SqlMarkerKind.Column
                 or SqlMarkerKind.Database
                 or SqlMarkerKind.Output
@@ -529,7 +541,7 @@ internal sealed class SqlMarkerScope(
             return;
         }
 
-        var defaultValue = WithoutComments(defaultText, lexed.Lexemes);
+        var defaultValue = WithoutComments(defaultText, lexed.Lexemes, rules);
 
         _tokenDefaults ??= [];
         foreach (var existing in _tokenDefaults)
@@ -554,13 +566,15 @@ internal sealed class SqlMarkerScope(
 
     // The default as one in the SQL is read: built without comments by the builder of a query's SQL, then trimmed as
     // the token scanner trims it.  A default without a comment is its own text and costs nothing more.
-    private static string WithoutComments(string defaultText, EquatableArray<SqlLexeme> lexemes)
+    private static string WithoutComments(string defaultText, EquatableArray<SqlLexeme> lexemes, SqlDialectRules rules)
     {
         for (var index = 0; index < lexemes.Count; index++)
         {
             if (lexemes[index].Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment)
             {
-                var built = SqlTextBuilder.Build(defaultText, lexemes, 0, lexemes.Count, keepComments: false).Text;
+                var built = SqlTextBuilder
+                    .Build(defaultText, rules, lexemes, 0, lexemes.Count, keepComments: false)
+                    .Text;
                 var trimmed = SqlText.Trim(built, 0, built.Length);
                 return trimmed.Length == built.Length ? built : built.Substring(trimmed.Start, trimmed.Length);
             }
@@ -581,6 +595,40 @@ internal sealed class SqlMarkerScope(
 
         _ignoredTokens ??= [];
         _ = _ignoredTokens.Add(name);
+    }
+
+    // "@a, @b": names as the SQL writes them, separated by commas, with white space around each and nothing else.  A
+    // marker with one item that is not a name is not applied.
+    private void ReadVariable(SqlMarker marker)
+    {
+        var end = marker.ValueSpan.End;
+        var itemStart = marker.ValueSpan.Start;
+        var count = _variables?.Count ?? 0;
+        while (true)
+        {
+            var comma = text.IndexOf(',', itemStart, end - itemStart);
+            var item = SqlText.Trim(text, itemStart, comma < 0 ? end : comma);
+            var nameEnd = item.IsEmpty ? item.Start : rules.FindParameterNameEnd(text, item.Start + 1, item.End);
+            if (
+                item.IsEmpty
+                || text[item.Start] != rules.ParameterPrefix
+                || nameEnd == item.Start + 1
+                || nameEnd != item.End
+            )
+            {
+                _variables?.RemoveRange(count, _variables.Count - count);
+                AddInvalid(marker);
+                return;
+            }
+
+            (_variables ??= []).Add(TextSpan.FromBounds(item.Start + 1, nameEnd));
+            if (comma < 0)
+            {
+                return;
+            }
+
+            itemStart = comma + 1;
+        }
     }
 
     // "@name [type] [null | not null] [-> [json] CSharpType]", the name ended by white space or by the arrow.  The

@@ -28,6 +28,7 @@ internal static class SqlServerFields
         SqlServerCallNames.Columns,
         SqlServerCallNames.Operands,
         SqlServerCallNames.Table,
+        SqlServerCallNames.Origins,
     ];
 
     // The methods whose request is SQL under declarations.
@@ -38,6 +39,7 @@ internal static class SqlServerFields
         SqlServerCallNames.Declared,
         SqlServerCallNames.Columns,
         SqlServerCallNames.Operands,
+        SqlServerCallNames.Origins,
     ];
 
     // The methods that ask sys.dm_exec_describe_first_result_set, whose rows give a type and whose error rows a
@@ -48,11 +50,12 @@ internal static class SqlServerFields
         SqlServerCallNames.Columns,
         SqlServerCallNames.Operands,
         SqlServerCallNames.Table,
+        SqlServerCallNames.Origins,
     ];
 
     /// <summary>The methods whose rows are the columns of a result set, with their sources.</summary>
     public static IReadOnlyList<string> ColumnMethods { get; } =
-    [SqlServerCallNames.Columns, SqlServerCallNames.Operands, SqlServerCallNames.Table];
+    [SqlServerCallNames.Columns, SqlServerCallNames.Operands, SqlServerCallNames.Table, SqlServerCallNames.Origins];
 
     /// <summary>The path of a row of an answer.</summary>
     public const string Rows = "answer.rows[]";
@@ -162,13 +165,15 @@ internal static class SqlServerFields
             Add(method, Row("sourceTable"), FieldRule.Name(NameClass.Table));
             Add(method, Row(SourceColumn), FieldRule.Name(NameClass.Column));
             Add(method, Row("sourceType"), FieldRule.Closed);
+            Add(method, Row("computedDefinition"), new FieldRule(FieldRuleKind.Sql, NameClass.Column));
         }
 
         foreach (var type in EntryRenamer.TypeRecords)
         {
             var record = type[..^1];
             var userType = JsonStrings.MemberOf(record, SidecarKeys.UserType);
-            Add(BundleFiles.Expected, JsonStrings.MemberOf(record, Name), FieldRule.TypeSpelling);
+            // Own, so that SqlServerRenaming leaves a user CLR type's name, which may not lex, to DeriveEntry.
+            Add(BundleFiles.Expected, JsonStrings.MemberOf(record, Name), FieldRule.Own);
             Add(BundleFiles.Expected, JsonStrings.MemberOf(record, SidecarKeys.BindName), FieldRule.TypeSpelling);
             Add(BundleFiles.Expected, JsonStrings.MemberOf(userType, Schema), FieldRule.Name(NameClass.Schema));
             Add(BundleFiles.Expected, JsonStrings.MemberOf(userType, Name), FieldRule.Name(NameClass.Type));

@@ -55,8 +55,8 @@ public sealed class TableMatchTests(SqlServerDatabases sqlServer)
     // Each query but the two of FOR SYSTEM_TIME and of another database, the two of a function, and the one of users,
     // differs from orders, id, user_id, total, note, in one way, and the last in three, and says the first check that
     // failed.  Under FOR SYSTEM_TIME the server gives no column an origin, and a column of another database or of a
-    // function, inline or multi-statement, has none.  The one of users reads every column of users through a join,
-    // which no proof follows, so name_len_p keeps the server's answer while the table's is corrected.
+    // function, inline or multi-statement, has none.  The one of users reads every column of users through a RIGHT
+    // JOIN, which can make each NULL, so name_len_p keeps the server's answer while the table's is corrected.
     [Theory]
     [InlineData(
         "SELECT id, user_id, total, note, total + 1 AS more FROM dbo.orders",
@@ -81,7 +81,7 @@ public sealed class TableMatchTests(SqlServerDatabases sqlServer)
     )]
     [InlineData(
         "SELECT u.id, u.name, u.email, u.nickname, u.credit, u.created_at, u.deleted_at, u.name_len, "
-            + "u.name_len_p, u.rv FROM dbo.users AS u JOIN dbo.orders AS o ON o.user_id = u.id",
+            + "u.name_len_p, u.rv FROM dbo.users AS u RIGHT JOIN dbo.orders AS o ON o.user_id = u.id",
         SidecarValues.TableMatch.NullabilityDiffers
     )]
     [InlineData("SELECT user_id AS owner_id, id FROM dbo.orders", SidecarValues.TableMatch.NamesDiffer)]

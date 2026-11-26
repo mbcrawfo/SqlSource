@@ -8,6 +8,7 @@ using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Describing.SqlServer.Columns;
+using SqlSource.Tool.Describing.SqlServer.Proofs;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 
@@ -257,6 +258,20 @@ public sealed class ColumnTests(SqlServerDatabases sqlServer)
         }
     }
 
+    // The server cannot say whether the one column of FOR JSON is an identity or a computed column, and answers NULL
+    // for both: the sidecar records that it is not known, and never that it is not.
+    [Fact]
+    public async Task DescribeAsync_ForJson_RecordsIdentityAndComputedAsUnknown()
+    {
+        var described = await Sessions.ShouldDescribeAsync(
+            sqlServer.ConnectionString,
+            Of(SqlDialectRules.SqlServer, "SELECT id, name FROM dbo.users FOR JSON PATH")
+        );
+
+        var column = described.Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+        (column.Identity, column.Computed).ShouldBe((null, null));
+    }
+
     // Mode 1 adds the key and rowversion columns of every table read; mode 2 adds ROWSTAT alone, whose name the server
     // ends with a NUL.
     [Fact]
@@ -337,6 +352,62 @@ public sealed class ColumnTests(SqlServerDatabases sqlServer)
             .Select(static row => row.PersistedNotNull)
             .ShouldBe([.. expected.Select(static flag => (bool?)flag)]);
 
+    // The tool's computed_definition is the catalog's definition of a computed column of a table, persisted or not, as
+    // the server writes it, and null for a stored column, an expression and a column of a view, whose source is the
+    // view: the proofs read it only of a table.
+    [Fact]
+    public async Task ColumnsAsync_ComputedDefinition_IsReadOfAComputedColumnOfATable()
+    {
+        await sqlServer.ExecuteAsync("DROP VIEW IF EXISTS dbo.user_name_lengths");
+        await sqlServer.ExecuteAsync("CREATE VIEW dbo.user_name_lengths AS SELECT name_len FROM dbo.users");
+        try
+        {
+            (await ColumnsAsync("SELECT name_len, name_len_p, id, 1 AS one FROM dbo.users"))
+                .Where(static row => !row.IsHidden)
+                .Select(static row => row.ComputedDefinition)
+                .ShouldBe(["(len([name]))", "(CONVERT([int],len([name])))", null, null]);
+            (await ColumnsAsync("SELECT name_len FROM dbo.user_name_lengths"))
+                .Single(static row => !row.IsHidden)
+                .ComputedDefinition.ShouldBeNull();
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP VIEW dbo.user_name_lengths");
+        }
+    }
+
+    // The realistic schema's dbo.products.sale_price, as the server writes its definition, which the proofs read as
+    // not null over the rows of "table" for its table: list_price is NOT NULL, and ISNULL replaces discount_pct's NULL.
+    [Fact]
+    public async Task ColumnsAsync_RealisticSalePrice_IsProvedOverItsTable()
+    {
+        await sqlServer.ExecuteAsync("DROP TABLE IF EXISTS dbo.computed_prices");
+        await sqlServer.ExecuteAsync(
+            "CREATE TABLE dbo.computed_prices (id int IDENTITY PRIMARY KEY, list_price decimal(10, 2) NOT NULL, "
+                + "discount_pct decimal(5, 2) NULL, sale_price AS (list_price * (1 - ISNULL(discount_pct, 0) / 100)))"
+        );
+        try
+        {
+            var row = (await ColumnsAsync("SELECT sale_price FROM dbo.computed_prices")).Single(static row =>
+                !row.IsHidden
+            );
+            await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+            var table = await new SqlServerLive(session.Connection).TableAsync(
+                new SqlServerTableRequest("dbo", "computed_prices"),
+                TestContext.Current.CancellationToken
+            );
+
+            (row.IsNullable, row.ComputedDefinition).ShouldBe(
+                (true, "([list_price]*((1)-isnull([discount_pct],(0))/(100)))")
+            );
+            ComputedProofs.Proves(row.ComputedDefinition!, table.Rows.ShouldNotBeNull()).ShouldBeTrue();
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP TABLE dbo.computed_prices");
+        }
+    }
+
     // A view is its columns' source under mode 2, so its column of name_len_p, read through a LEFT JOIN that makes it
     // NULL, is not the table's: persisted_not_null is false, as sys.tables holds no view.
     [Fact]
@@ -359,6 +430,80 @@ public sealed class ColumnTests(SqlServerDatabases sqlServer)
         {
             await sqlServer.ExecuteAsync("DROP VIEW dbo.order_name_lengths");
         }
+    }
+
+    // persisted_not_null is the source column's own: a PERSISTED column whose expression may be NULL is not, though a
+    // table of another name has a PERSISTED NOT NULL column of its name, and the table whose name holds a "." and a
+    // "]" is found by its quoted name.
+    [Theory]
+    [InlineData("SELECT c FROM dbo.[td.persisted]]not_null]", true)]
+    [InlineData("SELECT c FROM dbo.td_persisted_nullable", false)]
+    public async Task ColumnsAsync_PersistedColumnsOfOneName_AreEachTheirOwnTables(string sql, bool expected)
+    {
+        await sqlServer.ExecuteAsync(
+            "DROP TABLE IF EXISTS dbo.[td.persisted]]not_null], dbo.td_persisted_nullable; "
+                + "CREATE TABLE dbo.[td.persisted]]not_null] "
+                + "(id int NOT NULL PRIMARY KEY, c AS CAST(id * 2 AS int) PERSISTED NOT NULL); "
+                + "CREATE TABLE dbo.td_persisted_nullable (id int NOT NULL PRIMARY KEY, c AS NULLIF(id, 0) PERSISTED)"
+        );
+        try
+        {
+            var row = (await ColumnsAsync(sql)).Single(row => !row.IsHidden);
+
+            (row.SourceType, row.PersistedNotNull).ShouldBe(("U", expected));
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP TABLE dbo.[td.persisted]]not_null], dbo.td_persisted_nullable");
+        }
+    }
+
+    // A database of a collation other than the server's: the catalog's names and the describe's are compared under the
+    // database's, so "columns" answers and reads the PERSISTED NOT NULL column there.
+    [Fact]
+    public async Task ColumnsAsync_DatabaseOfAnotherCollation_ReadsPersistedNotNull()
+    {
+        const string CaseSensitive = "td_case_sensitive";
+        await sqlServer.ExecuteAsync(
+            $"IF DB_ID(N'{CaseSensitive}') IS NOT NULL BEGIN ALTER DATABASE {CaseSensitive} SET SINGLE_USER "
+                + $"WITH ROLLBACK IMMEDIATE; DROP DATABASE {CaseSensitive}; END; "
+                + $"CREATE DATABASE {CaseSensitive} COLLATE Latin1_General_CS_AS"
+        );
+        try
+        {
+            await sqlServer.ExecuteAsync(
+                $"EXEC {CaseSensitive}.sys.sp_executesql N'CREATE TABLE dbo.t "
+                    + "(id int NOT NULL PRIMARY KEY, c AS CAST(id * 2 AS int) PERSISTED NOT NULL)'"
+            );
+            await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionStringOf(CaseSensitive));
+
+            var answer = await new SqlServerLive(session.Connection).ColumnsAsync(
+                new SqlServerColumnsRequest("SELECT c FROM dbo.t", null),
+                TestContext.Current.CancellationToken
+            );
+
+            answer.Error.ShouldBeNull(
+                string.Join("; ", answer.Error?.Errors.Select(static error => error.Message) ?? [])
+            );
+            answer.Errors.ShouldBeNull(string.Join("; ", answer.Errors?.Select(static error => error.Message) ?? []));
+            answer.Rows.ShouldNotBeNull().Single(static row => !row.IsHidden).PersistedNotNull.ShouldBe(true);
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync(
+                $"ALTER DATABASE {CaseSensitive} SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE {CaseSensitive}"
+            );
+        }
+    }
+
+    // The text reaches the server whole, however long: a query after a comment of 5,000 characters, which a text cut
+    // at 4,000 would leave open.
+    [Fact]
+    public async Task ColumnsAsync_TextLongerThan4000Characters_IsDescribedWhole()
+    {
+        var rows = await ColumnsAsync($"/* {new string('x', 5000)} */ SELECT id FROM dbo.users");
+
+        rows.Where(static row => !row.IsHidden).Select(static row => row.Name).ShouldBe(["id"]);
     }
 
     // The server names the synonym's table as the source, and not the synonym.
