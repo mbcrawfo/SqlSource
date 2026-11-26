@@ -650,6 +650,58 @@
           "computed": false
         }
       ]
+    },
+    "MarkOrdersShipped": {
+      "hash": "4e82fb7d4161bc3d03c90b3cc87571528ffa98a32150e52d3c14e44b1d9c9dc7",
+      "toolVersion": "0.2.1",
+      "database": "mssql",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "shipped_on",
+          "type": {
+            "name": "date",
+            "maxLength": 3,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "shipped_on"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }

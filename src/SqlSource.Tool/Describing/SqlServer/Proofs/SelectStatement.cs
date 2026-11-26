@@ -59,7 +59,7 @@ internal sealed record SelectStatement(
         var ctes = new List<CommonTableExpression>();
         if (at < end && tokens[at].Is("WITH"))
         {
-            at = CtesEnd(tokens, at + 1, end, ctes);
+            at = ReadWith(tokens, at, end, ctes);
             if (at < 0)
             {
                 return null;
@@ -70,6 +70,13 @@ internal sealed record SelectStatement(
         var branches = ReadBranches(tokens, new TokenRange(at, end), names);
         return branches is null ? null : new SelectStatement(new TokenRange(withStart, at), branches, ctes);
     }
+
+    /// <summary>
+    /// The end of a <c>WITH</c> clause that starts at <paramref name="at" />, the word <c>WITH</c>, with its CTEs added
+    /// to <paramref name="ctes" />; or -1 when it is not <c>name [(columns)] AS (query)</c> separated by commas.
+    /// </summary>
+    internal static int ReadWith(IReadOnlyList<TsqlToken> tokens, int at, int end, List<CommonTableExpression> ctes) =>
+        CtesEnd(tokens, at + 1, end, ctes);
 
     // The SELECTs of a range, split at the set operators of its own level, or null when one cannot be read.  A side in
     // parentheses is read inside them, and anything after its ")" gives null.  Every branch must prove a column for it

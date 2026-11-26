@@ -21,7 +21,7 @@
   5. `columns` once the parameters are typed, with every parameter declared;
   6. then `operands`, only when a proof needs the server, with the declarations of `columns`;
   7. then `origins`, the text of `columns` in browse mode 1, only when a column of a CLR type answered not null is a view's or an inline function's;
-  8. then `table` for each of `ColumnProofs.ComputedTables`, whose failure proves nothing;
+  8. then `table` for each of `ColumnProofs.ProofTables`, a computed column's table or an `UPDATE`'s target whose `inserted` column the `WHERE` may prove, whose failure proves nothing;
   9. and `table` for the match only when every column has an origin in one table, since a call that fails for a table the match never reads would fail the query, reusing step 8's answer for it.
 - **A `parameters` that fails with `11501` asks `columns` with the declared parameters alone**, and `SqlServerErrors.AfterRefusal` reports the two answers.
 - **A parameter is declared only when its `-- param:` marker gives a type.**

@@ -83,7 +83,8 @@
             "isComputedColumn": false,
             "sourceType": "V",
             "persistedNotNull": false,
-            "computedDefinition": null
+            "computedDefinition": null,
+            "isSparseColumnSet": false
           },
           {
             "isHidden": false,
@@ -106,7 +107,8 @@
             "isComputedColumn": false,
             "sourceType": "V",
             "persistedNotNull": false,
-            "computedDefinition": null
+            "computedDefinition": null,
+            "isSparseColumnSet": false
           },
           {
             "isHidden": false,
@@ -129,7 +131,8 @@
             "isComputedColumn": false,
             "sourceType": "V",
             "persistedNotNull": false,
-            "computedDefinition": null
+            "computedDefinition": null,
+            "isSparseColumnSet": false
           },
           {
             "isHidden": false,
@@ -152,7 +155,8 @@
             "isComputedColumn": false,
             "sourceType": "V",
             "persistedNotNull": false,
-            "computedDefinition": null
+            "computedDefinition": null,
+            "isSparseColumnSet": false
           },
           {
             "isHidden": true,
@@ -175,7 +179,8 @@
             "isComputedColumn": false,
             "sourceType": null,
             "persistedNotNull": false,
-            "computedDefinition": null
+            "computedDefinition": null,
+            "isSparseColumnSet": false
           }
         ],
         "errors": null,
@@ -211,7 +216,8 @@
             "isComputedColumn": false,
             "sourceType": "V",
             "persistedNotNull": false,
-            "computedDefinition": null
+            "computedDefinition": null,
+            "isSparseColumnSet": false
           },
           {
             "isHidden": false,
@@ -234,7 +240,8 @@
             "isComputedColumn": false,
             "sourceType": "V",
             "persistedNotNull": false,
-            "computedDefinition": null
+            "computedDefinition": null,
+            "isSparseColumnSet": false
           },
           {
             "isHidden": false,
@@ -257,7 +264,8 @@
             "isComputedColumn": false,
             "sourceType": "V",
             "persistedNotNull": false,
-            "computedDefinition": null
+            "computedDefinition": null,
+            "isSparseColumnSet": false
           },
           {
             "isHidden": false,
@@ -280,7 +288,8 @@
             "isComputedColumn": false,
             "sourceType": "V",
             "persistedNotNull": false,
-            "computedDefinition": null
+            "computedDefinition": null,
+            "isSparseColumnSet": false
           },
           {
             "isHidden": true,
@@ -303,7 +312,8 @@
             "isComputedColumn": false,
             "sourceType": null,
             "persistedNotNull": false,
-            "computedDefinition": null
+            "computedDefinition": null,
+            "isSparseColumnSet": false
           }
         ],
         "errors": null,
