@@ -62,6 +62,27 @@ internal static class RunEvents
         );
     }
 
+    /// <summary>
+    /// A project of the solution that <c>--project</c> leaves out, which the run evaluated for what it needs of the
+    /// files it shares with the run.  Its event is a left-out project's, with whether it uses SqlSource.
+    /// </summary>
+    public static void LeftOutProject(RunTrace trace, ProjectEvaluation evaluation)
+    {
+        var uses = evaluation.State == ProjectState.UsesSqlSource;
+        trace.Log.Write(
+            "project",
+            new("path", evaluation.ProjectPath),
+            new("inRun", false),
+            new("usesSqlSource", UsesSqlSource(evaluation.State))
+        );
+        trace.Say(
+            uses
+                ? $"project '{evaluation.ProjectPath}' is left out: --project does not name it, and it is read for the "
+                    + "files it shares with the run"
+                : $"project '{evaluation.ProjectPath}' is left out: --project does not name it"
+        );
+    }
+
     // The paths of a project's manifests that differ, ignoring case: a file that two frameworks list is one.
     private static int DistinctCount(IEnumerable<string> paths) =>
         paths.Distinct(StringComparer.OrdinalIgnoreCase).Count();

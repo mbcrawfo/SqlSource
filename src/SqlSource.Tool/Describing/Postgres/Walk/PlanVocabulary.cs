@@ -60,10 +60,14 @@ internal static class AggregateStrategies
     public const string Sorted = "Sorted";
 }
 
-/// <summary>The value of <c>Operation</c> of a <c>ModifyTable</c> that the walk compares.</summary>
+/// <summary>
+/// The values of <c>Operation</c> of a <c>ModifyTable</c> that the walk compares, and that <c>explain</c> reads.
+/// </summary>
 internal static class PlanOperations
 {
     public const string Insert = "Insert";
+    public const string Update = "Update";
+    public const string Merge = "Merge";
 }
 
 /// <summary>The value of <c>Conflict Resolution</c> of a <c>ModifyTable</c> that the walk compares.</summary>

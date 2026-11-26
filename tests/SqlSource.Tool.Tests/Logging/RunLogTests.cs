@@ -552,7 +552,7 @@ public sealed class RunLogTests : IDisposable
     }
 
     [Fact]
-    public async Task Run_ProjectThatProjectOptionLeavesOut_IsInTheLogAndWasNotAsked()
+    public async Task Run_ProjectThatProjectOptionLeavesOut_IsInTheLogAsNoProjectOfTheRun()
     {
         var lib = Plans.Postgres(_scene.Run.Folder, "Lib", "Lib").AnsweredBy(_scene.Run.Processes);
         _ = _scene.Run.Folder.WriteFile(
@@ -565,7 +565,9 @@ public sealed class RunLogTests : IDisposable
         var projects = LogReader.Events(Log, "project");
         projects.Select(line => Text(line, "path")).ShouldBe([lib.ProjectPath, _scene.Project.ProjectPath]);
         projects[0].GetProperty("inRun").GetBoolean().ShouldBeFalse();
-        projects[0].TryGetProperty("usesSqlSource", out _).ShouldBeFalse();
+        // It is read for what it needs of the files it shares with the run.
+        projects[0].GetProperty("usesSqlSource").GetBoolean().ShouldBeTrue();
+        projects[0].TryGetProperty("sqlFiles", out _).ShouldBeFalse();
         projects[1].GetProperty("inRun").GetBoolean().ShouldBeTrue();
     }
 

@@ -275,6 +275,10 @@ internal sealed record SqlServerColumnsAnswer(
 /// condition of <paramref name="PersistedNotNull" />, persisted or not, nullable or not; null for any other row, and in
 /// a capture recorded before it.  Only <c>ColumnProofs</c> may act on it, for the same reason.
 /// </param>
+/// <param name="IsSparseColumnSet">
+/// Whether the column is a table's sparse column set, an <c>xml</c> column whose assignment writes every sparse column
+/// of the table; null when the server cannot say, and in a capture recorded before it.
+/// </param>
 internal sealed record SqlServerColumnRow(
     bool IsHidden,
     int ColumnOrdinal,
@@ -296,7 +300,8 @@ internal sealed record SqlServerColumnRow(
     bool? IsComputedColumn,
     string? SourceType,
     bool? PersistedNotNull = null,
-    string? ComputedDefinition = null
+    string? ComputedDefinition = null,
+    bool? IsSparseColumnSet = null
 ) : ISqlServerTypeRow;
 
 /// <summary>

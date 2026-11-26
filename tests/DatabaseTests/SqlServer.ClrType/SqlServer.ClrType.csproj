@@ -13,6 +13,11 @@
     <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
         <!-- The attribute of a CLR type is System.Data's on .NET Framework, which the server resolves. -->
         <Reference Include="System.Data" />
+        <!--
+            The SDK adds this only where no .NET Framework targeting pack is installed, so without it the lock file
+            written on Linux or macOS fails a locked restore on Windows.
+        -->
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
     </ItemGroup>
     <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
         <PackageReference Include="Microsoft.SqlServer.Server" />

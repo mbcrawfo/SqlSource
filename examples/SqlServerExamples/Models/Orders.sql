@@ -105,3 +105,10 @@ ORDER BY order_id, day_number;
 INSERT INTO orders (user_id)
 OUTPUT INSERTED.id, INSERTED.status, INSERTED.placed_at
 VALUES (@userId);
+
+-- name: MarkOrdersShipped
+-- summary: Marks as shipped every pending order that has a day it shipped, and returns each order with that day.
+UPDATE orders
+SET status = 'shipped'
+OUTPUT INSERTED.id, INSERTED.shipped_on
+WHERE status = 'pending' AND shipped_on IS NOT NULL;

@@ -138,7 +138,8 @@ internal sealed partial class SqlServerSession : DescriberSession
     /// the SQL as written and every parameter declared, and <c>batch</c> when it refuses a query with no parameter
     /// with syntax errors alone; then <c>operands</c>, when a proof of a column needs the
     /// server, with the same declarations; then <c>origins</c>, when a column of a CLR type needs it; then
-    /// <c>table</c> for each table whose computed column a proof reads; then, when every column has an origin in one
+    /// <c>table</c> for each table whose computed column a proof reads, and for each target of an <c>UPDATE</c> whose
+    /// <c>inserted</c> column the <c>WHERE</c> may prove; then, when every column has an origin in one
     /// table, <c>table</c> for it, unless the proofs asked it already, and the match.
     /// </para>
     /// <para>
@@ -350,7 +351,9 @@ internal sealed partial class SqlServerSession : DescriberSession
     // The columns, each that a proof shows cannot be NULL answered not null, through "operands" when a proof needs the
     // server, and each of a CLR type that may hold the type's Null nullable, unless "origins" shows that the view or
     // the function it is read from passes a stored column on, and each computed column read as a row of its table not
-    // null when its definition is over the rows of "table" for that table.  What "operands", "origins" and that "table"
+    // null when its definition is over the rows of "table" for that table, and each UPDATE's inserted column the WHERE
+    // keeps not null only when "table" for its target shows no sparse column set and lists the column.  What
+    // "operands", "origins" and that "table"
     // answer never fails the describe: an answer that proves nothing leaves the proofs of the text alone, and every
     // other column keeps the server's answer.  The answers of "table" go to the match, which asks no table twice.
     private async Task<(
@@ -393,11 +396,11 @@ internal sealed partial class SqlServerSession : DescriberSession
             origins = proofs.OriginsOf(answer);
         }
 
-        // Each table whose computed column the proofs read, after "origins": an answer with an error or error rows
-        // proves nothing.
+        // Each table whose computed column the proofs read, or whose UPDATE's inserted column the WHERE may prove,
+        // after "origins": an answer with an error or error rows proves nothing.
         var asked = new Dictionary<(string Schema, string Table), SqlServerColumnsAnswer>();
         var tables = new Dictionary<(string Schema, string Table), IReadOnlyList<SqlServerColumnRow>>();
-        foreach (var (schema, table) in proofs.ComputedTables)
+        foreach (var (schema, table) in proofs.ProofTables)
         {
             var answer = await TableAsync(request.Name, new SqlServerTableRequest(schema, table), cancellationToken);
             asked[(schema, table)] = answer;

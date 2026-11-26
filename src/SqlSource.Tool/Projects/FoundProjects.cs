@@ -23,6 +23,13 @@ internal sealed record FoundProjects(
     ImmutableArray<(string Project, string AssetsFile)> AssetsFiles
 )
 {
+    /// <summary>
+    /// The manifests of the projects of the solution that <c>--project</c> left out and that use SqlSource, when the
+    /// run asked for them, in the order of the projects.  They are no projects of the run: the plan takes from them
+    /// only what they need of the files that a project of the run claims too.
+    /// </summary>
+    public ImmutableArray<ProjectManifest> Others { get; init; } = [];
+
     /// <summary>No project, as a run finds when its solution cannot be read.</summary>
     public static FoundProjects None { get; } = new([], [], []);
 }

@@ -16,7 +16,10 @@ namespace SqlSource.Tool.Planning;
 /// </param>
 /// <param name="Hash">The hash of <c>SqlQueryHash</c>.  Null for a query that needs no entry.</param>
 /// <param name="Problems">Why it cannot be described, when it cannot.</param>
-/// <param name="IsSelected">Whether the filters of the run take it.  True in a run with no filter.</param>
+/// <param name="IsSelected">
+/// Whether a project of the run needs it and the filters of the run take it.  True in a run with no filter, unless only
+/// a project that <c>--project</c> leaves out needs it.
+/// </param>
 internal sealed record PlannedQuery(
     SqlQuery Query,
     bool NeedsEntry,

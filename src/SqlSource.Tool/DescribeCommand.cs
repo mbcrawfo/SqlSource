@@ -438,7 +438,10 @@ internal static class DescribeCommand
             PlanSteps.SourcesOf(usage, unit, host),
             plan.Filters.Databases,
             OnlineOf(usage)
-        );
+        )
+        {
+            HasProject = SharedOptions.ValuesOf(usage, SharedOptions.Project).Length > 0,
+        };
 
     /// <summary>
     /// The mode that the command line asks for.  <c>--check</c> beside <c>--force</c> is <c>--check</c>: it describes

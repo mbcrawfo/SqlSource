@@ -5,7 +5,9 @@ using Npgsql;
 using Shouldly;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
+using static SqlSource.Tool.Tests.PostgresPlans;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
@@ -43,15 +45,74 @@ public sealed class PostgresLiveTests
             .ShouldBe("EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE sqlsource_7(NULL, NULL)");
 
     [Fact]
-    public void SetTexts_RequestWithSettings_ForcesTheGenericPlanWithoutPruningThenSetsEach() =>
+    public void SetTexts_RequestWithSettings_ForcesTheGenericPlanWithPruningThenSetsEach() =>
         PostgresLive
             .SetTexts(new PostgresExplainRequest("sqlsource_1", 0, ["enable_nestloop=off", "enable_hashjoin=off"]))
             .ShouldBe([
                 "SET LOCAL plan_cache_mode = force_generic_plan",
-                "SET LOCAL enable_partition_pruning = off",
+                "SET LOCAL enable_partition_pruning = on",
                 "SET LOCAL enable_nestloop = off",
                 "SET LOCAL enable_hashjoin = off",
             ]);
+
+    // Constraint exclusion leaves out a partition whose CHECK rules it out, whatever partition pruning is.
+    [Fact]
+    public void UnprunedTexts_OfTheSecondStatement_TurnPruningAndConstraintExclusionOff() =>
+        PostgresLive.UnprunedTexts.ShouldBe([
+            "SET LOCAL enable_partition_pruning = off",
+            "SET LOCAL constraint_exclusion = off",
+        ]);
+
+    // The statement the session counted, with a suffix: the same at each run, and no name the session gives.
+    [Fact]
+    public void UnprunedName_OfAStatement_IsItsNameWithASuffix() =>
+        PostgresLive.UnprunedName("sqlsource_3").ShouldBe("sqlsource_3_unpruned");
+
+    // A ModifyTable of the operation over a scan of the relation, both of public.
+    private static PlanNode Modify(string operation, string target, PlanNode child) =>
+        Over("ModifyTable", child) with
+        {
+            Operation = operation,
+            RelationName = target,
+            Schema = "public",
+        };
+
+    public static TheoryData<string?, bool> PrunedPlans =>
+        new()
+        {
+            { Text(Append() with { SubplansRemoved = 2 }), true },
+            // Under a join, a subquery or any other node, as an UPDATE of a partitioned target prints it.
+            { Text(Join("Left", Scan("u", "u.id"), Append() with { SubplansRemoved = 1 })), true },
+            { Text(Over("ModifyTable", Append(Member("p_1", "t_1")) with { SubplansRemoved = 1 })), true },
+            // A planner's pruning prints no count, and the members left are every partition that may hold a row.
+            { Text(Append(Member("p_1", "t_1"), Member("p_2", "t_2"))), false },
+            { Text(Scan("p", "p.id")), false },
+            // An UPDATE or a MERGE that reads a relation other than its target, which may be the partition left, at the
+            // root or under it, as a writable WITH puts it.
+            { Text(Modify("Update", "p", Scan("p_1") with { RelationName = "p_kept" })), true },
+            { Text(Modify("Merge", "t", Join("Inner", Scan("t"), Scan("s")))), true },
+            { Text(Modify("Update", "t", Scan("t") with { Schema = "other" })), true },
+            {
+                Text(Over("CTE Scan", Modify("Update", "p", Scan("p_1") with { RelationName = "p_kept" }), "InitPlan")),
+                true
+            },
+            // One that reads its target alone, and a DELETE or an INSERT, which return no row they move.
+            { Text(Modify("Update", "t", Scan("t"))), false },
+            { Text(Modify("Delete", "p", Scan("p_1") with { RelationName = "p_kept" })), false },
+            { Text(Modify("Insert", "t", Scan("s"))), false },
+            // A text that is no plan is answered as it is: the session reads it as unreadable.
+            { /*lang=json,strict*/
+                """[{"Plan": {"Node Type": "Append", "Subplans Removed": "2"}}]""",
+                false
+            },
+            { "not a plan", false },
+            { null, false },
+        };
+
+    [Theory]
+    [MemberData(nameof(PrunedPlans))]
+    public void NeedsEveryPartition_Plan_IsWhetherTheExecutorPrunedOrARowMayMove(string? plan, bool expected) =>
+        PostgresLive.NeedsEveryPartition(plan).ShouldBe(expected);
 
     [Fact]
     public void SetTexts_SettingOutsideTheList_Throws() =>

@@ -23,4 +23,11 @@ internal sealed record DescribeOptions(
     ConnectionSources Sources,
     ImmutableArray<UsageValue> Databases,
     OnlineMode Online
-);
+)
+{
+    /// <summary>
+    /// Whether the run has <c>--project</c>, which leaves out a query of a shared file that only a project it leaves
+    /// out needs, as <c>--database</c> leaves out a query of another database.
+    /// </summary>
+    public bool HasProject { get; init; }
+}

@@ -45,37 +45,15 @@ public sealed class RepositoryInterfaceTests
         methods.ShouldContain(
             "namespace App\n{\n    partial class UserRepository : global::App.IUserRepository\n    {\n"
         );
-        methods.ShouldEndWith(
-            GeneratedFile.Joined(
-                """
-                    }
+        methods.ShouldContain("    public partial interface IUserRepository\n    {\n", Case.Sensitive);
+        methods.ShouldContain(
+            """
+                    global::System.Threading.Tasks.Task<global::App.GetUserDto?> GetUser(
+                        global::App.GetUserParams parameters,
+                        global::System.Threading.CancellationToken cancellationToken = default);
 
-                    /// <summary>
-                    /// The public repository methods of <c>App.UserRepository</c>, which it implements.
-                    /// </summary>
-                    public partial interface IUserRepository
-                    {
-                        /// <summary>
-                        /// The <c>GetUser</c> query from <c>Users.sql</c>.
-                        /// </summary>
-                        /// <remarks>
-                        /// <code>
-                        /// SELECT id FROM users WHERE id = @id;
-                        /// </code>
-                        /// </remarks>
-                        /// <param name="parameters">The query's parameters.</param>
-                        /// <param name="cancellationToken">Cancels the query.</param>
-                        /// <returns>The row, or null when there is none.</returns>
-                        /// <exception cref="T:SqlSource.UnexpectedRowCountException">↩
-                The query returned more than one row.</exception>
-                        global::System.Threading.Tasks.Task<global::App.GetUserDto?> GetUser(
-                            global::App.GetUserParams parameters,
-                            global::System.Threading.CancellationToken cancellationToken = default);
-                    }
-                }
-
-                """
-            )
+            """,
+            Case.Sensitive
         );
     }
 

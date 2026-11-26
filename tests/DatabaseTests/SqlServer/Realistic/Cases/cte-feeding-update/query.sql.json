@@ -95,8 +95,8 @@
             "precision": 0,
             "scale": 0
           },
-          "nullable": true,
-          "nullableSource": "server",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": {
             "schema": "dbo",
             "table": "orders",
@@ -133,8 +133,8 @@
             "precision": 10,
             "scale": 0
           },
-          "nullable": true,
-          "nullableSource": "server",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": {
             "schema": "billing",
             "table": "invoices",
@@ -152,8 +152,8 @@
             "precision": 19,
             "scale": 4
           },
-          "nullable": true,
-          "nullableSource": "server",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": false,
           "computed": false

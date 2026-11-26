@@ -73,6 +73,9 @@ public sealed class RunProjectsTests : IDisposable
         (await FindProjectsAsync(unit, named)).Manifests;
 
     private Task<FoundProjects> FindProjectsAsync(RunUnit unit, params UsageValue[] named) =>
+        FindProjectsAsync(unit, readsOthers: false, named);
+
+    private Task<FoundProjects> FindProjectsAsync(RunUnit unit, bool readsOthers, params UsageValue[] named) =>
         RunProjects.FindAsync(
             unit,
             named,
@@ -81,7 +84,20 @@ public sealed class RunProjectsTests : IDisposable
                 Hosts.Create(_folder.Path, _runner, _folder.CreateFolder("tmp")),
                 new Reporter(_error),
                 TestContext.Current.CancellationToken
-            )
+            ),
+            readsOthers
+        );
+
+    // As every run of describe asks, --check and a watch included: the projects that --project leaves out are read too.
+    private Task<FoundProjects> FindWithOthersAsync(params string[] named) =>
+        FindProjectsAsync(
+            new RunUnit(RunUnitKind.Solution, _solution),
+            readsOthers: true,
+            [
+                .. named.Select(
+                    (text, index) => new UsageValue(ProjectOption, text, 3 + (2 * index)) { MayBePrintedAsPath = true }
+                ),
+            ]
         );
 
     private Task<ImmutableArray<ProjectManifest>> FindInSolutionAsync(params string[] named) =>
@@ -277,6 +293,7 @@ public sealed class RunProjectsTests : IDisposable
         Asked().ShouldBe([_a, _c], ignoreOrder: true);
     }
 
+    // As diagnose asks, which writes no sidecar.
     [Fact]
     public async Task Find_OneProjectNamed_IsTheOnlyOneAskedAbout()
     {
@@ -285,6 +302,56 @@ public sealed class RunProjectsTests : IDisposable
         manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(_b);
         Asked().ShouldBe([_b]);
         _error.ToString().ShouldBeEmpty();
+    }
+
+    // describe reads the others for what they need of the files they share with it, and says nothing of them.
+    [Fact]
+    public async Task Find_OneProjectNamedReadingTheOthers_GivesTheirManifestsApart()
+    {
+        var found = await FindWithOthersAsync(_b);
+
+        found.Projects.ShouldBe([_b]);
+        found.Manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(_b);
+        found.Others.Select(manifest => manifest.ProjectPath).ShouldBe([_a, _c]);
+        Asked().ShouldBe([_a, _b, _c], ignoreOrder: true);
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    // A project left out may not build: it is no project of the run, so it stops nothing.
+    [Fact]
+    public async Task Find_OneProjectNamedReadingTheOthers_SaysNothingOfAnOtherThatCannotBeRead()
+    {
+        _ = NotRestored(_a);
+        _ = DoesNotUse(_c);
+
+        var found = await FindWithOthersAsync(_b);
+
+        found.Manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(_b);
+        found.Others.ShouldBeEmpty();
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    // A run that --project leaves with no project has no file for the others to share.
+    [Fact]
+    public async Task Find_NoProjectNamedOfTheSolutionReadingTheOthers_AsksAboutNone()
+    {
+        var typo = Path.Combine(_folder.Path, "Typo.csproj");
+
+        var found = await FindWithOthersAsync(typo);
+
+        found.Manifests.ShouldBeEmpty();
+        found.Others.ShouldBeEmpty();
+        _runner.Requests.ShouldBeEmpty();
+        _error.ToString().ShouldBe(Sqlsrc207(typo));
+    }
+
+    [Fact]
+    public async Task Find_SolutionReadingTheOthersWithNoProjectNamed_HasNoOthers()
+    {
+        var found = await FindWithOthersAsync();
+
+        found.Manifests.Select(manifest => manifest.ProjectPath).ShouldBe([_a, _b, _c]);
+        found.Others.ShouldBeEmpty();
     }
 
     [Fact]
