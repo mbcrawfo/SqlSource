@@ -276,7 +276,7 @@ public sealed class ConnectionTests
     {
         var text = ConnectionEnvironment
             .Of(
-                _ => Secrets.Word,
+                _ => Secrets.Connection,
                 new DotEnvFile(
                     DotEnvPath,
                     ImmutableDictionary<string, string>.Empty.Add("SQLSOURCE_CONNECTION", Secrets.Marker),
@@ -287,7 +287,7 @@ public sealed class ConnectionTests
             )
             .ToString();
 
-        text.ShouldNotContain(Secrets.Word);
+        text.ShouldNotContain(Secrets.Connection);
         text.ShouldNotContain(Secrets.Marker);
     }
 
