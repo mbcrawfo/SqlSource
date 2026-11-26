@@ -111,7 +111,7 @@ public sealed class ConnectionTests
     public void ToString_UsageValueOfAConnection_LeavesTheTextOut() =>
         new UsageValue(new Option<string>("--connection"), "billing=" + Secrets.Word, 3)
             .ToString()
-            .ShouldBe("UsageValue { Option = --connection, Position = 3 }");
+            .ShouldNotContain(Secrets.Word);
 
     [Fact]
     public void For_ValueOnTheCommandLine_IsUsedAndSaysWhereItCameFrom() =>
@@ -150,20 +150,12 @@ public sealed class ConnectionTests
         Resolve(["billing"], [], both).For("billing").Value.ShouldBe("B");
     }
 
-    [Fact]
-    public void For_VariableThatIsEmpty_IsNotSet()
-    {
-        var connections = Resolve(["billing"], [], ("SQLSOURCE_CONNECTION_BILLING", ""), ("SQLSOURCE_CONNECTION", ""));
-
-        connections.For("billing").Value.ShouldBeNull();
-        connections.UnnamedIsSetAndNotUsed.ShouldBeFalse();
-    }
-
     // Redacting a space would turn every space of a describer's text into the mark.
     [Theory]
+    [InlineData("")]
     [InlineData(" ")]
     [InlineData("\t \r\n")]
-    public void For_VariableThatHoldsOnlyWhiteSpace_IsNotSet(string blank)
+    public void For_VariableThatIsEmptyOrHoldsOnlyWhiteSpace_IsNotSet(string blank)
     {
         var connections = Resolve(
             ["billing"],
@@ -280,8 +272,9 @@ public sealed class ConnectionTests
     }
 
     [Fact]
-    public void ToString_ConnectionEnvironment_LeavesTheValuesOut() =>
-        ConnectionEnvironment
+    public void ToString_ConnectionEnvironment_LeavesTheValuesOut()
+    {
+        var text = ConnectionEnvironment
             .Of(
                 _ => Secrets.Word,
                 new DotEnvFile(
@@ -292,11 +285,11 @@ public sealed class ConnectionTests
                 "/work",
                 DotEnvPath
             )
-            .ToString()
-            .ShouldBe(
-                "ConnectionEnvironment { UnitFolder = /work, LookedFor = /work/.env, FilePath = /work/.env, "
-                    + "Errors = 0 }"
-            );
+            .ToString();
+
+        text.ShouldNotContain(Secrets.Word);
+        text.ShouldNotContain(Secrets.Marker);
+    }
 
     [Fact]
     public void For_VariableWithNoNameAndTwoSelectedDatabases_IsNotUsed()

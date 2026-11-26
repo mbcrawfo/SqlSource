@@ -163,7 +163,7 @@ Counts are of findings.  The guard is **mutation** (the scope's run before and a
 | 71 | [generator-parsing-mixed](2026-11-13-test-cleanup-phase-71-generator-parsing-mixed-design.md) | `tests/SqlSource.Tests/Parsing` | 4 | 3 | 5 | 1 |  | mutation: `generator-parsing`; covers and run time for 5 | done |
 | 72 | [tool-commands-loosen](2026-11-13-test-cleanup-phase-72-tool-commands-loosen-design.md) | `tests/SqlSource.Tool.Tests/Commands` |  |  |  | 6 |  | mutation: `tool-root`; covers and run time for 6 | done |
 | 73 | [tool-bundles-loosen](2026-11-13-test-cleanup-phase-73-tool-bundles-loosen-design.md) | `tests/SqlSource.Tool.Tests/Bundles` |  |  |  | 1 |  | mutation: `tool-bundles` | done |
-| 74 | [tool-describing-mixed](2026-11-13-test-cleanup-phase-74-tool-describing-mixed-design.md) | `tests/SqlSource.Tool.Tests/Describing` | 1 | 2 |  | 2 |  | mutation: `tool-describing`; covers and run time for 1 | not started |
+| 74 | [tool-describing-mixed](2026-11-13-test-cleanup-phase-74-tool-describing-mixed-design.md) | `tests/SqlSource.Tool.Tests/Describing` | 1 | 2 |  | 2 |  | mutation: `tool-describing`; covers and run time for 1 | done |
 | 75 | [repository-deletes](2026-11-13-test-cleanup-phase-75-repository-deletes-design.md) | `tests/SqlSource.Repository.Tests` | 2 |  |  |  |  | covers and run time | not started |
 | 76 | [generator-testharness-syncasync-deletes](2026-11-13-test-cleanup-phase-76-generator-testharness-syncasync-deletes-design.md) | `tests/SqlSource.Tests/TestHarness/SyncAsync` | 1 |  |  |  |  | covers and run time | not started |
 | 77 | [repository-strengthen](2026-11-13-test-cleanup-phase-77-repository-strengthen-design.md) | `tests/SqlSource.Repository.Tests` |  |  | 1 |  |  | covers and run time | not started |
