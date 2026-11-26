@@ -53,14 +53,21 @@ public sealed class PartitionPruningTests(PostgresDatabases postgres)
             { $"DELETE FROM {P} p WHERE p.k = 1 RETURNING p.n + 1 AS v", "n" },
         };
 
-    // A MERGE returns the new row of an update too.  MERGE has RETURNING from PostgreSQL 17.
-    [Fact]
-    public async Task DescribeAsync_MergeThatMovesARowToAPrunedPartition_KeepsItsReturningUnproved()
+    // A MERGE returns the new row of an update too, with or without a CHECK that constraint exclusion reads.  MERGE
+    // has RETURNING from PostgreSQL 17.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DescribeAsync_MergeThatMovesARowToAPrunedPartition_KeepsItsReturningUnproved(bool check)
     {
         postgres.SkipBelow(17, "MERGE has no RETURNING below 17");
         try
         {
             await postgres.ExecuteAsync(ScratchSchema.Pruning);
+            if (check)
+            {
+                await postgres.ExecuteAsync(ScratchSchema.PruningChecked);
+            }
 
             await ProvedColumns.ShouldAnswerAsync(
                 postgres,
@@ -68,6 +75,45 @@ public sealed class PartitionPruningTests(PostgresDatabases postgres)
                     + "WHEN MATCHED THEN UPDATE SET k = 2, n = NULL RETURNING p.n + 1 AS v",
                 "?"
             );
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropPruning);
+        }
+    }
+
+    // A CHECK of the partition a row moves to, which constraint exclusion reads whatever partition pruning is: the
+    // plan without pruning still shows that partition.  A read is right to leave it out.
+    public static TheoryData<string, string> CheckedQueries =>
+        new()
+        {
+            { $"UPDATE {P} p SET k = 2, n = NULL WHERE p.k = 1 RETURNING p.n + 1 AS v", "?" },
+            {
+                $"UPDATE {P} p SET k = 2, n = NULL FROM pruning.t t WHERE t.id = p.id AND p.k = 1 "
+                    + "RETURNING p.n + 1 AS v",
+                "?"
+            },
+            {
+                $"WITH u AS (UPDATE {P} p SET k = 2, n = NULL WHERE p.k = 1 RETURNING p.n + 1 AS v) SELECT u.v FROM u",
+                "?"
+            },
+            { $"UPDATE {P} p SET k = 2, n = NULL WHERE p.k = @p RETURNING p.n + 1 AS v", "?" },
+            { $"SELECT p.n + 1 AS v FROM {P} p WHERE p.k = 1", "n" },
+        };
+
+    [Theory]
+    [MemberData(nameof(CheckedQueries))]
+    public async Task DescribeAsync_ColumnOverAPartitionAConstraintRulesOut_IsProvedOnlyWhenItCannotBeNull(
+        string sql,
+        string expected
+    )
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.Pruning);
+            await postgres.ExecuteAsync(ScratchSchema.PruningChecked);
+
+            await ProvedColumns.ShouldAnswerAsync(postgres, sql, expected);
         }
         finally
         {

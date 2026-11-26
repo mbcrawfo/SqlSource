@@ -872,6 +872,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
     private const string NoPartitionPruningSql = "SET LOCAL enable_partition_pruning = off";
 
+    private const string NoConstraintExclusionSql = "SET LOCAL constraint_exclusion = off";
+
     /// <summary>
     /// What <c>prepare</c> sent for each statement it prepared, by the statement's name, for the second statement
     /// that <c>explain</c> may prepare from it.  Under a replay no <c>live</c> function runs, and it stays empty.
@@ -896,7 +898,9 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// parameter, every partition, and the plan shows an <c>Append</c> with no member and <c>Subplans Removed</c>,
     /// from which the walk cannot tell a partitioned table from a set operation.  An <c>UPDATE</c> or a <c>MERGE</c>
     /// may move the row it writes into a partition the planner pruned, so the one partition left proves nothing of
-    /// what it returns.  Such a plan is asked again without pruning, which shows every member (TD-0052).
+    /// what it returns.  Such a plan is asked again without pruning, and without constraint exclusion, which by its
+    /// default, <c>partition</c>, leaves out a partition whose <c>CHECK</c> rules it out whatever pruning is: the
+    /// plan then shows every member (TD-0052).
     /// </para>
     /// <para>
     /// The first <c>EXPLAIN</c> cached the generic plan in the prepared statement, and a setting does not end a
@@ -953,15 +957,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
     )
     {
         var again = asked with { Statement = UnprunedName(asked.Statement) };
-
-        // One of the texts that hold a user's SQL, as prepare's: the driver is given it as one statement.
-        await connection.ExecuteAsOneStatementAsync(
-            ParameterPlaceholders.PrepareText(again.Statement, prepared.Types, prepared.Sql),
-            token
-        );
+        await PrepareAgainAsync(again.Statement, prepared, token);
         try
         {
-            await SendAsync([NoPartitionPruningSql], token);
+            await SendAsync(UnprunedTexts, token);
             return await PlanAsync(again, token);
         }
         finally
@@ -970,6 +969,16 @@ internal sealed class PostgresLive(PostgresConnection connection)
             await SendAsync([$"DEALLOCATE {again.Statement}"], token);
         }
     }
+
+    /// <summary>
+    /// The <c>PREPARE</c> of what <c>prepare</c> sent, under another name: one of the texts that hold a user's SQL,
+    /// which the driver is given as one statement and never splits, as <c>prepare</c>'s.  Internal for a test.
+    /// </summary>
+    internal Task PrepareAgainAsync(string statement, PostgresPrepareRequest prepared, CancellationToken token) =>
+        connection.ExecuteAsOneStatementAsync(
+            ParameterPlaceholders.PrepareText(statement, prepared.Types, prepared.Sql),
+            token
+        );
 
     private async Task SendAsync(IReadOnlyList<string> texts, CancellationToken token)
     {
@@ -996,6 +1005,12 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// <exception cref="ArgumentException">A setting is not of <see cref="PlannerSettings" />.</exception>
     public static IReadOnlyList<string> SetTexts(PostgresExplainRequest asked) =>
         [ForceGenericPlanSql, PartitionPruningSql, .. asked.Settings.Select(PlannerSettings.SetText)];
+
+    /// <summary>
+    /// What <c>explain</c> sets, in order, before the plan of the second statement: no partition pruning and no
+    /// constraint exclusion, so that the plan shows every partition.
+    /// </summary>
+    public static IReadOnlyList<string> UnprunedTexts { get; } = [NoPartitionPruningSql, NoConstraintExclusionSql];
 
     /// <summary>
     /// The name of the second statement that <c>explain</c> prepares for a plan without pruning: the first's, which

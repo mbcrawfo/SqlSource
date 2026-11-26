@@ -44,6 +44,12 @@ internal static class ScratchSchema
         INSERT INTO pruning.t VALUES (1), (2), (3);
         """;
 
+    /// <summary>
+    /// On <see cref="Pruning" />, a <c>CHECK</c> of <c>p_open</c> that matches its bound, as the PostgreSQL manual
+    /// advises before <c>ATTACH PARTITION</c>: constraint exclusion reads it whether partition pruning is on or off.
+    /// </summary>
+    public const string PruningChecked = "ALTER TABLE pruning.p_open ADD CONSTRAINT p_open_k CHECK (k = 2)";
+
     /// <summary>Drops <see cref="Pruning" />.</summary>
     public const string DropPruning = "DROP SCHEMA IF EXISTS pruning CASCADE";
 

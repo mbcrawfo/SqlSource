@@ -55,6 +55,14 @@ public sealed class PostgresLiveTests
                 "SET LOCAL enable_hashjoin = off",
             ]);
 
+    // Constraint exclusion leaves out a partition whose CHECK rules it out, whatever partition pruning is.
+    [Fact]
+    public void UnprunedTexts_OfTheSecondStatement_TurnPruningAndConstraintExclusionOff() =>
+        PostgresLive.UnprunedTexts.ShouldBe([
+            "SET LOCAL enable_partition_pruning = off",
+            "SET LOCAL constraint_exclusion = off",
+        ]);
+
     // The statement the session counted, with a suffix: the same at each run, and no name the session gives.
     [Fact]
     public void UnprunedName_OfAStatement_IsItsNameWithASuffix() =>

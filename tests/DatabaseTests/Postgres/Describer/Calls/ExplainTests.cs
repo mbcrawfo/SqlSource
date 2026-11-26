@@ -178,6 +178,36 @@ public sealed class ExplainTests(PostgresDatabases postgres)
         (await PreparedAsync(connection)).ShouldBe([Statement]);
     }
 
+    // The second statement cannot be prepared, as when a statement of its name is left on the backend: the answer is
+    // the server's error, never the first plan, which the executor pruned, and the settings end with the call.
+    [Fact]
+    public async Task ExplainAsync_SecondStatementThatFails_AnswersItsError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
+        var live = new PostgresLive(connection);
+        var prepared = await live.PrepareAsync(
+            new PostgresPrepareRequest(
+                Statement,
+                "SELECT p.id, p.note FROM scratch_parts p WHERE p.kind = $1",
+                ["unknown"]
+            ),
+            token
+        );
+        prepared.Error.ShouldBeNull(prepared.Error?.Message);
+        await using (var left = await connection.CommandAsync($"PREPARE {Statement}_unpruned AS SELECT 1", token))
+        {
+            _ = await left.ExecuteNonQueryAsync(token);
+        }
+
+        var answer = await live.ExplainAsync(new PostgresExplainRequest(Statement, 1, []), token);
+
+        answer.Plan.ShouldBeNull();
+        answer.Error.ShouldNotBeNull().SqlState.ShouldBe("42P05");
+        (await ShowAsync(connection, "enable_partition_pruning")).ShouldBe("on");
+    }
+
     // A plan that needs every partition, of a statement that this connection's calls did not prepare, has no text to
     // prepare again: the answer is no plan, never the pruned one.
     [Fact]
