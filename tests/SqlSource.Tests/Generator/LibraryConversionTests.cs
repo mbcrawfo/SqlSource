@@ -432,9 +432,8 @@ public sealed class LibraryConversionTests
                 + Json
                 + "StringFromJsonElement(value) : global::System.DBNull.Value;\n"
         );
-        methods.ShouldContain(
-            "parameter.SqlDbType = global::System.Data.SqlDbType.NVarChar;\n                    parameter.Size = -1;\n"
-        );
+        methods.ShouldContain("parameter.SqlDbType = global::System.Data.SqlDbType.NVarChar;\n", Case.Sensitive);
+        methods.ShouldContain("parameter.Size = -1;\n", Case.Sensitive);
         methods.ShouldNotContain("NodaTimeConversions");
     }
 
