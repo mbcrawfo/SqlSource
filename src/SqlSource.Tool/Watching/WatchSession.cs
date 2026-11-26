@@ -99,6 +99,9 @@ internal sealed class WatchSession
     ];
     private readonly HashSet<(string Folder, string Message)> _reported = [];
     private ImmutableArray<ProjectManifest> _manifests = [];
+
+    // The manifests of the projects that --project leaves out, for what they need of the files of the run.
+    private ImmutableArray<ProjectManifest> _others = [];
     private bool _evaluationFailed = true;
     private int _pass;
 
@@ -190,7 +193,7 @@ internal sealed class WatchSession
                 await EvaluateAsync(context);
             }
 
-            if (await PlanSteps.PlanFromAsync(_unit, _manifests, _usage, context) is { } plan)
+            if (await PlanSteps.PlanFromAsync(_unit, _manifests, _others, _usage, context) is { } plan)
             {
                 await DescribeCommand.DescribePlanAsync(plan, _usage, _unit, mode, context, _counted);
             }
@@ -225,8 +228,9 @@ internal sealed class WatchSession
         WatchSet? set = null;
         try
         {
-            var found = await PlanSteps.FindManifestsAsync(_unit, _usage, pass);
+            var found = await PlanSteps.FindManifestsAsync(_unit, _usage, pass, readsOthers: true);
             _manifests = found.Manifests;
+            _others = found.Others;
             _evaluationFailed = pass.Reporter.Count > errors;
             set = WatchSet.Of(_unit.Path, _unitFolder, _envFile, found);
         }

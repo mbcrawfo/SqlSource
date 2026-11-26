@@ -40,6 +40,7 @@ internal static class PlanSteps
     {
         RunUnit unit;
         ImmutableArray<ProjectManifest> manifests;
+        ImmutableArray<ProjectManifest> others = [];
         if (SharedOptions.ValuesOf(usage, DescribeCommand.ManifestOption) is { Length: > 0 } given)
         {
             // The build has evaluated the project, so MSBuild is not asked again.  Each manifest is one of its
@@ -74,14 +75,16 @@ internal static class PlanSteps
         else if (FindUnit(usage, context) is { } found)
         {
             unit = found;
-            manifests = (await FindManifestsAsync(unit, usage, context)).Manifests;
+            var projects = await FindManifestsAsync(unit, usage, context, readsOthers: true);
+            manifests = projects.Manifests;
+            others = projects.Others;
         }
         else
         {
             return null;
         }
 
-        return await PlanFromAsync(unit, manifests, usage, context) is { } plan ? (unit, plan) : null;
+        return await PlanFromAsync(unit, manifests, others, usage, context) is { } plan ? (unit, plan) : null;
     }
 
     /// <summary>
@@ -106,25 +109,36 @@ internal static class PlanSteps
     /// <summary>
     /// The projects of the unit that the command line runs, which <c>--project</c> narrows, and their manifests: the
     /// evaluation of each, in the configuration that <c>--configuration</c> names, and its manifest target.  A project
-    /// with an error is reported and has no manifest.
+    /// with an error is reported and has no manifest.  With <paramref name="readsOthers" />, which every run of
+    /// <c>describe</c> gives, <c>--check</c> and a watch included, and <c>diagnose</c> does not, the projects of a
+    /// solution that <c>--project</c> leaves out are evaluated too, for <see cref="FoundProjects.Others" />.
     /// </summary>
-    internal static Task<FoundProjects> FindManifestsAsync(RunUnit unit, Usage usage, RunContext context) =>
+    internal static Task<FoundProjects> FindManifestsAsync(
+        RunUnit unit,
+        Usage usage,
+        RunContext context,
+        bool readsOthers
+    ) =>
         RunProjects.FindAsync(
             unit,
             SharedOptions.ValuesOf(usage, SharedOptions.Project),
             SharedOptions.ValuesOf(usage, SharedOptions.Configuration) is [{ } configuration]
                 ? configuration.Text
                 : null,
-            context
+            context,
+            readsOthers
         );
 
     /// <summary>
     /// The plan of the manifests, which <c>--database</c> and the <c>.sql</c> paths narrow, with what is wrong with it
     /// reported.  Null when there is no manifest; a run with no error then says that no project uses SqlSource.
+    /// <paramref name="others" /> are the manifests of the projects that <c>--project</c> leaves out, which add what
+    /// they need of the files of the run.
     /// </summary>
     internal static Task<RunPlan?> PlanFromAsync(
         RunUnit unit,
         ImmutableArray<ProjectManifest> manifests,
+        ImmutableArray<ProjectManifest> others,
         Usage usage,
         RunContext context
     )
@@ -140,7 +154,8 @@ internal static class PlanSteps
                 [.. manifests.SelectMany(static manifest => manifest.Files)]
             ),
             (_, error) => isOnline && IsReportedByTheCompiler(error),
-            context
+            context,
+            others
         );
     }
 
@@ -160,12 +175,17 @@ internal static class PlanSteps
     /// file, is written.
     /// </param>
     /// <param name="context">Standard output, where the errors go with the run's trace, and what ends the plan.</param>
+    /// <param name="others">
+    /// The manifests of the projects of the solution that <c>--project</c> leaves out, for what they need of the files
+    /// that a project of the run claims too.  None by default.
+    /// </param>
     internal static async Task<RunPlan?> PlanFromAsync(
         RunUnit unit,
         ImmutableArray<ProjectManifest> manifests,
         RunFilters filters,
         Func<RunPlan, ToolDiagnostic, bool> isLoggedOnly,
-        RunContext context
+        RunContext context,
+        ImmutableArray<ProjectManifest> others = default
     )
     {
         var reporter = context.Reporter;
@@ -182,7 +202,7 @@ internal static class PlanSteps
             return null;
         }
 
-        var result = RunPlanner.Plan(manifests, filters, context.CancellationToken);
+        var result = RunPlanner.Plan(manifests, filters, context.CancellationToken, others);
         foreach (var (projectPath, files) in result.Unclaimed)
         {
             RunEvents.Unclaimed(reporter.Trace, projectPath, files);
