@@ -69,12 +69,19 @@ Each kept test still fails when the rule it names breaks; each removed test or r
 - [x] **Step 9 (6-02, loosen):** `PlacementTests.Run_FileOfSeveralLocations_PutsEachQueryWhereItSays` asserts each constant inside its class (`OnType` on the type, `GetUser` in `Users`, `InSql` in `Sql`, `GetOrder` in `Orders`) and the order of the three class declarations by their indexes.  A local function takes a class's text from its declaration to its closing brace.
 - [x] **Step 10 (8-03, loosen):** `TypeDiagnosticsTests.Run_TypeWithSeveralProblems_ReportsThemAll` asserts the count of two and each prefix by `ShouldContain`, without an order.
 - [x] **Step 11:** Set row 67 of the epic's table to `done`.
-- [ ] **Step 12:** `./format.sh`, `./pre-commit-validation.sh`, then commit.
+- [x] **Step 12:** `./format.sh`, `./pre-commit-validation.sh`, then commit (`cdc94357`).
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-67/generator-root/after`, and `compare`.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-67/coverage-after/SqlSource.Tests`, compared over the 11 files of `src/SqlSource/*.cs`.
-- [ ] **Step 3:** `tests/SqlSource.Tests.RoslynFloor` passes.
-- [ ] **Step 4:** Covers for 5-01, 5-02, 6-01, 8-01 and 8-02, and the run time after.
-- [ ] **Step 5:** The pull request gives the change, the compare result, the coverage figures, the covers and the run times.
+- [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-67/generator-root/after` (Windows, on `cdc94357`): 238 mutants tested, 209 killed, 9 survived, 20 timeouts; the run took 2 h 15 min.  `compare`: 232 detected before, 228 still detected, 4 lost, 0 not comparable.
+- [x] **Step 2:** The four lost mutants, each `Timeout` before and `Survived` after, checked by hand.  None is the epic's plain exception, since the "before" report has each as a timeout under every test of the scope's run, the changed tests among them, so they went to the owner (p67 Q1).
+  - `SqlSourceGenerator.cs:1149:13`, Linq method mutation `OrderBy` to `OrderByDescending` in `DistinctLibraries`.
+  - `SqlSourceGenerator.cs:1159:13`, Linq method mutation `OrderBy` to `OrderByDescending` in `DistinctUses`.
+  - `SqlSourceGenerator.cs:1266:13`, Linq method mutation `ThenBy` to `ThenByDescending` in `ToSortedSignatures`.
+  - `SqlSourceGenerator.cs:1351:9`, Equality mutation `Files.Count > 0` to `>= 0` in `LevelOf`.
+
+  All four are `Survived` in both of phase 66's reports of this scope.  By hand, each mutant was applied to `src/SqlSource`, its `SqlSource.dll` built with the analyzers off, since two refuse `>= 0`, and put in a copy of the test build of the tests as they were before the change (`e2e419b7`), inside the checkout so that the tests that read the repository run.  The scope's tests, the 2,250 of `SqlSource.Tests.Generator` and the 131 of the root classes, all pass on each mutant as on the unmutated build, none hanging, in 5.5 to 6 min each.  No test, before the change or after it, detects any of the four, so the "before" timeouts did not come from a test.
+- [x] **Step 3:** Coverage into `artifacts/test-cleanup/phase-67/coverage-after/SqlSource.Tests` (9,818 tests, 6 min 14 s): 963 of 971 lines over the 11 files, and every one of the 291 files of `SqlSource` has the same figure before and after.
+- [x] **Step 4:** `tests/SqlSource.Tests.RoslynFloor`: 2,240 tests pass, in 6 min 13 s.
+- [x] **Step 5:** Covers for 5-01, 5-02, 6-01, 8-01 and 8-02: 6-01's test and 8-01's and 8-02's rows are removed beside the covers the spec names, which stay; 5-02's fact is folded into its theory, which now reads the type's file in every row; 5-01's test keeps the extension class, the internal method and its `this DbConnection` parameter, which make it 6-01's cover.  Run time: 9,818 tests in 6 min 7 s, against 9,829 in 7 min 16 s and 6 min 10 s before, on the same machine with other work running.
+- [ ] **Step 6:** The pull request gives the change, the compare result, the coverage figures, the covers and the run times.
