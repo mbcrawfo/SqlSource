@@ -155,6 +155,23 @@ public sealed class MappedTypeResolverTests
                 static int IMakes.Make() => 1;
             }
 
+            // Interfaces that inherit members they do not implement: none, a static abstract one, one next to an
+            // instance one, and a static virtual one.
+            public interface IInheritsShape : IShape;
+
+            public interface IInheritsMakes : IMakes;
+
+            public interface IMixed
+            {
+                static abstract int Make();
+
+                void Other();
+            }
+
+            public interface IInheritsMixed : IMixed;
+
+            public interface IInheritsDefault : IMakesByDefault;
+
             public enum Color
             {
                 Red,
@@ -168,7 +185,94 @@ public sealed class MappedTypeResolverTests
                 public sealed class Inner<U>
                     where U : T;
             }
+
+            // Constraints with a nullability inside: through a covariant, a contravariant and an invariant type
+            // parameter, and through a type parameter used with a ?.
+            public sealed class Names<T>
+                where T : System.Collections.Generic.IEnumerable<string>;
+
+            public sealed class MaybeNames<T>
+                where T : System.Collections.Generic.IEnumerable<string?>;
+
+            public sealed class Sorted<T>
+                where T : System.Collections.Generic.IComparer<string>;
+
+            public sealed class MaybeSorted<T>
+                where T : System.Collections.Generic.IComparer<string?>;
+
+            public sealed class Listed<T>
+                where T : System.Collections.Generic.IList<string>;
+
+            public sealed class Based<T>
+                where T : System.Collections.Generic.List<string>;
+
+            public sealed class MaybeItems<T, U>
+                where U : System.Collections.Generic.IEnumerable<T?>;
+
+            // The compiler takes the T of System.IEquatable<T> as contravariant for nullability, so string, an
+            // IEquatable<string?>, meets IEquatable<string>.
+            public sealed class SameBox<T>
+                where T : System.IEquatable<T>;
+
+            public sealed class MaybeSame<T>
+                where T : System.IEquatable<string?>;
+
+            public sealed class PlainSame : System.IEquatable<string>
+            {
+                public bool Equals(string? other) => false;
+            }
+
+            // Constraints that put a type parameter inside an array, a nested type or another generic, each with a ?.
+            public sealed class ArrOf<T, U>
+                where U : System.Collections.Generic.IList<T[]>;
+
+            public sealed class ArrIL<T, U>
+                where U : System.Collections.Generic.IList<T[]?>;
+
+            public sealed class ItemList<T, U>
+                where U : System.Collections.Generic.IList<Holder<T>.Item?>;
+
+            public sealed class ListList<T, U>
+                where U : System.Collections.Generic.IList<System.Collections.Generic.List<T>?>;
+
+            // A type nested in a covariant interface converts by the outer one's out too.
+            public interface IOuter<out T>
+            {
+                public interface IInner<out U>;
+            }
+
+            public sealed class Inner2 : IOuter<string>.IInner<string>;
+
+            public sealed class Inner3 : IOuter<string?>.IInner<string>;
+
+            public sealed class NullableWords : System.Collections.Generic.List<string?>;
+
+            public readonly struct WordRun : System.Collections.Generic.IEnumerable<string?>
+            {
+                public System.Collections.Generic.IEnumerator<string?> GetEnumerator() =>
+                    throw new System.NotSupportedException();
+
+                System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() =>
+                    throw new System.NotSupportedException();
+            }
         }
+
+        #nullable disable
+        namespace MyApp
+        {
+            // The same constraint as Names<T>'s, written where nullable annotations are off.
+            public sealed class OldNames<T>
+                where T : System.Collections.Generic.IEnumerable<string>;
+
+            // A type parameter used where nullable annotations are off keeps its argument's nullability.
+            public sealed class OldBox<T, U>
+                where U : System.Collections.Generic.IList<T>;
+
+            // An invariant type parameter of a constraint written where nullable annotations are off.
+            public sealed class OldList<T>
+                where T : System.Collections.Generic.IList<string>;
+        }
+        #nullable enable
 
         namespace Common
         {
@@ -295,6 +399,32 @@ public sealed class MappedTypeResolverTests
             public sealed class AccountId { }
 
             public sealed class Range<T> { }
+
+            public sealed class Outer<T>
+            {
+                public sealed class Inner<U> { }
+            }
+        }
+        """;
+
+    // Names that several types answer: Widget in the global namespace and in Zed, whose metadata names sort the other
+    // way round from their full names, and Gadget in two namespaces.
+    private const string AmbiguousSource = """
+        public sealed class Widget;
+
+        namespace Zed
+        {
+            public sealed class Widget;
+        }
+
+        namespace One
+        {
+            public sealed class Gadget;
+        }
+
+        namespace Two
+        {
+            public sealed class Gadget;
         }
         """;
 
@@ -337,8 +467,15 @@ public sealed class MappedTypeResolverTests
         )
     );
 
+    // A project whose short names Widget and Gadget each mean several types.
+    private static readonly Lazy<CSharpCompilation> AmbiguousProject = new(() =>
+        GeneratorHarness.CreateCompilation([new SourceFile("/app/MyApp.cs", AmbiguousSource)])
+    );
+
     [Theory]
     [InlineData("int", nameof(MappedTypeStatus.Found), true, true, "")]
+    [InlineData("object", nameof(MappedTypeStatus.Found), false, true, "")]
+    [InlineData("object[]", nameof(MappedTypeStatus.Found), false, true, "")]
     [InlineData("string", nameof(MappedTypeStatus.Found), false, true, "")]
     [InlineData("global::MyApp.UserId", nameof(MappedTypeStatus.Found), true, true, "")]
     [InlineData("global::System.Uri", nameof(MappedTypeStatus.Found), false, true, "")]
@@ -442,6 +579,14 @@ public sealed class MappedTypeResolverTests
         true,
         "CS0612,CS0618"
     )]
+    [InlineData(
+        "global::System.Collections.Generic.Dictionary<global::MyApp.OldThing, global::MyApp.Helpers>",
+        nameof(MappedTypeStatus.NotAPropertyType),
+        false,
+        false,
+        ""
+    )]
+    [InlineData("Twice", nameof(MappedTypeStatus.Ambiguous), false, false, "")]
     [InlineData("global::MyApp.Gone", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
     [InlineData("global::MyApp.OddId", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
     [InlineData("global::MyApp.Numbered", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
@@ -531,6 +676,76 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::System.Collections.Generic.List<global::System.Nullable<int>>")]
     [InlineData("global::MyApp.PairBox<object?, int?>")]
     [InlineData("global::MyApp.PairBox<global::System.ValueType?, int?>")]
+    [InlineData("global::MyApp.PairBox<global::System.Nullable<int>[], int?[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Nullable<int>[][], int?[][]>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<int>, "
+            + "global::System.Collections.Generic.List<int>>"
+    )]
+    [InlineData("global::System.Collections.Generic.List<global::System.Collections.Generic.IEnumerable<string>>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsShape>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsDefault>")]
+    [InlineData("global::MyApp.Names<global::System.Collections.Generic.List<string>>")]
+    [InlineData("global::MyApp.Names<string[]>")]
+    [InlineData("global::MyApp.MaybeNames<global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.MaybeNames<global::System.Collections.Generic.List<string>>")]
+    [InlineData("global::MyApp.MaybeNames<global::MyApp.NullableWords>")]
+    [InlineData("global::MyApp.MaybeNames<global::MyApp.WordRun>")]
+    [InlineData("global::MyApp.MaybeNames<string?[]>")]
+    [InlineData("global::MyApp.Sorted<global::System.Collections.Generic.Comparer<string?>>")]
+    [InlineData("global::MyApp.MaybeSorted<global::System.Collections.Generic.Comparer<string?>>")]
+    [InlineData("global::MyApp.Listed<global::System.Collections.Generic.List<string>>")]
+    [InlineData("global::MyApp.Based<global::System.Collections.Generic.List<string>>")]
+    [InlineData("global::MyApp.MaybeItems<string, global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.MaybeItems<string?, global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.MaybeItems<int, global::System.Collections.Generic.List<int>>")]
+    [InlineData("global::MyApp.OldNames<global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.SameBox<string>")]
+    [InlineData("global::MyApp.SameBox<int>")]
+    [InlineData("global::MyApp.SameBox<global::System.Uri>")]
+    [InlineData("global::MyApp.MaybeSame<string>")]
+    [InlineData("global::MyApp.ArrIL<string, global::System.Collections.Generic.List<string[]?>>")]
+    [InlineData("global::MyApp.OldList<global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<string?>, string[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<object?>, string[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.ICollection<string?>, string[]>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IList<"
+            + "global::System.Collections.Generic.IEnumerable<string?>>, "
+            + "global::System.Collections.Generic.List<string>[]>"
+    )]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<int>, int[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<string[]?>, string[]?[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<string[][]?>, string[][]?[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<int[]?>, int[]?[]>")]
+    [InlineData("global::MyApp.OldBox<string, global::System.Collections.Generic.List<string>>")]
+    [InlineData("global::MyApp.PairBox<global::MyApp.IOuter<string?>.IInner<string>, global::MyApp.Inner2>")]
+    [InlineData("global::MyApp.ArrOf<string?, global::System.Collections.Generic.List<string?[]>>")]
+    [InlineData(
+        "global::MyApp.ItemList<string, global::System.Collections.Generic.List<global::MyApp.Holder<string>.Item?>>"
+    )]
+    [InlineData(
+        "global::MyApp.ListList<string, global::System.Collections.Generic.List<"
+            + "global::System.Collections.Generic.List<string>?>>"
+    )]
+    [InlineData("global::MyApp.PairBox<string?[], string[]>")]
+    [InlineData("global::MyApp.PairBox<object?[], string[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Func<string?>, global::System.Func<string>>")]
+    [InlineData("global::MyApp.PairBox<global::System.Action<string>, global::System.Action<string?>>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<object?>, "
+            + "global::System.Collections.Generic.List<string>>"
+    )]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<"
+            + "global::System.Collections.Generic.IEnumerable<string?>>, "
+            + "global::System.Collections.Generic.List<string[]>>"
+    )]
+    [InlineData("global::MyApp.PairBox<global::MyApp.Holder<string?>.Item, global::MyApp.Holder<string?>.Item>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.KeyValuePair<string?, int>?, "
+            + "global::System.Collections.Generic.KeyValuePair<string?, int>?>"
+    )]
     public void Resolve_GenericNameWhoseArgumentsMeetTheConstraints_IsFound(string name)
     {
         CompilerReports(name).ShouldBeEmpty();
@@ -575,6 +790,73 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::System.Collections.Generic.Dictionary<string, global::MyApp.ValueBox<string>>")]
     [InlineData("global::MyApp.ValueBox<string>[]")]
     [InlineData("global::MyApp.ValueBox<int?[]>")]
+    [InlineData("global::MyApp.PairBox<int[], int?[]>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsMakes>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IInheritsMixed>")]
+    [InlineData("global::MyApp.Names<global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.Names<global::MyApp.NullableWords>")]
+    [InlineData("global::MyApp.Names<global::MyApp.WordRun>")]
+    [InlineData("global::MyApp.Names<string?[]>")]
+    [InlineData("global::MyApp.Names<global::System.Collections.Generic.IEnumerable<string?>>")]
+    [InlineData("global::MyApp.MaybeSorted<global::System.Collections.Generic.Comparer<string>>")]
+    [InlineData("global::MyApp.MaybeSame<global::MyApp.PlainSame>")]
+    [InlineData("global::MyApp.ArrIL<string, global::System.Collections.Generic.List<string[]>>")]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IList<string>, string?[]>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IList<"
+            + "global::System.Collections.Generic.KeyValuePair<string, int>>, "
+            + "global::System.Collections.Generic.KeyValuePair<string?, int>[]>"
+    )]
+    [InlineData("global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<string[]>, string[]?[]>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IList<string[]?[]>, "
+            + "global::System.Collections.Generic.List<string[][]>>"
+    )]
+    [InlineData("global::MyApp.OldBox<string, global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.PairBox<global::MyApp.IOuter<string>.IInner<string>, global::MyApp.Inner3>")]
+    [InlineData("global::MyApp.ArrOf<string, global::System.Collections.Generic.List<string?[]>>")]
+    [InlineData(
+        "global::MyApp.ItemList<string, global::System.Collections.Generic.List<global::MyApp.Holder<string>.Item>>"
+    )]
+    [InlineData(
+        "global::MyApp.ListList<string, global::System.Collections.Generic.List<"
+            + "global::System.Collections.Generic.List<string>>>"
+    )]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.List<global::MyApp.Holder<string>.Item>, "
+            + "global::System.Collections.Generic.List<global::MyApp.Holder<string?>.Item>>"
+    )]
+    [InlineData("global::MyApp.Listed<global::System.Collections.Generic.List<string?>>")]
+    [InlineData("global::MyApp.Based<global::MyApp.NullableWords>")]
+    [InlineData("global::MyApp.MaybeItems<int?, global::System.Collections.Generic.List<int>>")]
+    [InlineData("global::MyApp.PairBox<string[], string?[]>")]
+    [InlineData("global::MyApp.PairBox<global::System.Func<string>, global::System.Func<string?>>")]
+    [InlineData("global::MyApp.PairBox<global::System.Action<string?>, global::System.Action<string>>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.List<string>, "
+            + "global::System.Collections.Generic.List<string?>>"
+    )]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<"
+            + "global::System.Collections.Generic.IEnumerable<string>>, "
+            + "global::System.Collections.Generic.List<string?[]>>"
+    )]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.List<"
+            + "global::System.Collections.Generic.IEnumerable<string>>, "
+            + "global::System.Collections.Generic.List<"
+            + "global::System.Collections.Generic.IEnumerable<string?>>>"
+    )]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.IEnumerable<"
+            + "global::System.Collections.Generic.KeyValuePair<string, int>>, "
+            + "global::System.Collections.Generic.List<global::System.Collections.Generic.KeyValuePair<string?, int>>>"
+    )]
+    [InlineData("global::MyApp.PairBox<global::MyApp.Holder<string>.Item, global::MyApp.Holder<string?>.Item>")]
+    [InlineData(
+        "global::MyApp.PairBox<global::System.Collections.Generic.KeyValuePair<string, int>?, "
+            + "global::System.Collections.Generic.KeyValuePair<string?, int>?>"
+    )]
     public void Resolve_GenericNameWhoseArgumentsBreakAConstraint_IsNotAPropertyType(string name)
     {
         CompilerReports(name).ShouldNotBeEmpty();
@@ -928,6 +1210,173 @@ public sealed class MappedTypeResolverTests
         type.Package.ShouldBeNull();
     }
 
+    // A keyword as a type argument is the type it names: no other type of the name beside it, as the constraint of
+    // PairBox<T, U> asks, where U must be a T.
+    [Theory]
+    [InlineData("bool", "Boolean")]
+    [InlineData("byte", "Byte")]
+    [InlineData("sbyte", "SByte")]
+    [InlineData("short", "Int16")]
+    [InlineData("ushort", "UInt16")]
+    [InlineData("int", "Int32")]
+    [InlineData("uint", "UInt32")]
+    [InlineData("long", "Int64")]
+    [InlineData("ulong", "UInt64")]
+    [InlineData("nint", "IntPtr")]
+    [InlineData("nuint", "UIntPtr")]
+    [InlineData("char", "Char")]
+    [InlineData("float", "Single")]
+    [InlineData("double", "Double")]
+    [InlineData("decimal", "Decimal")]
+    [InlineData("string", "String")]
+    [InlineData("object", "Object")]
+    public void Resolve_KeywordAsATypeArgument_IsTheTypeItNames(string keyword, string typeName)
+    {
+        var name = $"global::MyApp.PairBox<global::System.{typeName}, {keyword}>";
+
+        CompilerReports(name).ShouldBeEmpty();
+        ResolvedStatusOf(name).ShouldBe(MappedTypeStatus.Found);
+    }
+
+    // The same, where the keyword is not the type the constraint asks for.
+    [Theory]
+    [InlineData("nint", "UIntPtr")]
+    [InlineData("nuint", "IntPtr")]
+    public void Resolve_KeywordAsATypeArgumentOfAnotherType_IsNotAPropertyType(string keyword, string typeName)
+    {
+        var name = $"global::MyApp.PairBox<global::System.{typeName}, {keyword}>";
+
+        CompilerReports(name).ShouldNotBeEmpty();
+        ResolvedStatusOf(name).ShouldBe(MappedTypeStatus.NotAPropertyType);
+    }
+
+    // The ids of the warnings of one name are the name's own: nothing of the name before it.
+    [Fact]
+    public void Resolve_NameAfterOneWithWarnings_HasNoneOfItsWarnings()
+    {
+        var types = MappedTypeResolver
+            .Resolve(
+                Project.Value,
+                TestSidecars.Of("global::MyApp.OldThing", "global::MyApp.UserId", "int"),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
+            .Types;
+
+        types
+            .Select(static type => type.WarningIds)
+            .ShouldBe([TestSidecars.Of("CS0612", "CS0618"), NoWarnings, NoWarnings]);
+    }
+
+    // A name that is written in full is given back as it was written, with no short name to write in full.
+    [Theory]
+    [InlineData("global::System.Collections.Generic.Dictionary<int,string>")]
+    [InlineData("System.Collections.Generic.List<int>")]
+    [InlineData("global::System.Collections.Generic.Dictionary<int,global::MyApp.Box<string>>")]
+    public void Resolve_NameWithNoShortName_KeepsItsTextAsWritten(string name)
+    {
+        var types = MappedTypeResolver
+            .Resolve(
+                Project.Value,
+                TestSidecars.Of(name),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
+            .Types;
+
+        var type = types.ShouldHaveSingleItem();
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Text.ShouldBe(name);
+    }
+
+    // Each short name in a name is written in full, and the rest of the name stays as it was written: the arguments
+    // before the first short name too, those of the parts around, and a part with none.
+    [Theory]
+    [InlineData("AccountId", "global::Brought.Client.AccountId")]
+    [InlineData("Range<AccountId>", "global::Brought.Client.Range<global::Brought.Client.AccountId>")]
+    [InlineData(
+        "System.Collections.Generic.Dictionary<int,AccountId>",
+        "global::System.Collections.Generic.Dictionary<int, global::Brought.Client.AccountId>"
+    )]
+    [InlineData(
+        "System.Collections.Generic.Dictionary<AccountId, int>",
+        "global::System.Collections.Generic.Dictionary<global::Brought.Client.AccountId, int>"
+    )]
+    [InlineData(
+        "System.Collections.Generic.Dictionary<AccountId, Range<int>>",
+        "global::System.Collections.Generic.Dictionary<global::Brought.Client.AccountId, "
+            + "global::Brought.Client.Range<int>>"
+    )]
+    [InlineData(
+        "System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<AccountId>>",
+        "global::System.Collections.Generic.Dictionary<int, "
+            + "global::System.Collections.Generic.List<global::Brought.Client.AccountId>>"
+    )]
+    [InlineData(
+        "global::Brought.Client.Outer<int>.Inner<AccountId>",
+        "global::Brought.Client.Outer<int>.Inner<global::Brought.Client.AccountId>"
+    )]
+    [InlineData(
+        "global::Brought.Client.Outer<AccountId>.Inner<int>",
+        "global::Brought.Client.Outer<global::Brought.Client.AccountId>.Inner<int>"
+    )]
+    [InlineData(
+        "global::Brought.Client.Outer<AccountId>.Inner<AccountId>",
+        "global::Brought.Client.Outer<global::Brought.Client.AccountId>.Inner<global::Brought.Client.AccountId>"
+    )]
+    [InlineData(
+        "global::Brought.Client.Outer<int>.Inner<Range<AccountId>>",
+        "global::Brought.Client.Outer<int>.Inner<global::Brought.Client.Range<global::Brought.Client.AccountId>>"
+    )]
+    public void Resolve_NameWithShortNames_IsWrittenInFull(string name, string written)
+    {
+        var type = ResolveBrought(name, TransitivePackageAssemblies.None);
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Text.ShouldBe(written);
+    }
+
+    // The binding of a name is its first short name's, and the arguments after it add none.
+    [Fact]
+    public void Resolve_ShortNamesAsTypeArguments_HaveTheFirstBinding()
+    {
+        var type = ResolveBrought(
+            "System.Collections.Generic.Dictionary<AccountId, Range<int>>",
+            TransitivePackageAssemblies.Of("Brought.Client")
+        );
+
+        type.Package.ShouldBe(new PackageBinding("AccountId", "Brought.Client.AccountId", "Brought.Client"));
+    }
+
+    [Fact]
+    public void Resolve_ShortNameThatSeveralTypesAnswer_GivesTheirFullNamesInOrdinalOrder()
+    {
+        var type = ResolveAmbiguous("Widget");
+
+        type.Status.ShouldBe(MappedTypeStatus.Ambiguous);
+        type.Candidates.ShouldBe(TestSidecars.Of("Zed.Widget", "global::Widget"));
+    }
+
+    // The candidates are those of the first short name that is ambiguous, not of a later one.
+    [Fact]
+    public void Resolve_TwoAmbiguousShortNamesAsArguments_GivesTheFirstsCandidates()
+    {
+        var type = ResolveAmbiguous("System.Collections.Generic.Dictionary<Gadget, Widget>");
+
+        type.Status.ShouldBe(MappedTypeStatus.Ambiguous);
+        type.Candidates.ShouldBe(TestSidecars.Of("One.Gadget", "Two.Gadget"));
+    }
+
+    // Candidates are for an ambiguous name alone: a name that fails first in the order of the statuses has none.
+    [Fact]
+    public void Resolve_NotFoundShortNameBesideAnAmbiguousOne_HasNoCandidates()
+    {
+        var type = ResolveAmbiguous("System.Collections.Generic.Dictionary<NoSuchType, Widget>");
+
+        type.Status.ShouldBe(MappedTypeStatus.NotFound);
+        type.Candidates.ShouldBe(NoCandidates);
+    }
+
     [Fact]
     public void Find_NameNotResolved_GivesNull()
     {
@@ -1043,6 +1492,17 @@ public sealed class MappedTypeResolverTests
                 BroughtProject.Value,
                 TestSidecars.Of(name),
                 packageAssemblies,
+                TestContext.Current.CancellationToken
+            )
+            .Types.ShouldHaveSingleItem();
+
+    // The record of the one name in the project whose short names are ambiguous.
+    private static MappedType ResolveAmbiguous(string name) =>
+        MappedTypeResolver
+            .Resolve(
+                AmbiguousProject.Value,
+                TestSidecars.Of(name),
+                TransitivePackageAssemblies.None,
                 TestContext.Current.CancellationToken
             )
             .Types.ShouldHaveSingleItem();

@@ -67,7 +67,8 @@ A type that the table does not name gets its C# type by what it is:
 | Kind | C# type |
 |----|----|
 | An alias type, `CREATE TYPE dbo.Email FROM nvarchar(320)` | Its base type's C# type: `dbo.Email` is a `string`.  To give it another, map it with the type override by its schema and name, `dbo.Email=MyApp.Email`.  `sysname` is a `string` |
-| A CLR type of your own assembly, or a type of a newer SQL Server | None: SQLSRC246.  Map it with the type override to the type the application reads it as; the message names the key to write |
+| A type of a newer SQL Server | None: SQLSRC246.  Map it with the type override to the type the application reads it as; the message names the key to write |
+| A CLR type of your own assembly, `CREATE TYPE dbo.Grade EXTERNAL NAME ...` | None: SQLSRC246.  Map it with the type override by its schema and name, `dbo.Grade=MyApp.Grade`, as [a CLR type of your own](#user-clr-type) says |
 
 <a id="type-notes"></a>
 
@@ -82,6 +83,38 @@ A type that the table does not name gets its C# type by what it is:
 - **`sql_variant` is an `object`.**  Its value has the C# type of the value that the row holds: an `int` for an `int`, a `string` for an `nvarchar`.
 - **`json`, the type of SQL Server 2025, is a `string`.**  It is a `JsonElement` where the library types turn System.Text.Json on: see [JSON](libraries.md#json).
 - **`vector` is a `Microsoft.Data.SqlTypes.SqlVector<float>`**, a type of Microsoft.Data.SqlClient.  The project references Microsoft.Data.SqlClient to name it.
+
+<a id="user-clr-type"></a>
+
+## A CLR type of your own
+
+A CLR type of your own assembly, made by `CREATE TYPE ... EXTERNAL NAME`, has no C# type until you map it.  A query that returns or takes one is described, and its build reports [SQLSRC246](../../../diagnostics.md#sqlsrc246), which names the key to map.  To read and send the type:
+
+1. Build the type's source for .NET too, with the same type name.  Give the assembly the name of the one on the server.  On .NET, the type takes its `SqlUserDefinedType` attribute from the package `Microsoft.SqlServer.Server`.
+2. Reference that build from the project of your queries.
+3. Map the type with the [type override](../../type-mapping.md#setting-type-overrides) by its schema and name, to the type of that build.
+
+For the type `dbo.Grade` of the assembly `Grades`, which `CREATE ASSEMBLY Grades` loaded into the database:
+
+```sql mssql
+CREATE TYPE dbo.Grade EXTERNAL NAME Grades.[MyApp.Grade];
+CREATE TABLE dbo.grades (id int NOT NULL PRIMARY KEY, grade dbo.Grade NOT NULL);
+```
+
+The application references a .NET build of `MyApp.Grade` in an assembly named `Grades`, and the settings file maps the type:
+
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "typeOverrides": {
+        "dbo.Grade": "MyApp.Grade",
+    },
+}
+```
+
+A query method then reads a column of the type as a `MyApp.Grade`, and sends a parameter of it as a `dbo.Grade`.  Microsoft.Data.SqlClient finds the C# type by its name and its assembly's name, as SQL Server gives them.
+
+SQL Server can say that a column of such a type is never null where SqlSource treats it as one that can be null.  SqlSource treats `geometry` the same way: see [which columns can be null](nullability.md#nullability).
 
 <a id="limits"></a>
 

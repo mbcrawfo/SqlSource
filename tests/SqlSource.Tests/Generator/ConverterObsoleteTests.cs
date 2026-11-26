@@ -82,6 +82,36 @@ public sealed class ConverterObsoleteTests
         methods.ShouldContain("reader.GetFieldValue<global::App.Email>(0)");
     }
 
+    // A method binds a mapped type that has no converter through a typed parameter, and an obsolete one warns there as
+    // it does where it is read.
+    [Fact]
+    public void Run_ObsoleteMappedTypeAsAParameterUnderMethods_DisablesItsWarning()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample;
+
+                [System.Obsolete("Use another type.")]
+                public readonly record struct Email(string Value);
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.email=App.Email\n-- name: DeleteUser\nDELETE FROM users WHERE email = @email;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "DeleteUser", [Parameter("email", Email, false)], null)], Source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("#nullable enable\n#pragma warning disable CS0612, CS0618 ");
+        methods.ShouldContain("NpgsqlParameter<global::App.Email>");
+    }
+
     // An [Experimental] converter is an error under its id unless the id is disabled, which only the errors of the
     // compilation would show.
     [Fact]

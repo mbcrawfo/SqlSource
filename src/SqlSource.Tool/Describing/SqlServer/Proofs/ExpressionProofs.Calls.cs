@@ -21,13 +21,25 @@ internal sealed partial class ExpressionProofs
         ["SUM"] = FormKind.Sum,
         ["MAX"] = FormKind.MaxOrMin,
         ["MIN"] = FormKind.MaxOrMin,
-        ["COALESCE"] = FormKind.CoalesceGreatestLeast,
-        ["GREATEST"] = FormKind.CoalesceGreatestLeast,
-        ["LEAST"] = FormKind.CoalesceGreatestLeast,
+        ["COALESCE"] = FormKind.Coalesce,
+        ["ISNULL"] = FormKind.IsNull,
+        ["GREATEST"] = FormKind.GreatestOrLeast,
+        ["LEAST"] = FormKind.GreatestOrLeast,
         ["CAST"] = FormKind.Cast,
         ["CONVERT"] = FormKind.Convert,
         ["JSON_OBJECT"] = FormKind.Json,
         ["JSON_ARRAY"] = FormKind.Json,
+        ["DATEADD"] = FormKind.DateAddOrDiff,
+        ["DATEDIFF"] = FormKind.DateAddOrDiff,
+        ["DATEDIFF_BIG"] = FormKind.DateAddOrDiff,
+        ["DATEPART"] = FormKind.DatePartOrName,
+        ["DATENAME"] = FormKind.DatePartOrName,
+        ["YEAR"] = FormKind.DateValue,
+        ["MONTH"] = FormKind.DateValue,
+        ["DAY"] = FormKind.DateValue,
+        ["EOMONTH"] = FormKind.EndOfMonth,
+        ["LAG"] = FormKind.LagOrLead,
+        ["LEAD"] = FormKind.LagOrLead,
     };
 
     // The forms, grouped where Form and FormType read the names of a group alike.
@@ -38,10 +50,17 @@ internal sealed partial class ExpressionProofs
         Ntile,
         Sum,
         MaxOrMin,
-        CoalesceGreatestLeast,
+        Coalesce,
+        IsNull,
+        GreatestOrLeast,
         Cast,
         Convert,
         Json,
+        DateAddOrDiff,
+        DatePartOrName,
+        DateValue,
+        EndOfMonth,
+        LagOrLead,
     }
 
     // "name ( ... ) [WITHIN GROUP ( ... )] [OVER ( ... ) | OVER name]", the name bare.
@@ -125,7 +144,10 @@ internal sealed partial class ExpressionProofs
                 ? Proof.Yes
                 : Proof.No,
             FormKind.Sum or FormKind.MaxOrMin => Aggregate(arguments, window, rows),
-            FormKind.CoalesceGreatestLeast => window is null
+            FormKind.Coalesce => window is null ? Coalesce(arguments, rows) : Proof.No,
+            FormKind.IsNull => window is null ? IsNull(arguments, rows) : Proof.No,
+            // Each reads an argument once, so one proved argument is enough, whatever the others do.
+            FormKind.GreatestOrLeast => window is null
                 ? AllOf([
                     AnyOf(Arguments(arguments).Select(argument => Expression(argument, rows))),
                     .. Arguments(arguments).Select(TypeOf),
@@ -134,8 +156,37 @@ internal sealed partial class ExpressionProofs
             FormKind.Cast => window is null ? Cast(arguments, rows) : Proof.No,
             FormKind.Convert => window is null ? Convert(arguments, rows) : Proof.No,
             FormKind.Json => window is null ? Proof.Yes : Proof.No,
+            FormKind.DateAddOrDiff => window is null ? DateOfPart(arguments, 3, rows) : Proof.No,
+            FormKind.DatePartOrName => window is null ? DateOfPart(arguments, 2, rows) : Proof.No,
+            FormKind.DateValue => window is null && Arguments(arguments).Count == 1
+                ? Expression(arguments, rows)
+                : Proof.No,
+            FormKind.EndOfMonth => window is null && Arguments(arguments).Count is 1 or 2
+                ? AllOf(Arguments(arguments).Select(argument => Expression(argument, rows)))
+                : Proof.No,
+            FormKind.LagOrLead => window is null ? Proof.No : LagOrLead(arguments, rows),
             _ => throw UnexpectedEnumValueException.Of(kind),
         };
+
+    // A date function whose first argument is a date part, one word, and every other argument proved.  Each is NULL
+    // only when one of those is: an overflow is an error under ANSI_WARNINGS on, and the server refuses a CLR type.
+    private Proof DateOfPart(TokenRange arguments, int count, bool rows)
+    {
+        var parts = Arguments(arguments);
+        return parts.Count == count && parts[0].Count == 1 && tokens[parts[0].Start].Kind == TsqlTokenKind.Word
+            ? AllOf(parts.Skip(1).Select(part => Expression(part, rows)))
+            : Proof.No;
+    }
+
+    // LAG or LEAD of a value and a default that are not null, the offset an integer literal.  The row it reads is a row
+    // of the same result, so the value keeps the select's context.  The default is converted to the value's type, and
+    // a string converted to a CLR type may be its Null.
+    private Proof LagOrLead(TokenRange arguments, bool rows) =>
+        Arguments(arguments) is [var value, var offset, var fallback]
+        && offset.Count == 1
+        && tokens[offset.Start].IsInteger
+            ? AllOf([Expression(value, rows), Expression(fallback, rows), TypeOf(value), TypeOf(fallback)])
+            : Proof.No;
 
     // SUM, MAX or MIN of a value that is not null.  Without OVER, over a group, which always has a row: the operand
     // is in the rows' context.  With OVER, over a frame that holds the current row: the operand keeps the context.

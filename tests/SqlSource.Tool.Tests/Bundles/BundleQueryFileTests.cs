@@ -43,6 +43,7 @@ public sealed class BundleQueryFileTests
         [SqlMarkerKind.MemberLocation] = "-- member-location: nested-class",
         [SqlMarkerKind.Visibility] = "-- visibility: public",
         [SqlMarkerKind.NestedClass] = "-- nested-class: Users",
+        [SqlMarkerKind.Variable] = "-- variable: @n",
     };
 
     // By name, since the enum is internal.
@@ -64,7 +65,7 @@ public sealed class BundleQueryFileTests
         var rules = SqlDialectRules.For(file.Dialect);
         var lexed = new SqlLexer(written, rules).ReadToEnd();
         var held = lexed.Lexemes.Any(lexeme =>
-            SqlMarkerReader.Read(written, lexeme) is { } found && found.Kind == kind
+            SqlMarkerReader.Read(written, lexeme, rules) is { } found && found.Kind == kind
         );
 
         var engine = new FakeEngineRenaming(SqlDialect.PostgreSql);
@@ -92,6 +93,39 @@ public sealed class BundleQueryFileTests
             refusals.ShouldBeEmpty();
             TokenCheck.Check(engine, mapping, [], renamedText, expected: null).ShouldBeNull();
         }
+    }
+
+    // A -- variable: marker of several names, or of one name twice, is renamed name by name as the SQL's names are, so
+    // the renamed file reads back with the same variables: no warning that a marked name is not written.
+    [Theory]
+    [InlineData("-- variable: @n, @m")]
+    [InlineData("-- variable: @n, @n")]
+    [InlineData("-- variable:@n,@M")]
+    public void RenameQueryFile_VariableMarkerOfAList_RenamesEachNameAsTheSqlIs(string line)
+    {
+        var engine = new FakeEngineRenaming(SqlDialect.PostgreSql);
+        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold, engine.Spelled);
+        var refusals = new List<RenamingRefusal>();
+        var renamer = new SqlRenamer(
+            engine,
+            mapping,
+            new HashSet<string>(["id"], SqlParameterName.Comparer),
+            RenamingCopies.None
+        );
+
+        var text = "-- name: Get\n" + line + "\nSELECT @n, @m, @id\n";
+
+        var renamed = renamer.RenameQueryFile(text, refusals.Add).Text;
+
+        refusals.ShouldBeEmpty();
+        TokenCheck.Check(engine, mapping, [], renamed, expected: null).ShouldBeNull();
+        var parsed = SqlFileParser.Parse(renamed, "Q.sql", SqlDialect.PostgreSql);
+        parsed.Errors.ShouldBeEmpty();
+        parsed.Warnings.ShouldBeEmpty();
+        var original = SqlFileParser.Parse(text, "Q.sql", SqlDialect.PostgreSql).Blocks.ShouldHaveSingleItem();
+        var block = parsed.Blocks.ShouldHaveSingleItem();
+        block.Parameters.Count.ShouldBe(original.Parameters.Count);
+        block.DeclaredVariables.Count.ShouldBe(original.DeclaredVariables.Count);
     }
 
     // A file of one query with the kind's line where the generator takes it: a marker of the file header before the
@@ -134,6 +168,7 @@ public sealed class BundleQueryFileTests
         SqlMarkerKind.Param,
         SqlMarkerKind.Token,
         SqlMarkerKind.TokenIgnore,
+        SqlMarkerKind.Variable,
     ];
 
     [Theory]

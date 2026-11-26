@@ -55,17 +55,20 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     private readonly MemoryStream _line = new();
     private readonly Stream _stream;
     private readonly TimeProvider _time;
+    private readonly UsageValue? _given;
     private bool _closed;
 
     /// <summary>Writes to a stream that is open.</summary>
     /// <param name="path">The full path of the file, for the error of a write that fails.</param>
     /// <param name="stream">Where the lines go.  The log closes it.</param>
     /// <param name="time">The clock of the run.</param>
-    internal RunLogFile(string path, Stream stream, TimeProvider time)
+    /// <param name="given">The token of <c>--log</c>, or null for a path that is no token.</param>
+    internal RunLogFile(string path, Stream stream, TimeProvider time, UsageValue? given = null)
     {
         Path = path;
         _stream = stream;
         _time = time;
+        _given = given;
     }
 
     public string Path { get; }
@@ -77,19 +80,20 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     /// Makes the file, or empties the one that is there.  When it cannot be, the <c>SQLSRC218</c> that says why:
     /// the system's reason, or that the name is a file of the run (a <c>.sql</c> file, a sidecar, a project or a
     /// solution, whatever the case), which is refused before anything is opened, made or emptied.  The error is
-    /// at the full path, or at <paramref name="given" /> when that is no path at all.  A path of <c>--log</c> that
-    /// holds <c>=</c> or <c>;</c> was refused before the run unless the run is under <c>--online</c>, whose log's path
-    /// the build wrote and is no secret, so the path is always printed.
+    /// at the full path, or at <paramref name="given" /> when that is no path at all.  A token of <c>--log</c> that
+    /// may not be printed is named by its position instead.
     /// </summary>
     /// <param name="given">The path as the option or the variable gave it.</param>
     /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
     /// <param name="createFile">Makes or empties the file at the full path and gives its stream.</param>
     /// <param name="time">The clock of the run.</param>
+    /// <param name="token">The token of <c>--log</c>, or null for a path of the variable.</param>
     public static Outcome<RunLogFile, ToolDiagnostic> Open(
         string given,
         string workingDirectory,
         Func<string, Stream> createFile,
-        TimeProvider time
+        TimeProvider time,
+        UsageValue? token = null
     )
     {
         var path = given;
@@ -103,18 +107,19 @@ internal sealed class RunLogFile : IRunLog, IDisposable
                     ToolDiagnostic.NotChanged(
                         path,
                         "written",
-                        "a log is not written over a .sql file, a sidecar, a project or a solution"
+                        "a log is not written over a .sql file, a sidecar, a project or a solution",
+                        token
                     )
                 );
             }
 
-            return new Outcome<RunLogFile, ToolDiagnostic>(new RunLogFile(path, createFile(path), time));
+            return new Outcome<RunLogFile, ToolDiagnostic>(new RunLogFile(path, createFile(path), time, token));
         }
         catch (Exception exception) when (FileErrors.IsPathError(exception))
         {
             // An empty path, a directory, a folder that is not there, or a file the system will not open.
             return Outcome<RunLogFile, ToolDiagnostic>.Failed(
-                ToolDiagnostic.NotChanged(path, "written", exception.Message)
+                ToolDiagnostic.NotChanged(path, "written", exception.Message, token)
             );
         }
     }
@@ -131,7 +136,7 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     /// names the file.
     /// </summary>
     /// <param name="reason">The system's reason.</param>
-    public ToolDiagnostic NotWritten(string reason) => ToolDiagnostic.NotChanged(Path, "written", reason);
+    public ToolDiagnostic NotWritten(string reason) => ToolDiagnostic.NotChanged(Path, "written", reason, _given);
 
     public bool Writes => true;
 

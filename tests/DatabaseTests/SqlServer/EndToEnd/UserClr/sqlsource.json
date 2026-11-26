@@ -1,0 +1,8 @@
+{
+  // The queries of this folder are of the database "user_clr", whose CLR type dbo.Grade is of a user's own assembly.
+  "database": "user_clr",
+  "typeOverrides": {
+    // The type's .NET build, of the same name as the assembly on the server, which SqlClient reads and sends it as.
+    "dbo.Grade": "SqlSource.DatabaseTests.SqlServer.ClrType.Grade",
+  },
+}

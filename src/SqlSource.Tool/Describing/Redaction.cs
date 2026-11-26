@@ -16,20 +16,33 @@ namespace SqlSource.Tool.Describing;
 /// A describer's rule is to put the value in nothing it returns.  The run does not rely on it: a driver's message
 /// for a connection string that is wrong can quote the string, and one for a password that is wrong can quote the
 /// password.  The whole value is replaced wherever it stands, and each part the describer said is secret where it
-/// stands as a token (<see cref="HoldsToken" />).  A whole form is the value, the value without the white space at its
-/// ends, and each rewrite of it that the describer gave (<see cref="ConnectionSecret.Wholes" />): a driver that
-/// trims the value or writes it again quotes the other text in a message.
+/// stands as a token (<see cref="HoldsToken" />), or, for a part too short or too common to be a token
+/// (<see cref="ConnectionSecret.KeyedParts" />), where it stands as the value of a password key
+/// (<see cref="HoldsKeyed" />).  A whole form is the value, the value without the white space at its ends, and each
+/// rewrite of it that the describer gave (<see cref="ConnectionSecret.Wholes" />): a driver that trims the value or
+/// writes it again quotes the other text in a message.
 /// </remarks>
 internal static class Redaction
 {
     /// <summary>What stands where the value was.</summary>
     public const string Mark = "***";
 
+    // The keys whose value is a password, as the drivers write them in a connection string, ignoring case.  "password"
+    // ends any key, as "SSL Password" and PGPASSWORD do; a short one is a key of its own, which no letter or digit
+    // comes before.
+    private static readonly (string Key, bool Alone)[] PasswordKeys =
+    [
+        ("password", false),
+        ("pwd", true),
+        ("psw", true),
+    ];
+
     /// <summary>
-    /// The text with each whole form of the value wherever it stands, and then each part where it stands as a token,
-    /// written as <see cref="Mark" />.
+    /// The text with each whole form of the value wherever it stands, then each part where it stands as a token, and
+    /// then each keyed part where it stands as the value of a password key, written as <see cref="Mark" />.
     /// </summary>
-    public static string Of(string text, ConnectionSecret secret) => Of(text, secret.Wholes, secret.Parts);
+    public static string Of(string text, ConnectionSecret secret) =>
+        Of(text, secret.Wholes, secret.Parts, secret.KeyedParts);
 
     /// <summary>
     /// The failure with the secret taken out of its descriptor and of what the server said.  Its arguments and its
@@ -97,6 +110,14 @@ internal static class Redaction
     /// </summary>
     public static bool HoldsToken(string text, string part) => NextToken(text, part, 0) >= 0;
 
+    /// <summary>
+    /// Whether the text holds the part as the value of a password key: as a token (<see cref="HoldsToken" />) after a
+    /// key, a quote, white space, <c>=</c> or <c>:</c>, white space and a quote, each but the sign optional.  The key
+    /// ends in <c>password</c>, or is <c>pwd</c> or <c>psw</c> after no letter or digit, ignoring case:
+    /// <c>Password=pg;</c>, <c>PWD = 'pg'</c>, <c>"password":"pg"</c>.
+    /// </summary>
+    public static bool HoldsKeyed(string text, string part) => NextKeyed(text, part, 0) >= 0;
+
     // The same descriptor when no text of it holds the secret, as it is or on one line, which is every descriptor but
     // a broken describer's.  One that does has each text cleaned as AsPrinted cleans it.
     private static DiagnosticDescriptor OfDescriptor(DiagnosticDescriptor descriptor, ConnectionSecret secret)
@@ -149,7 +170,12 @@ internal static class Redaction
     private static bool IsInAsPrinted(string text, ConnectionSecret secret) =>
         secret.IsIn(text) || secret.IsIn(OneLine.Of(text));
 
-    private static string Of(string text, IEnumerable<string> wholes, IEnumerable<string> parts)
+    private static string Of(
+        string text,
+        IEnumerable<string> wholes,
+        IEnumerable<string> parts,
+        IEnumerable<string> keyed
+    )
     {
         var cleaned = text;
         foreach (var whole in wholes)
@@ -159,7 +185,12 @@ internal static class Redaction
 
         foreach (var part in parts)
         {
-            cleaned = OfToken(cleaned, part);
+            cleaned = OfFound(cleaned, part, NextToken);
+        }
+
+        foreach (var part in keyed)
+        {
+            cleaned = OfFound(cleaned, part, NextKeyed);
         }
 
         return cleaned;
@@ -176,16 +207,18 @@ internal static class Redaction
             secret
                 .Wholes.Select(static whole => whole.ReplaceLineEndings(Break))
                 .OrderByDescending(static whole => whole.Length),
-            secret.Parts.Select(static part => part.ReplaceLineEndings(Break))
+            secret.Parts.Select(static part => part.ReplaceLineEndings(Break)),
+            secret.KeyedParts.Select(static part => part.ReplaceLineEndings(Break))
         );
         return string.Equals(cleaned, joined, StringComparison.Ordinal)
             ? lines
             : new EquatableArray<string>([.. cleaned.Split(Break)]);
     }
 
-    private static string OfToken(string text, string part)
+    // The text with each place the search finds the part written as the mark.
+    private static string OfFound(string text, string part, Func<string, string, int, int> next)
     {
-        var found = NextToken(text, part, 0);
+        var found = next(text, part, 0);
         if (found < 0)
         {
             return text;
@@ -197,10 +230,67 @@ internal static class Redaction
         {
             _ = cleaned.Append(text, from, found - from).Append(Mark);
             from = found + part.Length;
-            found = NextToken(text, part, from);
+            found = next(text, part, from);
         }
 
         return cleaned.Append(text, from, text.Length - from).ToString();
+    }
+
+    // Where the part next stands as the value of a password key, at or after the start, or -1.  JoinedRedaction uses
+    // it too.
+    internal static int NextKeyed(string text, string part, int start)
+    {
+        for (var found = NextToken(text, part, start); found >= 0; found = NextToken(text, part, found + 1))
+        {
+            if (FollowsPasswordKey(text, found))
+            {
+                return found;
+            }
+        }
+
+        return -1;
+    }
+
+    // Whether a password key and its sign stand before the index, with the white space and the quotes HoldsKeyed
+    // allows.
+    private static bool FollowsPasswordKey(string text, int value)
+    {
+        var at = WhiteSpaceBefore(text, QuoteBefore(text, value));
+        if (at == 0 || text[at - 1] is not ('=' or ':'))
+        {
+            return false;
+        }
+
+        at = QuoteBefore(text, WhiteSpaceBefore(text, at - 1));
+        foreach (var (key, alone) in PasswordKeys)
+        {
+            var keyStart = at - key.Length;
+            if (
+                keyStart >= 0
+                && string.Compare(text, keyStart, key, 0, key.Length, StringComparison.OrdinalIgnoreCase) == 0
+                && (!alone || keyStart == 0 || !char.IsLetterOrDigit(text[keyStart - 1]))
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Where a quote that ends at the index starts, or the index when none does.
+    private static int QuoteBefore(string text, int end) => end > 0 && text[end - 1] is '\'' or '"' ? end - 1 : end;
+
+    // Where the white space that ends at the index starts.
+    private static int WhiteSpaceBefore(string text, int end)
+    {
+        var at = end;
+        while (at > 0 && char.IsWhiteSpace(text[at - 1]))
+        {
+            at--;
+        }
+
+        return at;
     }
 
     // Where the part next stands as a token, at or after the start, or -1.  The one place of the rule of a token, which
@@ -232,5 +322,6 @@ internal static class Redaction
         return -1;
     }
 
-    private static bool IsWordCharacter(char character) => char.IsLetterOrDigit(character) || character == '_';
+    // A character that a token may not have beside it.  JoinedRedaction judges the ends of a part cut in two by it.
+    internal static bool IsWordCharacter(char character) => char.IsLetterOrDigit(character) || character == '_';
 }

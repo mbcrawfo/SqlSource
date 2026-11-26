@@ -143,6 +143,26 @@ internal sealed class SqlDeclaredVariables
         return names is null ? null : new SqlDeclaredVariables(text, names);
     }
 
+    /// <summary>
+    /// The variables of <paramref name="declared" /> and the names <paramref name="marked" />, each a span of
+    /// <paramref name="text" /> without its prefix: what a query's <c>-- variable:</c> markers name.  The marked names
+    /// come after the declared ones, and null is returned when there are neither.
+    /// </summary>
+    public static SqlDeclaredVariables? With(
+        SqlDeclaredVariables? declared,
+        string text,
+        IReadOnlyList<TextSpan> marked
+    )
+    {
+        if (marked.Count == 0)
+        {
+            return declared;
+        }
+
+        List<TextSpan> names = declared is null ? [.. marked] : [.. declared._names, .. marked];
+        return new SqlDeclaredVariables(text, names);
+    }
+
     /// <summary>Each declared name as written, without its prefix, in order.  A name may be here twice.</summary>
     public EquatableArray<string> ToNames()
     {

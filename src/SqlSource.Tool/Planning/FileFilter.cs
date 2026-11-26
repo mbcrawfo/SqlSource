@@ -9,6 +9,6 @@ namespace SqlSource.Tool.Planning;
 /// </param>
 /// <param name="Named">
 /// How an error names the file: the full path in quotes, or the position of the token that gave it when that token
-/// holds <c>=</c> or <c>;</c>.
+/// may not be printed.
 /// </param>
 internal sealed record FileFilter(string? NormalizedPath, string Named);

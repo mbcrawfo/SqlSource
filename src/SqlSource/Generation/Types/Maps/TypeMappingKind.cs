@@ -35,8 +35,19 @@ internal enum TypeMappingKind
     /// </summary>
     NotWrittenByTheTool,
 
-    /// <summary>A range of a subtype the map does not list, or a multirange of such a range.</summary>
+    /// <summary>
+    /// A composite, range or multirange of <c>pg_catalog</c> whose name is <c>_</c> and at least one more character,
+    /// which a superuser can move there.  The key <c>pg_catalog._x</c> means the array <c>x[]</c>, so no type override
+    /// names it.  A <c>-- column:</c> marker gives a column a C# type, and a parameter is declared as <c>text</c> with
+    /// a <c>-- param:</c> marker and cast in the query.
+    /// </summary>
+    NamedAsAnArray,
+
+    /// <summary>A range of a subtype the map does not list.</summary>
     UserDefinedRange,
+
+    /// <summary>A multirange of a range of a subtype the map does not list, read as an array of the range.</summary>
+    UserDefinedMultirange,
 
     /// <summary>
     /// With no driver referenced, the type's C# type is the driver's: of the <c>NpgsqlTypes</c> namespace for Npgsql,

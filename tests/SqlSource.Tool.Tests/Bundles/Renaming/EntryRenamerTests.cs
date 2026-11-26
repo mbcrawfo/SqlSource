@@ -28,7 +28,7 @@ public sealed class EntryRenamerTests
         var run = Run(engine, raw.Query);
         var query = run.RenameQueryFile(raw.Query);
 
-        var renamed = EntryRenamer.Rename(engine, run, raw.Expected.ShouldNotBeNull(), query, token);
+        var renamed = EntryRenamer.Rename(engine, run, raw.Expected.ShouldNotBeNull(), query, [], token);
 
         run.Refusal.ShouldBeNull();
         var entry = SidecarReader.Read(renamed.ShouldNotBeNull()).Sidecar.ShouldNotBeNull().Queries[0];
@@ -50,7 +50,7 @@ public sealed class EntryRenamerTests
             .Expected.ShouldNotBeNull()
             .Replace("\"resultKind\"", "\"note\": \"secret\",\n\"resultKind\"", System.StringComparison.Ordinal);
 
-        _ = EntryRenamer.Rename(engine, run, expected, run.RenameQueryFile(raw.Query), token);
+        _ = EntryRenamer.Rename(engine, run, expected, run.RenameQueryFile(raw.Query), [], token);
 
         run.Refusal.ShouldBe(new RenamingRefusal(RefusalStep.Token, "expected.json note", "secret"));
     }

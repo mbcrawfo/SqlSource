@@ -38,6 +38,7 @@
   - Pass every value from the event to the script through `env:`.  The head branch name is chosen by the fork; an expression inside `run:` would execute it.
   - Find the pull request from the event, never from the artifact.
   - It is bound to three names: `name: CI` in `workflows/ci.yml`, the `coverage` artifact that `workflows/build.yml` uploads, and `SummaryGithub.md` inside it.  Change one and change the workflow in the same commit.
+- **A job that starts SQL Server containers has the step `Upload SQL Server crashes` after its tests**, which uploads the folder of the workflow's `SQLSOURCE_TESTS_SQLSERVER_CRASHES` as `sqlserver-crash-<leg or job>`, a name no other job of the run uses, so that a crash at a container's start keeps its dump (TD-0072).
 - **An expression cannot yield an empty string from the middle of `&&`/`||`.**  `cond && '' || x` always yields `x`.  Put the empty string last, as `publish.yml` does.
 - **Local actions live in `.github/actions/<name>/action.yml`**, and a job checks out the repository before it uses one.  `postgis-image` is the one way a job gets the PostGIS image; it never builds after a load from the cache, since BuildKit's cache does not hold a loaded image, so the jobs of `workflows/nightly.yml` pass `use-cache: false` to build it every night.
 - Fold workflow lines over the 120-character `.editorconfig` limit with `>-` or `\`.

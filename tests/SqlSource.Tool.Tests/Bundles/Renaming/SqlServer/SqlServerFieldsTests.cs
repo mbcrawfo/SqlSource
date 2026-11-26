@@ -28,6 +28,7 @@ public sealed class SqlServerFieldsTests
         [SqlServerCallNames.Columns] = (typeof(SqlServerColumnsRequest), typeof(SqlServerColumnsAnswer)),
         [SqlServerCallNames.Operands] = (typeof(SqlServerColumnsRequest), typeof(SqlServerColumnsAnswer)),
         [SqlServerCallNames.Table] = (typeof(SqlServerTableRequest), typeof(SqlServerColumnsAnswer)),
+        [SqlServerCallNames.Origins] = (typeof(SqlServerColumnsRequest), typeof(SqlServerColumnsAnswer)),
     };
 
     private static readonly string[] Methods =
@@ -39,13 +40,14 @@ public sealed class SqlServerFieldsTests
         "columns",
         "operands",
         "table",
+        "origins",
     ];
 
-    private static readonly string[] SqlMethods = ["parameters", "probe", "declared", "columns", "operands"];
+    private static readonly string[] SqlMethods = ["parameters", "probe", "declared", "columns", "operands", "origins"];
 
-    private static readonly string[] DescribeMethods = ["declared", "columns", "operands", "table"];
+    private static readonly string[] DescribeMethods = ["declared", "columns", "operands", "table", "origins"];
 
-    private static readonly string[] ColumnMethods = ["columns", "operands", "table"];
+    private static readonly string[] ColumnMethods = ["columns", "operands", "table", "origins"];
 
     // The rule of each member, by "<method> <path>".
     private static readonly Dictionary<string, FieldRule> Table = Build();
@@ -194,11 +196,12 @@ public sealed class SqlServerFieldsTests
             rules[$"{method} answer.rows[].sourceTable"] = FieldRule.Name(NameClass.Table);
             rules[$"{method} answer.rows[].sourceColumn"] = FieldRule.Name(NameClass.Column);
             rules[$"{method} answer.rows[].sourceType"] = FieldRule.Closed;
+            rules[$"{method} answer.rows[].computedDefinition"] = new FieldRule(FieldRuleKind.Sql, NameClass.Column);
         }
 
         foreach (var record in (string[])["parameters[].type.", "columns[].type."])
         {
-            rules[$"{BundleFiles.Expected} {record}name"] = FieldRule.TypeSpelling;
+            rules[$"{BundleFiles.Expected} {record}name"] = FieldRule.Own;
             rules[$"{BundleFiles.Expected} {record}bindName"] = FieldRule.TypeSpelling;
             rules[$"{BundleFiles.Expected} {record}userType.schema"] = FieldRule.Name(NameClass.Schema);
             rules[$"{BundleFiles.Expected} {record}userType.name"] = FieldRule.Name(NameClass.Type);

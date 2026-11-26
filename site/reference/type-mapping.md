@@ -222,12 +222,3 @@ Through these conditions, a query gets one such error at most.  SQLSRC251 is als
 
 **What to do.**  Write `dbo.Email`, which matches the name of the type in any case.  Or write `"dbo"."Email"`, which matches its case exactly.  The message shows both.  See [type overrides](#setting-type-overrides).
 
-<a id="limit-nullable-type-argument"></a>
-
-### A compiler warning in a model for a `?` inside a type argument
-
-**What you see.**  The compiler's warning CS8631 in a generated model, for a C# type that is generic.  The type comes from a type override, a column type or a `-- param:` marker, and has a `?` inside a type argument.
-
-**Why.**  SqlSource reports [SQLSRC252](../diagnostics.md#sqlsrc252) at the query for a type argument written with a `?` where a constraint forbids null.  It does not report a `?` inside a type argument.  For example, `Names<T>` requires `where T : System.Collections.Generic.IEnumerable<string>`.  SqlSource accepts the override `MyApp.Names<System.Collections.Generic.List<string?>>`, and the generated model gets the warning.
-
-**What to do.**  Give the type arguments the nullability that their constraints ask for.  See [type overrides](#setting-type-overrides).

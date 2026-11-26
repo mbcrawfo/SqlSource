@@ -25,7 +25,13 @@ public sealed class SidecarHarnessTests
 
         var parsed = SqlFileParser.Parse(QuerySql, "Users.sql", SqlDialect.PostgreSql);
         var block = parsed.Blocks.Single();
-        var expected = SqlQueryHash.Compute(SqlDialect.PostgreSql, block.Segments, block.Tokens, block.Parameters);
+        var expected = SqlQueryHash.Compute(
+            SqlDialect.PostgreSql,
+            block.Segments,
+            block.Tokens,
+            block.Parameters,
+            block.MarkedVariables
+        );
 
         Sidecars.HashOf(file, "Q", SqlDialect.PostgreSql).ShouldBe(expected);
         Sidecars.HashOf(file, "Q", SqlDialect.PostgreSql).ShouldNotBe(Sidecars.HashOf(file, "Q", SqlDialect.Ansi));
@@ -61,7 +67,13 @@ public sealed class SidecarHarnessTests
 
         var parsed = SqlFileParser.Parse(text, "Users.sql", SqlDialect.SqlServer);
         var block = parsed.Blocks.Single();
-        var expected = SqlQueryHash.Compute(SqlDialect.SqlServer, block.Segments, block.Tokens, block.Parameters);
+        var expected = SqlQueryHash.Compute(
+            SqlDialect.SqlServer,
+            block.Segments,
+            block.Tokens,
+            block.Parameters,
+            block.MarkedVariables
+        );
         var entry = SidecarReader.Read(sidecar.Text!).Sidecar!.Queries.Single();
         entry.Hash.ShouldBe(expected);
         entry.Engine.ShouldBe("mssql");

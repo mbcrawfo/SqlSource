@@ -439,10 +439,11 @@ The values that each key takes follow.
 - `postgresql` also means `postgres`.
 - `cockroach` also means `cockroachdb`.
 
-After `mysql` or `mariadb`, the value can name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  Each of these makes the whole value wrong:
+After `mysql` or `mariadb`, the value can name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`, and the server's version, `version=` and three numbers of one or two digits, as in `"mysql,version=8.0.36"`.  Each of these makes the whole value wrong:
 
 - an option that does not exist;
 - an option after any other dialect;
+- a version that is not three such numbers, such as `version=8.0`, or a second `version=`;
 - a comma with nothing before it or after it.
 
 These keys take one value from a list.  The value matches in any case, and with or without hyphens and spaces:
@@ -1435,7 +1436,7 @@ The value of a marker is not valid.  The cause is one of these:
 - What follows a name in a `-- name:` marker is not a shape.
 - A `-- dialect:` marker does not name a dialect.
 - A marker that holds a setting has a value that the setting does not take.  Examples are `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` and `-- library-types:`.
-- A `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
+- A `-- token:`, `-- token-ignore:`, `-- param:`, `-- variable:` or `-- column:` marker does not hold what it needs.
 
 The values that each marker takes follow.
 
@@ -1495,6 +1496,8 @@ A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else.  A quote or a block comment inside the default must close there.
 
 A `-- param:` marker starts with the query parameter as the SQL writes it, `@name`.  The parameter stands alone, or a space or `->` follows it.  What follows its `->` is a C# type, written as the type of a type override is.  It is never `default`, since nothing below a query maps a parameter: `-- param: @author -> default` is this error.
+
+A `-- variable:` marker holds one variable or more as the SQL writes them, `@name`, separated by commas: `-- variable: @a, @b`.  Anything else is this error: `-- variable: a`, `-- variable: @a @b` and `-- variable: @a,` are.
 
 Inside a query, a `-- column:` marker holds the name of a column, then one of these, or both in this order:
 
@@ -1688,6 +1691,7 @@ A file with no `-- name:` line is one query, and takes every marker.
 | `-- dialect:` | yes | no |
 | `-- generator:` | yes | yes |
 | `-- param:` | no | yes |
+| `-- variable:` | no | yes |
 | `-- token:` | no | yes |
 | `-- token-ignore:` | no | yes |
 | `-- database:` | yes | yes |
@@ -2181,6 +2185,67 @@ FROM tested;
 
 See: [List parameters](reference/list-parameters.md#list-parameters)
 
+## SQLSRC128
+
+**Variable is declared as a parameter**
+
+Reported by: the build and the tool.
+
+A name that a `-- variable:` marker gives is declared by a `-- param:` marker of the same query.  The error is at the name in the `-- variable:` marker.
+
+The `-- variable:` marker says that the name is no query parameter, and the `-- param:` marker says that it is one.
+
+```sql error
+-- name: GetOrders
+-- variable: @last
+-- param: @last int
+SET @last = (SELECT MAX(id) FROM orders);
+SELECT * FROM orders WHERE id = @last;
+```
+
+**Fix:** do one of these.
+
+- Remove the name from the `-- variable:` marker, if it is a query parameter.
+- Remove the `-- param:` marker, if it is a variable.
+
+See: [Variables the SQL sets](reference/parameters.md#variable-marker)
+
+## SQLSRC129
+
+**Variable is not written in its query**
+
+Reported by: the build.
+
+A name that a `-- variable:` marker gives is not written anywhere in its query: not in its SQL, a token's default included, and not in the default of a `-- token:` marker of one of its tokens.  A comment, a string or a hint, such as `/*!80000 SET @last = 1 */`, that holds the name does not count.  The warning is at the name in the marker.
+
+```sql error
+-- name: GetOrders
+-- variable: @lastId
+SET @last = (SELECT MAX(id) FROM orders);
+SELECT * FROM orders WHERE id = @last;
+```
+
+```console
+/work/App/Queries/Orders.sql(2,14): warning SQLSRC129: '@lastId' is named by a '-- variable:' marker, and the query does not write it.  Correct its spelling, or remove it from the marker.
+```
+
+The name usually has a typing error, as `@lastId` has above.  The name the query writes, `@last`, is then read as a query parameter.
+
+**Fix:** do one of these.
+
+- Correct the spelling of the name in the marker.
+- Remove the name from the marker.
+
+A project can list it in `NoWarn` to turn it off:
+
+```xml
+<PropertyGroup>
+    <NoWarn>$(NoWarn);SQLSRC129</NoWarn>
+</PropertyGroup>
+```
+
+See: [Variables the SQL sets](reference/parameters.md#variable-marker)
+
 ## SQLSRC200
 
 **The tool failed unexpectedly**
@@ -2196,11 +2261,14 @@ sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.IO.FileNotFou
 
 Here the current folder was deleted while a terminal was still in it.
 
+`sqlsource diagnose` can report it with the message `The capture holds the connection's value or a password of it.`  Then the bundle would hold your connection string or one of its passwords, so `diagnose` writes no bundle.  A password shorter than four characters, or the name of its logical database or dialect, counts only as a password's value.  An example is `password = 'pg'` in your query, with the password `pg`.  See [what the tool hides](reference/connections.md#connections).
+
 **Fix:**
 
-1. If the message names such a condition of your machine, mend that.
-2. If it does not, the error is a bug in the tool.  Set the environment variable `SQLSOURCE_DEBUG` to any value, and run the command again.
-3. [Report the bug](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
+1. If `diagnose` gives that message because your query holds your password, use another password for `diagnose`.
+2. If the message names such a condition of your machine, mend that.
+3. If it does neither, the error is a bug in the tool.  Set the environment variable `SQLSOURCE_DEBUG` to any value, and run the command again.
+4. [Report the bug](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
 
 See: [Environment variables](reference/cli.md#environment-variables)
 
@@ -2221,7 +2289,7 @@ Reported by: the tool.
 $ dotnet sqlsource describe src/App/App.csproj
 ```
 
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2241,7 +2309,7 @@ Reported by: the tool.
 $ dotnet sqlsource describe App.slnx
 ```
 
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2258,7 +2326,7 @@ The path given to `sqlsource describe` does not exist, or it is a file that is n
 1. Give the path of a solution, of a C# project, or of a folder that holds exactly one of them.
 
 - **A solution filter, `.slnf`, and a project of another language are not read.**
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2284,7 +2352,7 @@ $ dotnet sqlsource describe src/Tools/Tools.csproj
 The tool reads projects by these rules:
 
 - **A project of a solution that was not named is not an error.**  The tool leaves it out, and says nothing.
-- **A project with several target frameworks is read by the first of them.**  So a project that references SqlSource for a later framework alone is this error.
+- **A project with several target frameworks uses SqlSource when any of them does.**  So a project that references SqlSource for one framework alone is not this error.
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2294,7 +2362,7 @@ See: [Arguments](reference/cli.md#arguments)
 
 Reported by: the tool.
 
-`sqlsource` asks MSBuild about each project with `dotnet msbuild`: first what the project is, then which files the compiler is given.  One of those runs failed.  The lines under the error give the reason, and then the first twenty lines that MSBuild wrote.
+`sqlsource` asks MSBuild about each project with `dotnet msbuild`: first what the project is, then which files the compiler is given.  It asks about each target framework of a project that has several.  One of those runs failed, and the tool describes nothing of the project.  The lines under the error give the reason, and then the first twenty lines that MSBuild wrote.
 
 ```console
 $ dotnet sqlsource describe
@@ -2335,6 +2403,8 @@ Here the SqlSource package of the project and the `sqlsource` tool are of differ
 1. Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool`.
 
 - **When the build runs the tool, the message names the manifest file that the build wrote, by its full path**, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, whatever the path holds.
+- **A `--manifest` path that you typed and that may be a secret is named by its position**, as `The project manifest at position 3 cannot be read`: see [how an error names a path](reference/cli.md#paths).  A reason of the system is then only `the system would not read it`, since its words repeat the path.
+- **The manifests can be of two projects**, as `it is of '/work/Tools/Tools.csproj', and the first manifest is of '/work/App/App.csproj'` says.  You can give `--manifest` once for each target framework of one project.  Give the manifests of one project alone.
 - **Any other reason, such as one that names a line, is a bug in SqlSource.**  The package wrote a file that the tool of its own version does not expect.  [Report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
 See: [Install the tool](reference/cli.md#install-the-tool)
@@ -2356,7 +2426,7 @@ sqlsource : error SQLSRC207: '/work/Tools.csproj' is not a project of '/work/App
 
 1. Give the path of a `.csproj` file that the solution lists.  `dotnet sln list` shows them.
 
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).
 
 See: [Options](reference/cli.md#options)
 
@@ -2519,7 +2589,7 @@ sqlsource : error SQLSRC212: '/work/App/Queries/User.sql' is not a .sql file tha
 
 - **The rest of the run goes on.**
 - **On Linux and macOS, a path written with backslashes whose `..` go above the root of the file system is reported here too**, with its `..` as typed.
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -2555,7 +2625,7 @@ The error is reported once for a database, at its first query that must be descr
 - Give the connection in one of the ways that the `help:` line names.
 - Leave the database out of the run with `--database`.
 
-**The `help:` line names the `.env` file that the run reads**, whether or not the file is there.  It is the one in the folder of the solution or project that the run is on, or the one that `--env-file` names.  The line ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`.  So you see that a `.env` file elsewhere, such as in a folder above the project's, is not read.  Under `--env-file none` the line says `The run reads no .env file` instead.  The run never reads a `.env` file in a folder above its own.
+**The `help:` line names the `.env` file that the run reads**, whether or not the file is there.  It is the one in the folder of the solution or project that the run is on, or the one that `--env-file` names.  The line ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`.  So you see that a `.env` file elsewhere, such as in a folder above the project's, is not read.  Under `--env-file none` the line says `The run reads no .env file` instead.  An `--env-file` path that may be a secret is named by its position, as `the path at position 3`: see [how an error names a path](reference/cli.md#paths).  The run never reads a `.env` file in a folder above its own.
 
 **A run on a solution reads the `.env` file beside the solution, and not one in the folder of a project.**  A project of the database can have a `.env` file in its folder, or in a folder between it and the folder of the solution.  Then the `help:` line names each such file, in the place of the sentence above, as `The run did not read /work/App/.env: it reads /work/.env alone, and --env-file, or SqlSourceEnvFile in a build, names another`.  Do one of these:
 
@@ -2706,11 +2776,13 @@ For a log:
 - **The log cannot be made or emptied as the run starts.**  Its folder is not there, it is a folder, or the system does not let the tool write it.  Nothing runs, and the exit code is 1.  Give a path that can be written, or run the command from another folder.
 - **The path ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a log is not written over a .sql file, a sidecar, a project or a solution`.  It touches nothing and runs nothing, so that a name left out before a `.sql` path does not empty that file.  Give the log a name of its own.
 - **The log stops being writable while the run goes on**, as when the disk is full.  The run finishes and writes its sidecars.  The error is reported once at the end, and the exit code is 1.  The log holds what was written before it stopped.
+- **A `--log` path that may be a secret is named by its position**, as `The path at position 3 could not be written: the system refused`: see [how an error names a path](reference/cli.md#paths).  The reason of the system is left out, since its words repeat the path.
 
 For a bundle of `diagnose`:
 
 - **The path of `--out` ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a bundle is not written over a .sql file, a sidecar, a project or a solution`, before it describes anything, and touches nothing.  Give the bundle a name of its own, such as `report.zip`.
 - **The bundle or its mapping cannot be written.**  Its folder is not there, it is a folder, or the system does not let the tool write it.  The query has been described by then.  Nothing is written past the file that failed: when the mapping fails, the bundle is written and its line printed, and the error is at the mapping.  The exit code is 1.  Run the command again with an `--out` in a folder that exists and can be written.
+- **An `--out` path that may be a secret is named by its position**, as for a log.  When the bundle is written, its lines say `bundle written to the path at position 5` and `mapping written beside the bundle, with '.mapping.json' after its name`, and a mapping that cannot be written is `The mapping beside the path at position 5`.
 
 See: [Logs](reference/cli.md#logs), [making a bundle with `diagnose`](reference/bundles.md#diagnose)
 
@@ -2729,7 +2801,7 @@ What the end of the message means:
 | `the sidecar does not exist` | A query of the file needs an entry, and the file has no sidecar |
 | `the sidecar cannot be read`, or `the sidecar has format 2, and this tool writes 1` | The sidecar is no sidecar of this version of the tool.  A merge conflict in it is the usual cause of the first |
 | `the sidecar has no entry` | The query was added, or renamed, since the sidecar was written |
-| `the query has changed since it was described` | The SQL, the type or the nullability of a `-- param:` marker, or the default of a token changed |
+| `the query has changed since it was described` | The SQL, the type or the nullability of a `-- param:` marker, the names of a `-- variable:` marker, or the default of a token changed |
 | `columns[2].nullable is true, and the database says false` | The database describes the query another way than the sidecar holds, such as a column that can now be null, or one now read from another table (`columns[0].origin.table`).  A change to the schema is the usual cause |
 | `database is "billing", and the project says "reports"` | The query belongs to another database, or another kind of database, than the one it was described against |
 | `the query is not in the file`, or `the query needs no entry` | The sidecar holds an entry for a query that was removed, or whose output is now `sql` |
@@ -2791,6 +2863,7 @@ $ dotnet sqlsource describe
 1. Run `dotnet restore` on the solution or the project.
 2. Run the command again.
 
+- **A project with several target frameworks gives this error when one framework was not restored**, as after you add a framework to `TargetFrameworks`.  The tool describes none of its frameworks until you restore.
 - **In a solution every C# project is checked, one that has no SQL too.**  A run on a fresh checkout must not succeed by finding nothing.
 - **A reference that keeps the MSBuild files of the package out of the project gives this error after a restore as well**, `ExcludeAssets="build"` for one.  Remove that from the reference.
 
@@ -2837,7 +2910,7 @@ sqlsource : error SQLSRC222: '/srv/locked' cannot be read: Access to the path '/
 
 1. Give yourself the right to read the folder.
 
-- **A path that holds `=` or `;` is named by its position on the command line instead**, as `The path at position 2`.  It may be a connection string typed in the wrong place.  The reason is then only `the system would not list its files`, since the words of the system repeat the path.
+- **A path that may be a secret is named by its position on the command line instead**, as `The path at position 2`: see [how an error names a path](reference/cli.md#paths).  The reason is then only `the system would not list its files`, since the words of the system repeat the path.
 
 See: [Arguments](reference/cli.md#arguments)
 
@@ -3294,6 +3367,8 @@ The query is `SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL`:
 
 **A parameter that is an array of a domain, and that the query returns as a column.**  This difference has no `@` in it.  An example is `-- param: @p email_t[]`.  Npgsql sends it as an array of the base type of the domain.  So the column is `character varying[]` for Npgsql, and `email_t[]` for SqlSource.  The help is then `Npgsql sends a parameter that is an array of a domain as an array of the domain's base type, so the column it is returned as has another type; cast the column, @p::varchar[] for an array of a domain over varchar` in place of the first example's help.
 
+**A parameter that is an array of a type `x`, when the schema also has a type named `_x`.**  Whichever was created first, PostgreSQL gave the array of `x` another name, and Npgsql sends `x[]` as the type `_x`.  The `server:` line is then `42883: operator does not exist`, with `x[]` and `_x`: see [the limit](reference/databases/postgresql/types.md#limit-array-of-a-renamed-type).
+
 - **An error of the check that says nothing of how Npgsql reads the SQL is [SQLSRC225](#sqlsrc225), at the same step.**  A lost connection is one.
 - **If the SQL is plain and the two readings still differ, report it.**
 
@@ -3303,6 +3378,7 @@ The query is `SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL`:
 - For a misread `:name`, rename the parameter, so that it is not the name of a column that a slice reads.
 - For a schema that changed, run `describe` again.
 - For an array of a domain, cast the column to the type you want: `@p::varchar[]`.
+- For an array of a type `x` beside a type `_x`, declare the parameter as `text` with `-- param:` and cast it, `@p::public.x[]`.
 
 **On SQL Server.**  The tool compares the parameters that SqlSource reads in the query with those that SQL Server reports, ignoring case.  The message names each one that only one of them reads.
 
@@ -3353,6 +3429,7 @@ This is a known limit, and not a fault of the query.  Npgsql cannot send a value
 - `regclass`, which `WHERE c.oid = @t::regclass` gives a parameter, and the other types of the system catalogs that Npgsql does not load, such as `aclitem`, `txid_snapshot` and `pg_node_tree`;
 - a type whose schema or whose name holds a `.`, which cannot be written to Npgsql without ambiguity, since `a.b.c` could name more than one type;
 - a type of an extension that Npgsql cannot send, such as `seg`.
+- an array of an enum or a range whose own name starts with `_`, such as `public._mood[]`, since Npgsql reads the `_` as the mark of an array: see [the limit](reference/databases/postgresql/types.md#limit-array-parameter-underscore).
 
 These are bound:
 
@@ -3713,6 +3790,7 @@ The entry of the query in the sidecar is out of date: the query changed after it
 
 - the SQL of the query;
 - the type or the nullability of a `-- param:` marker;
+- the names of a [`-- variable:` marker](reference/parameters.md#variable-marker);
 - the default of one of its tokens.
 
 A change to a comment alone does not count, and neither does a C# type after `->`.
@@ -3786,8 +3864,8 @@ Under the output `models`, the constant or token method of the query is still ge
   - Map it with the [type override](reference/type-mapping.md#setting-type-overrides) to the C# type that your application reads it as: `public.address=MyApp.Address` for a type that the data source maps.
   - Select its fields as columns of their own.
 - **A range of a subtype that SqlSource does not know, and a multirange of one.**  Do both of these:
-  1. Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of the C# type of its subtype: `public.floatrange=NpgsqlTypes.NpgsqlRange<double>`.
-  2. Call `EnableUnmappedTypes()` on the data source builder.  Without it, Npgsql cannot read the type.
+  1. Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of the C# type of its subtype, and a multirange to an array of it: `public.floatrange=NpgsqlTypes.NpgsqlRange<double>` and `public.floatmultirange=NpgsqlTypes.NpgsqlRange<double>[]`.
+  2. Call `EnableUnmappedTypes()` on the data source builder.  Without it, Npgsql cannot read or send the type.
 
   A project that does not reference Npgsql cannot name `NpgsqlTypes.NpgsqlRange<T>`, so the message tells it to reference Npgsql first.
 - **`cube` on Npgsql 8 or 9**, which cannot read it.  Update Npgsql to 10, which reads it as `NpgsqlTypes.NpgsqlCube`.  Or cast the column to `text` in the query, as the message says.
@@ -3800,16 +3878,18 @@ Under the output `models`, the constant or token method of the query is still ge
   - Reference `NetTopologySuite.IO.SqlServerBytes` and NetTopologySuite 2.5.0 or later, and turn NetTopologySuite on with the [library types](reference/library-types-and-json.md#setting-library-types).  A query whose output is `repository` or `methods` then reads them as NetTopologySuite's `Geometry`: see [NetTopologySuite on SQL Server](reference/databases/sqlserver/libraries.md#nettopologysuite).  A query whose output is `models` gets this error with NetTopologySuite on.
   - Reference the package `Microsoft.SqlServer.Types`, which Microsoft.Data.SqlClient needs to read them.  Map the type with the type override to the type of that package for it, as the message says: `geography=Microsoft.SqlServer.Types.SqlGeography` or `geometry=Microsoft.SqlServer.Types.SqlGeometry`.
 - **`hierarchyid` of SQL Server.**  Microsoft.Data.SqlClient reads it only when the application references the package `Microsoft.SqlServer.Types`.  Reference the package, and map the type with the type override to the type of that package, as the message says: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`.
-- **A SQL Server type that this version of SqlSource does not know, and a CLR type of your own assembly.**  Map it with the type override to the C# type that your application reads it as, as the message says.  Write `sys.newtype=MyApp.NewType` for a type of a newer SQL Server, or `dbo."Money"=MyApp.Money` for a CLR type of the schema `dbo`.
+- **A SQL Server type that this version of SqlSource does not know.**  Map it with the type override to the C# type that your application reads it as, as the message says: `sys.newtype=MyApp.NewType` for a type of a newer SQL Server.
+- **A CLR type of your own assembly, on SQL Server.**  Build the type for .NET in an assembly of the same name, and reference that build.  Then map the type with the type override by its schema and name, as the message says: `dbo.Grade=MyApp.Grade`.  See [a CLR type of your own](reference/databases/sqlserver/types.md#user-clr-type).
+- **A composite, a range or a multirange of `pg_catalog` whose name is `_` and at least one more character.**  No type override can name it, because `pg_catalog._x` means the array `x[]`.  Give a column a C# type with a [`-- column:` marker](reference/model-properties.md#column-marker).  For a parameter, declare it as `text` with a [`-- param:` marker](reference/parameters.md#param-marker), `-- param: @p text`, and cast it in the query, `@p::pg_catalog._x`.
 - **A parameter with no type, `record`, `unknown`, `void`, a kind of type that this version of SqlSource does not know, or a SQL Server type with no name.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand, or written by a newer tool.  Run `dotnet sqlsource describe`.
 
 When the message says to map the type, it names the key of the type by these rules:
 
-- **The key has the schema of the type.**  It is `public.address`, `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server.  A key without a schema must be a type that SqlSource knows.
+- **The key has the schema of the type.**  It is `public.address`, `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server.  A key without a schema must be a type that SqlSource knows.  A type named as an alias of another type keeps its schema, as in `pg_catalog.integer` or `sys.rowversion`, because the bare name means the other type.
 - **A schema or a name that needs quotes is in them**, as in `"my schema"."Order Item"`.
 - **A schema or a name with a line break, a tab or any other control character is written with escapes**, as in `"my schema".U&"Order\000AItem"`.  So the key can be written in a marker, which is one line.
 - **A name with a capital letter is quoted too**, as in `public."Status"`.  So an entry for it maps that type alone, and not one whose name differs only by case.
-- **For an array or a domain, the key is of the element or base that has no C# type.**  An entry for it maps the array or domain too.
+- **For an array or a domain, the key is of the element or base that has no C# type.**  An entry for it maps the array or domain too.  If no key can name that element or base, because its name is `_` and more in `pg_catalog`, the key is the array's, `pg_catalog._x[]`, or the domain's.
 
 See: [PostgreSQL types](reference/databases/postgresql/types.md#type-map), [SQL Server types](reference/databases/sqlserver/types.md#types)
 
@@ -4014,6 +4094,7 @@ Some rules decide these cases:
 
 - **`[Experimental]` on the assembly or module that declares the type counts as on the type.**
 - **A type argument written with a `?` breaks a constraint that forbids null.**  Such a constraint is `notnull`, `class` without a `?`, or a base type or interface written without a `?`.  `System.Collections.Generic.Dictionary<string?, int>` breaks one, since its key is `notnull`.
+- **A `?` inside a type argument breaks a constraint whose type does not take it.**  `MyApp.Names<System.Collections.Generic.List<string?>>` breaks one where `Names<T>` requires `where T : System.Collections.Generic.IEnumerable<string>`, since its items can be null.  A constraint that only reads its type argument, such as `System.Collections.Generic.IComparer<string>` or `System.IEquatable<string>`, takes a `?` inside, so `System.Collections.Generic.Comparer<string?>` meets it.
 - **A type marked `[Obsolete]` or `[Experimental]` otherwise is accepted.**  Its model compiles without a warning.
 
 Under the output `models`, the constant or token method of the query is still generated.  Under `repository` or `methods`, the query gets no method until the error is fixed.
@@ -5193,6 +5274,8 @@ The run goes on as if the file gave no connection at all.  So the tool reports [
 $ dotnet sqlsource describe /work/App
 /work/App/.env : error SQLSRC285: '/work/App/.env' cannot be read: Access to the path '/work/App/.env' is denied.
 ```
+
+An `--env-file` path that may be a secret is named by its position, as `The path at position 3 cannot be read: the system would not read it`, since the words of the system repeat the path: see [how an error names a path](reference/cli.md#paths).
 
 **Fix:** do one of these.
 

@@ -268,7 +268,8 @@ def dialect_of_chain(texts: Iterable[str]) -> DialectChoice:
     return _ANSI
 
 
-def _decode(data: bytes) -> str:
+def decode(data: bytes) -> str:
+    """The text of a file's bytes, as SqlSource reads them."""
     # Roslyn's SourceText.From(bytes): a byte order mark picks UTF-8, UTF-16 or UTF-32, and without one the bytes are
     # UTF-8.  The mark is not part of the text, and a byte that is not valid is a replacement character.
     if data.startswith(b"\xff\xfe\x00\x00"):
@@ -291,7 +292,7 @@ def _read_file(folder: str) -> str | None:
         if FILE_NAME not in os.listdir(folder):
             return None
         with open(path, "rb") as file:
-            return _decode(file.read())
+            return decode(file.read())
     except (OSError, ValueError):
         return None
 

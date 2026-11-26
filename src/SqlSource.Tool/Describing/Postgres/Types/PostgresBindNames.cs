@@ -15,7 +15,10 @@ namespace SqlSource.Tool.Describing.Postgres.Types;
 /// <item>
 /// An array is its element's name and <c>[]</c>.  An array whose name the server cut, since <c>_</c> and its element's
 /// name is longer than a name can be, is its own schema, a <c>.</c> and its own name, as for rule 6: Npgsql refuses
-/// the element's name and <c>[]</c> as too long, and binds the array's own name.
+/// the element's name and <c>[]</c> as too long, and binds the array's own name.  So is an array whose element's
+/// name, after its schema, starts with <c>_</c>, as <c>public._mood</c>: Npgsql reads <c>_</c> as the mark of an
+/// array, and the element's name and <c>[]</c> makes it recurse until the stack overflows, which ends the process.
+/// The array's own name reaches Npgsql's own answer for the type.
 /// </item>
 /// <item>
 /// A domain over a domain is the name of the first base, going down, that is no domain: Npgsql sends a domain as its
@@ -68,7 +71,12 @@ internal static class PostgresBindNames
                 return Qualified(row);
             }
 
-            return OfRow(element, rows) is { } name ? PostgresTypeNames.ArrayOf(name) : null;
+            return OfRow(element, rows) switch
+            {
+                null => null,
+                var name when ReadAsAnArray(name) => Qualified(row),
+                var name => PostgresTypeNames.ArrayOf(name),
+            };
         }
 
         if (row.Typtype == "d" && PostgresTypes.Row(row.Typbasetype, rows) is { Typtype: "d" } baseDomain)
@@ -90,6 +98,14 @@ internal static class PostgresBindNames
         row.Nspname.Contains('.', StringComparison.Ordinal) || row.Typname.Contains('.', StringComparison.Ordinal)
             ? null
             : $"{row.Nspname}.{row.Typname}";
+
+    // Whether Npgsql reads the name as an array's: the part after its schema, or the whole name without one, starts
+    // with "_".  Npgsql 10.0.3 recurses without end on such a name with "[]", and the stack overflow ends the process.
+    private static bool ReadAsAnArray(string name)
+    {
+        var dot = name.IndexOf('.', StringComparison.Ordinal);
+        return name.AsSpan(dot + 1).StartsWith("_", StringComparison.Ordinal);
+    }
 
     // Whether the server cut the array's name: it is "_" and the element's name, cut to a name's length.  An array
     // named otherwise, as "__name" when "_name" was taken, is not cut.

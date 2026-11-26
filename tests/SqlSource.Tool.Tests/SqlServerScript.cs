@@ -149,6 +149,9 @@ internal sealed class SqlServerScript
     public SqlServerScript Operands(SqlServerColumnsRequest request, SqlServerColumnsAnswer answer) =>
         Add(SqlServerCallNames.Operands, request, answer);
 
+    public SqlServerScript Origins(SqlServerColumnsRequest request, SqlServerColumnsAnswer answer) =>
+        Add(SqlServerCallNames.Origins, request, answer);
+
     public SqlServerScript Table(SqlServerTableRequest request, SqlServerColumnsAnswer answer) =>
         Add(SqlServerCallNames.Table, request, answer);
 

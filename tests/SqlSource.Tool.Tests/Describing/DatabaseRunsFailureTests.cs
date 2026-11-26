@@ -101,6 +101,23 @@ public sealed class DatabaseRunsFailureTests : IDisposable
             .ShouldContain("    query: GetUser, database postgres, postgres 16.4, FakeDriver 1.2.3\n");
     }
 
+    // Such a password is still removed where a message quotes it as a password key's value.
+    [Fact]
+    public async Task Run_QueryThatFailsWithAPasswordThatIsTheEnginesNameAsAKeysValue_PrintsTheMarkThere()
+    {
+        _scene.Describer.Secrets = ["postgres"];
+        _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure(
+            "GetUser",
+            "08001: refused Host=other;Password=postgres for user postgres"
+        );
+
+        _ = await _scene.RunAsync(given: ["postgres=Host=db;Password=postgres"]);
+
+        var printed = _scene.Error.ToString();
+        printed.ShouldContain("    server: 08001: refused Host=other;Password=*** for user postgres\n");
+        printed.ShouldContain("    query: GetUser, database postgres, postgres 16.4, FakeDriver 1.2.3\n");
+    }
+
     // The same for the database's name alone, which is not the engine's.
     [Fact]
     public async Task Run_QueryThatFailsWithAPasswordThatIsTheDatabasesName_PrintsTheQueryLineAsItIs()

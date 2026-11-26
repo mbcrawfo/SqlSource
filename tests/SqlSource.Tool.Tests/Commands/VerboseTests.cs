@@ -162,6 +162,18 @@ public sealed class VerboseTests : IDisposable
         result.Out.ShouldContain(Line($"file '{latin1}': postgres, is not saved as UTF-8, claimed by {queries}(1)"));
     }
 
+    // Each type that claims the file is named, in the order the project compiles their source files.
+    [Fact]
+    public async Task Run_VerboseWithAFileThatTwoTypesClaim_NamesBoth()
+    {
+        var others = _scene.Project.AddSource("Others.cs", Plans.TypeNamed("Others"));
+        var queries = _scene.Project.PathOf("Queries.cs");
+
+        var result = await _scene.DescribeAsync("App.csproj", "--verbose");
+
+        result.Out.ShouldContain(Line($"file '{_users}': postgres, ready, claimed by {queries}(1), {others}(1)"));
+    }
+
     [Fact]
     public async Task Run_VerboseWithAProjectThatWasNotRestored_SaysItCouldNotBeRead()
     {

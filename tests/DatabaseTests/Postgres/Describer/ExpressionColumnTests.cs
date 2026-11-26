@@ -57,8 +57,6 @@ public sealed class ExpressionColumnTests(PostgresDatabases postgres)
                     + "WHERE b.id = 2) s ON s.id = a.id",
                 "?"
             },
-            // The word NEW, here an alias, may name the new row, so no subquery is read.
-            { $"SELECT (SELECT count(*) FROM {T} x) AS new", "?" },
             // A FULL JOIN's form: a cast within a family, and computed above the join.
             { $"SELECT coalesce(a.big, b.id) AS v FROM {Full}", "n" },
             { $"SELECT coalesce(a.id, b.id) AS v FROM {Full} GROUP BY a.id, b.id", "n" },
@@ -212,6 +210,27 @@ public sealed class ExpressionColumnTests(PostgresDatabases postgres)
             await postgres.ExecuteAsync(ScratchSchema.ScanColumns);
 
             await ProvedColumns.ShouldAnswerAsync(postgres, sql, expected);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropScanColumns);
+        }
+    }
+
+    // On 18 the word NEW, here a column's label, may name the new row, so no subquery is read.  Before 18 it names
+    // none.
+    [Fact]
+    public async Task DescribeAsync_SubqueryInAStatementThatSaysNew_IsProvedBefore18()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ScanColumns);
+
+            await ProvedColumns.ShouldAnswerAsync(
+                postgres,
+                $"SELECT (SELECT count(*) FROM {T} x) AS new",
+                postgres.Major >= 18 ? "?" : "n"
+            );
         }
         finally
         {

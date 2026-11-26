@@ -5,7 +5,8 @@
 # Then publishes a web project that references the package, and checks that no .sql file, no sidecar and no settings
 # file is copied.
 # Then builds a project of two target frameworks that references the package, with a stand-in for the sqlsource tool,
-# and checks that the outer build ran the tool once, for the first framework, before it dispatched the inner builds.
+# and checks that the outer build ran the tool once, on each framework's manifest, before it dispatched the inner
+# builds.
 # NuGet imports buildMultiTargeting/SqlSource.targets only for a package reference, so no other test reaches it.
 # Last, installs the packed tool of the same version into a project of one query, with a tool manifest, and builds it
 # under each value of SqlSourceOnline, with no database: the packed package starts the packed tool, and the build
@@ -372,10 +373,12 @@ if [[ ! -f "$stand_in_log" ]] || [[ "$(wc -l <"$stand_in_log")" -ne 1 ]]; then
     multi_fails 'did not run the tool exactly once'
 fi
 
-# The manifest of the run is the first framework's, whose folder under obj/ names it, with backslashes on Windows.
-manifest_argument='^describe --manifest .*[/\\]netstandard2\.1[/\\]Multi\.csproj\.SqlSource\.manifest --online true$'
+# The run has each framework's manifest, in the order of TargetFrameworks, whose folder under obj/ names it, with
+# backslashes on Windows.
+manifest_argument='^describe --manifest .*[/\\]netstandard2\.1[/\\]Multi\.csproj\.SqlSource\.manifest'
+manifest_argument+=' --manifest .*[/\\]net10\.0[/\\]Multi\.csproj\.SqlSource\.manifest --online true$'
 if ! grep -q "$manifest_argument" "$stand_in_log"; then
-    multi_fails 'did not run the tool for the first framework'
+    multi_fails 'did not run the tool on the manifest of each framework'
 fi
 
 # The target of buildMultiTargeting/SqlSource.targets finished before the outer build dispatched the inner ones.

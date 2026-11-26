@@ -42,6 +42,7 @@ internal static class ManifestReader
         var files = ImmutableArray.CreateBuilder<string>();
         var settingsFiles = ImmutableArray.CreateBuilder<string>();
         var compileFiles = ImmutableArray.CreateBuilder<string>();
+        var usingAliases = ImmutableArray.CreateBuilder<UsingAlias>();
 
         var number = 0;
         while (TryReadLine(ref rest, out var line))
@@ -95,6 +96,16 @@ internal static class ManifestReader
                 case "Compile":
                     compileFiles.Add(value);
                     break;
+                case "UsingAlias":
+                    // alias=type.  An alias is an identifier and holds no "=", and a value without one names
+                    // nothing the compiler would accept, so it is passed over.
+                    var at = value.IndexOf('=', StringComparison.Ordinal);
+                    if (at > 0)
+                    {
+                        usingAliases.Add(new UsingAlias(value[..at].Trim(), value[(at + 1)..].Trim()));
+                    }
+
+                    break;
                 default:
                     // A key of a later package, or a Property. or File. line, which no package of version 2 writes.
                     break;
@@ -128,6 +139,7 @@ internal static class ManifestReader
                 Files = files.ToImmutable(),
                 SettingsFiles = settingsFiles.ToImmutable(),
                 CompileFiles = compileFiles.ToImmutable(),
+                UsingAliases = usingAliases.ToImmutable(),
             }
         );
     }

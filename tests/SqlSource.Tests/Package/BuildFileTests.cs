@@ -165,6 +165,9 @@ public sealed partial class BuildFileTests
                         or RunOnlineTarget
                         or ListSidecarsTarget
                         or CreatedSidecarsTarget
+                        or OnlineFrameworkTarget
+                        or FrameworkManifestsTarget
+                        or FrameworkInputsTarget
                     )
             )
             .ToList();
@@ -538,6 +541,17 @@ public sealed partial class BuildFileTests
         settings.ShouldBe(lines.IndexOf("@(Compile->'Compile=%(FullPath)')") - 1);
     }
 
+    // The SDK makes a Using item with an Alias a global using in a file under obj that only a compile writes, so the
+    // Compile lines never hold it: the manifest lists each such item, for the tool's reader of the attribute.
+    [Fact]
+    public void Targets_ManifestTarget_ListsTheUsingItemsWithAnAlias()
+    {
+        var aliases = Manifest().Descendants("SqlSourceManifestUsingAlias").ShouldHaveSingleItem();
+
+        aliases.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("@(Using)");
+        aliases.Attribute("Condition").ShouldNotBeNull().Value.ShouldBe("'%(Using.Alias)' != ''");
+    }
+
     // The tool runs the target by name.  A hook would make every build write the manifest, and a condition would
     // make a run of the tool find no file.
     [Fact]
@@ -570,6 +584,7 @@ public sealed partial class BuildFileTests
                 "@(SqlSourceManifestSqlFile->'File=%(FullPath)')",
                 "@(SqlSourceManifestSettingsFile->'%(FullPath)'->Distinct()->'Settings=%(Identity)')",
                 "@(Compile->'Compile=%(FullPath)')",
+                "@(SqlSourceManifestUsingAlias->'UsingAlias=%(Alias)=%(Identity)')",
             ]);
 
     // A project may write its constants one on each line.  A line break inside a value would end its line of the
@@ -641,7 +656,12 @@ public sealed partial class BuildFileTests
             .Where(name => name != "FileWrites")
             .Distinct()
             .ShouldBe(
-                ["SqlSourceManifestLine", "SqlSourceManifestSqlFile", "SqlSourceManifestSettingsFile"],
+                [
+                    "SqlSourceManifestLine",
+                    "SqlSourceManifestSqlFile",
+                    "SqlSourceManifestSettingsFile",
+                    "SqlSourceManifestUsingAlias",
+                ],
                 ignoreOrder: true
             );
 

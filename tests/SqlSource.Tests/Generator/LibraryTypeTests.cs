@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Converters;
+using SqlSource.Generation.Methods;
 using SqlSource.Generation.Types;
 using SqlSource.Settings;
 using SqlSource.Settings.Libraries;
@@ -665,6 +666,51 @@ public sealed class LibraryTypeTests
         columns[1].Library.ShouldBe(SqlLibrary.Json);
     }
 
+    // The libraries a type's queries use, each once, in the order of the libraries and not of the columns.
+    [Fact]
+    public void Run_JsonAndNodaTimeOnInOneQuery_UsesBothInTheOrderOfTheLibraries()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- library-types: json=on nodatime=on\n\n-- name: ListEvents\nSELECT doc, at FROM events;\n"
+        );
+        var entry = Entry(
+            file,
+            "ListEvents",
+            [],
+            [Column("doc", Catalog("jsonb")), Column("at", Timestamptz, origin: EventsAt)]
+        );
+
+        var run = MethodRuns.Run(file, [entry], references: WithThePlugin);
+
+        run.ShouldBeClean();
+        StepOutputs
+            .Single<TypeMethods>(run, TrackingNames.TypeMethods)
+            .UsedLibraries.ShouldBe([
+                new LibraryUse(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql),
+                new LibraryUse(SqlLibrary.Json, DatabaseEngine.PostgreSql),
+            ]);
+    }
+
+    // A library's type that only a parameter has is a use of the library too.
+    [Fact]
+    public void Run_NodaTimeParameterOnly_UsesNodaTime()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: CountEvents -> one\nSELECT count(*) AS n FROM events WHERE at > @since;\n"
+        );
+        var entry = Entry(file, "CountEvents", [Parameter("since", Timestamptz)], [Column("n")]);
+
+        var run = MethodRuns.Run(file, [entry], references: WithThePlugin);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("global::NodaTime.Instant");
+        StepOutputs
+            .Single<TypeMethods>(run, TrackingNames.TypeMethods)
+            .UsedLibraries.ShouldBe([new LibraryUse(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql)]);
+    }
+
     // PostGIS's types under NetTopologySuite's row, read by the plugin: a column of geometry, of geography in another
     // schema, of an array of geometry and of a domain over it.  Without the library none has a C# type, so the row
     // stays, with nothing beside it, and the query keeps the failure of its first column for a claim at Models.
@@ -741,6 +787,69 @@ public sealed class LibraryTypeTests
         ModelFiles(run).ShouldBeEmpty();
         // Typing does not know the output: the column has the library's type, and the failure is kept beside it.
         QueryOf(run).Columns.ShouldNotBeNull().ShouldHaveSingleItem().Text.ShouldBe(Geometry);
+    }
+
+    // Each query of the type that has one reports its own failure.
+    [Fact]
+    public void Run_ModelsClaimOfTwoLibraryOnlyQueries_Reports246ForEach()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            ListShapes + "\n-- name: ListMore\nSELECT shape FROM more;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [ShapesEntry(file), Entry(file, "ListMore", [], [Column("shape", PostgisGeometry)])],
+            references: WithNetTopologySuite,
+            settings: AtModels
+        );
+
+        run.Diagnostics.ShouldBe([
+            ShapeHasNoCSharpType,
+            ShapeHasNoCSharpType.Replace("(1,10)-(1,20)", "(4,10)-(4,18)", StringComparison.Ordinal),
+        ]);
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
+    // The type's own problem takes the place of its models, and so of the failure that stands for them.
+    [Fact]
+    public void Run_ModelsClaimOfATypeWithADiagnostic_ReportsThatDiagnosticAlone()
+    {
+        const string NotPartial = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public class Rows;
+            }
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+
+        var run = MethodRuns.Run(file, [ShapesEntry(file)], NotPartial, WithNetTopologySuite, settings: AtModels);
+
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC001 ");
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
+    // The type's first file has no query at Models, so the query that fails is the first read of its file, the second.
+    [Fact]
+    public void Run_ModelsClaimOfALibraryOnlyColumnInTheSecondFile_Reports246()
+    {
+        var first = new SqlFile("/app/Repo/A.sql", "-- output: sql\n\n-- name: Other\nSELECT 1;\n");
+        var second = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+
+        var run = MethodRuns.Run(
+            second,
+            [ShapesEntry(second)],
+            references: WithNetTopologySuite,
+            settings: AtModels,
+            otherFiles: [first]
+        );
+
+        run.Diagnostics.ShouldBe([ShapeHasNoCSharpType]);
+        ModelFiles(run).ShouldBeEmpty();
     }
 
     // Two types that claim one query at Models each defer the same failure, which is reported once, as typing reported

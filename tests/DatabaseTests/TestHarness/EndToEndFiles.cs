@@ -10,11 +10,12 @@ using System.Threading.Tasks;
 
 namespace SqlSource.DatabaseTests.TestHarness;
 
-// The files of the end-to-end databases "app" and "billing", and PostgreSQL's "gis", in the repository: a folder for
-// each in the engine's folder, with its schema.sql and its seed.sql, which tools/describe-end-to-end.sh applies in the
-// same order.  Every database of the test projects of both engines is built through it, over a DbDataSource of the
-// project's own, so that it needs no driver: "app", "billing" and "gis", and from the files its caller names,
-// "fixtures" and "realistic" of each engine.
+// The files of the end-to-end databases "app" and "billing", SQL Server's "user_clr", and PostgreSQL's "gis", in the
+// repository: a folder for each in the engine's folder, with its schema.sql and its seed.sql, which
+// tools/describe-end-to-end.sh applies in the same order.  Every database of the test projects of both engines is
+// built through it, over a DbDataSource of the project's own, so that it needs no driver: "app", "billing" and "gis",
+// and from the files its caller names, "fixtures" and "realistic" of each engine.  "user_clr" runs its files through
+// RunAsync, once its caller has created the assembly that they need.
 internal static partial class EndToEndFiles
 {
     public static string Schema(EndToEndEngine engine, string database) =>
@@ -25,7 +26,7 @@ internal static partial class EndToEndFiles
 
     // Reads the file and runs each of its batches as one command, in order, on one connection of the source, as
     // sqlcmd runs a script in one session.
-    private static async Task RunAsync(
+    public static async Task RunAsync(
         DbDataSource source,
         string path,
         EndToEndEngine engine,

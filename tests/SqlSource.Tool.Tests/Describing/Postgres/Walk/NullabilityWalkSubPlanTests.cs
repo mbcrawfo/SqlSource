@@ -1,6 +1,7 @@
 using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -31,7 +32,7 @@ public sealed class NullabilityWalkSubPlanTests
             new PlanInstancesCache(root, null),
             columns,
             origins,
-            new WalkScope(false, false, true, PostgresTables.Of(TableA, OrdersO), types)
+            new WalkScope(false, OldAndNewNames.None, true, PostgresTables.Of(TableA, OrdersO), types)
         );
     }
 
@@ -153,7 +154,7 @@ public sealed class NullabilityWalkSubPlanTests
             origins,
             new WalkScope(
                 false,
-                false,
+                OldAndNewNames.None,
                 true,
                 PostgresTables.Of(TableA, OrdersO),
                 [BuiltInTypes.Int4, type],
@@ -250,7 +251,7 @@ public sealed class NullabilityWalkSubPlanTests
                     origins,
                     new WalkScope(
                         false,
-                        false,
+                        OldAndNewNames.None,
                         true,
                         PostgresTables.Of(TableA, OrdersO),
                         [BuiltInTypes.Int4, BuiltInTypes.Int8]
@@ -339,7 +340,13 @@ public sealed class NullabilityWalkSubPlanTests
             new PlanInstancesCache(ScanOfA("(SubPlan 1)", SubPlan("SubPlan 1", CountOfO())), null),
             columns,
             origins,
-            new WalkScope(false, true, true, PostgresTables.Of(TableA, OrdersO), [BuiltInTypes.Int4, BuiltInTypes.Int8])
+            new WalkScope(
+                false,
+                OldAndNewNames.Unknown,
+                true,
+                PostgresTables.Of(TableA, OrdersO),
+                [BuiltInTypes.Int4, BuiltInTypes.Int8]
+            )
         );
 
         AnswersOf(outcome).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);

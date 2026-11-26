@@ -261,13 +261,13 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Build_ColumnMarker_MakesTheMonthEndNotNull() =>
+    public void Build_ColumnMarker_MakesTheMonthStartNotNull() =>
         ShouldBeModel(
             typeof(ListAccountMonthsDto),
             $"{Namespace}.ListAccountMonthsDto",
             ModelShape.SealedRecord,
             ("Id", typeof(AccountId), false),
-            ("MonthEnd", typeof(DateOnly), false)
+            ("MonthStart", typeof(DateOnly), false)
         );
 
     [Fact]
@@ -350,7 +350,7 @@ public sealed class ModelShapeTests
             $"{Namespace}.ListRemindersDto",
             ModelShape.SealedRecord,
             ("Id", typeof(int), false),
-            ("RemindAt", typeof(TimeSpan?), true)
+            ("RemindAt", typeof(TimeSpan), false)
         );
 
     [Fact]

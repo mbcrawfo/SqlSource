@@ -1,0 +1,31 @@
+{
+  "fileName": "seed.sql",
+  "settings": [
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"mssql\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  \"typeOverrides\": {\n    // The C# type that date is read as, in place of the default of the type map.\n    \"date\": \"System.DateOnly\",\n  },\n  // The collection type of a query's rows, where no marker or nearer settings file sets one.\n  \"collectionType\": \"IReadOnlyList\",\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The rows of the database \"user_clr\": two grades, the first with no maybe.  UserClrDatabase and\n-- tools/describe-end-to-end.sh apply this after schema.sql, and a change to it is followed by a run of\n-- tools/describe-end-to-end.sh.\n\nINSERT INTO dbo.grades (id, grade, maybe) VALUES\n(1, N'5', NULL),\n(2, N'7', N'8');\n",
+  "expected": {
+    "startDialect": "mssql",
+    "startOptions": [],
+    "dialect": "mssql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 97],
+      ["Text", 97, 98],
+      ["LineComment", 98, 201],
+      ["Text", 201, 202],
+      ["LineComment", 202, 234],
+      ["Text", 234, 290],
+      ["Quoted", 290, 293],
+      ["Text", 293, 307],
+      ["Quoted", 307, 310],
+      ["Text", 310, 313],
+      ["Quoted", 313, 316],
+      ["Text", 316, 319]
+    ],
+    "spans": [],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

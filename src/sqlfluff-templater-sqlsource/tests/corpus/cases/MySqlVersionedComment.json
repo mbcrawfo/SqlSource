@@ -1,0 +1,37 @@
+{
+  "fileName": "MySqlVersionedComment.sql",
+  "settings": [],
+  "input": "-- dialect: mysql, version=8.4.0\n-- name: A\nSELECT 1 /*!50700 , '*/' */, {{t:x}} /*!90000 a */ FROM t WHERE id = @id\n\n-- name: B\nSELECT /*! '*/' */ 2\n",
+  "expected": {
+    "startDialect": "ansi",
+    "startOptions": [],
+    "dialect": "mysql",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 32],
+      ["Text", 32, 33],
+      ["LineComment", 33, 43],
+      ["Text", 43, 53],
+      ["Hint", 53, 71],
+      ["Text", 71, 81],
+      ["Hint", 81, 94],
+      ["Text", 94, 113],
+      ["Parameter", 113, 116],
+      ["Text", 116, 118],
+      ["LineComment", 118, 128],
+      ["Text", 128, 136],
+      ["Hint", 136, 147],
+      ["Text", 147, 150]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 0, "end": 32, "name": null, "default": null },
+      { "kind": "markerComment", "start": 33, "end": 43, "name": null, "default": null },
+      { "kind": "token", "start": 73, "end": 80, "name": "t", "default": "x" },
+      { "kind": "parameter", "start": 113, "end": 116, "name": "id", "default": null },
+      { "kind": "queryEnd", "start": 116, "end": 116, "name": null, "default": null },
+      { "kind": "markerComment", "start": 118, "end": 128, "name": null, "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

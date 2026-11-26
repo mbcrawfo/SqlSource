@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Testing;
+using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
 using static SqlSource.Tool.Tests.FileChanges;
@@ -54,6 +55,21 @@ public sealed class WatchChangeTests : IAsyncDisposable
         _watch.ManifestRuns.ShouldBe(manifestRuns + 1);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
         _watch.PassStarts().ShouldBe([(1, 0, true), (2, 2, true)]);
+    }
+
+    // Each evaluation of a watch is in the configuration it was given, the first and those after a change alike.
+    [Fact]
+    public async Task Watch_Configuration_IsGivenToEveryEvaluation()
+    {
+        await _watch.StartAsync("--configuration", "Release");
+
+        await _watch.ChangeAsync(Changed(_watch.Project.ProjectPath));
+
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+        _watch.ManifestRuns.ShouldBe(2);
+        _watch.Run.Processes.Requests.ShouldAllBe(request =>
+            FakeProcessRunner.PropertyOf(request, "Configuration") == "Release"
+        );
     }
 
     [Fact]

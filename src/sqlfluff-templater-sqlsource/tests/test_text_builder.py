@@ -14,7 +14,7 @@ ANSI = DialectRules.for_choice(DialectChoice(Dialect.ANSI))
 def built(text: str, rules: DialectRules = ANSI) -> BlockText:
     lexemes, error = Lexer(text, rules).read_to_end()
     assert error is None
-    return build(text, lexemes, 0, len(lexemes))
+    return build(text, rules, lexemes, 0, len(lexemes))
 
 
 @pytest.mark.parametrize(
@@ -88,13 +88,27 @@ def test_build_of_a_dialect_reads_its_comments_and_hints(dialect, text, expected
     assert built(text, DialectRules.for_choice(DialectChoice(dialect))).text == expected
 
 
+# MySQL ends a line only at a line feed, so a carriage return alone stays in the SQL.  A carriage return and a line
+# feed end a line as in every dialect.
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("SELECT 1 -- c\r, 2\nFROM t", "SELECT 1\nFROM t"),
+        ("SELECT 1,\r  2  \r\n\r\nFROM t", "SELECT 1,\r  2\nFROM t"),
+        ("SELECT 'a\rb', /*! x\ry */ 1", "SELECT 'a\rb', /*! x\ry */ 1"),
+    ],
+)
+def test_carriage_return_alone_under_mysql_ends_no_line(text, expected):
+    assert built(text, DialectRules.for_choice(DialectChoice(Dialect.MYSQL))).text == expected
+
+
 def test_build_of_a_lexeme_range_uses_only_that_range():
     text = "A\n-- name: X\nB\n"
     lexemes, _ = Lexer(text, ANSI).read_to_end()
 
-    assert build(text, lexemes, 0, 1).text == "A"
-    assert build(text, lexemes, 2, 3).text == "B"
-    assert build(text, lexemes, 2, 2).text == ""
+    assert build(text, ANSI, lexemes, 0, 1).text == "A"
+    assert build(text, ANSI, lexemes, 2, 3).text == "B"
+    assert build(text, ANSI, lexemes, 2, 2).text == ""
 
 
 def test_parameters_are_copied_and_their_places_in_the_sql_are_kept():

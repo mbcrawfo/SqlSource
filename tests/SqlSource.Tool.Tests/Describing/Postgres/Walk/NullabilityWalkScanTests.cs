@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -35,7 +36,7 @@ public sealed class NullabilityWalkScanTests
         PlanNode root,
         long type,
         bool noCastAcrossFamilies = false,
-        bool oldAndNewMayBeNamed = false
+        OldAndNewNames? oldAndNew = null
     )
     {
         var (columns, origins) = Built(false, Expression);
@@ -45,7 +46,7 @@ public sealed class NullabilityWalkScanTests
             origins,
             new WalkScope(
                 false,
-                oldAndNewMayBeNamed,
+                oldAndNew ?? OldAndNewNames.None,
                 true,
                 PostgresTables.Of(TableA, OrdersO),
                 [type],
@@ -107,7 +108,7 @@ public sealed class NullabilityWalkScanTests
     // The old or the new row may print under an alias of the scanned plan.
     [Fact]
     public void Run_StatementThatMayNameOldOrNew_IsUnknown() =>
-        AnswerOf(ScanOf("count(*)"), BuiltInTypes.Int8, oldAndNewMayBeNamed: true).ShouldBe(UnknownNoOrigin);
+        AnswerOf(ScanOf("count(*)"), BuiltInTypes.Int8, oldAndNew: OldAndNewNames.Unknown).ShouldBe(UnknownNoOrigin);
 
     // A scan inside the scan is read the same way, entry by entry.
     [Theory]

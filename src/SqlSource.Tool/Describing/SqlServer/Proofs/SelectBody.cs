@@ -49,6 +49,12 @@ internal sealed record SelectBody(
     bool IsOneTable
 )
 {
+    /// <summary>Its <c>FROM</c> clause, from the word <c>FROM</c> to its end; null without one.</summary>
+    public TokenRange? From { get; init; }
+
+    /// <summary>Its <c>WHERE</c> clause, from the word <c>WHERE</c> to its end; null without one.</summary>
+    public TokenRange? Where { get; init; }
+
     // The words that start another statement.  T-SQL needs no ";" between two, so one of them at the select's level
     // is a batch of several.
     private static readonly HashSet<string> StatementWords =
@@ -176,7 +182,11 @@ internal sealed record SelectBody(
             HasFrom: from is not null,
             IsOneTable: from is { } table
                 && IsOneTableAlone(tokens, new TokenRange(table.Start + 1, table.End), cteNames)
-        );
+        )
+        {
+            From = from,
+            Where = where,
+        };
     }
 
     /// <summary>

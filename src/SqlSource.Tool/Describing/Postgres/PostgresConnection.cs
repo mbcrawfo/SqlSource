@@ -59,10 +59,10 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// <c>UsePeriodicPasswordProvider</c>; then the connection's <c>ProvidePasswordCallback</c>; then
     /// <c>PGPASSWORD</c>; then the entry of a password file that matches the host, port, database and user.  The tool
     /// sets no provider and no callback.
-    /// The file is the string's <c>Passfile</c>, else <c>PGPASSFILE</c>, else the default one, read only when it
-    /// exists.  So <c>PGPASSWORD</c> is given when the string has no <c>Password</c>, and when it has neither the
-    /// password of every entry of each file it could read is (<see cref="PasswordFile" />): which entry matches is
-    /// the driver's to say, and a password too many only removes a word that nothing else prints.  A file that cannot
+    /// The file is the string's <c>Passfile</c>, else <c>PGPASSFILE</c>, else the default one of the system, read only
+    /// when it exists.  So <c>PGPASSWORD</c> is given when the string has no <c>Password</c>, and when it has neither
+    /// the password of each entry of the file that may match the string's host, port, database and user is
+    /// (<see cref="PasswordFile" />), the user being the string's, else <c>PGUSER</c>.  A file that cannot
     /// be read for an I/O or access reason gives none, since the driver would fail to open the session in its own
     /// place; anything else it throws is a bug, which the run's guard turns into <c>SQLSRC200</c>.  The environment is
     /// the host's.
@@ -92,9 +92,17 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
             return secrets;
         }
 
-        foreach (var path in PasswordFile.PathsOf(builder.Passfile, getEnvironmentVariable))
+        var user = builder.Username is { Length: > 0 } fromString ? fromString : getEnvironmentVariable("PGUSER");
+        var target = new PasswordFile.Target(
+            PasswordFile.ServersOf(builder.Host, builder.Port),
+            builder.Database,
+            user is { Length: > 0 } ? user : null
+        );
+        foreach (
+            var path in PasswordFile.PathsOf(builder.Passfile, getEnvironmentVariable, OperatingSystem.IsWindows())
+        )
         {
-            secrets.AddRange(PasswordsIn(path));
+            secrets.AddRange(PasswordsIn(path, target));
         }
 
         return secrets;
@@ -119,8 +127,10 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     // The password file is read as the driver reads it, whole, and a file it cannot read gives none.  So is one that
     // can be read only once, a named pipe or the pipe of a shell's process substitution, which is read ahead of the
     // driver here and would leave it nothing: an empty length, which such a pipe has until a reader opens it, is not
-    // opened, and a stream that cannot seek is closed unread.
-    private static IReadOnlyList<string> PasswordsIn(string path)
+    // opened, and a stream that cannot seek is closed unread.  Handing the driver the tool's copy instead would need
+    // the connection's ProvidePasswordCallback, which Npgsql 10.0.3 marks obsolete, or a provider of the data source,
+    // which is not told the host and user the driver resolves, so the tool would choose the entry in its place.
+    private static IReadOnlyList<string> PasswordsIn(string path, PasswordFile.Target target)
     {
         try
         {
@@ -136,7 +146,7 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
             }
 
             using var reader = new StreamReader(stream);
-            return PasswordFile.Passwords(reader.ReadToEnd());
+            return PasswordFile.Passwords(reader.ReadToEnd(), target);
         }
         catch (Exception exception) when (FileErrors.IsPathError(exception))
         {
@@ -328,6 +338,11 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
         // refuses every query that has one.  It changes nothing of a column's description, refuses another
         // extension's type as before, and describes as before against a database without PostGIS.
         _ = builder.UseNetTopologySuite();
+
+        // Without it Npgsql throws for a column of a user's own range, of its multirange or of a domain over it, and
+        // refuses a parameter of one; the manual tells an application to call it for such a type.  It changes nothing
+        // of another type's column or parameter.
+        _ = builder.EnableUnmappedTypes();
 
         var driverLog = NpgsqlRunLogger.For(log);
         if (driverLog is not null)

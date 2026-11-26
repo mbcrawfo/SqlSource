@@ -35,6 +35,26 @@ public sealed class SqlQueryHashTests
         Hash(Text).ShouldBe("7ce509523c09f8150953aa1222e35feff3e8f1e7c7e82611241aed9b6c4a34c8");
     }
 
+    // printf 'postgres\nSET @a = 1; SELECT @B;\n@a\n@B\n' | shasum -a 256.  A -- variable: name is a line of its own
+    // after the declarations, once, as first written, in marker order.
+    [Theory]
+    [InlineData("-- variable: @a, @B")]
+    [InlineData("-- variable: @a, @B, @A")]
+    [InlineData("-- variable: @a\n-- variable: @B\n-- variable: @b")]
+    public void Compute_QueryWithVariableMarkers_AddsALineForEachName(string markers) =>
+        Hash("-- name: Q\n" + markers + "\nSET @a = 1; SELECT @B;\n")
+            .ShouldBe("c378d8e638dba7c65f0e5ae9351cb0119fe3fbf0c1908a8b1c92c16626faa88c");
+
+    // A variable takes a name out of the parameters, so adding or removing one, or changing its order or spelling,
+    // makes the entry stale.
+    [Theory]
+    [InlineData("-- variable: @a", "")]
+    [InlineData("-- variable: @a, @b", "-- variable: @b, @a")]
+    [InlineData("-- variable: @a", "-- variable: @A")]
+    public void Compute_ChangeToTheVariables_GivesAnotherHash(string first, string second) =>
+        Hash("-- name: Q\n" + first + "\nSELECT @a, @b;\n")
+            .ShouldNotBe(Hash("-- name: Q\n" + second + "\nSELECT @a, @b;\n"));
+
     [Theory]
     [InlineData("-- name: Q\r\nSELECT 1;\r\n")]
     [InlineData("-- name: Q\n-- summary: Text.\nSELECT 1; -- a comment\n")]
@@ -121,13 +141,14 @@ public sealed class SqlQueryHashTests
         block.Segments.Count.ShouldBeGreaterThan(1);
 
         SqlQueryHash
-            .Compute(result.Dialect, block.Segments, block.Tokens, block.Parameters)
+            .Compute(result.Dialect, block.Segments, block.Tokens, block.Parameters, block.MarkedVariables)
             .ShouldBe(
                 SqlQueryHash.Compute(
                     result.Dialect,
                     new EquatableArray<SqlSegment>([new SqlSegment(SqlSegmentKind.Literal, Sql)]),
                     block.Tokens,
-                    block.Parameters
+                    block.Parameters,
+                    block.MarkedVariables
                 )
             );
     }
@@ -144,6 +165,12 @@ public sealed class SqlQueryHashTests
         var result = SqlFileParser.Parse(text, "Query.sql", new SqlDialectChoice(dialect, SqlDialectOptions.None));
         result.Errors.ShouldBeEmpty();
         var block = result.Blocks.ShouldHaveSingleItem();
-        return SqlQueryHash.Compute(result.Dialect, block.Segments, block.Tokens, block.Parameters);
+        return SqlQueryHash.Compute(
+            result.Dialect,
+            block.Segments,
+            block.Tokens,
+            block.Parameters,
+            block.MarkedVariables
+        );
     }
 }

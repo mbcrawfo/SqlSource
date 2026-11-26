@@ -4,6 +4,19 @@ using System.Linq;
 
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 
+/// <summary>The rows an operand is asked over, each scope in a call of <c>operands</c> of its own.</summary>
+internal enum OperandScope
+{
+    /// <summary>The rows of the branch's <c>FROM</c> through its <c>WHERE</c>.</summary>
+    Rows,
+
+    /// <summary>The rows of the left side of the branch's last <c>FULL JOIN</c> alone.</summary>
+    LeftSide,
+
+    /// <summary>The rows of the right side of the branch's last <c>FULL JOIN</c> alone.</summary>
+    RightSide,
+}
+
 /// <summary>
 /// The proofs that the items of one <c>SELECT</c> cannot be <c>NULL</c>, read from their tokens, and the operands they
 /// leave to ask the server.
@@ -12,10 +25,10 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// <para>
 /// An expression is split at its own level on <c>+</c>, <c>-</c>, <c>*</c>, <c>/</c> and <c>%</c>, a sign before a
 /// piece being unary, and is proved when every piece is.  A piece is a primary: a literal, <c>NULL</c>, a parameter, a
-/// column, <c>( ... )</c>, a subquery, a <c>CASE</c> or a call.  A call of a bare name may be a form that proves it;
-/// one of a schema's name is a user's function, which proves nothing.  An expression with anything else at its own
-/// level is a leaf, and so are a column, a <c>CASE</c>, a subquery that is not a <c>COUNT</c>'s, and a call that is no
-/// form.
+/// column, <c>( ... )</c>, a subquery, a <c>CASE</c>, a call or <c>a AT TIME ZONE z</c> of two primaries.  A call of a
+/// bare name may be a form that proves it; one of a schema's name is a user's function, which proves nothing.  An
+/// expression with anything else at its own level is a leaf, and so are a column, a <c>CASE</c> that is no form, a
+/// subquery that is not a <c>COUNT</c>'s, and a call that is no form.
 /// </para>
 /// <para>
 /// A leaf is asked when its context allows: the rows' context, an aggregate's operand without <c>OVER</c>, always;
@@ -36,7 +49,19 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// which an overflow is an error and not a <c>NULL</c>.
 /// </para>
 /// </remarks>
-internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBody body)
+/// <param name="tokens">The query's tokens.</param>
+/// <param name="body">The <c>SELECT</c> or branch whose items are proved.</param>
+/// <param name="filtered">What its <c>FROM</c> and <c>WHERE</c> keep from being <c>NULL</c>, if read.</param>
+/// <param name="asksLoneLeaf">
+/// True when the server's answer about an item that is one leaf is not the column's: the item is one branch of several,
+/// or <c>operands</c> reads a <c>LEFT JOIN</c> that the <c>WHERE</c> makes inner.
+/// </param>
+internal sealed partial class ExpressionProofs(
+    IReadOnlyList<TsqlToken> tokens,
+    SelectBody body,
+    FilteredRows? filtered = null,
+    bool asksLoneLeaf = false
+)
 {
     // The built-in aggregates.  A leaf that holds one is never asked, so a name too many only proves less.
     private static readonly HashSet<string> Aggregates =
@@ -66,14 +91,20 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
 
     private readonly List<TokenRange> _operands = [];
 
-    // The leaves of the item being proved, which a Proof.Operand indexes until Of numbers the ones its proof keeps.
-    private readonly List<TokenRange> _leaves = [];
+    private readonly List<OperandScope> _scopes = [];
+
+    // The leaves of the item being proved, each with the rows it is asked over, which a Proof.Operand indexes until Of
+    // numbers the ones its proof keeps.
+    private readonly List<(TokenRange Range, OperandScope Scope)> _leaves = [];
 
     /// <summary>
-    /// The operands to ask, each text once, in the order the items' proofs first use them; a
+    /// The operands to ask, each text once in each scope, in the order the items' proofs first use them; a
     /// <see cref="Proof.Operand" /> indexes it.
     /// </summary>
     public IReadOnlyList<TokenRange> Operands => _operands;
+
+    /// <summary>The rows each operand of <see cref="Operands" /> is asked over, by its index.</summary>
+    public IReadOnlyList<OperandScope> Scopes => _scopes;
 
     /// <summary>The proof of an item's expression, in the select's context.</summary>
     /// <remarks>
@@ -91,9 +122,44 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
 
         _leaves.Clear();
         var proof = Expression(expression, rows: false);
-        return proof is Proof.Operand leaf && IsTheWholeItem(_leaves[leaf.Index], expression)
+        return !asksLoneLeaf && proof is Proof.Operand leaf && IsTheWholeItem(_leaves[leaf.Index].Range, expression)
             ? Proof.No
             : Numbered(proof);
+    }
+
+    /// <summary>
+    /// The proof that a branch's item gives the value of a column of a CLR type that no conversion made: the item, one
+    /// leaf whole, answered as a stored column (<see cref="Proof.Stored" />) of a type that may be a CLR type
+    /// (<see cref="Proof.Clr" />).  A set operator converts a branch of a string to a CLR type, and a string may parse
+    /// as the type's Null; two CLR types are never combined, so every branch shown so is of the column's type.
+    /// </summary>
+    /// <remarks>
+    /// A source and a type are the same in every context, so the leaf is asked under a grouping set too.  A literal, a
+    /// parameter, <c>NULL</c> and a leaf that holds what is never asked are no column, and prove nothing.
+    /// </remarks>
+    public Proof OfStoredClr(TokenRange expression)
+    {
+        _leaves.Clear();
+        if (
+            expression.IsEmpty
+            || (
+                expression.Count == 1
+                && (
+                    tokens[expression.Start].Kind
+                        is TsqlTokenKind.Parameter
+                            or TsqlTokenKind.String
+                            or TsqlTokenKind.Number
+                    || tokens[expression.Start].Is("NULL")
+                )
+            )
+            || HoldsWhatIsNeverAsked(expression)
+        )
+        {
+            return Proof.No;
+        }
+
+        _leaves.Add((expression, OperandScope.Rows));
+        return Numbered(new Proof.AllOf([new Proof.Stored(0), new Proof.Clr(0)]));
     }
 
     private static Proof AnyOf(IEnumerable<Proof> parts)
@@ -120,7 +186,18 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
         };
     }
 
-    private static Proof AllOf(IEnumerable<Proof> parts)
+    /// <summary>
+    /// The proof that the <c>LEFT JOIN</c>s the <c>WHERE</c> makes inner are so: for each, one of the columns that name
+    /// its source is stored.
+    /// </summary>
+    /// <param name="guards">The columns of each join, as <see cref="FilteredRows.CutGuards" /> gives them.</param>
+    public Proof OfInnerJoins(IReadOnlyList<IReadOnlyList<TokenRange>> guards)
+    {
+        _leaves.Clear();
+        return Numbered(AllOf(guards.Select(columns => AnyOf(columns.Select(Proof (column) => StoredLeaf(column))))));
+    }
+
+    internal static Proof AllOf(IEnumerable<Proof> parts)
     {
         var kept = new List<Proof>();
         foreach (var part in parts)
@@ -149,26 +226,31 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
     private static bool IsOperator(TsqlToken token) =>
         token.Kind == TsqlTokenKind.Symbol && token.Text is "+" or "-" or "*" or "/" or "%";
 
-    // The proof with each leaf it kept numbered as an operand, a text asked before taking its number.
+    // The proof with each leaf it kept numbered as an operand, a text asked before in its scope taking its number.
     private Proof Numbered(Proof proof) =>
         proof switch
         {
             Proof.Operand leaf => new Proof.Operand(OperandIndex(_leaves[leaf.Index])),
             Proof.NotClr leaf => new Proof.NotClr(OperandIndex(_leaves[leaf.Index])),
+            Proof.Stored leaf => new Proof.Stored(OperandIndex(_leaves[leaf.Index])),
+            Proof.Clr leaf => new Proof.Clr(OperandIndex(_leaves[leaf.Index])),
             Proof.AnyOf any => new Proof.AnyOf([.. any.Parts.Select(Numbered)]),
             Proof.AllOf all => new Proof.AllOf([.. all.Parts.Select(Numbered)]),
             _ => proof,
         };
 
-    private int OperandIndex(TokenRange range)
+    private int OperandIndex((TokenRange Range, OperandScope Scope) leaf)
     {
-        var index = _operands.FindIndex(operand => IsSameText(operand, range));
-        if (index >= 0)
+        for (var index = 0; index < _operands.Count; index++)
         {
-            return index;
+            if (_scopes[index] == leaf.Scope && IsSameText(_operands[index], leaf.Range))
+            {
+                return index;
+            }
         }
 
-        _operands.Add(range);
+        _operands.Add(leaf.Range);
+        _scopes.Add(leaf.Scope);
         return _operands.Count - 1;
     }
 
@@ -243,6 +325,11 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
     // The proof of a piece that is a primary, or null when it is none.
     private Proof? Primary(TokenRange piece, bool rows)
     {
+        if (AtTimeZoneOf(piece) is { } conversion)
+        {
+            return AtTimeZone(conversion, rows);
+        }
+
         var first = tokens[piece.Start];
         if (piece.Count == 1 && first.Kind is TsqlTokenKind.String or TsqlTokenKind.Number)
         {
@@ -320,7 +407,7 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
     {
         if (tokens[piece.Start].Is("CASE"))
         {
-            return Leaf(piece, rows);
+            return GuardOf(piece) is { } guard ? Guarded(guard, rows) : Leaf(piece, rows);
         }
 
         var inner = new TokenRange(piece.Start + 1, piece.End - 1);
@@ -375,8 +462,24 @@ internal sealed partial class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, 
             return Proof.No;
         }
 
-        _leaves.Add(range);
-        return new Proof.Operand(_leaves.Count - 1);
+        _leaves.Add((range, OperandScope.Rows));
+        var index = _leaves.Count - 1;
+
+        // A filter tests the value and the result reads it again, so what it keeps from NULL holds only of a value
+        // that gives one value in a row: a stored column.
+        Proof leaf =
+            filtered?.KeepsFromNull(range) == true
+                ? new Proof.AnyOf([new Proof.Operand(index), new Proof.Stored(index)])
+                : new Proof.Operand(index);
+
+        // A column of a CTE of several branches is not null when every branch proves it, which CteProofs decides.
+        // Its branches convert to the column's type, and a string converts to a CLR type's Null.
+        return filtered?.CteColumnOf(range) is { } column
+            ? new Proof.AnyOf([
+                leaf,
+                new Proof.AllOf([new Proof.NotClr(index), new Proof.CteColumn(column.Cte, column.Column)]),
+            ])
+            : leaf;
     }
 
     // OVER, an aggregate's name before "(", or a name after "." or "::" before "(", a call of a schema's name or a

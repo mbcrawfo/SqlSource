@@ -41,6 +41,7 @@ _ALLOWED_IN_QUERY = frozenset(
         MarkerKind.TOKEN,
         MarkerKind.TOKEN_IGNORE,
         MarkerKind.PARAM,
+        MarkerKind.VARIABLE,
         MarkerKind.COLUMN,
         MarkerKind.DATABASE,
         MarkerKind.OUTPUT,
@@ -128,7 +129,7 @@ class MarkerScope:
             self._add_invalid(marker)
             return
 
-        default_value = _without_comments(default_text, lexemes)
+        default_value = _without_comments(default_text, lexemes, self._rules)
         for existing in self.token_defaults:
             if existing.name == token.name:
                 if existing.value != default_value:
@@ -151,9 +152,9 @@ class MarkerScope:
 
 # The default as one in the SQL is read: built without comments by the builder of a query's SQL, then trimmed as the
 # token scanner trims it.  A default without a comment is its own text.
-def _without_comments(default_text: str, lexemes: list[Lexeme]) -> str:
+def _without_comments(default_text: str, lexemes: list[Lexeme], rules: DialectRules) -> str:
     if not any(lexeme.kind in (LexemeKind.LINE_COMMENT, LexemeKind.BLOCK_COMMENT) for lexeme in lexemes):
         return default_text
-    built = build(default_text, lexemes, 0, len(lexemes)).text
+    built = build(default_text, rules, lexemes, 0, len(lexemes)).text
     start, end = trim(built, 0, len(built))
     return built[start:end]

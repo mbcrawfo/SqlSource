@@ -39,7 +39,7 @@ internal sealed partial class TokenCheck
                     Whole(IsParameter(name), place, name);
                     break;
                 case SqlLexemeKind.LineComment:
-                    if (queryFile && SqlMarkerReader.Read(text, lexeme) is { } marker)
+                    if (queryFile && SqlMarkerReader.Read(text, lexeme, _rules) is { } marker)
                     {
                         Marker(text, marker, place);
                     }
@@ -89,6 +89,7 @@ internal sealed partial class TokenCheck
                 Name(value, NameClass.Database, place);
                 break;
             case SqlMarkerKind.Param:
+            case SqlMarkerKind.Variable:
             case SqlMarkerKind.Token:
                 Sql(value, place, queryFile: false);
                 break;

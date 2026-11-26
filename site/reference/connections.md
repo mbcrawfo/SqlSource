@@ -51,7 +51,8 @@ The environment wins over the `.env` file, variable by variable.  The file gives
 
 - the whole value of a connection, wherever the tool finds it;
 - each password of the connection string, where it stands apart from other letters, digits and underscores;
-- in the same way, a password that the PostgreSQL driver reads from `PGPASSWORD` or a password file, when the connection string gives none.
+- a password shorter than four characters, or one that is the name of its logical database or of its dialect, where a message gives it as the value of a password, as in `Password=pg;`;
+- in the same way, a password that the PostgreSQL driver reads from `PGPASSWORD`, or from the entry of a password file that it would use for the connection, when the connection string gives none.
 
 The tool finds the whole value as you wrote it, without the white space at its ends, or as the database driver writes it again.
 
@@ -123,19 +124,20 @@ If a line of a connection variable cannot be read, the tool reports [SQLSRC286](
 
 **What you see.**  A short password, or a connection string typed in the wrong place, can appear as written in the output or in a log.  These can appear:
 
-- a password shorter than four characters;
-- a password that is the name of its logical database or of its dialect, such as `postgres`;
+- a password shorter than four characters, where a message does not give it as the value of a password;
+- a password that is the name of its logical database or of its dialect, such as `postgres`, where a message does not give it as the value of a password;
 - the password of a PostgreSQL password file that is a pipe, such as `PGPASSFILE=<(...)` in a shell;
 - the login, in an error of SQL Server about a query, such as an error for a database that the login may not open;
-- a secret that holds neither `=` nor `;`, typed alone where a path goes, or as the value of `--log`, `--env-file` or `--out`.  The tool prints it as a path, and logs it as typed.  A path goes in these places: the path of `describe` or `diagnose`, a `.sql` path, a value of `--project`, `--query` or `--scrub`, and the bundle of `replay`.
+- a secret typed where a path goes that reads as a path, such as one that ends in `.sql` or names a file that exists.  The tool prints it as a path, and logs it as typed: see [how an error names a path](cli.md#paths).
 
-You can also see `***` in the place of a word that is not a secret, such as the name of a column.  That word equals a password that the tool hides.
+You can also see `***` in the place of a word that is not a secret, such as the name of a column.  That word equals a password that the tool hides.  In a log, `***` can also stand in the place of two values that together make a password, such as `postgres` and `1` for the password `postgres1`.
 
-**Why.**  The tool writes a connection value as `***` wherever it finds the whole value.  It writes each password of the value as `***` only where the password stands apart from other letters, digits and underscores.  It does the same for a password from `PGPASSWORD` or a PostgreSQL password file.  It hides every password of a password file that it reads, not only the one that the connection uses.  The tool leaves these passwords as they are:
+**Why.**  The tool writes a connection value as `***` wherever it finds the whole value.  It writes each password of the value as `***` only where the password stands apart from other letters, digits and underscores.  It does the same for a password from `PGPASSWORD` or a PostgreSQL password file.  From a password file, it hides the password of each entry that the connection may use, up to the first that the driver surely uses.  When neither the connection string nor `PGUSER` names the user, the tool cannot tell which user's entry the driver takes, so it hides the password of each of them.  The tool leaves these passwords as they are, but where a message gives one as the value of a password, as in `Password=pg;`:
 
 - a password shorter than four characters, which would match too much ordinary text;
-- a password that is the name of its logical database or of its dialect, because the tool prints these words anyway;
-- the password of a password file that is a pipe, because the tool leaves that file for the driver to read.
+- a password that is the name of its logical database or of its dialect, because the tool prints these words anyway.
+
+It leaves the password of a password file that is a pipe as it is, because the tool leaves that file for the driver to read.
 
 A password that the tool hides hides each word of a message that equals it, such as a column named like it.
 
@@ -143,14 +145,14 @@ SQL Server can name the login in an error about a query.  The tool prints and lo
 
 On the command line, the tool guards against a connection string typed in the wrong place:
 
-- It does not print a connection string typed where a path goes, or as the value of `--project`, `--query`, `--scrub` or `--out`.
+- It does not print a connection string typed where a path goes, nor a password typed there alone, such as `dotnet sqlsource describe S3cret`: see [how an error names a path](cli.md#paths).
 - It does not print a connection string typed after `--database`.
 - It does not print a connection string typed after `--connection` without its `name=`, except for its first word.  It prints that word, such as `Host`, only when the word is close to the name of a database of the run.  Nothing after the first `=` is printed.
 - In the log, it writes `***` for every value of `--database` and `--connection`.
-- In the log, it writes `***` for a path that holds `=` or `;`, a value of `--project`, `--query` or `--scrub` included.
+- In the log, it writes `***` for each path that an error would name by its position.
 - It refuses a `--log`, `--env-file` or `--out` path that holds `=` or `;`.
 
-To the tool, a secret that holds neither `=` nor `;` is a path like any other.
+A secret that reads as a path, as one that ends in `.sql` does, is printed as a path.
 
 **What to do.**
 

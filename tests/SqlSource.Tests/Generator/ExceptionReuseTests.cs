@@ -501,6 +501,22 @@ public sealed class ExceptionReuseTests
                     + Item(accessibility: "public", constructorAccessibility: "internal"),
                 internalsVisible: false
             ),
+            // Each of the three alone in the assembly, as the copies of a version that had fewer.
+            Old(RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")),
+            Old(RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")),
+            Old(Item()),
+            // A constructor that takes its last argument by reference is none that a generated method calls.
+            Old(
+                RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
+                    + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")
+                    + Item(parameters: "string queryName, int itemIndex, in System.Data.Common.DbException inner")
+            ),
+            // A second argument that is named Exception and is not System.Exception.
+            Old(
+                RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
+                    + RolledBack("System.InvalidOperationException", "string queryName, Elsewhere.Exception inner")
+                    + Item()
+            ) + "namespace Elsewhere { public class Exception : System.Exception { } }\n",
         ];
         var shapes = new TheoryData<string, bool>();
         foreach (var source in sources)

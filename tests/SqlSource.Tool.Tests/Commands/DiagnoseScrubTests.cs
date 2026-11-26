@@ -273,9 +273,31 @@ public sealed class DiagnoseScrubTests : IDisposable
         File.Exists(run.Folder.PathOf("report.zip")).ShouldBeFalse();
     }
 
+    // A raw bundle of an engine that this version does not describe is replay's SQLSRC291, and is not renamed.
+    [Fact]
+    public async Task Diagnose_ScrubOfABundleOfAnEngineWithNoDescriber_IsSQLSRC291()
+    {
+        using var run = new CliRun { ReleasedDescribers = true };
+        var folder = await OlderRawBundleAsync(run, "select-left-join", engine: "db2");
+        await EditAsync(Path.Combine(folder, BundleFiles.Capture), static capture => capture["engine"] = "db2");
+
+        var result = await run.RunAsync("diagnose", "--scrub", "old", "--out", "report.zip");
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                $"{folder} : error SQLSRC291: The bundle is of the engine 'db2', which this version of sqlsource does "
+                    + "not describe\n"
+                    + Expected.See("SQLSRC291")
+            )
+        );
+        File.Exists(run.Folder.PathOf("report.zip")).ShouldBeFalse();
+    }
+
     // A case of SQL Server's fixtures copied into the folder "old" of the run, as a raw bundle that sqlsource 1.4.0
-    // made; gives the folder's full path.
-    private static async Task<string> OlderRawBundleAsync(CliRun run, string name)
+    // made, whose bundle.json names the engine; gives the folder's full path.
+    private static async Task<string> OlderRawBundleAsync(CliRun run, string name, string engine = "mssql")
     {
         var folder = run.Folder.CreateFolder("old");
         foreach (var file in Directory.GetFiles(FixtureCases.Named("mssql", name).Folder))
@@ -283,7 +305,7 @@ public sealed class DiagnoseScrubTests : IDisposable
             File.Copy(file, Path.Combine(folder, Path.GetFileName(file)));
         }
 
-        var info = BundleInfos.Sample("mssql") with { ServerVersion = "17.0.1000.7" };
+        var info = BundleInfos.Sample(engine) with { ServerVersion = "17.0.1000.7" };
         await File.WriteAllTextAsync(
             Path.Combine(folder, BundleFiles.Info),
             BundleJson.Write(info),

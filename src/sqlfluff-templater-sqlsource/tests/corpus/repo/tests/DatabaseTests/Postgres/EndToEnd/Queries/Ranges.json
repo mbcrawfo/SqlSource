@@ -1,0 +1,41 @@
+{
+  "fileName": "Ranges.sql",
+  "settings": [
+    "{\n  // The dialect of every query of the project.\n  \"dialect\": \"postgres\",\n  // The logical database that a query is described against, unless its file names another.\n  \"database\": \"app\",\n  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.\n  \"output\": \"Methods\",\n  // The suffix of the model of a query's parameters.\n  \"inputModelSuffix\": \"Args\",\n  // The kind of type that a query's input model is.\n  \"inputModelType\": \"record\",\n  // The collection that a method returns the rows of a query whose shape is many in.\n  \"collectionType\": \"IReadOnlyList\",\n  \"typeOverrides\": {\n    // The C# type that timestamptz is read as, in place of the default of the type map.\n    \"timestamptz\": \"System.DateTimeOffset\",\n  },\n  \"libraryTypes\": {\n    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected\n    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.\n    \"nodaTime\": \"off\",\n    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets\n    // Npgsql.NetTopologySuite through the tool and references it for those queries.\n    \"netTopologySuite\": \"off\",\n  },\n}\n",
+    "{\n  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the\n  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that\n  // has no root file of its own.\n  \"root\": true,\n}\n"
+  ],
+  "input": "-- The queries of a range of a user's own, reading_range, and its multirange, claimed by RangeQueries.  The header's\n-- type overrides are the manual's mapping, NpgsqlRange<double> of the subtype float8, and an array of it for the\n-- multirange, and the methods run on EndToEndSources.AppWithUnmappedTypes.\n-- type-override: public.reading_range = NpgsqlTypes.NpgsqlRange<double>\n-- type-override: public.reading_multirange = NpgsqlTypes.NpgsqlRange<double>[]\n\n-- name: ListReadingsOverlapping -> many\n-- summary: The readings whose span overlaps a range.\nSELECT\n    id,\n    span,\n    spans\nFROM readings\nWHERE span && @within\nORDER BY id;\n",
+  "expected": {
+    "startDialect": "postgres",
+    "startOptions": [],
+    "dialect": "postgres",
+    "options": [],
+    "lexemes": [
+      ["LineComment", 0, 116],
+      ["Text", 116, 117],
+      ["LineComment", 117, 230],
+      ["Text", 230, 231],
+      ["LineComment", 231, 306],
+      ["Text", 306, 307],
+      ["LineComment", 307, 379],
+      ["Text", 379, 380],
+      ["LineComment", 380, 459],
+      ["Text", 459, 461],
+      ["LineComment", 461, 501],
+      ["Text", 501, 502],
+      ["LineComment", 502, 555],
+      ["Text", 555, 619],
+      ["Parameter", 619, 626],
+      ["Text", 626, 640]
+    ],
+    "spans": [
+      { "kind": "markerComment", "start": 307, "end": 379, "name": null, "default": null },
+      { "kind": "markerComment", "start": 380, "end": 459, "name": null, "default": null },
+      { "kind": "markerComment", "start": 461, "end": 501, "name": null, "default": null },
+      { "kind": "markerComment", "start": 502, "end": 555, "name": null, "default": null },
+      { "kind": "parameter", "start": 619, "end": 626, "name": "within", "default": null }
+    ],
+    "error": null,
+    "hasOtherErrors": false
+  }
+}

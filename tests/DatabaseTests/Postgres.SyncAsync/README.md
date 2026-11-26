@@ -50,7 +50,7 @@ It is a project of its own, apart from SQL Server's, since the generator finds a
 `Scenarios/` has a file for each query file of the end-to-end project, `<File>Scenarios.cs`, whose `All` lists its scenarios, and `AllScenarios.cs` lists the files.  `Calls.cs` has the setups they share and the helpers that name a scenario `<Host>.<Method>: <what>`, or `<Host>.<Method>, collection: <what>` for a collection method.  A scenario names its pair by the type that declares both methods and the synchronous method's name, and gives:
 
 - its input model or a collection method's items, and its tokens;
-- its setup: a connection open or closed, a caller's transaction begun or none, the data source by name (`default`, `multiplexing`, `nodatime`, `gis` or `billing`, each set up as `EndToEndSources` of the end-to-end project sets up its own), SQL to run on the connection before the call, whether it writes, and the `SELECT`s whose rows the outcome records;
+- its setup: a connection open or closed, a caller's transaction begun or none, the data source by name (`default`, `multiplexing`, `nodatime`, `unmapped`, `gis` or `billing`, each set up as `EndToEndSources` of the end-to-end project sets up its own), SQL to run on the connection before the call, whether it writes, and the `SELECT`s whose rows the outcome records;
 - a tag, which says what it shows: an ordinary result, a refused row count, a database error, or for a collection method an empty collection, a chunk boundary or a failure in a later chunk.
 
 A scenario holds no expected value: the asynchronous method's outcome is the one the synchronous method's is compared with.  A collection method's `transaction` value is its query's marker, so a scenario picks it by picking the query.

@@ -32,6 +32,8 @@ internal static class SharedOptions
 
     public const string EnvFile = "--env-file";
 
+    public const string Configuration = "--configuration";
+
     /// <summary>The environment variable that gives the log's path when <c>--log</c> does not.</summary>
     public const string LogVariable = "SQLSOURCE_LOG";
 
@@ -85,6 +87,21 @@ internal static class SharedOptions
                 "Read the connections from this .env file instead of the one in the folder of the solution or "
                 + "project; 'none' reads none.",
             HelpName = "path",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
+    /// <summary>
+    /// <c>--configuration</c>, which <c>PlanSteps.FindManifestsAsync</c> gives every run of MSBuild, as
+    /// <c>dotnet build -c</c> does.
+    /// </summary>
+    public static Option<string> ConfigurationOption() =>
+        new(Configuration)
+        {
+            Description =
+                "Read the projects in this configuration, as 'dotnet build -c' does, so that an attribute inside #if "
+                + "is read as that build reads it.  Each project's own default, Debug unless the environment says "
+                + "otherwise, when left out.",
+            HelpName = "name",
             Arity = ArgumentArity.ExactlyOne,
         };
 
@@ -197,6 +214,25 @@ internal static class SharedOptions
     }
 
     /// <summary>
+    /// What is wrong with a value of <c>--configuration</c>, as a whole line, or null: it is empty or white space, or
+    /// holds <c>=</c> or <c>;</c>, which are what a connection string is made of and no configuration's name holds, so
+    /// that the value may be one typed after the option.
+    /// </summary>
+    public static string? ProblemOfConfiguration(UsageValue configuration)
+    {
+        if (string.IsNullOrWhiteSpace(configuration.Text))
+        {
+            return $"{Cli.LinePrefix}the value of option '{Configuration}' at position {configuration.Position} is "
+                + "not a configuration's name";
+        }
+
+        return configuration.HoldsConnectionText
+            ? $"{Cli.LinePrefix}the value of option '{Configuration}' at position {configuration.Position} holds '=' "
+                + "or ';', which a configuration's name may not"
+            : null;
+    }
+
+    /// <summary>
     /// What is wrong with a value of <c>--log</c> as a path, as a whole line, or null: it is no path, or, without
     /// <c>--online</c>, it holds <c>=</c> or <c>;</c>.
     /// </summary>
@@ -233,7 +269,7 @@ internal static class SharedOptions
         // "=" and ";" are what a connection string is made of: the value may be one typed after the option.  The
         // build's paths may hold them, as a project's name may, and the owner ruled that a path the build writes is
         // no secret, so under --online a message prints such a path in full.
-        return !isOnline && !value.MayBePrintedAsPath
+        return !isOnline && value.HoldsConnectionText
             ? $"{Cli.LinePrefix}the value of option '{option}' at position {value.Position} holds '=' or ';', which "
                 + $"{ofWhat} may not"
             : null;
