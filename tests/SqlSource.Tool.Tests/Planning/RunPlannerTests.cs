@@ -725,6 +725,7 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_FileThatOnlyALeftOutProjectClaims_IsNotPlanned()
     {
         var (run, other, shared) = SharedWithALeftOutProject();
+        _ = other.AddSource("Own.cs", Plans.TypeNamed("Own"));
         _ = other.AddSql("Own.sql", "-- name: Own\nSELECT 3;\n");
 
         var files = WithOthers([run], other).Plan.Files;
@@ -732,12 +733,15 @@ public sealed class RunPlannerTests : IDisposable
         files.Select(file => file.Path).ShouldBe([shared]);
     }
 
-    // The left-out project's errors are its own build's, as a Source that is no literal.
+    // The left-out project's errors are its own build's: a Source that is no literal, and its own settings file's
+    // output that is not valid, which a file it lists reaches.
     [Fact]
     public void Plan_LeftOutProjectsErrors_AreNotReported()
     {
         var (run, other, _) = SharedWithALeftOutProject();
         _ = other.AddSource("Broken.cs", Plans.TypeNamed("Broken", "Source = Folder"));
+        other.Settings["output"] = "nonsense";
+        _ = other.AddSql("Own.sql", "-- name: Own\nSELECT 3;\n");
 
         var result = WithOthers([run], other);
 

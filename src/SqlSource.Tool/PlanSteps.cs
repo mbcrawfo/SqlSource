@@ -109,9 +109,9 @@ internal static class PlanSteps
     /// <summary>
     /// The projects of the unit that the command line runs, which <c>--project</c> narrows, and their manifests: the
     /// evaluation of each, in the configuration that <c>--configuration</c> names, and its manifest target.  A project
-    /// with an error is reported and has no manifest.  With <paramref name="readsOthers" />, a run that writes
-    /// sidecars, the projects of a solution that <c>--project</c> leaves out are evaluated too, for
-    /// <see cref="FoundProjects.Others" />.
+    /// with an error is reported and has no manifest.  With <paramref name="readsOthers" />, which every run of
+    /// <c>describe</c> gives, <c>--check</c> and a watch included, and <c>diagnose</c> does not, the projects of a
+    /// solution that <c>--project</c> leaves out are evaluated too, for <see cref="FoundProjects.Others" />.
     /// </summary>
     internal static Task<FoundProjects> FindManifestsAsync(
         RunUnit unit,

@@ -42,8 +42,8 @@ internal static class RunProjects
     /// </param>
     /// <param name="readsOthers">
     /// Whether the projects of a solution that <c>--project</c> leaves out are evaluated too, for
-    /// <see cref="FoundProjects.Others" />, so that a run that writes keeps what they need of a file they share with
-    /// it.
+    /// <see cref="FoundProjects.Others" />, so that <c>describe</c>, <c>--check</c> and a watch included, keeps what
+    /// they need of a file they share with the run.
     /// </param>
     public static async Task<FoundProjects> FindAsync(
         RunUnit unit,
@@ -77,8 +77,11 @@ internal static class RunProjects
         }
 
         // A project that --project leaves out is asked about only for what it needs of the files it shares with the
-        // run, in the same call, so that it costs no time of its own, and nothing is said of it: it may not even build.
-        var others = readsOthers ? [.. all.Except(projects, PathComparer)] : ImmutableArray<string>.Empty;
+        // run, and only when the run has a project to share them.  It is asked in the same call as the run's projects,
+        // so that they are evaluated side by side, though each costs an evaluation of its own.  Nothing is said of
+        // it: it may not even build.
+        var others =
+            readsOthers && !projects.IsEmpty ? [.. all.Except(projects, PathComparer)] : ImmutableArray<string>.Empty;
         foreach (var left in all.Except(projects, PathComparer).Except(others, PathComparer))
         {
             RunEvents.Project(reporter.Trace, left, evaluation: null);

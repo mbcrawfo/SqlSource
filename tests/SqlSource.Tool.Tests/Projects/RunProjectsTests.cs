@@ -93,7 +93,11 @@ public sealed class RunProjectsTests : IDisposable
         FindProjectsAsync(
             new RunUnit(RunUnitKind.Solution, _solution),
             readsOthers: true,
-            [.. named.Select((text, index) => new UsageValue(ProjectOption, text, 3 + (2 * index)))]
+            [
+                .. named.Select(
+                    (text, index) => new UsageValue(ProjectOption, text, 3 + (2 * index)) { MayBePrintedAsPath = true }
+                ),
+            ]
         );
 
     private Task<ImmutableArray<ProjectManifest>> FindInSolutionAsync(params string[] named) =>
@@ -325,6 +329,20 @@ public sealed class RunProjectsTests : IDisposable
         found.Manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(_b);
         found.Others.ShouldBeEmpty();
         _error.ToString().ShouldBeEmpty();
+    }
+
+    // A run that --project leaves with no project has no file for the others to share.
+    [Fact]
+    public async Task Find_NoProjectNamedOfTheSolutionReadingTheOthers_AsksAboutNone()
+    {
+        var typo = Path.Combine(_folder.Path, "Typo.csproj");
+
+        var found = await FindWithOthersAsync(typo);
+
+        found.Manifests.ShouldBeEmpty();
+        found.Others.ShouldBeEmpty();
+        _runner.Requests.ShouldBeEmpty();
+        _error.ToString().ShouldBe(Sqlsrc207(typo));
     }
 
     [Fact]
