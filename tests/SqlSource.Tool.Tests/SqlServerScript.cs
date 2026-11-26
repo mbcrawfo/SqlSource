@@ -155,6 +155,9 @@ internal sealed class SqlServerScript
     public SqlServerScript Table(SqlServerTableRequest request, SqlServerColumnsAnswer answer) =>
         Add(SqlServerCallNames.Table, request, answer);
 
+    public SqlServerScript Batch(SqlServerBatchRequest request, SqlServerBatchAnswer answer) =>
+        Add(SqlServerCallNames.Batch, request, answer);
+
     // "parameters" answering that the statement has none, then "columns" of the statement, for a test of its columns.
     public SqlServerScript NoParametersThenColumns(string sql, SqlServerColumnsAnswer answer) =>
         Parameters(new SqlServerParametersRequest(sql, null, null), new SqlServerParametersAnswer([], null))

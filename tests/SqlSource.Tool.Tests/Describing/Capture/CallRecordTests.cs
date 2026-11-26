@@ -57,6 +57,8 @@ public sealed class CallRecordTests
             .Select(static type => type.Name)
             .Order(StringComparer.Ordinal)
             .ShouldBe([
+                "SqlServerBatchAnswer",
+                "SqlServerBatchRequest",
                 "SqlServerColumnsAnswer",
                 "SqlServerColumnsRequest",
                 "SqlServerDeclaredAnswer",

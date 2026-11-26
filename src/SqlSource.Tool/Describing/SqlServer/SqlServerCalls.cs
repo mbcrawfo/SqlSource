@@ -305,6 +305,23 @@ internal sealed record SqlServerColumnRow(
 ) : ISqlServerTypeRow;
 
 /// <summary>
+/// The request of <c>batch</c>: <c>sys.sp_describe_first_result_set</c> of the query's SQL as written, with no
+/// declarations, which analyses the text as its own batch, as a query with no parameter runs.
+/// <c>sys.dm_exec_describe_first_result_set</c> analyses it as the body of a parameterized batch, where a
+/// <c>CREATE SCHEMA</c> is a syntax error.
+/// </summary>
+/// <param name="Sql">The query's SQL as written.</param>
+internal sealed record SqlServerBatchRequest(string Sql);
+
+/// <summary>How many columns the first result set of the batch has, or why the server could not say.</summary>
+/// <param name="Columns">
+/// The number of rows the procedure answered in browse mode 0, which adds no hidden column, when it raised nothing; or
+/// null.  0 is a statement with no result set.
+/// </param>
+/// <param name="Error">What the procedure raised, or why the server could not be asked; or null.</param>
+internal sealed record SqlServerBatchAnswer(int? Columns, SqlServerServerError? Error);
+
+/// <summary>
 /// The type a row of <c>sp_describe_undeclared_parameters</c> or of <c>sys.dm_exec_describe_first_result_set</c> gives,
 /// under the names of the latter, which <see cref="Types.SqlServerTypes" /> reads.  It adds no member to a record: a
 /// row of <c>sp_describe_undeclared_parameters</c> gives its <c>suggested_</c> columns through an explicit

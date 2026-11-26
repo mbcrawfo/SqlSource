@@ -29,6 +29,7 @@ public sealed class SqlServerFieldsTests
         [SqlServerCallNames.Operands] = (typeof(SqlServerColumnsRequest), typeof(SqlServerColumnsAnswer)),
         [SqlServerCallNames.Table] = (typeof(SqlServerTableRequest), typeof(SqlServerColumnsAnswer)),
         [SqlServerCallNames.Origins] = (typeof(SqlServerColumnsRequest), typeof(SqlServerColumnsAnswer)),
+        [SqlServerCallNames.Batch] = (typeof(SqlServerBatchRequest), typeof(SqlServerBatchAnswer)),
     };
 
     private static readonly string[] Methods =
@@ -41,6 +42,7 @@ public sealed class SqlServerFieldsTests
         "operands",
         "table",
         "origins",
+        "batch",
     ];
 
     private static readonly string[] SqlMethods = ["parameters", "probe", "declared", "columns", "operands", "origins"];
@@ -166,6 +168,7 @@ public sealed class SqlServerFieldsTests
             ["parameters answer.rows[].suggestedUserTypeSchema"] = FieldRule.Name(NameClass.Schema),
             ["parameters answer.rows[].suggestedUserTypeName"] = FieldRule.Name(NameClass.Type),
             ["parameters answer.rows[].suggestedAssemblyQualifiedTypeName"] = FieldRule.WholeName(NameClass.Type),
+            ["batch request.sql"] = FieldRule.Sql,
         };
         foreach (var method in Methods)
         {

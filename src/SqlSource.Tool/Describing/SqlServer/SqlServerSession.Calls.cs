@@ -89,6 +89,20 @@ internal sealed partial class SqlServerSession
             cancellationToken
         );
 
+    // The procedure's description of the query's text as its own batch, after "columns" refused it.
+    private Task<SqlServerBatchAnswer> BatchAsync(
+        string query,
+        SqlServerBatchRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        AskAsync(
+            SqlServerCallNames.Batch,
+            request,
+            _live.BatchAsync,
+            (asked, answer, durationMs) => SqlServerEvents.Batch(_log, query, asked, answer, durationMs),
+            cancellationToken
+        );
+
     private Task<SqlServerColumnsAnswer> TableAsync(
         string query,
         SqlServerTableRequest request,

@@ -1,0 +1,80 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null,
+        "database": "fixtures"
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "CREATE SCHEMA staging AUTHORIZATION dbo;",
+        "params": null,
+        "reused": null
+      },
+      "answer": {
+        "rows": [],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "sql": "CREATE SCHEMA staging AUTHORIZATION dbo;",
+        "params": null
+      },
+      "answer": {
+        "rows": null,
+        "errors": [
+          {
+            "number": 156,
+            "type": 2,
+            "message": "Incorrect syntax near the keyword 'SCHEMA'."
+          },
+          {
+            "number": 11501,
+            "type": 2,
+            "message": "The batch could not be analyzed because of compile errors."
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "batch",
+      "request": {
+        "sql": "CREATE SCHEMA staging AUTHORIZATION dbo;"
+      },
+      "answer": {
+        "columns": 0,
+        "error": null
+      }
+    }
+  ]
+}
