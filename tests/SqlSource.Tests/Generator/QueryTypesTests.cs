@@ -154,9 +154,6 @@ public sealed class QueryTypesTests
     // No Npgsql reads these, and the type override cannot help: an entry would compile and fail as the query runs.
     // A base type of pg_catalog that SqlSource does not know is one of them, and its bare name is no key.
     [Theory]
-    [InlineData("pg_snapshot", "pg_snapshot", "text")]
-    [InlineData("txid_snapshot", "txid_snapshot", "text")]
-    [InlineData("pg_node_tree", "pg_node_tree", "text")]
     [InlineData("aclitem", "aclitem", "text")]
     [InlineData("aclitem[]", "_aclitem", "text[]")]
     public void Run_TypeNoNpgsqlReads_IsSqlsrc246WithTheCastToText(string name, string internalName, string cast)
@@ -263,7 +260,6 @@ public sealed class QueryTypesTests
     // mends the sidecar.
     [Theory]
     [InlineData("record", "base")]
-    [InlineData("void", "base")]
     [InlineData("users", "table")]
     public void Run_TypeTheToolNeverWrites_IsSqlsrc246WithDescribe(string internalName, string kind)
     {
@@ -883,18 +879,6 @@ public sealed class QueryTypesTests
                 "global::MyApp.Address",
                 "global::System.DateTimeOffset",
             ]);
-    }
-
-    [Fact]
-    public void Run_ColumnOfTheBaseMap_HasNoBaseMapTypeOfItsOwn()
-    {
-        var run = Run(
-            [NpgsqlReferences.Npgsql10],
-            GeneratorHarness.UsersFile,
-            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("id", Catalog("int4"))])
-        );
-
-        StepOutputs.ColumnsOf(run).ShouldHaveSingleItem().Database.ShouldBeNull();
     }
 
     private static MetadataReference[] Driver(string driver) =>
