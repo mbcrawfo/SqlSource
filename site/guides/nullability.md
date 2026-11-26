@@ -156,7 +156,6 @@ On SQL Server, a column most often gets a nullable property when:
 - A filter keeps it from being null in a form such as `x IN (1, 2)` or `x BETWEEN 1 AND 2`.
 - It is a function such as `DATEFROMPARTS` or `SWITCHOFFSET`, even of values that are never null.
 - It is `CASE WHEN x IS NULL THEN 0 ELSE x END` of a computed column, a view's column or a subquery's expression.  Write `ISNULL(x, 0)`, which is never null.
-- It is a count or a sum in an `OUTPUT` clause.
 
 To fix one, [say that the column is never null](#not-null).  See [Which columns can be null](../reference/databases/sqlserver/nullability.md#nullability) and [the limit](../reference/databases/sqlserver/nullability.md#limit-columns-treated-as-nullable).
 

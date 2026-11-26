@@ -408,6 +408,113 @@ public sealed class SqlServerSessionProofTests
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Expression)]);
     }
 
+    // An UPDATE's inserted.nickname that the WHERE keeps asks "table" for the target, dbo.users, after "columns", and
+    // the match takes that answer and asks no second time: it keeps the proof when the table lists the column and has
+    // no sparse column set, and proves nothing when it has one or failed.
+    [Theory]
+    [InlineData("plain", false)]
+    [InlineData("column set", true)]
+    [InlineData("lost", true)]
+    public async Task DescribeAsync_UpdateInsertedKeptByTheWhere_AsksTheTargetOnceForTheProofAndTheMatch(
+        string how,
+        bool nullable
+    )
+    {
+        const string Sql =
+            "UPDATE dbo.users SET name = N'x' OUTPUT inserted.id, inserted.nickname WHERE nickname IS NOT NULL";
+        var table = new SqlServerTableRequest("dbo", "users");
+        var answer = how switch
+        {
+            "plain" => new SqlServerColumnsAnswer([IdColumn, NicknameColumn, Rowstat], null, null),
+            "column set" => new SqlServerColumnsAnswer(
+                [
+                    IdColumn,
+                    NicknameColumn,
+                    NicknameColumn with
+                    {
+                        ColumnOrdinal = 3,
+                        Name = "cs",
+                        SystemTypeName = "xml",
+                        SourceColumn = "cs",
+                        IsSparseColumnSet = true,
+                    },
+                    Rowstat with
+                    {
+                        ColumnOrdinal = 4,
+                    },
+                ],
+                null,
+                null
+            ),
+            _ => new SqlServerColumnsAnswer(null, null, Lost),
+        };
+        var script = Script(Sql, [IdColumn, NicknameColumn, Rowstat with { ColumnOrdinal = 3 }]).Table(table, answer);
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        asked.ShouldBe([
+            Call(Calls.Parameters, new SqlServerParametersRequest(Sql, null, null)),
+            Call(Calls.Columns, new SqlServerColumnsRequest(Sql, null)),
+            Call(Calls.Table, table),
+        ]);
+        if (how == "lost")
+        {
+            _ = described.Failure.ShouldNotBeNull();
+            return;
+        }
+
+        Nullability(described)[1]
+            .ShouldBe(
+                nullable
+                    ? (true, SidecarValues.NullableSource.Server)
+                    : (false, SidecarValues.NullableSource.Expression)
+            );
+    }
+
+    // The target is asked though the match needs no table, since an item has no origin, and a failed answer then
+    // proves nothing and fails nothing.
+    [Theory]
+    [InlineData("plain", false)]
+    [InlineData("lost", true)]
+    public async Task DescribeAsync_UpdateInsertedKeptByTheWhereWithoutAMatch_AsksTheTarget(string how, bool nullable)
+    {
+        const string Sql =
+            "UPDATE dbo.users SET name = N'x' OUTPUT inserted.nickname, 1 AS one WHERE nickname IS NOT NULL";
+        var table = new SqlServerTableRequest("dbo", "users");
+        var answer =
+            how == "plain"
+                ? new SqlServerColumnsAnswer([IdColumn, NicknameColumn, Rowstat], null, null)
+                : new SqlServerColumnsAnswer(null, null, Lost);
+        var script = Script(
+                Sql,
+                [
+                    NicknameColumn with
+                    {
+                        ColumnOrdinal = 1,
+                    },
+                    ExpressionRow(2, "one") with
+                    {
+                        IsNullable = false,
+                    },
+                    Rowstat with
+                    {
+                        ColumnOrdinal = 3,
+                    },
+                ]
+            )
+            .Table(table, answer);
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        asked.Select(static call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns, Calls.Table]);
+        Nullability(described)[0]
+            .ShouldBe(
+                nullable
+                    ? (true, SidecarValues.NullableSource.Server)
+                    : (false, SidecarValues.NullableSource.Expression)
+            );
+    }
+
     private static readonly SqlServerTableRequest Products = new("dbo", "products");
 
     // dbo.products of the realistic schema as "table" describes it: list_price NOT NULL, discount_pct NULL and

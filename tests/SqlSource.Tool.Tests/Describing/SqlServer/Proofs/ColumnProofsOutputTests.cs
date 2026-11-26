@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Shouldly;
@@ -68,8 +69,17 @@ public sealed partial class ColumnProofsOutputTests
         JOIN due AS d ON d.order_id = o.id;
         """;
 
+    // The statements of the review that assign the column set cs of dbo.t, whose sparse column s1 is NULL afterwards
+    // in a row the WHERE kept.
+    private const string SparseSetXml = "UPDATE dbo.t SET cs = '<s2>1</s2>' OUTPUT inserted.s1 WHERE s1 IS NOT NULL";
+    private const string SparseSetNull = "UPDATE dbo.t SET cs = NULL OUTPUT inserted.s1 WHERE s1 IS NOT NULL";
+    private const string SparseSetFromAlias =
+        "UPDATE o SET o.cs = NULL OUTPUT inserted.s1 FROM dbo.t AS o WHERE o.s1 IS NOT NULL";
+
     // Everything a pseudo-table's column may be: the server answers each operand not null and stored, of no CLR type.
     private static readonly OperandFacts Proving = new(NotNull: true, NotClr: true, Stored: true);
+
+    private static readonly (string Schema, string Table) Orders = ("dbo", "orders");
 
     // A stored column of a table, in the place given, its name the column's.
     private static SqlServerColumnRow Stored(int ordinal, string name, bool nullable, string table = "orders") =>
@@ -84,11 +94,12 @@ public sealed partial class ColumnProofsOutputTests
         };
 
     // The OUTPUT of the realistic update proves inserted.shipped_at, which the WHERE keeps from NULL and the SET does
-    // not write, by the text, and nothing else: inserted.ship_city is kept by nothing, and c.email alone is what the
-    // server answered.  So nothing is asked.
+    // not write, by the text over the rows of "table" for dbo.orders, and nothing else: inserted.ship_city is kept by
+    // nothing, and c.email alone is what the server answered.  So no operand is asked.
     [Fact]
     public void UpdateFromJoinOutput_ShippedAtKeptByTheWhere_IsProved()
     {
+        var shippedAt = Stored(4, "shipped_at", nullable: true);
         var proofs = Read(
             UpdateFromJoin,
             Stored(1, "id", nullable: false) with
@@ -100,7 +111,7 @@ public sealed partial class ColumnProofsOutputTests
                 Name = "previous_status",
             },
             Stored(3, "status", nullable: false),
-            Stored(4, "shipped_at", nullable: true),
+            shippedAt,
             Stored(5, "ship_city", nullable: true),
             Stored(6, "name", nullable: false, "customers") with
             {
@@ -113,7 +124,8 @@ public sealed partial class ColumnProofsOutputTests
         );
 
         proofs.OperandQueries.ShouldBeEmpty();
-        Nullability(proofs.Apply(null))
+        proofs.ProofTables.ShouldBe([Orders]);
+        Nullability(proofs.Apply(null, null, TablesOf(proofs, shippedAt)))
             .ShouldBe([
                 (false, SidecarValues.NullableSource.Server),
                 (false, SidecarValues.NullableSource.Server),
@@ -250,11 +262,106 @@ public sealed partial class ColumnProofsOutputTests
     )]
     public void DeleteDeleted_KeptByTheWhere_IsProved(string sql) => ShouldProveByTheText(sql);
 
-    // inserted holds the value the WHERE tested when the SET writes no column of its name.
+    // inserted holds the value the WHERE tested when the SET writes no column of its name, and "table" for the target
+    // shows no sparse column set and lists the column; without that answer it proves nothing.
     [Theory]
     [InlineData("UPDATE dbo.orders SET note = NULL OUTPUT inserted.shipped_at WHERE shipped_at IS NOT NULL")]
     [InlineData("UPDATE o SET note = @n OUTPUT inserted.shipped_at FROM dbo.orders AS o WHERE shipped_at IS NOT NULL")]
-    public void UpdateInserted_KeptByTheWhereAndNotWritten_IsProved(string sql) => ShouldProveByTheText(sql);
+    public void UpdateInserted_KeptByTheWhereAndNotWritten_IsProved(string sql)
+    {
+        var shippedAt = Stored(1, "shipped_at", nullable: true);
+        var proofs = Read(sql, shippedAt);
+
+        proofs.OperandQueries.ShouldBeEmpty();
+        proofs.ProofTables.ShouldBe([Orders]);
+        Nullability(proofs.Apply(null, null, TablesOf(proofs, shippedAt)))
+            .ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // Assigning a sparse column set writes every sparse column its XML leaves out, so inserted.s1 of dbo.t (id, s1 and
+    // s2 SPARSE NULL, cs the column set) is NULL though the WHERE kept it.  "table" for the target is the proof's
+    // condition: an answer with the column set, one that lacks the column, as SELECT * lacks a sparse column of a
+    // table with a column set, and none, or one with an error, prove nothing; a plain table's answer keeps the proof.
+    [Theory]
+    [InlineData(SparseSetXml, "column set", true)]
+    [InlineData(SparseSetNull, "column set", true)]
+    [InlineData(SparseSetFromAlias, "column set", true)]
+    [InlineData(SparseSetXml, "as the server answers", true)]
+    [InlineData(SparseSetNull, "as the server answers", true)]
+    [InlineData(SparseSetFromAlias, "as the server answers", true)]
+    [InlineData(SparseSetXml, "lacks the column", true)]
+    [InlineData(SparseSetNull, "lacks the column", true)]
+    [InlineData(SparseSetFromAlias, "lacks the column", true)]
+    [InlineData(SparseSetXml, "not asked", true)]
+    [InlineData(SparseSetNull, "not asked", true)]
+    [InlineData(SparseSetFromAlias, "not asked", true)]
+    [InlineData(SparseSetXml, "plain", false)]
+    [InlineData(SparseSetNull, "plain", false)]
+    [InlineData(SparseSetFromAlias, "plain", false)]
+    public void UpdateInserted_KeptByTheWhereOfATableWithAColumnSet_StaysNullable(
+        string sql,
+        string answer,
+        bool nullable
+    )
+    {
+        var s1 = Stored(1, "s1", nullable: true, "t");
+        var proofs = Read(sql, s1);
+        var id = Stored(1, "id", nullable: false, "t");
+        var s2 = Stored(2, "s2", nullable: true, "t");
+        var columnSet = Stored(3, "cs", nullable: true, "t") with { SystemTypeName = "xml", IsSparseColumnSet = true };
+        IReadOnlyList<SqlServerColumnRow>? rows = answer switch
+        {
+            "column set" => [id, s1 with { ColumnOrdinal = 2 }, columnSet, Rowstat with { ColumnOrdinal = 4 }],
+            "as the server answers" => [id, columnSet with { ColumnOrdinal = 2 }, Rowstat with { ColumnOrdinal = 3 }],
+            "lacks the column" => [id, s2, Rowstat with { ColumnOrdinal = 3 }],
+            "plain" =>
+            [
+                id,
+                s1 with
+                {
+                    ColumnOrdinal = 2,
+                },
+                s2 with
+                {
+                    ColumnOrdinal = 3,
+                },
+                Rowstat with
+                {
+                    ColumnOrdinal = 4,
+                },
+            ],
+            _ => null,
+        };
+
+        proofs.OperandQueries.ShouldBeEmpty();
+        proofs.ProofTables.ShouldBe([("dbo", "t")]);
+        var tables = new Dictionary<(string Schema, string Table), IReadOnlyList<SqlServerColumnRow>>();
+        if (rows is not null)
+        {
+            tables[("dbo", "t")] = rows;
+        }
+
+        Nullability(proofs.Apply(null, null, tables))
+            .ShouldBe([
+                nullable
+                    ? (true, SidecarValues.NullableSource.Server)
+                    : (false, SidecarValues.NullableSource.Expression),
+            ]);
+    }
+
+    // deleted holds the value the WHERE tested, which no assignment of a column set changes, so it asks nothing.
+    [Theory]
+    [InlineData("UPDATE dbo.t SET cs = '<s2>1</s2>' OUTPUT deleted.s1 WHERE s1 IS NOT NULL")]
+    [InlineData("UPDATE o SET o.cs = NULL OUTPUT deleted.s1 FROM dbo.t AS o WHERE o.s1 IS NOT NULL")]
+    public void UpdateDeleted_KeptByTheWhereOfATableWithAColumnSet_IsProvedWithoutTable(string sql)
+    {
+        var proofs = Read(sql, Stored(1, "s1", nullable: true, "t"));
+
+        proofs.OperandQueries.ShouldBeEmpty();
+        proofs.ProofTables.ShouldBeEmpty();
+        Nullability(proofs.Apply(null)).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+    }
 
     // A value of the text alone needs no rows, and one the server must answer is asked of none without a FROM.
     [Theory]
@@ -441,22 +548,43 @@ public sealed partial class ColumnProofsOutputTests
         ShouldAskNoPseudoTable(proofs);
     }
 
+    // A proof of deleted by the WHERE, which needs no "table".
     private static void ShouldProveByTheText(string sql)
     {
         var proofs = Read(sql, Stored(1, "shipped_at", nullable: true));
 
         proofs.OperandQueries.ShouldBeEmpty();
+        proofs.ProofTables.ShouldBeEmpty();
         Nullability(proofs.Apply(null)).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
     }
 
+    // Nothing is proved though every operand asked is answered proving and every table asked lists the column.
     private static void ShouldProveNothing(string sql, SqlServerColumnRow row)
     {
         var proofs = Read(sql, row);
 
         ShouldAskNoPseudoTable(proofs);
         var asked = proofs.OperandQueries.Sum(static query => query.Count);
-        Nullability(proofs.Apply([.. Enumerable.Repeat(Proving, asked)]))
+        Nullability(proofs.Apply([.. Enumerable.Repeat(Proving, asked)], null, TablesOf(proofs, row)))
             .ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // The rows of "table" for each table the proofs ask: the rows given, each named as its source column, of no
+    // sparse column set, and the hidden row.
+    private static Dictionary<(string Schema, string Table), IReadOnlyList<SqlServerColumnRow>> TablesOf(
+        ColumnProofs proofs,
+        params SqlServerColumnRow[] rows
+    )
+    {
+        IReadOnlyList<SqlServerColumnRow> described =
+        [
+            .. rows.Select(static (row, index) => row with { ColumnOrdinal = index + 1, Name = row.SourceColumn }),
+            Rowstat with
+            {
+                ColumnOrdinal = rows.Length + 1,
+            },
+        ];
+        return proofs.ProofTables.ToDictionary(static table => table, _ => described);
     }
 
     private static void ShouldAskNoPseudoTable(ColumnProofs proofs)

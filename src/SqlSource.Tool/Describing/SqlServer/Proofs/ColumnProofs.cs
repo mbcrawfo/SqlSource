@@ -44,7 +44,7 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// then proved by the catalog, with the <c>nullableSource</c> <c>catalog</c>.  Any other of a <c>SELECT</c>, of no CLR
 /// type, with its <see cref="SqlServerColumnRow.ComputedDefinition" />, is proved with the <c>nullableSource</c>
 /// <c>expression</c> when <see cref="ComputedProofs.Proves" /> holds of its definition over the rows of <c>table</c>
-/// for its table, which <see cref="ComputedTables" /> names.  A <c>*</c> gets no proof of a form and asks no operand:
+/// for its table, which <see cref="ProofTables" /> names.  A <c>*</c> gets no proof of a form and asks no operand:
 /// these are the proofs it can have.
 /// </para>
 /// <para>
@@ -57,12 +57,14 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// pseudo-table's column alone whose row is stored is proved when the <c>WHERE</c> keeps the target's column of its
 /// name from <c>NULL</c> (<see cref="OutputStatement.IsTargetColumn" />): <c>deleted</c> holds the value it tested,
 /// and <c>inserted</c> holds it still when the <c>SET</c> writes no column of that name
-/// (<see cref="OutputStatement.Writes" />).  An <c>inserted</c> column that one assignment writes is proved by the
-/// value it writes (<see cref="ExpressionProofs.OfAssigned" />).  Every other item of an <c>UPDATE</c> or a
-/// <c>DELETE</c> that names no pseudo-table is proved as the item of one <c>SELECT</c> over the statement's
-/// <c>FROM</c> and <c>WHERE</c>: the server refuses a pseudo-table's column in a <c>SELECT</c>, and the whole call
-/// with it, so nothing that names one is asked.  Without a <c>FROM</c> there are no rows to ask over, and only a proof
-/// of the text alone holds.
+/// (<see cref="OutputStatement.Writes" />) and the rows of <c>table</c> for the target, which
+/// <see cref="ProofTables" /> names, hold no sparse column set and a visible row of the column's name: a column set's
+/// assignment writes every sparse column its XML leaves out.  An <c>inserted</c> column that one assignment writes
+/// is proved by the value it writes (<see cref="ExpressionProofs.OfAssigned" />).  Every other item of an
+/// <c>UPDATE</c> or a <c>DELETE</c> that names no pseudo-table is proved as the item of one <c>SELECT</c> over the
+/// statement's <c>FROM</c> and <c>WHERE</c>: the server refuses a pseudo-table's column in a <c>SELECT</c>, and the
+/// whole call with it, so nothing that names one is asked.  Without a <c>FROM</c> there are no rows to ask over, and
+/// only a proof of the text alone holds.
 /// </para>
 /// </remarks>
 internal sealed class ColumnProofs
@@ -96,6 +98,10 @@ internal sealed class ColumnProofs
     // The computed column of a table that each column, by its place, is read as a row of and may be proved by, or null.
     private readonly IReadOnlyList<ComputedColumn?> _computed;
 
+    // The target's column that each column, by its place, is an inserted column of whose proof by the WHERE holds only
+    // when "table" for the target shows no assignment writes it unseen, or null.
+    private readonly IReadOnlyList<TargetColumn?> _unwritten;
+
     // The CTE columns the proofs read.
     private readonly CteProofs _ctes;
 
@@ -107,7 +113,8 @@ internal sealed class ColumnProofs
         IReadOnlyList<bool> asksOrigin,
         IReadOnlyList<OperandQuery> operandQueries,
         IReadOnlyList<ComputedColumn?>? computed = null,
-        CteProofs? ctes = null
+        CteProofs? ctes = null,
+        IReadOnlyList<TargetColumn?>? unwritten = null
     )
     {
         _columns = columns;
@@ -116,11 +123,16 @@ internal sealed class ColumnProofs
         _clrNull = clrNull;
         _asksOrigin = asksOrigin;
         _computed = computed ?? [];
+        _unwritten = unwritten ?? [];
         _ctes = ctes ?? CteProofs.None;
         OperandQueries = operandQueries;
-        ComputedTables =
+        ProofTables =
         [
-            .. _computed.OfType<ComputedColumn>().Select(static column => (column.Schema, column.Table)).Distinct(),
+            .. Enumerable
+                .Range(0, Math.Max(_computed.Count, _unwritten.Count))
+                .Select(TableOf)
+                .OfType<(string Schema, string Table)>()
+                .Distinct(),
         ];
     }
 
@@ -139,9 +151,11 @@ internal sealed class ColumnProofs
 
     /// <summary>
     /// The tables to ask <c>table</c> for, each once, in the order of the columns: each of a computed column that a
-    /// column is read as a row of, whose definition its rows may prove.  <see cref="Apply" /> reads their answers.
+    /// column is read as a row of, whose definition its rows may prove, and each target of an <c>UPDATE</c> whose
+    /// <c>inserted</c> column the <c>WHERE</c> may prove, whose rows must show that no assignment writes it unseen.
+    /// <see cref="Apply" /> reads their answers.
     /// </summary>
-    public IReadOnlyList<(string Schema, string Table)> ComputedTables { get; }
+    public IReadOnlyList<(string Schema, string Table)> ProofTables { get; }
 
     /// <summary>
     /// Whether each column, by its place, is a stored column of a table in the answer of <c>origins</c>, which names
@@ -333,6 +347,7 @@ internal sealed class ColumnProofs
         var kept = RowFilter.Read(tokens, rows.Where).Columns;
         var parts = new List<Proof>?[visible.Count];
         var catalog = new bool[visible.Count];
+        var unwritten = new TargetColumn?[visible.Count];
         for (var index = 0; index < visible.Count; index++)
         {
             var expression = rows.Items[index].Expression;
@@ -362,6 +377,17 @@ internal sealed class ColumnProofs
             if (pseudo is { Column: { } column } of)
             {
                 part = OfPseudoColumn(tokens, output, of.IsInserted, column, row, kept, asking);
+
+                // A WHERE's proof of inserted needs the target's rows of "table": a sparse column set's assignment
+                // writes every sparse column its XML leaves out, which no assignment names.
+                if (part is not null && of.IsInserted && !output.Writes(column))
+                {
+                    unwritten[index] = row
+                        is { SourceSchema: { } schema, SourceTable: { } table, SourceColumn: { } name }
+                        ? new TargetColumn(schema, table, name)
+                        : null;
+                    part = unwritten[index] is null ? null : part;
+                }
             }
             else
             {
@@ -382,14 +408,15 @@ internal sealed class ColumnProofs
             parts,
             described,
             catalog,
-            computed: null
+            computed: null,
+            unwritten
         );
     }
 
     // The proof of a pseudo-table's column alone of an UPDATE or a DELETE, or null: the WHERE keeps the target's
     // stored column of its name from NULL, which deleted holds as it was tested, and inserted holds when the SET
-    // writes no column of that name; or the value of the one assignment that writes it, for inserted, when it names no
-    // pseudo-table.
+    // writes no column of that name, which the caller also asks "table" to show; or the value of the one assignment
+    // that writes it, for inserted, when it names no pseudo-table.
     private static Proof? OfPseudoColumn(
         IReadOnlyList<TsqlToken> tokens,
         OutputStatement output,
@@ -426,7 +453,8 @@ internal sealed class ColumnProofs
         IReadOnlyList<List<Proof>?> parts,
         Described described,
         IReadOnlyList<bool> catalog,
-        IReadOnlyList<ComputedColumn?>? computed
+        IReadOnlyList<ComputedColumn?>? computed,
+        IReadOnlyList<TargetColumn?>? unwritten = null
     )
     {
         // What the server answers of a branch whose text cuts a LEFT holds only when that cut does.  A proof of the
@@ -479,7 +507,8 @@ internal sealed class ColumnProofs
             described.AsksOrigin,
             [.. queries, .. ctes.OperandQueries],
             computed,
-            ctes
+            ctes,
+            unwritten
         );
     }
 
@@ -497,7 +526,7 @@ internal sealed class ColumnProofs
     /// The answer of <c>origins</c> as <see cref="OriginsOf" /> reads it, or null when it was not asked or shows none.
     /// </param>
     /// <param name="tables">
-    /// The rows of <c>table</c> for each table of <see cref="ComputedTables" /> that it answered with rows, the hidden
+    /// The rows of <c>table</c> for each table of <see cref="ProofTables" /> that it answered with rows, the hidden
     /// ones included; a table it was not asked for, or that it answered with an error or error rows, proves nothing.
     /// </param>
     public IReadOnlyList<BuiltColumn> Apply(
@@ -608,7 +637,12 @@ internal sealed class ColumnProofs
         }
 
         var isProved =
-            (index < _proofs.Count && _proofs[index] is { } proof && _ctes.Holds(proof, answers))
+            (
+                index < _proofs.Count
+                && _proofs[index] is { } proof
+                && _ctes.Holds(proof, answers)
+                && (index >= _unwritten.Count || _unwritten[index] is not { } target || IsUnwritten(target, tables))
+            )
             || (
                 index < _computed.Count
                 && _computed[index] is { } computed
@@ -618,6 +652,31 @@ internal sealed class ColumnProofs
             );
         return isProved ? SidecarValues.NullableSource.Expression : null;
     }
+
+    // The table asked for the column in the place: its computed column's, or the target's of its inserted column that
+    // the WHERE may prove; or null.
+    private (string Schema, string Table)? TableOf(int index)
+    {
+        if (index < _computed.Count && _computed[index] is { } computed)
+        {
+            return (computed.Schema, computed.Table);
+        }
+
+        return index < _unwritten.Count && _unwritten[index] is { } target ? (target.Schema, target.Table) : null;
+    }
+
+    // True when the rows of "table" for the target show that no assignment writes its column unseen: they hold no
+    // sparse column set, whose assignment writes every sparse column its XML leaves out, and a visible row of the
+    // column's name, compared ordinally, which SELECT * leaves out for a sparse column of a table with a column set.
+    // A table not asked, or answered with an error or error rows, shows nothing.
+    private static bool IsUnwritten(
+        TargetColumn target,
+        IReadOnlyDictionary<(string Schema, string Table), IReadOnlyList<SqlServerColumnRow>>? tables
+    ) =>
+        tables is not null
+        && tables.TryGetValue((target.Schema, target.Table), out var rows)
+        && !rows.Any(static row => row.IsSparseColumnSet == true)
+        && SqlServerColumns.Visible(rows).Any(row => string.Equals(row.Name, target.Column, StringComparison.Ordinal));
 
     // The column as the proofs answer it.
     private BuiltColumn Applied(
@@ -702,6 +761,9 @@ internal sealed class ColumnProofs
 
     // A computed column of a table: its schema, its table and its definition, as the catalog holds them.
     private sealed record ComputedColumn(string Schema, string Table, string Definition);
+
+    // A column of an UPDATE's target, as the server names its source: its schema, its table and its name.
+    private sealed record TargetColumn(string Schema, string Table, string Column);
 
     // A pseudo-table's column alone, or its "*" with no column.
     private readonly record struct PseudoColumn(bool IsInserted, string? Column);

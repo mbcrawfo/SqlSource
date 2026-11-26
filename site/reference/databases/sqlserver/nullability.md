@@ -92,7 +92,7 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 
 - **A computed column declared `PERSISTED NOT NULL`**, as `inserted.total`, or a column of `inserted.*` or `deleted.*` when that is the only item.  The statement must change a table, and not a view.
 - **A `deleted` column that the `WHERE` keeps from being null**, as `deleted.shipped_at` in `WHERE shipped_at IS NOT NULL`.  `deleted` holds the value that the `WHERE` tested, whatever the `SET` writes.
-- **An `inserted` column of an `UPDATE` that the `WHERE` keeps from being null, when the `SET` does not write that column.**
+- **An `inserted` column of an `UPDATE` that the `WHERE` keeps from being null, when the `SET` does not write that column.**  The table that the statement changes must have no column set, and `SELECT *` of that table must return the column.
 - **An `inserted` column of an `UPDATE` whose `SET` writes a value that is never null**, by the items above, as `inserted.note` in `SET note = N'shipped'`.  If the value needs the answer of SQL Server, such as a column or `CONCAT` of one, the `UPDATE` must have a `FROM`.
 - **Any other column of an `UPDATE` or a `DELETE`, by the items above**, read as a column of a `SELECT` over the statement's `FROM` and `WHERE`, such as `ISNULL(c.email, c.name)` of a table that the `FROM` joins.  Without a `FROM`, a value that needs the answer of SQL Server, such as a column, does not count.
 
@@ -153,6 +153,7 @@ These answers assume that the connection that runs the query leaves `ANSI_WARNIN
   - an expression of an `inserted` or `deleted` column, such as `COALESCE(inserted.note, N'')` or `(inserted.total)`;
   - a column of an `INSERT` that is not a `PERSISTED NOT NULL` computed column;
   - a `SET` value of `DEFAULT`;
+  - an `inserted` column that only the `WHERE` keeps from being null, in a table with a column set, `COLUMN_SET FOR ALL_SPARSE_COLUMNS`, since a `SET` of the column set writes null to each sparse column that its XML leaves out;
   - in an `UPDATE` or a `DELETE` without a `FROM`, a value that needs the answer of SQL Server, such as a column;
   - an `UPDATE` or a `DELETE` that changes a table through a view, a `WITH` query or a subquery, or that names it otherwise beside a `FROM`, as in `UPDATE dbo.orders ... FROM dbo.orders AS o`;
   - an `UPDATE` or a `DELETE` whose `FROM` holds an `APPLY`, a comma, a join hint, a table function, `FOR SYSTEM_TIME`, a join in parentheses or a table named `inserted` or `deleted`, or with `WHERE CURRENT OF`.

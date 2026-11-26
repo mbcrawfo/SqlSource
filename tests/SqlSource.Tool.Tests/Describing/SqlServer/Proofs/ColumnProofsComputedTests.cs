@@ -88,7 +88,7 @@ public sealed class ColumnProofsComputedTests
         var proofs = Read(sql, ProductId, SalePriceColumn(2));
 
         proofs.OperandQueries.ShouldBeEmpty();
-        proofs.ComputedTables.ShouldBe([ProductsTable]);
+        proofs.ProofTables.ShouldBe([ProductsTable]);
         Nullability(proofs.Apply(null, null, Tables()))
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Expression)]);
         Nullability(proofs.Apply(null, null, Tables(listPriceNullable: true)))
@@ -108,7 +108,7 @@ public sealed class ColumnProofsComputedTests
     {
         var proofs = Read(sql, ProductId, SalePriceColumn(2));
 
-        proofs.ComputedTables.ShouldBe([ProductsTable]);
+        proofs.ProofTables.ShouldBe([ProductsTable]);
         Nullability(proofs.Apply(null, null, Tables()))
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Expression)]);
     }
@@ -160,7 +160,7 @@ public sealed class ColumnProofsComputedTests
     {
         var proofs = Read(sql, ProductId, SalePriceColumn(2));
 
-        proofs.ComputedTables.ShouldBeEmpty();
+        proofs.ProofTables.ShouldBeEmpty();
         Nullability(proofs.Apply(null, null, Tables()))[^1].ShouldBe((true, SidecarValues.NullableSource.Server));
     }
 
@@ -190,12 +190,12 @@ public sealed class ColumnProofsComputedTests
 
         var proofs = Read("SELECT id, sale_price FROM dbo.products", ProductId, row);
 
-        proofs.ComputedTables.ShouldBeEmpty();
+        proofs.ProofTables.ShouldBeEmpty();
     }
 
     // Each table once, in the order of the columns.
     [Fact]
-    public void ComputedTables_TwoColumnsOfOneTable_AskItOnce()
+    public void ProofTables_TwoColumnsOfOneTable_AskItOnce()
     {
         var proofs = Read(
             "SELECT p.sale_price, p.sale_price AS again, o.total FROM dbo.products AS p "
@@ -213,7 +213,7 @@ public sealed class ColumnProofsComputedTests
             }
         );
 
-        proofs.ComputedTables.ShouldBe([ProductsTable, ("dbo", "orders")]);
+        proofs.ProofTables.ShouldBe([ProductsTable, ("dbo", "orders")]);
     }
 
     // A PERSISTED NOT NULL column read from a table no join makes NULL is a row of the table, by a column alone or by
@@ -226,7 +226,7 @@ public sealed class ColumnProofsComputedTests
     {
         var proofs = Read(sql, IdColumn, PersistedColumn(2));
 
-        proofs.ComputedTables.ShouldBeEmpty();
+        proofs.ProofTables.ShouldBeEmpty();
         Nullability(proofs.Apply(null))
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Catalog)]);
     }

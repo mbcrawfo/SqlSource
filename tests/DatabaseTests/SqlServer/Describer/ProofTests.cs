@@ -1281,9 +1281,13 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
     // The cases of the review, each NULL in some row that the statement changes: a SET that writes the filtered
     // column, by any spelling, trailing spaces too; a target that is a view, a CTE or a derived table whose x is the
     // table's b under another name; a filter on another source's column of the same name; a pseudo-table inside an
-    // expression; and a MERGE, whose inserted is NULL in a row it deletes.
+    // expression; a MERGE, whose inserted is NULL in a row it deletes; and an assignment of a sparse column set,
+    // which writes every sparse column its XML leaves out, s1 among them, though no assignment names s1.
     public static TheoryData<string> BreakingOutputs =>
         [
+            "UPDATE dbo.proof_sparse SET cs = '<s2>1</s2>' OUTPUT inserted.s1 WHERE s1 IS NOT NULL",
+            "UPDATE dbo.proof_sparse SET cs = NULL OUTPUT inserted.s1 WHERE s1 IS NOT NULL",
+            "UPDATE o SET o.cs = NULL OUTPUT inserted.s1 FROM dbo.proof_sparse AS o WHERE o.s1 IS NOT NULL",
             "UPDATE o SET o.b = NULL OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL",
             "UPDATE o SET B = NULL OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL",
             "UPDATE o SET @v = b = NULL OUTPUT inserted.b FROM dbo.proof_rows AS o WHERE o.b IS NOT NULL",
@@ -1368,7 +1372,8 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
         });
 
     // The tables of the proofs and their rows, made for the body and dropped after it.  g and b are NULL in some rows
-    // and a in none; proof_other and proof_computed find no row for the rows 3 to 5 of proof_rows.  dbo.COUNT is a
+    // and a in none; proof_other and proof_computed find no row for the rows 3 to 5 of proof_rows.  proof_sparse has
+    // the sparse columns s1 and s2, each NULL in a row, and their column set cs.  dbo.COUNT is a
     // user's function that is NULL for every row, which a bare COUNT never calls.  proof_shapes holds a point and
     // two rows whose wkt, never NULL, is the text that geometry and geography parse as their Null, beside solid and
     // solid2, geometries never NULL, place, a geography never NULL, and node, a hierarchyid never NULL;
@@ -1399,6 +1404,13 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
                     + "(id int NOT NULL PRIMARY KEY, c AS CAST(id * 2 AS int) PERSISTED NOT NULL)"
             );
             await sqlServer.ExecuteAsync("INSERT INTO dbo.proof_computed (id) VALUES (1), (2)");
+            await sqlServer.ExecuteAsync(
+                "CREATE TABLE dbo.proof_sparse (id int NOT NULL PRIMARY KEY, s1 int SPARSE NULL, "
+                    + "s2 int SPARSE NULL, cs xml COLUMN_SET FOR ALL_SPARSE_COLUMNS)"
+            );
+            await sqlServer.ExecuteAsync(
+                "INSERT INTO dbo.proof_sparse (id, s1, s2) VALUES (1, 1, NULL), (2, 2, 3), (3, NULL, 4)"
+            );
             await sqlServer.ExecuteAsync(
                 "CREATE TABLE dbo.proof_shapes "
                     + "(id int NOT NULL PRIMARY KEY, wkt nvarchar(100) NOT NULL, shape geometry NULL, "
@@ -1525,7 +1537,7 @@ public sealed class ProofTests(SqlServerDatabases sqlServer)
                 + "dbo.proof_shapes_mix_of, "
                 + "dbo.proof_shapes_mix, dbo.proof_shapes_plain_of, dbo.proof_shapes_plain, dbo.proof_shapes_same; "
                 + "DROP TABLE IF EXISTS dbo.proof_priced, dbo.proof_many, dbo.proof_volatile, dbo.proof_dates, "
-                + "dbo.proof_shapes, dbo.proof_computed, dbo.proof_other, dbo.proof_rows"
+                + "dbo.proof_shapes, dbo.proof_sparse, dbo.proof_computed, dbo.proof_other, dbo.proof_rows"
         );
 
     // The query's one column, described in a session of its own, must be as expected.
