@@ -114,19 +114,25 @@ public sealed class SafetyTests(SqlServerDatabases sqlServer)
         }
     }
 
-    // "batch" of a text that drops the canary: the procedure describes it, a statement with no result set, and runs it
-    // not.
+    // "batch" of a text that would leave a trace if it ran, each a statement with no result set that compiles as a
+    // batch: the procedure describes it and runs none of it, so the canary stands and nothing is made.
     [Theory]
     [InlineData("DROP TABLE dbo.victim")]
-    [InlineData("CREATE SCHEMA safety_schema AUTHORIZATION dbo; DROP TABLE dbo.victim")]
-    public async Task BatchAsync_TextThatDropsATable_RunsNothing(string sql)
+    [InlineData("CREATE SCHEMA safety_schema AUTHORIZATION dbo CREATE TABLE victim_twin (a int)")]
+    public async Task BatchAsync_TextThatWouldLeaveATrace_DescribesItAndRunsNothing(string sql)
     {
         await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
         var live = new SqlServerLive(session.Connection);
 
-        _ = await live.BatchAsync(new SqlServerBatchRequest(sql), TestContext.Current.CancellationToken);
+        var answer = await live.BatchAsync(new SqlServerBatchRequest(sql), TestContext.Current.CancellationToken);
 
+        answer.Error.ShouldBeNull(
+            string.Join("; ", answer.Error?.Errors.Select(error => $"Msg {error.Number}: {error.Message}") ?? [])
+        );
+        answer.Columns.ShouldBe(0);
         await ShouldStandAsync();
+        _ = (await sqlServer.ScalarAsync("SELECT SCHEMA_ID('safety_schema')")).ShouldBeOfType<DBNull>();
+        _ = (await sqlServer.ScalarAsync("SELECT OBJECT_ID('safety_schema.victim_twin')")).ShouldBeOfType<DBNull>();
     }
 
     // A CREATE SCHEMA, which "columns" refuses and "batch" describes: it is a statement with no result set, and the

@@ -138,19 +138,16 @@ public sealed class SqlServerSessionBatchTests
         described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC264");
     }
 
-    // Error rows without 11501 are no batch the function could not compile: no "batch".
+    // A syntax error without 11501 is no batch the function could not compile: no "batch".
     [Fact]
-    public async Task DescribeAsync_RefusedWithout11501_AsksNoBatch()
+    public async Task DescribeAsync_SyntaxErrorWithout11501_AsksNoBatch()
     {
-        const string Sql = "EXEC";
+        const string Sql = "CREATE SCHEMA raw AUTHORIZATION dbo;";
         var script = new SqlServerScript().NoParametersThenColumns(
             Sql,
             new SqlServerColumnsAnswer(
                 null,
-                [
-                    new SqlServerDescribeError(2812, 1, "Could not find stored procedure ''."),
-                    new SqlServerDescribeError(11529, 1, "The metadata could not be determined."),
-                ],
+                [new SqlServerDescribeError(156, 2, "Incorrect syntax near the keyword 'schema'.")],
                 null
             )
         );
@@ -159,5 +156,30 @@ public sealed class SqlServerSessionBatchTests
 
         asked.Select(call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns]);
         described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC225");
+    }
+
+    // Syntax rows beside a row whose type gives a cause, a temporary table here: the cause is reported, and no
+    // "batch" is asked.
+    [Fact]
+    public async Task DescribeAsync_SyntaxRowsBesideACause_AsksNoBatch()
+    {
+        const string Sql = "SELECT id INTO #t FROM dbo.users; SELECT id FROM #t";
+        var script = new SqlServerScript().NoParametersThenColumns(
+            Sql,
+            new SqlServerColumnsAnswer(
+                null,
+                [
+                    new SqlServerDescribeError(156, 2, "Incorrect syntax near the keyword 'schema'."),
+                    new SqlServerDescribeError(11526, 10, "The metadata could not be determined: '#t'."),
+                    new SqlServerDescribeError(11501, 2, "The batch could not be analyzed."),
+                ],
+                null
+            )
+        );
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        asked.Select(call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns]);
+        described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC265");
     }
 }
