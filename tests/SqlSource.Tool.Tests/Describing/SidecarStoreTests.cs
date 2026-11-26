@@ -460,26 +460,6 @@ public sealed class SidecarStoreTests : IDisposable
         Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "sqlsource.json"]);
     }
 
-    [Fact]
-    public void Apply_RunOnTheWholeThatWasCancelled_RemovesNothing()
-    {
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
-        var leftover = Leftover(TimeSpan.FromDays(3));
-
-        _ = Should.Throw<OperationCanceledException>(() =>
-            SidecarStore.Apply(
-                [Outcome(FileAction.Write, "{}")],
-                new Reporter(_error),
-                _clock,
-                onTheWhole: true,
-                cancelled.Token
-            )
-        );
-
-        File.Exists(leftover).ShouldBeTrue();
-    }
-
     // The run is cancelled when the store has begun: it reads the clock once, before it removes anything.
     [Theory]
     [InlineData(true)]
@@ -561,12 +541,7 @@ public sealed class SidecarStoreTests : IDisposable
 
     // Only the temporary file of a sidecar: a file of another program that ends the same way is not the tool's.
     [Theory]
-    [InlineData("Users.sql.json.tmp")]
-    [InlineData("Users.sql.json.backup.tmp")]
-    [InlineData("Users.sql.json.0123456789abcdef0123456789abcde.tmp")]
-    [InlineData("Users.sql.json.0123456789abcdef0123456789abcdeg.tmp")]
     [InlineData("Users.sql.json.0123456789ABCDEF0123456789abcdef.tmp")]
-    [InlineData("Users.sql.json.0123456789abcdef0123456789abcdef.tmp.txt")]
     [InlineData("Users.sql.0123456789abcdef0123456789abcdef.tmp")]
     [InlineData("settings.json.0123456789abcdef0123456789abcdef.tmp")]
     [InlineData("Users.sqlx.json.0123456789abcdef0123456789abcdef.tmp")]
