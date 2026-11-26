@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
@@ -91,9 +92,7 @@ public sealed class BundleJsonTests
     [InlineData(-1)]
     public void Read_BundleVersionBelowOne_IsSqlsrc288(int version)
     {
-        var text = BundleJson
-            .Write(Info)
-            .Replace("\"bundleVersion\": 1,", $"\"bundleVersion\": {version},", System.StringComparison.Ordinal);
+        var text = WrittenWith(json => json["bundleVersion"] = version);
 
         var read = BundleJson.Read(text, BundleInfos.Path);
 
@@ -107,7 +106,7 @@ public sealed class BundleJsonTests
     [Fact]
     public void Read_NoEngine_IsSqlsrc288NamingEngine()
     {
-        var text = BundleJson.Write(Info).Replace("  \"engine\": \"postgres\",\n", "", System.StringComparison.Ordinal);
+        var text = WrittenWith(json => json.Remove("engine").ShouldBeTrue());
 
         var read = BundleJson.Read(text, BundleInfos.Path);
 
@@ -120,9 +119,7 @@ public sealed class BundleJsonTests
     [Fact]
     public void Read_MistypedMember_IsSqlsrc288NamingIt()
     {
-        var text = BundleJson
-            .Write(Info)
-            .Replace("\"renamed\": true", "\"renamed\": \"yes\"", System.StringComparison.Ordinal);
+        var text = WrittenWith(json => json["renamed"] = "yes");
 
         var read = BundleJson.Read(text, BundleInfos.Path);
 
@@ -160,6 +157,14 @@ public sealed class BundleJsonTests
         text.ShouldNotEndWith("\n\n");
         text.ShouldNotContain("\r");
         text.ShouldContain("16.4 <\\\"x\\\">");
+    }
+
+    // The written file with one member changed, so that a test of a bad member does not depend on the layout.
+    private static string WrittenWith(System.Action<JsonObject> change)
+    {
+        var json = JsonNode.Parse(BundleJson.Write(Info)).ShouldNotBeNull().AsObject();
+        change(json);
+        return json.ToJsonString();
     }
 
     private static (string Name, string? Value)[] OutcomeMembers(string written)
