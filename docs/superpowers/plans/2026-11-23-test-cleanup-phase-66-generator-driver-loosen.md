@@ -66,12 +66,16 @@ Each test still fails when the rule it names breaks, and no longer fails on a ch
 - [x] **Step 7 (4-03):** `Run_SqlServerJsonColumnWithJsonOn_ReadsAndWritesThroughJsonConversions` asserts the `SqlDbType` and `Size` statements separately.
 - [x] **Step 8 (6-06):** `Run_RepositoryType_ImplementsItsGeneratedInterface` keeps the base list and asserts the interface's declaration and the member's signature.
 - [x] **Step 9:** Set row 66 of the epic's table to `done`.
-- [ ] **Step 10:** `./format.sh`, `./pre-commit-validation.sh`, then commit.
+- [x] **Step 10:** `./format.sh`, `./pre-commit-validation.sh`, then commit (`e508b848`).
 
 ### Task 2: The guard's "after" half
 
-- [ ] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-66/generator-root/after`, then `compare` against the "before" report.
-- [ ] **Step 2:** Coverage into `artifacts/test-cleanup/phase-66/coverage-after/SqlSource.Tests`, compared with the "before" figures.
-- [ ] **Step 3:** `tests/SqlSource.Tests.RoslynFloor` passes.
-- [ ] **Step 4:** Covers and run time for 2-01, 2-02 and 4-03.
-- [ ] **Step 5:** The pull request gives the change, the compare result, the coverage figures and the run times.
+- [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-66/generator-root/after` (Windows, on `e508b848`): 238 mutants tested, 209 killed, 10 survived, 19 timeouts, 19 compile errors, 69 ignored; the run took 2 h 9 min.  `compare`: 229 detected before, 227 still detected, 1 lost, 1 not comparable.
+- [x] **Step 2:** The two moved mutants, checked by hand.  Neither is the epic's plain exception, since the changed tests cover both and three of them killed the second, so both went to the owner, who accepted both (p66 Q1, "A: accept both"), with no further run of the guard.
+  - **Lost:** `SqlSourceGenerator.cs:1266:13`, Linq method mutation `OrderBy` to `OrderByDescending` in `ToSortedSignatures`, `Timeout` before and `Survived` after.  With the mutant applied by hand, all 9,415 tests of `tests/SqlSource.Tests` pass, with the changed tests and with the seven files as they were before the change, and none hangs.  The "before" timeout did not come from a test: no form of the tests detects the mutant.  Its neighbours, `ThenBy` at the same place and `OrderBy` at `:1274`, survive in both reports.
+  - **Not comparable:** `SortedSearch.cs:68:23`, Arithmetic mutation `middle + 1` to `middle - 1`, `Killed` before and `Timeout` after, so still detected; p65 saw the same move.  Before, 473 tests killed it, among them `Run_NestedType_RepeatsEachContainingType`, `Run_ClassLocation_PutsTheConstantsOnTheType` and `Run_RepositoryType_ImplementsItsGeneratedInterface`.  With the mutated `SqlSource.dll` in place of the one the tests load, as Stryker runs it, each of those three, as changed, fails with an `IndexOutOfRangeException` inside the run, before any assertion.  The test project cannot simply be built on the mutant: the generator runs while the tests compile, and the mutant hangs the compiler.
+- [x] **Step 3:** Coverage into `artifacts/test-cleanup/phase-66/coverage-after/SqlSource.Tests` (9,415 tests, 6 min 4 s): 963 of 971 lines over the 11 files, and every one of the 291 files of `SqlSource` has the same figure before and after.
+- [x] **Step 4:** `tests/SqlSource.Tests.RoslynFloor`: 2,181 tests pass, in 6 min 6 s.
+- [x] **Step 5:** Covers for 2-01, 2-02 and 4-03: no test or row is removed, and each keeps the assertions of its rule, so none needs a cover.  Run time: 9,415 tests in 6 min 17 s, against 5 min 50 s before, on the same machine with other work running, and the change takes text out of nine tests' assertions.
+- [x] **Step 6:** `main` moved to `f1a19e57` after the guard ran.  It changed no source file of the scope, `src/SqlSource/*.cs`, and added tests to the scope's folder, none of them the nine.
+- [ ] **Step 7:** The pull request gives the change, the compare result, the coverage figures and the run times.
