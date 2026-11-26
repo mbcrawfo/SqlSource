@@ -82,7 +82,7 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
         SELECT d.is_hidden, d.column_ordinal, d.name, d.is_nullable, d.system_type_name, d.max_length, d.precision,
             d.scale, d.user_type_schema, d.user_type_name, d.assembly_qualified_type_name, d.source_server,
             d.source_database, d.source_schema, d.source_table, d.source_column, d.is_identity_column,
-            d.is_computed_column, d.error_number, d.error_type, d.error_message,
+            d.is_computed_column, d.is_sparse_column_set, d.error_number, d.error_type, d.error_message,
             RTRIM(CAST(OBJECTPROPERTYEX(s.source_id, 'BaseType') AS nvarchar(2))) AS source_type,
             CAST(
                 CASE
@@ -348,7 +348,8 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                             BoolOf(reader, "is_computed_column"),
                             StringOf(reader, "source_type"),
                             BoolOf(reader, "persisted_not_null"),
-                            StringOf(reader, "computed_definition")
+                            StringOf(reader, "computed_definition"),
+                            BoolOf(reader, "is_sparse_column_set")
                         )
                     );
                 }

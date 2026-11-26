@@ -5,17 +5,18 @@ using System.Linq;
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 
 /// <summary>
-/// The proofs that the columns of a CTE of several branches, a recursive one among them, cannot be <c>NULL</c>: what
-/// they ask the server in <c>operands</c>, and the value of each <see cref="Proof.CteColumn" /> as the answer decides.
+/// The proofs that the columns of a CTE, of one branch or of several, a recursive one among them, cannot be
+/// <c>NULL</c>: what they ask the server in <c>operands</c>, and the value of each <see cref="Proof.CteColumn" /> as
+/// the answer decides.
 /// </summary>
 /// <remarks>
 /// <para>
-/// A row of such a CTE is a row of one of its branches, so a column is not null when every branch proves its item at
+/// A row of a CTE is a row of one of its branches, so a column is not null when every branch proves its item at
 /// that place.  Each branch is proved as a <c>SELECT</c> of its own, by <see cref="ExpressionProofs" /> over its own
 /// <c>FROM</c> and <c>WHERE</c>, with one <c>operands</c> call behind the <c>WITH</c> clause cut after its CTE: the
 /// branch sees only the CTEs before its own and its own, so a later CTE of the name of a table it reads must not hide
-/// that table.  Its lone leaf
-/// is asked, since what <c>columns</c> answered is the column of all the branches together.
+/// that table.  Its lone leaf is asked, since what <c>columns</c> answered is the query's column, read from the CTE,
+/// and not the branch's item.
 /// </para>
 /// <para>
 /// A recursive member reads the CTE's own rows, and a column it reads is a <see cref="Proof.CteColumn" /> of the same
@@ -24,7 +25,7 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// CTE, so they prove the set over their rows outright, and a recursive member reads only rows already made, which
 /// hold the set not null, so it proves the set over the rows it makes.  The set is found by starting from every column
 /// asked and taking away, until none goes, each column that a branch does not prove.  A branch's column of an earlier
-/// CTE of several branches is decided first, by its own set.
+/// CTE is decided first, by its own set.
 /// </para>
 /// <para>
 /// Only the columns that a proof of the query reaches are proved, and the columns their branches read in turn.
