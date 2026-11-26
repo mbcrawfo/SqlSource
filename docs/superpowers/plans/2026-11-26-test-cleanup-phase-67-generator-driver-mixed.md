@@ -70,6 +70,7 @@ Each kept test still fails when the rule it names breaks; each removed test or r
 - [x] **Step 10 (8-03, loosen):** `TypeDiagnosticsTests.Run_TypeWithSeveralProblems_ReportsThemAll` asserts the count of two and each prefix by `ShouldContain`, without an order.
 - [x] **Step 11:** Set row 67 of the epic's table to `done`.
 - [x] **Step 12:** `./format.sh`, `./pre-commit-validation.sh`, then commit (`cdc94357`).
+- [x] **Step 13:** The text that 5-01 and 6-02 assert takes `Case.Sensitive` (from the PR's own check, after the guard ran), since Shouldly's string `ShouldContain` ignores case by default and the `ShouldBe` it replaces did not, as phase 66's review found (its R1-F1).
 
 ### Task 2: The guard's "after" half
 

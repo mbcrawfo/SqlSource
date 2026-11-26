@@ -460,10 +460,13 @@ public sealed class PlacementTests
 
         run.ShouldBeClean();
         var sample = run.Sources[GeneratorHarness.SampleFile];
-        sample.ShouldContain("\n        public const string OnType = \"SELECT 1;\";");
-        ClassOf(sample, "Users").ShouldContain("\n            public const string GetUser = \"SELECT 2;\";");
-        ClassOf(sample, "Sql").ShouldContain("\n            public const string InSql = \"SELECT 3;\";");
-        ClassOf(sample, "Orders").ShouldContain("\n            public const string GetOrder = \"SELECT 4;\";");
+        sample.ShouldContain("\n        public const string OnType = \"SELECT 1;\";", Case.Sensitive);
+        ClassOf(sample, "Users")
+            .ShouldContain("\n            public const string GetUser = \"SELECT 2;\";", Case.Sensitive);
+        ClassOf(sample, "Sql")
+            .ShouldContain("\n            public const string InSql = \"SELECT 3;\";", Case.Sensitive);
+        ClassOf(sample, "Orders")
+            .ShouldContain("\n            public const string GetOrder = \"SELECT 4;\";", Case.Sensitive);
         var users = sample.IndexOf("        private static partial class Users\n", StringComparison.Ordinal);
         var sql = sample.IndexOf("        private static partial class Sql\n", StringComparison.Ordinal);
         var orders = sample.IndexOf("        private static partial class Orders\n", StringComparison.Ordinal);

@@ -78,11 +78,13 @@ public sealed class MethodTests
         methods.ShouldContain(
             "    /// The query methods of <c>App.Sample</c>, which extend the connection they run on.\n"
                 + "    /// </summary>\n"
-                + "    internal static partial class SampleExtensions\n"
+                + "    internal static partial class SampleExtensions\n",
+            Case.Sensitive
         );
         methods.ShouldContain(
             "        internal static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
-                + "            this global::System.Data.Common.DbConnection connection,\n"
+                + "            this global::System.Data.Common.DbConnection connection,\n",
+            Case.Sensitive
         );
     }
 
