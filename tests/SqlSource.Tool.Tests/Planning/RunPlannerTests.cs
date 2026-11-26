@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -747,6 +748,24 @@ public sealed class RunPlannerTests : IDisposable
 
         result.Errors.ShouldBeEmpty();
         result.Plan.Files.ShouldHaveSingleItem().Queries[1].NeedsEntry.ShouldBeTrue();
+    }
+
+    // An error of the shared file under what the left-out project needs is the run's file's, as a run on the whole
+    // solution and the left-out project's build report it: here a token without a default in a query only it needs.
+    [Fact]
+    public void Plan_QueryThatOnlyALeftOutProjectNeeds_ReportsItsOwnPlanError()
+    {
+        var (run, other, shared) = SharedWithALeftOutProject();
+        File.WriteAllText(
+            shared,
+            "-- name: Both\n-- output: models\nSELECT 1;\n\n-- name: OtherOnly\nSELECT * FROM {{table}};\n"
+        );
+
+        var result = WithOthers([run], other);
+
+        result.Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC210"]);
+        result.Plan.Files.ShouldHaveSingleItem().Queries[1].Problems.ShouldBe(QueryProblems.TokenWithoutDefault);
+        Plans.Result(run).Errors.ShouldBeEmpty();
     }
 
     [Fact]
