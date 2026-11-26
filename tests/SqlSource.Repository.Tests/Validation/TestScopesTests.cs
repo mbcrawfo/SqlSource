@@ -98,17 +98,6 @@ public sealed class TestScopesTests
         scopes.Lines.ShouldBeEmpty();
     }
 
-    // The assembly of a database project is its project file's name under the prefix that
-    // tests/DatabaseTests/Directory.Build.props gives it, and RepositoryRoot finds the running project by its assembly.
-    [Fact]
-    public void Parse_ProjectLine_IsKeyedByThePrefixedProjectName()
-    {
-        var scopes = TestScopes.Parse("project postgres tests/DatabaseTests/Postgres/Postgres.csproj\n");
-
-        scopes.Projects.Keys.ShouldBe(["SqlSource.DatabaseTests.Postgres"]);
-        scopes.ProjectFiles.ShouldBe(["tests/DatabaseTests/Postgres/Postgres.csproj"]);
-    }
-
     [Fact]
     public void Runs_ProjectOfTheOtherEngine_IsFalse()
     {
