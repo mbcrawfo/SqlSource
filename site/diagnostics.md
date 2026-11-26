@@ -3080,7 +3080,7 @@ Write the type meant in the place of `<type>`: here `@age::interval`, or `-- par
     server: Msg 11501, Level 16, State 2: The batch could not be analyzed because of compile errors.
 ```
 
-The step can also be `describe columns`, when SQL Server accepted the parameters of the query and could not work out its columns.  There each line is `Msg <number>:` and its text, with no level or state.  The last line is often `Msg 11529`, which says only that every path of the query failed.  A call of a procedure that the database does not have, with no argument, is such a query:
+The step can also be `describe columns`, when SQL Server accepted the parameters of the query and could not work out its columns.  There each line is usually `Msg <number>:` and its text, with no level or state.  A query that SQL Server runs as a batch of its own, such as a `CREATE SCHEMA`, has lines with a level and a state, as at `describe parameters`.  The last line is often `Msg 11529`, which says only that every path of the query failed.  A call of a procedure that the database does not have, with no argument, is such a query:
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC225: The server rejected the query 'ArchiveOrders': Could not find stored procedure 'dbo.archive_ordrs'.

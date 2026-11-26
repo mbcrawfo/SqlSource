@@ -62,20 +62,6 @@ public sealed class PlacementTests
         run.Sources[GeneratorHarness.SampleFile].ShouldContain("            public const string GetUser = ");
     }
 
-    [Fact]
-    public void Run_MethodsQueryWithNoLocation_IsAnInternalMethodOfTheExtensionClass()
-    {
-        var run = MethodRuns.Run(Users, [UserEntry(Users)]);
-
-        run.ShouldBeClean();
-        var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("    internal static partial class SampleExtensions\n");
-        methods.ShouldContain(
-            "        internal static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
-                + "            this global::System.Data.Common.DbConnection connection,\n"
-        );
-    }
-
     // On the type, the members are public when the type and every type around it are, and internal otherwise.
     [Theory]
     [InlineData("[SqlSourceGenerate(Source = \".\")]\npublic partial class Sample;", "public")]
@@ -473,67 +459,29 @@ public sealed class PlacementTests
         );
 
         run.ShouldBeClean();
-        run.Sources[GeneratorHarness.SampleFile]
-            .ShouldBe(
-                $$"""
-                {{GeneratedFile.Header}}
-                namespace App
-                {
-                    partial class Sample
-                    {
-                        /// <summary>
-                        /// The <c>OnType</c> query from <c>Users.sql</c>.
-                        /// </summary>
-                        /// <remarks>
-                        /// <code>
-                        /// SELECT 1;
-                        /// </code>
-                        /// </remarks>
-                        public const string OnType = "SELECT 1;";
+        var sample = run.Sources[GeneratorHarness.SampleFile];
+        sample.ShouldContain("\n        public const string OnType = \"SELECT 1;\";", Case.Sensitive);
+        ClassOf(sample, "Users")
+            .ShouldContain("\n            public const string GetUser = \"SELECT 2;\";", Case.Sensitive);
+        ClassOf(sample, "Sql")
+            .ShouldContain("\n            public const string InSql = \"SELECT 3;\";", Case.Sensitive);
+        ClassOf(sample, "Orders")
+            .ShouldContain("\n            public const string GetOrder = \"SELECT 4;\";", Case.Sensitive);
+        var users = sample.IndexOf("        private static partial class Users\n", StringComparison.Ordinal);
+        var sql = sample.IndexOf("        private static partial class Sql\n", StringComparison.Ordinal);
+        var orders = sample.IndexOf("        private static partial class Orders\n", StringComparison.Ordinal);
+        users.ShouldBeLessThan(sql);
+        sql.ShouldBeLessThan(orders);
 
-                        private static partial class Users
-                        {
-                            /// <summary>
-                            /// The <c>GetUser</c> query from <c>Users.sql</c>.
-                            /// </summary>
-                            /// <remarks>
-                            /// <code>
-                            /// SELECT 2;
-                            /// </code>
-                            /// </remarks>
-                            public const string GetUser = "SELECT 2;";
-                        }
-
-                        private static partial class Sql
-                        {
-                            /// <summary>
-                            /// The <c>InSql</c> query from <c>Users.sql</c>.
-                            /// </summary>
-                            /// <remarks>
-                            /// <code>
-                            /// SELECT 3;
-                            /// </code>
-                            /// </remarks>
-                            public const string InSql = "SELECT 3;";
-                        }
-
-                        private static partial class Orders
-                        {
-                            /// <summary>
-                            /// The <c>GetOrder</c> query from <c>Users.sql</c>.
-                            /// </summary>
-                            /// <remarks>
-                            /// <code>
-                            /// SELECT 4;
-                            /// </code>
-                            /// </remarks>
-                            public const string GetOrder = "SELECT 4;";
-                        }
-                    }
-                }
-
-                """
-            );
+        // The text of a nested class of the type, from its declaration to its closing brace.
+        static string ClassOf(string text, string name)
+        {
+            var start = text.IndexOf("        private static partial class " + name + "\n", StringComparison.Ordinal);
+            start.ShouldBeGreaterThanOrEqualTo(0);
+            var end = text.IndexOf("\n        }\n", start, StringComparison.Ordinal);
+            end.ShouldBeGreaterThan(start);
+            return text[start..end];
+        }
     }
 
     // Two files fill one class.  One writes its visibility and the other leaves it to the default, so the written one

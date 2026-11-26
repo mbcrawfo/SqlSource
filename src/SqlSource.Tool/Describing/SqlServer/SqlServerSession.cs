@@ -39,6 +39,12 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// against (<see cref="SqlServerTableMatcher" />).  There is no plan walk, so an entry with rows records <c>plan</c>
 /// as <c>skipped</c>.
 /// </para>
+/// <para>
+/// The function compiles a text as the body of a parameterized batch, where a statement that must begin its batch,
+/// <c>CREATE SCHEMA</c>, is a syntax error.  A query with no parameter that it refuses so is asked again as
+/// <c>batch</c>, of <c>sys.sp_describe_first_result_set</c>, which compiles the text as its own batch, as the query
+/// runs.
+/// </para>
 /// </remarks>
 internal sealed partial class SqlServerSession : DescriberSession
 {
@@ -129,7 +135,8 @@ internal sealed partial class SqlServerSession : DescriberSession
     /// reused parameters are renamed to copies and the declarations; then the comparison of the server's parameters
     /// with the list, before any <c>probe</c>, so that a text whose parameters the two read differently is not probed;
     /// then, for each reused parameter whose copies' types differ, the probes of its copies; then <c>columns</c>, with
-    /// the SQL as written and every parameter declared; then <c>operands</c>, when a proof of a column needs the
+    /// the SQL as written and every parameter declared, and <c>batch</c> when it refuses a query with no parameter
+    /// with syntax errors alone; then <c>operands</c>, when a proof of a column needs the
     /// server, with the same declarations; then <c>origins</c>, when a column of a CLR type needs it; then
     /// <c>table</c> for each table whose computed column a proof reads, and for each target of an <c>UPDATE</c> whose
     /// <c>inserted</c> column the <c>WHERE</c> may prove; then, when every column has an origin in one
@@ -253,7 +260,11 @@ internal sealed partial class SqlServerSession : DescriberSession
     public override ValueTask DisposeAsync() => Connection.DisposeAsync();
 
     // The columns of the query's first result set, through "columns", corrected by the proofs through "operands", and
-    // the match of its table, through "table", with the parameters already described.
+    // the match of its table, through "table", with the parameters already described.  A query with no parameter that
+    // "columns" refuses with 11501, every row a syntax error, is asked again as "batch": the function compiles its text
+    // as the body of a parameterized batch, where a CREATE SCHEMA is a syntax error, and the procedure as its own
+    // batch, as the query runs.  No column from it is a statement with no result set, and its error is the failure;
+    // columns from it, which have none of the tool's own facts, leave the refusal of "columns".
     private async Task<Outcome<QueryDescription, DescribeFailure>> ResultAsync(
         DescribeRequest request,
         EquatableArray<DescribedParameter> parameters,
@@ -266,6 +277,28 @@ internal sealed partial class SqlServerSession : DescriberSession
             new SqlServerColumnsRequest(request.Sql, declarations),
             cancellationToken
         );
+        if (
+            declarations is null
+            && answer.Errors is { } refused
+            && refused.Any(static row => row.Number == SqlServerErrors.RefusedBatch)
+            && refused.All(static row => row.Type == SqlServerErrors.SyntaxType)
+        )
+        {
+            var batch = await BatchAsync(request.Name, new SqlServerBatchRequest(request.Sql), cancellationToken);
+            if (batch.Error is { } error)
+            {
+                return Failed(SqlServerErrors.Failed(request, error, DescribeStep.DescribeColumns));
+            }
+
+            var described =
+                batch.Columns
+                ?? throw new InvalidOperationException("The answer to 'batch' holds no count and no error.");
+            if (described == 0)
+            {
+                return NoResult(parameters);
+            }
+        }
+
         var rows = RowsOf(request, answer, DescribeStep.DescribeColumns, SqlServerCallNames.Columns);
         if (!rows.Succeeded)
         {
@@ -280,9 +313,7 @@ internal sealed partial class SqlServerSession : DescriberSession
 
         if (built.Value.Count == 0)
         {
-            return Outcome<QueryDescription, DescribeFailure>.Of(
-                new QueryDescription(SidecarResultKind.None, parameters, null, null, null, null)
-            );
+            return NoResult(parameters);
         }
 
         var (proved, tables) = await ProvedAsync(request, built.Value, rows.Value, declarations, cancellationToken);
@@ -310,6 +341,12 @@ internal sealed partial class SqlServerSession : DescriberSession
             )
         );
     }
+
+    // The description of a statement with no result set: its parameters, and nothing of a result.
+    private static Outcome<QueryDescription, DescribeFailure> NoResult(EquatableArray<DescribedParameter> parameters) =>
+        Outcome<QueryDescription, DescribeFailure>.Of(
+            new QueryDescription(SidecarResultKind.None, parameters, null, null, null, null)
+        );
 
     // The columns, each that a proof shows cannot be NULL answered not null, through "operands" when a proof needs the
     // server, and each of a CLR type that may hold the type's Null nullable, unless "origins" shows that the view or

@@ -29,6 +29,7 @@ internal static class SqlServerFields
         SqlServerCallNames.Operands,
         SqlServerCallNames.Table,
         SqlServerCallNames.Origins,
+        SqlServerCallNames.Batch,
     ];
 
     // The methods whose request is SQL under declarations.
@@ -146,6 +147,9 @@ internal static class SqlServerFields
             Add(method, "request.sql", FieldRule.Sql);
             Add(method, "request.params", FieldRule.TypeSpelling);
         }
+
+        // "batch" is sent the query's SQL alone, with no declarations.
+        Add(SqlServerCallNames.Batch, "request.sql", FieldRule.Sql);
 
         foreach (var method in DescribeMethods)
         {

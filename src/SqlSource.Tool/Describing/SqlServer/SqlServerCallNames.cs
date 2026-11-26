@@ -15,4 +15,5 @@ internal static class SqlServerCallNames
     public const string Operands = "operands";
     public const string Table = "table";
     public const string Origins = "origins";
+    public const string Batch = "batch";
 }

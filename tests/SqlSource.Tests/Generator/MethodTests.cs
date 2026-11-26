@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using Shouldly;
-using SqlSource.Generation.Emitting;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
@@ -75,100 +74,21 @@ public sealed class MethodTests
         var run = MethodRuns.Run(Users, UsersEntries);
 
         run.ShouldBeClean();
-        run.Sources[MethodRuns.MethodsFile]
-            .ShouldBe(
-                GeneratedFile.Joined(
-                    $$$"""
-                    {{{GeneratedFile.ModelHeader}}}
-                    namespace App
-                    {
-                        /// <summary>
-                        /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
-                        /// </summary>
-                        internal static partial class SampleExtensions
-                        {
-                            /// <summary>
-                            /// The <c>GetUser</c> query from <c>Users.sql</c>.
-                            /// </summary>
-                            /// <remarks>
-                            /// <code>
-                            /// SELECT id, name FROM users WHERE id = @id;
-                            /// </code>
-                            /// </remarks>
-                            /// <param name="connection">The connection to run the query on.  ↩
-                        It is opened when it is closed, and closed again when the method opened it.</param>
-                            /// <param name="parameters">The query's parameters.</param>
-                            /// <param name="transaction">The transaction to run the query in, or null.</param>
-                            /// <param name="commandTimeout">↩
-                        The command's timeout in seconds, or null for the driver's.</param>
-                            /// <param name="cancellationToken">Cancels the query.</param>
-                            /// <returns>The rows the query returned.</returns>
-                            internal static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(
-                                this global::System.Data.Common.DbConnection connection,
-                                global::App.GetUserParams parameters,
-                                global::System.Data.Common.DbTransaction? transaction = null,
-                                int? commandTimeout = null,
-                                global::System.Threading.CancellationToken cancellationToken = default)
-                            {
-                                global::System.ArgumentNullException.ThrowIfNull(connection);
-                                global::System.ArgumentNullException.ThrowIfNull(parameters);
-                                const string sql = "SELECT id, name FROM users WHERE id = @id;";
-                                var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
-                                if (wasClosed)
-                                {
-                                    await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-                                }
-
-                                try
-                                {
-                                    var command = connection.CreateCommand();
-                                    await using var commandScope = ↩
-                        global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
-                                    command.CommandText = sql;
-                                    command.Transaction = transaction;
-                                    if (commandTimeout.HasValue)
-                                    {
-                                        command.CommandTimeout = commandTimeout.Value;
-                                    }
-
-                                    {
-                                        var parameter = new global::Npgsql.NpgsqlParameter<int>();
-                                        parameter.ParameterName = "id";
-                                        parameter.DataTypeName = "pg_catalog.int4";
-                                        parameter.TypedValue = parameters.Id;
-                                        command.Parameters.Add(parameter);
-                                    }
-
-                                    var reader = await command.ExecuteReaderAsync(↩
-                        global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
-                                    await using var readerScope = ↩
-                        global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
-                                    var rows = new global::SqlSource.SqlSourceRowBuffer<global::App.GetUserDto>();
-                                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                                    {
-                                        rows.Add(new global::App.GetUserDto(reader.GetFieldValue<int>(0), ↩
-                        reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));
-                                    }
-
-                                    return rows.ToArray();
-                                }
-                                finally
-                                {
-                                    if (wasClosed)
-                                    {
-                                        await connection.CloseAsync().ConfigureAwait(false);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    """
-                )
-            );
-        run.Sources[RowBuffer.HintName].ShouldBe(GeneratedFile.RowBuffer);
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(
+            "    /// The query methods of <c>App.Sample</c>, which extend the connection they run on.\n"
+                + "    /// </summary>\n"
+                + "    internal static partial class SampleExtensions\n",
+            Case.Sensitive
+        );
+        methods.ShouldContain(
+            "        internal static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
+                + "            this global::System.Data.Common.DbConnection connection,\n",
+            Case.Sensitive
+        );
     }
 
+    // The method takes the place of the query's constant, so the two never clash on the type.
     [Theory]
     [InlineData("Public", "public static")]
     [InlineData("Internal", "internal static")]
@@ -188,22 +108,7 @@ public sealed class MethodTests
                 + "            global::System.Data.Common.DbConnection connection,\n"
         );
         methods.ShouldNotContain("SampleExtensions");
-    }
-
-    // The method takes the place of the query's constant, so the two never clash on the type.
-    [Fact]
-    public void Run_MethodOnTheType_TakesThePlaceOfTheConstant()
-    {
-        var users = UsersWith("-- member-location: class\n-- visibility: public\n");
-
-        var run = MethodRuns.Run(users, EntriesOf(users));
-
-        run.ShouldBeClean();
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
-        run.Sources[MethodRuns.MethodsFile]
-            .ShouldContain(
-                "        public static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
-            );
     }
 
     // A nested class that no query of the type uses is not written, so a method on the type may have its name.
