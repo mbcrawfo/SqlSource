@@ -107,34 +107,92 @@ public sealed class ExplainTests(PostgresDatabases postgres)
         connection.InDescribe.ShouldBeTrue();
     }
 
-    private async Task<PostgresExplainAnswer> ExplainPartitionedAsync(PostgresConnection connection, string sql)
+    // The statement's parameters are the $n of the SQL, each of an inferred type.
+    private async Task<PostgresExplainAnswer> ExplainPartitionedAsync(
+        PostgresConnection connection,
+        string sql,
+        int parameters = 1
+    )
     {
         var token = TestContext.Current.CancellationToken;
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);
         var live = new PostgresLive(connection);
-        var prepared = await live.PrepareAsync(new PostgresPrepareRequest(Statement, sql, ["unknown"]), token);
+        var prepared = await live.PrepareAsync(
+            new PostgresPrepareRequest(Statement, sql, [.. Enumerable.Repeat("unknown", parameters)]),
+            token
+        );
         prepared.Error.ShouldBeNull(prepared.Error?.Message);
-        return await live.ExplainAsync(new PostgresExplainRequest(Statement, 1, []), token);
+        return await live.ExplainAsync(new PostgresExplainRequest(Statement, parameters, []), token);
     }
 
-    // The executor prunes every partition for the NULL of the parameter, and the plan is asked again without pruning,
-    // in place of the one the statement cached: every member shows, and the settings end with the call.
+    // The statements the connection holds prepared, by name.
+    private static async Task<string[]> PreparedAsync(PostgresConnection connection)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var command = await connection.CommandAsync(
+            "SELECT pg_catalog.array_agg(name ORDER BY name) FROM pg_catalog.pg_prepared_statements",
+            token
+        );
+        return (string[])(await command.ExecuteScalarAsync(token)).ShouldNotBeNull();
+    }
+
+    // The executor prunes every partition for the NULL of the parameter, or for the value of a stable function, and the
+    // plan is asked again without pruning, of a second statement in place of the one that cached the first plan: every
+    // member shows, the second statement is freed, and the settings end with the call.
     [Theory]
-    [InlineData("SELECT p.id, p.note FROM scratch_parts p WHERE p.kind = $1")]
-    [InlineData("SELECT p.id, p.note FROM scratch_parts p WHERE p.kind = extract(dow FROM now())::integer + $1")]
-    public async Task ExplainAsync_KeyThatTheExecutorPrunes_AnswersThePlanOfEveryPartition(string sql)
+    [InlineData("SELECT p.id, p.note FROM scratch_parts p WHERE p.kind = $1", 1)]
+    [InlineData("SELECT p.id, p.note FROM scratch_parts p WHERE p.kind = extract(dow FROM now())::integer * 0 + 3", 0)]
+    public async Task ExplainAsync_KeyThatTheExecutorPrunes_AnswersThePlanOfEveryPartition(string sql, int parameters)
     {
         await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
 
-        var answer = await ExplainPartitionedAsync(connection, sql);
+        var answer = await ExplainPartitionedAsync(connection, sql, parameters);
 
         answer.Error.ShouldBeNull(answer.Error?.Message);
         var root = PlanNode.Read(answer.Plan.ShouldNotBeNull()).ShouldNotBeNull();
         root.NodeType.ShouldBe("Append");
         root.SubplansRemoved.ShouldBe(0);
         root.Plans.Select(static member => member.RelationName).ShouldBe(["scratch_parts_1", "scratch_parts_2"]);
+        (await PreparedAsync(connection)).ShouldBe([Statement]);
         (await ShowAsync(connection, "enable_partition_pruning")).ShouldBe("on");
         (await ShowAsync(connection, "plan_cache_mode")).ShouldBe("auto");
+    }
+
+    // An UPDATE that a constant prunes to one partition is asked again too, since the row it writes may move to a
+    // partition the planner pruned: its partitions show as members.
+    [Fact]
+    public async Task ExplainAsync_UpdateOfAPrunedPartitionedTable_AnswersThePlanOfEveryPartition()
+    {
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+
+        var answer = await ExplainPartitionedAsync(
+            connection,
+            "UPDATE scratch_parts p SET kind = 2 WHERE p.kind = 1 AND p.id = $1 RETURNING p.note"
+        );
+
+        var root = PlanNode.Read(answer.Plan.ShouldNotBeNull()).ShouldNotBeNull();
+        root.SelfAndDescendants()
+            .Where(static node => node.RelationName is not null && node.NodeType != "ModifyTable")
+            .Select(static node => node.RelationName)
+            .ShouldBe(["scratch_parts_1", "scratch_parts_2"]);
+        (await PreparedAsync(connection)).ShouldBe([Statement]);
+    }
+
+    // A plan that needs every partition, of a statement that this connection's calls did not prepare, has no text to
+    // prepare again: the answer is no plan, never the pruned one.
+    [Fact]
+    public async Task ExplainAsync_PrunedStatementPreparedElsewhere_AnswersNoPlan()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+        _ = await ExplainPartitionedAsync(connection, "SELECT p.id, p.note FROM scratch_parts p WHERE p.kind = $1");
+
+        var answer = await new PostgresLive(connection).ExplainAsync(
+            new PostgresExplainRequest(Statement, 1, []),
+            token
+        );
+
+        answer.ShouldBe(new PostgresExplainAnswer(null, null));
     }
 
     // The planner prunes for a constant, and prints no count: the plan with pruning is the answer, a scan of the one

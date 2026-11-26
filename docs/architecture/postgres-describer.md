@@ -164,7 +164,7 @@ The catalog calls run on the describe's connection, under the user's `search_pat
 | `types` | The closure of the types |
 | `spellings` | `format_type` of each pair of a type and a modifier |
 | `check` | Npgsql's describe of the SQL as written |
-| `explain` | The generic plan with partition pruning, and again without it when the executor pruned, under the describe's savepoint, which it rolls back to |
+| `explain` | The generic plan with partition pruning, and when it needs every partition, the plan of a second statement without it, under the describe's savepoint, which it rolls back to |
 | `partitions` | The ancestors of each relation an `Append` may scan as a partition |
 | `relations` | The relations a plan scans that `tables` did not answer, by schema and name, answered as `tables` answers |
 | `overloads` | Which of the function and operator names a plan prints a schema other than `pg_catalog` holds, or `pg_catalog` holds as an object that is not built in (an OID of `16384` or more) |
@@ -295,7 +295,7 @@ Two texts hold a user's SQL, and each goes through a batch of one command, as th
 
 | Text | Sent by | Through |
 |----|----|----|
-| `PREPARE sqlsource_<n> (<types>) AS <sql>`, with a line break before the `)` | `PostgresLive.PrepareAsync` | `PostgresConnection.ExecuteAsOneStatementAsync`, with no parameters |
+| `PREPARE sqlsource_<n> (<types>) AS <sql>`, with a line break before the `)` | `PostgresLive.PrepareAsync`, and `PostgresLive.ExplainAsync` again as `sqlsource_<n>_unpruned` for a [plan without pruning](postgres-nullability.md#the-plan) | `PostgresConnection.ExecuteAsOneStatementAsync`, with no parameters |
 | The SQL as written | `PostgresLive.CheckAsync` | `PostgresConnection.BatchOfOneAsync`, under `CommandBehavior.SchemaOnly`, with a named parameter for each of the list |
 
 Every other text is the tool's own and goes through `PostgresConnection.CommandAsync`: the reads of `open`, the read of `pg_prepared_statements`, which takes the `PREPARE`'s text as a parameter's value that the server never parses, the queries of the catalog, `SELECT $1` for a type's name alone, the `EXECUTE` of `columns`, the `SET LOCAL`s and the `EXPLAIN` of `explain`, and `DEALLOCATE`; the describe's transaction is made through `NpgsqlTransaction` by `PostgresConnection.BeginDescribeAsync`, `RestoreDescribeAsync` and `EndDescribeAsync`, and its savepoint by the `SAVEPOINT` and `RELEASE SAVEPOINT` of `BeginDescribeAsync` and `KeepPreparedAsync`, with the tool's own name of the savepoint.  The `EXECUTE`, the `EXPLAIN` and the `DEALLOCATE` hold a name the tool made, and the `SET LOCAL`s of `explain` hold settings of `PlannerSettings`' closed list.

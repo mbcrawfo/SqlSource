@@ -4,7 +4,8 @@
 
 ## What the code and the server say, against the item
 
-- Measured on 14.24 and 18.6: the first `EXPLAIN EXECUTE` caches its generic plan in the prepared statement.  A second one after `SET LOCAL enable_partition_pruning = off` reuses it and still prints `Subplans Removed`, and a rollback to the savepoint keeps it.  So the second plan needs `DISCARD PLANS` first, which works inside the transaction (owner question Q1; this plan builds option A).
+- Measured on 14.24 and 18.6: the first `EXPLAIN EXECUTE` caches its generic plan in the prepared statement.  A second one after `SET LOCAL enable_partition_pruning = off` reuses it and still prints `Subplans Removed`, and a rollback to the savepoint keeps it.  The owner chose (Q1, option B) a second `PREPARE` of the same text under `sqlsource_<n>_unpruned`, freed in the call, over `DISCARD PLANS`, which reaches other clients' cached plans on a pooled backend.
+- Review finding R1-F1: an `UPDATE` or `MERGE` may move its row into a partition the planner pruned.  The owner chose (Q2) to plan again without pruning for any `ModifyTable` of an `UPDATE` or `MERGE` that reads a relation other than its target.
 - With pruning off every partition shows, even for a constant on the key.  With it on, a constant prunes at plan time and prints no `Subplans Removed`: one partition left is a plain scan under the query's alias, and none left a `Result` with `One-Time Filter: false`.  A partition the planner prunes holds no row for any execution of the plan, since the planner prunes by immutable values alone and leaves a parameter or a stable function to the executor.
 - The request does not change: the decision is made in `PostgresLive.ExplainAsync`, so an older capture, whose plan was asked without pruning, still replays, and a capture changes only where the first plan differs.
 

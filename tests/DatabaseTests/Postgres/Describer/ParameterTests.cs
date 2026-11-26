@@ -11,6 +11,7 @@ using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Statements;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -110,6 +111,47 @@ public sealed class ParameterTests(PostgresDatabases postgres)
             var error = answer.Error.ShouldNotBeNull();
             error.SqlState.ShouldBe("42601");
             error.Message.ShouldBe("cannot insert multiple commands into a prepared statement");
+        }
+        finally
+        {
+            await using var drop = own.CreateCommand($"DROP TABLE IF EXISTS {Canary}");
+            _ = await drop.ExecuteNonQueryAsync(token);
+        }
+    }
+
+    // "explain" prepares the text of "prepare" a second time for a plan the executor pruned, sent as one command that
+    // the driver does not split, as the first: a ";" and a statement inside a dollar quote stay a string of the query,
+    // and the table they name is still there.
+    [Fact]
+    public async Task ExplainAsync_StatementPreparedAgain_RunsNothingOfItsText()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using (var create = own.CreateCommand($"CREATE TABLE {Canary} (id int)"))
+        {
+            _ = await create.ExecuteNonQueryAsync(token);
+        }
+
+        try
+        {
+            await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
+            var live = new PostgresLive(session.Connection);
+            var prepared = await live.PrepareAsync(
+                new PostgresPrepareRequest(
+                    "sqlsource_canary",
+                    $"SELECT p.id FROM scratch_parts p WHERE p.kind = $1 AND p.note <> $q$; DROP TABLE {Canary}; $q$",
+                    ["unknown"]
+                ),
+                token
+            );
+            prepared.Error.ShouldBeNull(prepared.Error?.Message);
+
+            var answer = await live.ExplainAsync(new PostgresExplainRequest("sqlsource_canary", 1, []), token);
+
+            await using var find = own.CreateCommand($"SELECT pg_catalog.to_regclass('{Canary}') IS NOT NULL");
+            (await find.ExecuteScalarAsync(token)).ShouldBe(true, "the call ran the statement inside the string");
+            PlanNode.Read(answer.Plan.ShouldNotBeNull()).ShouldNotBeNull().Plans.Count.ShouldBe(2);
         }
         finally
         {
