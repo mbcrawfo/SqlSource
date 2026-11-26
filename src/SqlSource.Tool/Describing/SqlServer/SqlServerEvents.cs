@@ -27,7 +27,8 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// proof of a column needs the server, then <c>column</c> for each column in order, then <c>table</c> when every
 /// column has an origin in one table, then <c>table-match</c>.  An event is written only when its call was made or its
 /// step was reached, so a describe that fails writes nothing after the step that failed.  When <c>parameters</c> fails
-/// with 11501, <c>columns</c> follows it, asked with the declarations alone, and nothing after.
+/// with 11501, <c>columns</c> follows it, asked with the declarations alone, and nothing after.  When <c>columns</c>
+/// refuses a query with no parameter with syntax errors alone, <c>batch</c> follows it, and nothing after.
 /// </remarks>
 internal static class SqlServerEvents
 {
@@ -155,6 +156,27 @@ internal static class SqlServerEvents
                 DescribedOf(answer.Error, answer.Errors, answer.Rows, ColumnRowOf),
                 new(Duration, durationMs),
             ]
+        );
+
+    /// <summary>
+    /// <c>mssql.batch</c>: the SQL as written, and how many columns the procedure described of it as its own batch,
+    /// or the error.
+    /// </summary>
+    public static void Batch(
+        IRunLog log,
+        string query,
+        SqlServerBatchRequest request,
+        SqlServerBatchAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            SqlServerCallNames.Batch,
+            new("query", query),
+            new("sql", request.Sql),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember("columns", LogValue.Of(answer.Columns)),
+            new(Duration, durationMs)
         );
 
     /// <summary>

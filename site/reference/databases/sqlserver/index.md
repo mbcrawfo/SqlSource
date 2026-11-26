@@ -85,7 +85,7 @@ SELECT id, shipped_at FROM dbo.orders WHERE id = @id;
 
 The tool describes a query by its first result set: the rows of its first `SELECT`, or of the first `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`.  A query can hold several statements, as above, where the `UPDATE` returns no result set and the `SELECT` gives the query its columns.
 
-- **A query that returns no result set at all gets no output model.**  Examples are an `UPDATE` with no `OUTPUT`, and an `OUTPUT ... INTO` a table.
+- **A query that returns no result set at all gets no output model.**  Examples are an `UPDATE` with no `OUTPUT`, an `OUTPUT ... INTO` a table, and a `CREATE SCHEMA`.
 - **A `SELECT` that matches no row still has its columns, and gets an output model.**
 - **Only the first result set is described, and read into the query's model.**  A query that returns two result sets, `SELECT ...; SELECT ...`, gets an output model of the first alone, and nothing is reported of the second.  Give each `SELECT` a `-- name:` of its own.
 

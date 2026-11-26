@@ -161,6 +161,7 @@ public sealed class DescriberFixtureTests : IDisposable
             .Select(static found => found.ToString())
             .ShouldBe(
                 [
+                    "mssql/create-schema",
                     "mssql/delete-declared-only",
                     "mssql/insert-declared",
                     "mssql/insert-output",
@@ -217,6 +218,7 @@ public sealed class DescriberFixtureTests : IDisposable
     [InlineData("operands", "select-aggregates")]
     [InlineData("table", "select-table-star")]
     [InlineData("origins", "select-view-clr")]
+    [InlineData("batch", "create-schema")]
     public Task Replay_SqlServerCaptureWithACallRemoved_ThrowsACaptureMiss(
         string method,
         string from = "update-inferred"

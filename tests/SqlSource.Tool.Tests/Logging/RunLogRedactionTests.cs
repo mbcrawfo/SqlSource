@@ -307,7 +307,7 @@ public sealed class RunLogRedactionTests : IDisposable
     // The events of the SQL Server describer hold the SQL, the declarations, the server's rows and its messages, so the
     // value is searched in each: the fake describer writes them through its log as the real one does.  The scene's fake
     // describer is PostgreSQL's, so the events of these tests are named postgres.parameters, postgres.probe,
-    // postgres.declared, postgres.columns, postgres.table, postgres.column and postgres.table-match.
+    // postgres.declared, postgres.columns, postgres.table, postgres.column, postgres.table-match and postgres.batch.
     [Fact]
     public async Task Run_DescriberThatLogsAParametersEventWithItsConnection_HasTheMarkInEachString()
     {
@@ -401,6 +401,27 @@ public sealed class RunLogRedactionTests : IDisposable
         row.GetProperty("assemblyQualifiedTypeName").GetString().ShouldBe("***");
         events[1].GetProperty("errors")[0].GetProperty("message").GetString().ShouldBe("Cannot find data type ***.");
         events[2].GetProperty("error")[0].GetProperty("message").GetString().ShouldBe("Cannot reach '***'.");
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatLogsABatchEventWithItsConnection_HasTheMarkInEachString()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            var sql = "CREATE SCHEMA [" + value + "]";
+            SqlServerEvents.Batch(log, "CreateSchema", new(sql), new(0, null), 1);
+            var error = new SqlServerServerError([new SqlServerErrorRow(53, 20, 0, "Cannot reach '" + value + "'.")]);
+            SqlServerEvents.Batch(log, "CreateSchema", new(sql), new(null, error), 1);
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var events = LogReader.Events(Log, "postgres.batch");
+        events.Count.ShouldBe(2);
+        events[0].GetProperty("sql").GetString().ShouldBe("CREATE SCHEMA [***]");
+        events[1].GetProperty("error")[0].GetProperty("message").GetString().ShouldBe("Cannot reach '***'.");
     }
 
     // A row of "columns" or "table" whose every string is the value.
