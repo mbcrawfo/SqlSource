@@ -120,7 +120,12 @@ public sealed class VerboseTests : IDisposable
             "App.csproj"
         );
 
-        result.Out.ShouldContain(Line($"project '{_lib.ProjectPath}' is left out: --project does not name it"));
+        result.Out.ShouldContain(
+            Line(
+                $"project '{_lib.ProjectPath}' is left out: --project does not name it, and it is read for the "
+                    + "files it shares with the run"
+            )
+        );
         result.Out.ShouldContain(Line($"query 'GetUser' in '{_users}': skipped, its entry is current"));
         result.Out.ShouldContain(Line($"query 'GetInvoice' in '{_users}': not selected"));
         result.Out.ShouldContain(Line($"sidecar '{_users}.json': unchanged"));

@@ -107,7 +107,7 @@ The rule holds for every place a path goes: the path of `describe` or `diagnose`
 
 | Option | What it does |
 |----|----|
-| `--project <path>` | Runs on this project of the solution and not on the others.  May be given several times.  A path that is not a C# project of the solution is [SQLSRC207](../diagnostics.md#sqlsrc207) |
+| `--project <path>` | Runs on this project of the solution and not on the others.  May be given several times.  A path that is not a C# project of the solution is [SQLSRC207](../diagnostics.md#sqlsrc207).  `describe` still reads the other projects, so that a `.sql` file one of them also claims keeps the entries that project needs: see [a file in two projects](sidecars.md#limit-file-in-two-projects) |
 | `--database <name>` | Describes only the queries of this [logical database](connections.md#connections).  May be given several times.  Every other sidecar is left as it was |
 | `--connection <name>=<connection string>` | The connection of a database: see [connections](connections.md#connections).  May be given several times, once for each name |
 | `--env-file <path>` | Reads the connections from this file in place of the `.env` in the folder of the project or solution, or from no file when it is `none`; a path that holds `=` or `;` is refused: see [a `.env` file](connections.md#env-file) |

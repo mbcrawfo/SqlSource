@@ -192,7 +192,7 @@ internal static class DiagnoseRun
             return null;
         }
 
-        var manifests = (await PlanSteps.FindManifestsAsync(unit, usage, context)).Manifests;
+        var manifests = (await PlanSteps.FindManifestsAsync(unit, usage, context, readsOthers: false)).Manifests;
         var filters = RunFilters.Create(
             [query.File],
             [],

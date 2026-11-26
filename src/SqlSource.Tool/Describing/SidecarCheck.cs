@@ -47,18 +47,19 @@ internal static class SidecarCheck
     /// </summary>
     /// <param name="files">The files, with every selected query that needs an entry described or failed.</param>
     /// <param name="outcomes">What <see cref="FileOutcomes" /> decided for the same files, in the same order.</param>
-    /// <param name="databases">
-    /// The names of <c>--database</c>.  When there are any, an entry for a query that is gone is reported only when
-    /// the file's outcome is <see cref="FileAction.Write" />, whatever the entry's database: a run for some databases
-    /// drops such an entry only by writing its file, and a file it holds back keeps it.
+    /// <param name="leavesQueriesOut">
+    /// Whether the run has <c>--database</c>, or <c>--project</c>, which leaves out a query that only a project it
+    /// leaves out needs.  Then an entry for a query that is gone is reported only when the file's outcome is
+    /// <see cref="FileAction.Write" />, whatever the entry's database: such a run drops such an entry only by writing
+    /// its file, and a file it holds back keeps it.
     /// </param>
     public static ImmutableArray<FileCheck> Compare(
         ImmutableArray<FileWork> files,
         ImmutableArray<FileOutcome> outcomes,
-        ImmutableArray<string> databases
-    ) => [.. files.Select((file, index) => Compare(file, outcomes[index], databases))];
+        bool leavesQueriesOut
+    ) => [.. files.Select((file, index) => Compare(file, outcomes[index], leavesQueriesOut))];
 
-    private static FileCheck Compare(FileWork file, FileOutcome outcome, ImmutableArray<string> databases)
+    private static FileCheck Compare(FileWork file, FileOutcome outcome, bool leavesQueriesOut)
     {
         var sql = file.File.Path;
 
@@ -116,7 +117,7 @@ internal static class SidecarCheck
             }
         }
 
-        differences.AddRange(EntriesWithoutAQuery(file, outcome, onDisk, sidecar, databases));
+        differences.AddRange(EntriesWithoutAQuery(file, outcome, onDisk, sidecar, leavesQueriesOut));
         return Of(outcome, differences);
     }
 
@@ -186,14 +187,14 @@ internal static class SidecarCheck
         };
 
     // An entry for a name that no query of the file has, or for a query that needs none: writing drops it.  Such an
-    // entry is in no target, so a file that has one and is not held back is written.  A run with --database has a
-    // file held back by a query it left out, so it reports such an entry only for a file it writes.
+    // entry is in no target, so a file that has one and is not held back is written.  A run with --database or
+    // --project has a file held back by a query it left out, so it reports such an entry only for a file it writes.
     private static IEnumerable<ToolDiagnostic> EntriesWithoutAQuery(
         FileWork file,
         FileOutcome outcome,
         SidecarOnDisk onDisk,
         Sidecar sidecar,
-        ImmutableArray<string> databases
+        bool leavesQueriesOut
     )
     {
         SourceText? text = null;
@@ -207,7 +208,7 @@ internal static class SidecarCheck
                 continue;
             }
 
-            if (!databases.IsEmpty && outcome.Action != FileAction.Write)
+            if (leavesQueriesOut && outcome.Action != FileAction.Write)
             {
                 continue;
             }
