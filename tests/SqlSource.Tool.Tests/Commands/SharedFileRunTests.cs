@@ -126,6 +126,32 @@ public sealed class SharedFileRunTests : IDisposable
         Sidecar().ShouldBe(before);
     }
 
+    // describe --project holds the file back, by the stale entry of the project it leaves out, so it keeps an entry
+    // whose query is gone, and --check with the same filter reports what describe would change: nothing.
+    [Fact]
+    public async Task Check_Project_ReportsNoGoneEntryOfAFileThatDescribeHoldsBack()
+    {
+        await File.WriteAllTextAsync(
+            _shared,
+            SharedSql + "\n-- name: Gone\n-- output: models\nSELECT 3;\n",
+            TestContext.Current.CancellationToken
+        );
+        await DescribeTheSolutionAsync();
+        await File.WriteAllTextAsync(
+            _shared,
+            SharedSql.Replace("SELECT 2", "SELECT 20", StringComparison.Ordinal),
+            TestContext.Current.CancellationToken
+        );
+        var before = Sidecar();
+
+        var describe = await _run.RunAsync("describe", "--project", _a.ProjectPath);
+        var check = await _run.RunAsync("describe", "--check", "--project", _a.ProjectPath);
+
+        describe.ExitCode.ShouldBe(0, describe.Error);
+        Sidecar().ShouldBe(before);
+        check.ShouldBe(new CliResult(0, "postgres (postgres): 1 same, 0 differ, 0 failed\n", ""));
+    }
+
     [Fact]
     public async Task Check_Project_FindsNoDifferenceInTheEntryThatTheProjectLeftOutNeeds()
     {

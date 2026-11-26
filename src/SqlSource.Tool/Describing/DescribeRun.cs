@@ -92,7 +92,11 @@ internal static class DescribeRun
         var outcomes = FileOutcomes.Decide(files, mayDelete, SidecarOnDisk.Read);
         if (options.Mode == RunMode.Check)
         {
-            var checks = SidecarCheck.Compare(files, outcomes, DatabaseNames(options));
+            var checks = SidecarCheck.Compare(
+                files,
+                outcomes,
+                leavesQueriesOut: !options.Databases.IsEmpty || options.HasProject
+            );
             for (var index = 0; index < checks.Length; index++)
             {
                 var check = checks[index];
@@ -234,9 +238,6 @@ internal static class DescribeRun
         || (connection.SharesVariableWith is not null && environment.Find(connection.Variable) is not null);
 
     // The names of --database, for the steps that take no position.
-    private static ImmutableArray<string> DatabaseNames(DescribeOptions options) =>
-        [.. options.Databases.Select(static value => value.Text)];
-
     // What the log says of a sidecar that was checked: that it differs, when a difference was reported for the file;
     // that it is the same, only when every selected query of the file that needs an entry was described, so that each
     // was compared; and nothing otherwise, since a query that could not be checked is neither.

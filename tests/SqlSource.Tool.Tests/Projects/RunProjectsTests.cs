@@ -88,7 +88,7 @@ public sealed class RunProjectsTests : IDisposable
             readsOthers
         );
 
-    // As a run that writes sidecars asks: the projects that --project leaves out are read too.
+    // As every run of describe asks, --check and a watch included: the projects that --project leaves out are read too.
     private Task<FoundProjects> FindWithOthersAsync(params string[] named) =>
         FindProjectsAsync(
             new RunUnit(RunUnitKind.Solution, _solution),
@@ -304,7 +304,7 @@ public sealed class RunProjectsTests : IDisposable
         _error.ToString().ShouldBeEmpty();
     }
 
-    // A run that writes reads the others for what they need of the files they share with it, and says nothing of them.
+    // describe reads the others for what they need of the files they share with it, and says nothing of them.
     [Fact]
     public async Task Find_OneProjectNamedReadingTheOthers_GivesTheirManifestsApart()
     {

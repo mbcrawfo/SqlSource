@@ -37,7 +37,8 @@ internal static class RunPlanner
     /// <param name="others">
     /// The manifests of the projects of the solution that <c>--project</c> leaves out.  They add what they need of a
     /// file that a project of the run claims, so that its sidecar keeps their entries, and nothing else: no file that
-    /// only they claim, no error, no count of unclaimed files, and no query that only they need is selected.
+    /// only they claim, no error of their own claims or settings files, no count of unclaimed files, and no query that
+    /// only they need is selected.  An error of the run's file under their needs is the file's, and is reported.
     /// </param>
     public static RunPlanResult Plan(
         ImmutableArray<ProjectManifest> manifests,
