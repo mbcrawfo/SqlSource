@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Npgsql;
 using Npgsql.Schema;
 using SqlSource.Tool.Describing.Postgres.Statements;
+using SqlSource.Tool.Describing.Postgres.Walk;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -382,6 +383,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
                     if (answer.Error is null)
                     {
                         await connection.KeepPreparedAsync(token);
+                        _prepared[asked.Statement] = asked;
                     }
                 }
                 catch (NpgsqlException)
@@ -866,23 +868,53 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
     private const string ForceGenericPlanSql = "SET LOCAL plan_cache_mode = force_generic_plan";
 
+    private const string PartitionPruningSql = "SET LOCAL enable_partition_pruning = on";
+
     private const string NoPartitionPruningSql = "SET LOCAL enable_partition_pruning = off";
+
+    private const string NoConstraintExclusionSql = "SET LOCAL constraint_exclusion = off";
+
+    /// <summary>
+    /// What <c>prepare</c> sent for each statement it prepared, by the statement's name, for the second statement
+    /// that <c>explain</c> may prepare from it.  Under a replay no <c>live</c> function runs, and it stays empty.
+    /// </summary>
+    private readonly Dictionary<string, PostgresPrepareRequest> _prepared = [with(StringComparer.Ordinal)];
 
     /// <summary>
     /// Asks <c>explain</c>: the generic plan of the prepared statement, under the describe's savepoint, which it rolls
-    /// back to afterwards.
+    /// back to afterwards.  The plan is asked with partition pruning, and again without it, of a second statement,
+    /// when <see cref="NeedsEveryPartition" /> says so.
     /// </summary>
     /// <remarks>
     /// <c>EXPLAIN</c> without <c>ANALYZE</c> plans the statement and does not execute it.  Planning evaluates an
     /// immutable function whose arguments are constants, inside the describe's transaction, which is rolled back: a
     /// function wrongly marked immutable runs, and an effect outside the transaction, a sequence's for one, remains
     /// (TD-0047).  Under <c>force_generic_plan</c> the <c>NULL</c> of a parameter is not folded into the plan, so
-    /// <c>id = $1</c> stays a condition.  Partition pruning is off: the executor would prune every partition for the
-    /// <c>NULL</c> of a parameter when it starts, and the plan would show an <c>Append</c> with no member, from
-    /// which the walk cannot tell a partitioned table from a set operation (TD-0052).  Each setting is a
-    /// <c>SET LOCAL</c>, which the rollback to the savepoint ends, after the plan or, through
+    /// <c>id = $1</c> stays a condition.
+    /// <para>
+    /// Partition pruning is on, so a plan holds no partition that a constant rules out.  The planner prunes by
+    /// immutable values alone, so a partition it pruned holds no row that a read returns.  It leaves a condition on a
+    /// parameter or a stable function to the executor, which prunes when it starts: for the <c>NULL</c> of a
+    /// parameter, every partition, and the plan shows an <c>Append</c> with no member and <c>Subplans Removed</c>,
+    /// from which the walk cannot tell a partitioned table from a set operation.  An <c>UPDATE</c> or a <c>MERGE</c>
+    /// may move the row it writes into a partition the planner pruned, so the one partition left proves nothing of
+    /// what it returns.  Such a plan is asked again without pruning, and without constraint exclusion, which by its
+    /// default, <c>partition</c>, leaves out a partition whose <c>CHECK</c> rules it out whatever pruning is: the
+    /// plan then shows every member (TD-0052).
+    /// </para>
+    /// <para>
+    /// The first <c>EXPLAIN</c> cached the generic plan in the prepared statement, and a setting does not end a
+    /// cached plan, so the second plan is of a second statement: the text that <c>prepare</c> sent, under the name
+    /// <see cref="UnprunedName" />, sent the same way, as one statement the driver does not split, and freed before the
+    /// call answers.  A statement that this connection did not prepare has no text to prepare again, and its plan is
+    /// answered as no plan.  A failure of either step is the answer's error, never the first plan.
+    /// </para>
+    /// <para>
+    /// Each setting is a <c>SET LOCAL</c>, which the rollback to the savepoint ends, after the plan or, through
     /// <see cref="InDescribeAsync{TAnswer}" />, after a failure at any step, so no setting reaches a later call.  The
-    /// texts hold a name the tool made, settings of a closed list and nothing of a user's.
+    /// texts but the second <c>PREPARE</c> hold a name the tool made, settings of a closed list and nothing of a
+    /// user's.
+    /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// No describe's transaction is held: outside one, a <c>SET LOCAL</c> would change nothing.
@@ -897,16 +929,13 @@ internal sealed class PostgresLive(PostgresConnection connection)
         return InDescribeAsync(
             async () =>
             {
-                foreach (var text in SetTexts(asked))
+                await SendAsync(SetTexts(asked), token);
+                var plan = await PlanAsync(asked, token);
+                if (NeedsEveryPartition(plan))
                 {
-                    await using var set = await connection.CommandAsync(text, token);
-                    _ = await set.ExecuteNonQueryAsync(token);
-                }
-
-                string? plan;
-                await using (var command = await connection.CommandAsync(ExplainText(asked), token))
-                {
-                    plan = await command.ExecuteScalarAsync(token) as string;
+                    plan = _prepared.TryGetValue(asked.Statement, out var prepared)
+                        ? await UnprunedPlanAsync(asked, prepared, token)
+                        : null;
                 }
 
                 await connection.RestoreDescribeAsync(token);
@@ -919,17 +948,100 @@ internal sealed class PostgresLive(PostgresConnection connection)
         );
     }
 
+    // The plan without pruning, of a second statement prepared from the first's text, which is freed after it.  The
+    // rollback to the savepoint goes before the DEALLOCATE, so that a failed EXPLAIN's transaction can run it.
+    private async Task<string?> UnprunedPlanAsync(
+        PostgresExplainRequest asked,
+        PostgresPrepareRequest prepared,
+        CancellationToken token
+    )
+    {
+        var again = asked with { Statement = UnprunedName(asked.Statement) };
+        await PrepareAgainAsync(again.Statement, prepared, token);
+        try
+        {
+            await SendAsync(UnprunedTexts, token);
+            return await PlanAsync(again, token);
+        }
+        finally
+        {
+            await connection.RestoreDescribeAsync(token);
+            await SendAsync([$"DEALLOCATE {again.Statement}"], token);
+        }
+    }
+
+    /// <summary>
+    /// The <c>PREPARE</c> of what <c>prepare</c> sent, under another name: one of the texts that hold a user's SQL,
+    /// which the driver is given as one statement and never splits, as <c>prepare</c>'s.  Internal for a test.
+    /// </summary>
+    internal Task PrepareAgainAsync(string statement, PostgresPrepareRequest prepared, CancellationToken token) =>
+        connection.ExecuteAsOneStatementAsync(
+            ParameterPlaceholders.PrepareText(statement, prepared.Types, prepared.Sql),
+            token
+        );
+
+    private async Task SendAsync(IReadOnlyList<string> texts, CancellationToken token)
+    {
+        foreach (var text in texts)
+        {
+            await using var command = await connection.CommandAsync(text, token);
+            _ = await command.ExecuteNonQueryAsync(token);
+        }
+    }
+
+    private async Task<string?> PlanAsync(PostgresExplainRequest asked, CancellationToken token)
+    {
+        await using var command = await connection.CommandAsync(ExplainText(asked), token);
+        return await command.ExecuteScalarAsync(token) as string;
+    }
+
     /// <summary>The text <c>explain</c> sends for the plan.</summary>
     public static string ExplainText(PostgresExplainRequest asked) =>
         "EXPLAIN (VERBOSE, FORMAT JSON) " + ExecuteText(asked.Statement, asked.Parameters);
 
     /// <summary>
-    /// What <c>explain</c> sets for its transaction, in order: the generic plan, no partition pruning, then each
-    /// setting.
+    /// What <c>explain</c> sets for its transaction, in order: the generic plan, partition pruning, then each setting.
     /// </summary>
     /// <exception cref="ArgumentException">A setting is not of <see cref="PlannerSettings" />.</exception>
     public static IReadOnlyList<string> SetTexts(PostgresExplainRequest asked) =>
-        [ForceGenericPlanSql, NoPartitionPruningSql, .. asked.Settings.Select(PlannerSettings.SetText)];
+        [ForceGenericPlanSql, PartitionPruningSql, .. asked.Settings.Select(PlannerSettings.SetText)];
+
+    /// <summary>
+    /// What <c>explain</c> sets, in order, before the plan of the second statement: no partition pruning and no
+    /// constraint exclusion, so that the plan shows every partition.
+    /// </summary>
+    public static IReadOnlyList<string> UnprunedTexts { get; } = [NoPartitionPruningSql, NoConstraintExclusionSql];
+
+    /// <summary>
+    /// The name of the second statement that <c>explain</c> prepares for a plan without pruning: the first's, which
+    /// the session counted, with a suffix, so it is the same at each run and no other statement's.
+    /// </summary>
+    public static string UnprunedName(string statement) => statement + "_unpruned";
+
+    /// <summary>
+    /// Whether a plan asked with partition pruning is asked again without it, when it is a plan that
+    /// <see cref="PlanNode.Read" /> reads.  A node of it prints <c>Subplans Removed</c> above 0, the members the
+    /// executor pruned when it started; or a <c>ModifyTable</c> of an <c>UPDATE</c> or a <c>MERGE</c>, at the root or
+    /// under it, reads under it a relation other than its target, which may be a partition of the target that the row
+    /// it writes leaves.  A text that is no plan is answered as it is.
+    /// </summary>
+    public static bool NeedsEveryPartition(string? plan) =>
+        plan is not null
+        && PlanNode.Read(plan) is { } root
+        && root.SelfAndDescendants().Any(static node => node.SubplansRemoved > 0 || ReadsBeyondItsTarget(node));
+
+    // An UPDATE's or a MERGE's ModifyTable with a node under it that names a relation other than its target.
+    private static bool ReadsBeyondItsTarget(PlanNode node) =>
+        node.NodeType == PlanNodeTypes.ModifyTable
+        && node.Operation is PlanOperations.Update or PlanOperations.Merge
+        && node.Plans.SelectMany(static child => child.SelfAndDescendants())
+            .Any(read =>
+                read.RelationName is not null
+                && (
+                    !string.Equals(read.RelationName, node.RelationName, StringComparison.Ordinal)
+                    || !string.Equals(read.Schema, node.Schema, StringComparison.Ordinal)
+                )
+            );
 
     /// <summary>
     /// Asks <c>deallocate</c>: frees the statement inside the describe's transaction, on the backend that prepared it,
@@ -940,6 +1052,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         AnswerAsync(
             async () =>
             {
+                _ = _prepared.Remove(asked.Statement);
                 try
                 {
                     await using var command = await connection.CommandAsync($"DEALLOCATE {asked.Statement}", token);
