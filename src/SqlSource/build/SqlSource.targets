@@ -344,6 +344,10 @@
         A Settings line is written for every AdditionalFiles item named sqlsource.json, the ones the search added and
         any the project lists itself, so that the tool reads exactly the settings files the compiler is given.  Each
         is written once, by its full path, since the project may list a file by a relative path too.
+
+        A UsingAlias line is written for every Using item with an Alias, as alias=type: the SDK makes each a global
+        using in a file it writes under obj only on the way to a compile, so the Compile lines never hold it, and the
+        tool reads [SqlSourceGenerate] through such an alias.
     -->
     <!-- editorconfig-checker-disable -->
     <Target Name="SqlSourceWriteManifest" DependsOnTargets="$(SqlSourceManifestDependsOn)">
@@ -367,6 +371,8 @@
             />
             <SqlSourceManifestLine Include="@(SqlSourceManifestSettingsFile->'%(FullPath)'->Distinct()->'Settings=%(Identity)')" />
             <SqlSourceManifestLine Include="@(Compile->'Compile=%(FullPath)')" />
+            <SqlSourceManifestUsingAlias Include="@(Using)" Condition="'%(Using.Alias)' != ''" />
+            <SqlSourceManifestLine Include="@(SqlSourceManifestUsingAlias->'UsingAlias=%(Alias)=%(Identity)')" />
         </ItemGroup>
         <WriteLinesToFile
             File="$(SqlSourceManifestFile)"

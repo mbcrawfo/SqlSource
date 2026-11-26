@@ -20,13 +20,18 @@ public sealed class FixtureProjectTests : IDisposable
     public void Dispose() => _fixtures.Dispose();
 
     // The temporary directory has a name that MSBuild would split, as a user's may.
-    private async Task<ProjectEvaluation> EvaluateAsync(string project, string? solution = null)
+    private async Task<ProjectEvaluation> EvaluateAsync(
+        string project,
+        string? solution = null,
+        string? configuration = null
+    )
     {
         var temp = Directory.CreateDirectory(_fixtures.PathOf("tmp ;,%41")).FullName;
         var evaluations = await ProjectEvaluator.EvaluateAsync(
             Hosts.Real(_fixtures.Root, temp),
             [project],
             solution,
+            configuration,
             TestContext.Current.CancellationToken
         );
         Directory.EnumerateFileSystemEntries(temp).ShouldBeEmpty();
@@ -184,6 +189,21 @@ public sealed class FixtureProjectTests : IDisposable
         var manifest = evaluation.Manifests.ShouldHaveSingleItem();
         manifest.Files.ShouldBe([Path.Combine(folder, "a;b=c%41 'é.sql")]);
         manifest.CompileFiles.ShouldBe([Path.Combine(folder, "a;b=c%41 'é.cs")]);
+    }
+
+    // What "dotnet build -c" compiles with, whatever configuration the machine's environment names: "#if RELEASE"
+    // holds in Release and not in Debug.
+    [Theory]
+    [InlineData("Release", "RELEASE", "DEBUG")]
+    [InlineData("Debug", "DEBUG", "RELEASE")]
+    public async Task Evaluate_Configuration_GivesItsConstants(string configuration, string holds, string doesNot)
+    {
+        var evaluation = await EvaluateAsync(_fixtures.Copy("Single"), configuration: configuration);
+
+        evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
+        var constants = evaluation.Manifests.ShouldHaveSingleItem().DefineConstants;
+        constants.ShouldContain(holds);
+        constants.ShouldNotContain(doesNot);
     }
 
     // What the build of such a project compiles with: "#if FEATURE_C" holds there.

@@ -34,10 +34,18 @@ internal static class RunProjects
     /// The paths that <c>--project</c> gave, as they were typed.  Empty when it gave none.  A message names one by
     /// its position when it may not be printed.
     /// </param>
+    /// <param name="configuration">
+    /// The configuration that <c>--configuration</c> gave, or null for each project's default.
+    /// </param>
     /// <param name="context">
     /// The working directory and what MSBuild is run with, where the errors go, and what ends the run.
     /// </param>
-    public static async Task<FoundProjects> FindAsync(RunUnit unit, IReadOnlyList<UsageValue> named, RunContext context)
+    public static async Task<FoundProjects> FindAsync(
+        RunUnit unit,
+        IReadOnlyList<UsageValue> named,
+        string? configuration,
+        RunContext context
+    )
     {
         var (host, reporter, cancellationToken) = context;
         ImmutableArray<string> projects = [unit.Path];
@@ -70,7 +78,15 @@ internal static class RunProjects
 
         var manifests = ImmutableArray.CreateBuilder<ProjectManifest>();
         var assetsFiles = ImmutableArray.CreateBuilder<(string Project, string AssetsFile)>();
-        foreach (var evaluation in await ProjectEvaluator.EvaluateAsync(host, projects, solution, cancellationToken))
+        foreach (
+            var evaluation in await ProjectEvaluator.EvaluateAsync(
+                host,
+                projects,
+                solution,
+                configuration,
+                cancellationToken
+            )
+        )
         {
             RunEvents.Project(reporter.Trace, evaluation.ProjectPath, evaluation);
             var project = evaluation.ProjectPath;
