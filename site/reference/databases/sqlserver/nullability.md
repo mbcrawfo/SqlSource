@@ -86,7 +86,26 @@ A `MERGE` that only updates leaves neither empty.  So its `inserted` and `delete
 - **A `NOT NULL` column of the optional side of a `LEFT JOIN`, when the `WHERE` makes the join inner.**  The `WHERE` must hold such a condition on a stored column of that side, written with its table alias, as `o.status` in `WHERE o.status = @status`.  The joins of the `FROM` must be plain joins, one after the other.
 - **A column read from a `WITH` query whose own `WHERE` keeps it from being null**, when the `WITH` query is one `SELECT` that returns the column itself, and no outer join of the outer query can fill it with null.
 - **A column of `UNION`, `UNION ALL`, `INTERSECT` or `EXCEPT`, when each `SELECT` gives a value that is never null in that place.**  Each `SELECT` is read on its own, with its own `FROM` and `WHERE`.
-- **A column of a `WITH` query made of several `SELECT`s, a recursive one included, when each `SELECT` gives a value that is never null in that place.**  In the recursive part, a column that the `WITH` query reads from itself counts as never null when that column is one of those SqlSource shows never null.  The outer query must read the column by its name, through the `WITH` query's own name or alias, and no outer join of the outer query may fill it with null.  The `FROM` of each `SELECT` must be plain joins, one after the other.
+- **A column of a `WITH` query, made of one `SELECT` or several, a recursive one included, when each `SELECT` gives a value that is never null in that place.**  In the recursive part, a column that the `WITH` query reads from itself counts as never null when that column is one of those SqlSource shows never null.  The outer query must read the column by its name, through the `WITH` query's own name or alias, and no outer join of the outer query may fill it with null.  The `FROM` of each `SELECT` must be plain joins, one after the other.
+
+**SqlSource also treats these columns of an `OUTPUT` clause as never null, where SQL Server does not**, in an `INSERT`, `UPDATE` or `DELETE`, with or without a `WITH` clause.  `inserted` counts in an `INSERT` or an `UPDATE`, and `deleted` in an `UPDATE` or a `DELETE`.
+
+- **A computed column declared `PERSISTED NOT NULL`**, as `inserted.total`, or a column of `inserted.*` or `deleted.*` when that is the only item.  The statement must change a table, and not a view.
+- **A `deleted` column that the `WHERE` keeps from being null**, as `deleted.shipped_at` in `WHERE shipped_at IS NOT NULL`.  `deleted` holds the value that the `WHERE` tested, whatever the `SET` writes.
+- **An `inserted` column of an `UPDATE` that the `WHERE` keeps from being null, when the `SET` does not write that column.**  The table that the statement changes must have no column set, and `SELECT *` of that table must return the column.
+- **An `inserted` column of an `UPDATE` whose `SET` writes a value that is never null**, by the items above, as `inserted.note` in `SET note = N'shipped'`.  If the value needs the answer of SQL Server, such as a column or `CONCAT` of one, the `UPDATE` must have a `FROM`.
+- **Any other column of an `UPDATE` or a `DELETE`, by the items above**, read as a column of a `SELECT` over the statement's `FROM` and `WHERE`, such as `ISNULL(c.email, c.name)` of a table that the `FROM` joins.  Without a `FROM`, a value that needs the answer of SQL Server, such as a column, does not count.
+
+For the `WHERE` and the `SET`, all of these must be true:
+
+- the column is stored in a table of the query's own database, and is not a computed column, or of a spatial type, of `hierarchyid` or of another .NET type;
+- the condition is one that keeps a column from being null in a `SELECT`, as above, such as `x IS NOT NULL` or `x = @id`;
+- the condition writes the column as the `OUTPUT` writes it, as `x` when the statement has no `FROM` or a `FROM` of one table, or as `o.x` with the name of the table that the statement changes;
+- with a `FROM`, the statement names the table that it changes by its alias in the `FROM`, as in `UPDATE o SET ... FROM dbo.orders AS o`, or by a name of one part that the `FROM` uses alone;
+- for an `inserted` column, each item of the `SET` is `x = value`, `o.x = value` or `@v = value`;
+- for the value that the `SET` writes, the `SET` writes the column once, with the name that the `OUTPUT` gives it.
+
+Any other item of the `SET`, such as `x += 1` or `@v = x = 0`, counts as one that writes every column.  Names that differ only in case or in trailing spaces count as the same column: a `SET` that writes `Shipped_At` or `[shipped_at ]` writes `shipped_at`.  A name with any character but an ASCII letter, a digit, `_`, `@`, `#` or `$`, such as `[ß]` or `[ship date]`, counts as every column, since a collation may make it the same as another spelling.
 
 **SqlSource treats none of these items as never null in two kinds of query:**
 
@@ -129,7 +148,15 @@ These answers assume that the connection that runs the query leaves `ANSI_WARNIN
 - **A computed column, a view's column or a subquery's expression that the `WHERE` tests.**  SQL Server can compute such a value again for the result, and the second value can be null.
 - **The optional side of a `LEFT JOIN` whose condition in the `WHERE` names the column without its table alias**, or whose `FROM` also holds an `APPLY`, a comma, a join hint or a join in parentheses.
 - **A column of a `UNION`, `INTERSECT` or `EXCEPT` with a `SELECT` that can give null in that place**, or with `*` in its select list.
-- **A column of a query that is not a `SELECT`, or that the tool does not read.**  Such a query keeps the answer of SQL Server, so a count or a sum in it can be null, but for a column of a spatial type, of `hierarchyid` or of another .NET type that SqlSource treats as one that can be null, as [which columns can be null](#nullability) says.  This holds for the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, for `FOR XML` or `FOR JSON`, and for several statements in one query.
+- **A column of a query that the tool does not read.**  Such a query keeps the answer of SQL Server, so a count or a sum in it can be null, but for a column of a spatial type, of `hierarchyid` or of another .NET type that SqlSource treats as one that can be null, as [which columns can be null](#nullability) says.  This holds for the `OUTPUT` of a `MERGE`, for `FOR XML` or `FOR JSON`, and for several statements in one query.
+- **A column of an `OUTPUT` clause in another form**, which keeps the answer of SQL Server in the same way:
+  - an expression of an `inserted` or `deleted` column, such as `COALESCE(inserted.note, N'')` or `(inserted.total)`;
+  - a column of an `INSERT` that is not a `PERSISTED NOT NULL` computed column;
+  - a `SET` value of `DEFAULT`;
+  - an `inserted` column that only the `WHERE` keeps from being null, in a table with a column set, `COLUMN_SET FOR ALL_SPARSE_COLUMNS`, since a `SET` of the column set writes null to each sparse column that its XML leaves out;
+  - in an `UPDATE` or a `DELETE` without a `FROM`, a value that needs the answer of SQL Server, such as a column;
+  - an `UPDATE` or a `DELETE` that changes a table through a view, a `WITH` query or a subquery, or that names it otherwise beside a `FROM`, as in `UPDATE dbo.orders ... FROM dbo.orders AS o`;
+  - an `UPDATE` or a `DELETE` whose `FROM` holds an `APPLY`, a comma, a join hint, a table function, `FOR SYSTEM_TIME`, a join in parentheses or a table named `inserted` or `deleted`, or with `WHERE CURRENT OF`.
 - **A conversion to `geometry`, `geography`, `hierarchyid` or another .NET type**, since SQL Server can convert the text `'NULL'` to such a type as null: `CAST(N'NULL' AS geometry)` is null.
 - **`COALESCE`, `GREATEST` or `LEAST` over a value of such a type**, for the same reason: `COALESCE(shape, 'NULL')` is null.
 - **A column of a query that uses `window` as a name**, an alias or a column without brackets, as in `FROM dbo.panes window`.  Such a query keeps the answer of SQL Server, but for a column of a spatial type, of `hierarchyid` or of another .NET type, as for the query above.  Write `[window]`.
@@ -170,7 +197,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - `COALESCE(AVG(x), 0)`;
 - a computed column read through a subquery, a `WITH` query, a view or the optional side of an outer join, or whose expression holds `CAST` or `CONVERT`;
 - a column that a filter keeps from being null in a form such as `x IN (1, 2)` or `x BETWEEN 1 AND 2`;
-- a count or a sum in an `OUTPUT` clause;
+- an expression of an `inserted` or `deleted` column in an `OUTPUT` clause, or a column of an `UPDATE` or a `DELETE` without a `FROM` whose value needs the answer of SQL Server;
 - a column of a spatial type, of `hierarchyid` or of another .NET type that is read from a table variable, a table of another database or of a linked server, a function with a body of several statements or a view created `WITH VIEW_METADATA`, that a `VALUES` list or an expression gives, or that a `UNION`, `INTERSECT` or `EXCEPT` inside a subquery, a `WITH` query, a view or a function gives, as [which columns can be null](#nullability) says.
 
 **What to do.**  Do one of these:
@@ -178,6 +205,7 @@ See [which properties can be null](../../model-properties.md#model-nullability) 
 - Give such a column a `-- column: name not null` marker, as [which columns can be null](#nullability) shows.
 - End the alias of the column with `!`.
 - In the place of a `COALESCE` or a `CASE` that replaces the null of `x`, write `ISNULL(x, 0)`.
+- Give an `UPDATE` or a `DELETE` a `FROM` with an alias, and change the table by that alias: `UPDATE o SET ... FROM dbo.orders AS o`.
 
 <a id="limit-ansi-warnings-off"></a>
 

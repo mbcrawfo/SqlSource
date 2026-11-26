@@ -61,6 +61,11 @@ public sealed partial class StoreQueries(DbConnection connection)
     public Task<AddOrderDto> AddOrderAsync(int userId) =>
         connection.QuerySingleAsync<AddOrderDto>(Sql.AddOrder, new AddOrderParams(userId));
 
+    // ShippedOn is a DateOnly and not a DateOnly?: the WHERE keeps the orders with no day out and the SET does not
+    // write the column, so the tool shows that the OUTPUT clause's day is never null.
+    public Task<IEnumerable<MarkOrdersShippedDto>> MarkOrdersShippedAsync() =>
+        connection.QueryAsync<MarkOrdersShippedDto>(Sql.MarkOrdersShipped);
+
     // SELECT * gives the model of the table, UsersDto, which every query that reads the whole table shares.
     public Task<UsersDto?> GetUserAsync(int userId) =>
         connection.QuerySingleOrDefaultAsync<UsersDto>(Sql.GetUser, new GetUserParams(userId));
