@@ -74,7 +74,7 @@ Each kept test still fails when the rule it names breaks; each removed test or r
 ### Task 2: The guard's "after" half
 
 - [x] **Step 1:** The mutation run with output `artifacts/test-cleanup/phase-67/generator-root/after` (Windows, on `cdc94357`): 238 mutants tested, 209 killed, 9 survived, 20 timeouts; the run took 2 h 15 min.  `compare`: 232 detected before, 228 still detected, 4 lost, 0 not comparable.
-- [x] **Step 2:** The four lost mutants, each `Timeout` before and `Survived` after, checked by hand.  None is the epic's plain exception, since the "before" report has each as a timeout under every test of the scope's run, the changed tests among them, so they went to the owner (p67 Q1).
+- [x] **Step 2:** The four lost mutants, each `Timeout` before and `Survived` after, checked by hand.  None is the epic's plain exception, since the "before" report has each as a timeout under every test of the scope's run, the changed tests among them, so they went to the owner, who accepted all four (p67 Q1, "A: accept them"), with no further run of the guard.
   - `SqlSourceGenerator.cs:1149:13`, Linq method mutation `OrderBy` to `OrderByDescending` in `DistinctLibraries`.
   - `SqlSourceGenerator.cs:1159:13`, Linq method mutation `OrderBy` to `OrderByDescending` in `DistinctUses`.
   - `SqlSourceGenerator.cs:1266:13`, Linq method mutation `ThenBy` to `ThenByDescending` in `ToSortedSignatures`.
