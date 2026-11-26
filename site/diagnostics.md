@@ -2722,7 +2722,7 @@ The tool did not write the sidecar of a `.sql` file.  A sidecar is written whole
 The lines under the message name each such query and say why:
 
 - `failed`: the query has an error of its own, above.
-- `not in this run`: `--database` or a `.sql` path left the query out, and its entry is missing or out of date.
+- `not in this run`: `--database` or a `.sql` path left the query out, and its entry is missing or out of date.  So did `--project`, when only a project that it leaves out needs the query: see [a file in two projects](reference/sidecars.md#limit-file-in-two-projects).
 
 ```console
 /work/App/Queries/Users.sql : error SQLSRC217: The sidecar of '/work/App/Queries/Users.sql' was not written, because not every query of the file has an entry
@@ -3833,8 +3833,8 @@ When no query of the file needs an entry any more, a run of `describe` over the 
 
 **A `.sql` file that two projects include is the exception.**  One of the projects can miss a settings file of its folder that the other finds.  That is a settings file that a build target of your own adds, or one named in another case, such as `SqlSource.json`, that one project lists itself.  The output of the query can then be `sql` in one project and not in the other.
 
-- A run of `describe` over both projects keeps the entry that the other project needs, so the warning stays.
-- A run over only the project that warns removes the entry.  The build of the other project then reports [SQLSRC241](#sqlsrc241).
+- A run of `describe` on the solution keeps the entry that the other project needs, so the warning stays.  This holds with `--project` too.
+- A run on the project that warns alone, or its build, removes the entry.  The build of the other project then reports [SQLSRC241](#sqlsrc241).
 - For such a file, the warning clears when both projects find the same settings files, or when the project lists `SQLSRC245` in `NoWarn`.  See [a file in two projects](reference/sidecars.md#limit-file-in-two-projects).
 
 This is a warning, since an entry that nothing uses changes no generated code.  A project can list it in `NoWarn` to hide it.  A project that sets `TreatWarningsAsErrors` can list it in `WarningsNotAsErrors` to keep it a warning.

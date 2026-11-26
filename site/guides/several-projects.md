@@ -139,13 +139,13 @@ $ dotnet sqlsource describe App.slnx
 - A `.sql` file outside the project's folder is not included.  List it and its sidecar as `AdditionalFiles` items.  See [Which `.sql` files are included](../reference/msbuild.md#included-files).
 - `Source` is relative to the folder of the C# file, never to the project.  See [Source](../reference/attributes.md#setting-source).
 - Both projects read the settings of the file from its markers and the settings files of its own folder.  So both projects need the same entries in its sidecar.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
-- If one project finds a settings file that the other does not, a run on it can leave out or remove entries that the other needs.  Name every settings file `sqlsource.json`, and describe the whole solution in one run.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
+- If one project finds a settings file that the other does not, a run on that project alone, or its build, can leave out or remove entries that the other needs.  Name every settings file `sqlsource.json`, and describe the solution, with `--project` if you want one project.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
 
 ## If it does not work
 
 - **SQLSRC004 in the second project.**  The project does not list the `.sql` file.  Add it as an `AdditionalFiles` item.  See [SQLSRC004](../diagnostics.md#sqlsrc004).
 - **SQLSRC241 in the second project, and the sidecar has the entry.**  The project does not list the sidecar.  Add it as an `AdditionalFiles` item.  See [SQLSRC241](../diagnostics.md#sqlsrc241).
-- **SQLSRC241 in one project after a run on the other.**  The two projects read different settings for the file.  Describe the whole solution in one run.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
+- **SQLSRC241 in one project after a run on the other.**  The two projects read different settings for the file.  Describe the solution, not the other project alone.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
 - **SQLSRC022 in the app.**  Put the exceptions in a shared project, as [Share the exceptions between two data projects and an app](#share-the-exceptions) shows.  See [SQLSRC022](../diagnostics.md#sqlsrc022).
 - **SQLSRC038 in a data project.**  Add a target of .NET 6 or later to Data.Shared.  See [SQLSRC038](../diagnostics.md#sqlsrc038).
 - **A `catch` compiles, but misses what a data project throws.**  Grant the project `InternalsVisibleTo` from Data.Shared.  See [Share the exceptions between two data projects and an app](#share-the-exceptions).

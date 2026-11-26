@@ -139,7 +139,7 @@ So a run over part of the project never removes what another part needs.  When n
 
 **What you see.**  Two projects of one solution include the same `.sql` file, each with a type that claims it.  You can see one of these, or both:
 
-- **Entries are missing from the sidecar of the file, or vanish from it**, or the sidecar itself is gone, after a run of `describe` on one of the two projects.  The build of the other project then reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each query that lost its entry.
+- **Entries are missing from the sidecar of the file, or vanish from it**, or the sidecar itself is gone, after a run of `describe` on one of the two projects alone, or after its build describes it.  The build of the other project then reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each query that lost its entry.
 - **The build of one project warns of an entry that the other project needs** ([SQLSRC245](../diagnostics.md#sqlsrc245)).  It is the project in which the query has the output `sql`.
 
 **Why.**  The file has one sidecar for both projects.  Both projects read the settings of the file, its [output](settings.md#setting-output) among them, from its markers and from the settings files of its own folder.  So the two projects need the same entries in the sidecar.  They differ when the build of one project misses a settings file that the other project finds for the `.sql` file.  A query can then need an entry for one project and not for the other.  One of these can cause it:
@@ -147,10 +147,12 @@ So a run over part of the project never removes what another part needs.  When n
 - A build target of your own that adds the `.sql` file, as [a limit](msbuild.md#limit-file-added-by-a-target) describes.
 - A settings file named in another case, such as `SqlSource.json`, that the project file of one project lists itself.  That project does not read the settings file.  The other project finds it on macOS and Windows, as [its name](settings-file.md#settings-files) says.
 
-A run on only one of the two projects does not see what the other project needs.  It can write a sidecar that lacks entries that only the other project needs.  It can also remove those entries, or delete a sidecar that the other project needs.
+A run on the solution sees what both projects need, with `--project` too.  If `--project` leaves the other project out, the run still reads that project for the files it shares.  The run keeps the entries that only that project needs, and does not describe them.  If such an entry is out of date, the run leaves the sidecar as it was, and [SQLSRC217](../diagnostics.md#sqlsrc217) says so.  If the run cannot read the other project, as when it is not restored, it does not see what that project needs.
 
-**What to do.**  Make both projects find the same settings files, and describe the whole solution in one run:
+A run on one project alone does not see what the other project needs, and the build of one project does not either.  Such a run can write a sidecar that lacks entries that only the other project needs.  It can also remove those entries, or delete a sidecar that the other project needs.
+
+**What to do.**  Make both projects find the same settings files, and describe the solution:
 
 1. If a build target of your own adds the file, make it run before the package lists the project's files.  [That limit](msbuild.md#limit-file-added-by-a-target) shows how.
 2. Name every settings file `sqlsource.json`.
-3. Describe the whole solution in one run.
+3. Describe the solution, with `--project` if you want one project, never the project alone.

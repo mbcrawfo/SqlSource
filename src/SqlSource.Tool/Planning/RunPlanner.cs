@@ -28,10 +28,22 @@ namespace SqlSource.Tool.Planning;
 /// </remarks>
 internal static class RunPlanner
 {
+    /// <summary>
+    /// The plan of the manifests of the run's projects, which the filters narrow.
+    /// </summary>
+    /// <param name="manifests">The manifests of the run's projects, a project's frameworks one after another.</param>
+    /// <param name="filters">What the run is restricted to.</param>
+    /// <param name="cancellationToken">Ends the plan.</param>
+    /// <param name="others">
+    /// The manifests of the projects of the solution that <c>--project</c> leaves out.  They add what they need of a
+    /// file that a project of the run claims, so that its sidecar keeps their entries, and nothing else: no file that
+    /// only they claim, no error, no count of unclaimed files, and no query that only they need is selected.
+    /// </param>
     public static RunPlanResult Plan(
         ImmutableArray<ProjectManifest> manifests,
         RunFilters filters,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        ImmutableArray<ProjectManifest> others = default
     )
     {
         var errors = ImmutableArray.CreateBuilder<ToolDiagnostic>();
@@ -65,6 +77,21 @@ internal static class RunPlanner
                     byPath.Add(claimed.NormalizedPath, work);
                     works.Add(work);
                 }
+            }
+        }
+
+        // A project that --project leaves out claims a file of the run alongside its projects, after them, so the file
+        // is still planned under a project of the run.
+        foreach (var manifest in others.IsDefault ? [] : others)
+        {
+            if (byPath.Count == 0)
+            {
+                break;
+            }
+
+            foreach (var claimed in ReadOther(manifest, settingsFiles, byPath, cancellationToken))
+            {
+                byPath[claimed.NormalizedPath].Claimants.Add(claimed);
             }
         }
 
@@ -117,19 +144,7 @@ internal static class RunPlanner
             }
 
             _ = project.Claimed.Add(path);
-            var text = new SqlFileText(listed[path]);
-            // The chain of the file's folder in this project's settings files, as the generator finds it.
-            var chain = settingsFileSet.ChainOf(path);
-            claimed.Add(
-                new ClaimedFile(
-                    manifest.ProjectPath,
-                    path,
-                    text,
-                    chain,
-                    FileLevel.Resolve(path, chain)?.Level ?? SettingsLevel.None,
-                    types
-                )
-            );
+            claimed.Add(ClaimedFileOf(manifest, path, listed, settingsFileSet, types, isInRun: true));
         }
 
         // Every listed .sql file reaches, claimed or not, as every C# file does that is not the build's.
@@ -140,6 +155,59 @@ internal static class RunPlanner
             errors
         );
         return claimed;
+    }
+
+    // The files of the run that a project left out by --project claims too, each with the settings files that reach it
+    // in that project.  Nothing of that project is reported: its errors are its own build's.
+    private static List<ClaimedFile> ReadOther(
+        ProjectManifest manifest,
+        RunSettingsFiles settingsFiles,
+        Dictionary<string, FileWork> planned,
+        CancellationToken cancellationToken
+    )
+    {
+        var listed = ListedFiles.Read(manifest);
+        if (!listed.Paths.Any(planned.ContainsKey))
+        {
+            return [];
+        }
+
+        var claimsOf = ClaimsByFile(AttributeReader.Read(manifest, cancellationToken).Claims, listed);
+        var settingsFileSet = settingsFiles.Of(manifest, cancellationToken);
+        return
+        [
+            .. listed
+                .Paths.Where(planned.ContainsKey)
+                .Select(path =>
+                    claimsOf.TryGetValue(path, out var types)
+                        ? ClaimedFileOf(manifest, path, listed, settingsFileSet, types, isInRun: false)
+                        : null
+                )
+                .OfType<ClaimedFile>(),
+        ];
+    }
+
+    // One claimed file as one project sees it, with the chain of the file's folder in the project's settings files, as
+    // the generator finds it.
+    private static ClaimedFile ClaimedFileOf(
+        ProjectManifest manifest,
+        string path,
+        ListedFiles listed,
+        SettingsFileSet settingsFileSet,
+        List<TypeClaim> types,
+        bool isInRun
+    )
+    {
+        var chain = settingsFileSet.ChainOf(path);
+        return new ClaimedFile(
+            manifest.ProjectPath,
+            path,
+            new SqlFileText(listed[path]),
+            chain,
+            FileLevel.Resolve(path, chain)?.Level ?? SettingsLevel.None,
+            types,
+            isInRun
+        );
     }
 
     // The claims of each claimed file, by its path, in the order they came.  A claim says nothing of what its files
@@ -226,7 +294,7 @@ internal static class RunPlanner
         ImmutableArray<ToolDiagnostic>.Builder errors
     )
     {
-        var output = GreatestOutput(query, work);
+        var output = GreatestOutput(query, work, inRunOnly: false);
         if (output == OutputKind.Sql)
         {
             // It needs no entry, and so belongs to no database and has no hash.
@@ -274,7 +342,9 @@ internal static class RunPlanner
             NeedsEntry: true,
             QuerySettings.ResolveDatabase(query.Markers, owner.Level, SqlDialectName.Canonical(dialect)),
             SqlQueryHash.Compute(dialect, query.Segments, query.Tokens, query.Parameters, query.MarkedVariables),
-            problems
+            problems,
+            // A query that only a project left out by --project needs is kept when it is current, and is not described.
+            IsSelected: GreatestOutput(query, work, inRunOnly: true) != OutputKind.Sql
         );
     }
 
@@ -318,11 +388,11 @@ internal static class RunPlanner
 
     // The output resolves for each query from its markers and its file's chain, which every type of one project
     // shares, and a file needs what any project that claims it needs: the greatest over every project, each with the
-    // chain of its own settings files.
-    private static OutputKind GreatestOutput(SqlQuery query, FileWork work)
+    // chain of its own settings files.  With inRunOnly, over the projects of the run alone.
+    private static OutputKind GreatestOutput(SqlQuery query, FileWork work, bool inRunOnly)
     {
         var greatest = OutputKind.Sql;
-        foreach (var claimant in work.Claimants)
+        foreach (var claimant in work.Claimants.Where(claimant => !inRunOnly || claimant.IsInRun))
         {
             var output = QuerySettings.Resolve(query.Markers, claimant.Level).Output;
             if (output > greatest)
@@ -454,7 +524,12 @@ internal static class RunPlanner
             files[index] = file with
             {
                 Queries = new EquatableArray<PlannedQuery>([
-                    .. file.Queries.Select(query => query with { IsSelected = isNamed && IsNamed(query, filters) }),
+                    .. file.Queries.Select(query =>
+                        query with
+                        {
+                            IsSelected = query.IsSelected && isNamed && IsNamed(query, filters),
+                        }
+                    ),
                 ]),
             };
         }
@@ -488,14 +563,16 @@ internal static class RunPlanner
     }
 
     // One claimed file as one project sees it.  Chain is that of the file's folder in the project's settings files, and
-    // Level is the chain's, as the generator's FileLevel gives it.
+    // Level is the chain's, as the generator's FileLevel gives it.  IsInRun is false for a project that --project
+    // leaves out.
     private sealed record ClaimedFile(
         string ProjectPath,
         string NormalizedPath,
         SqlFileText Text,
         SettingsChain Chain,
         SettingsLevel Level,
-        List<TypeClaim> Types
+        List<TypeClaim> Types,
+        bool IsInRun
     );
 
     // One claimed file of the run, with every project that claims it.  The first is the one it is planned under.
