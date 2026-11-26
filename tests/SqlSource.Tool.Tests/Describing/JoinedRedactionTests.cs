@@ -18,6 +18,7 @@ public sealed class JoinedRedactionTests
     [InlineData("refused Host=db;Password=pw00 for 'hunter22' at latest_hunter22")]
     [InlineData("Host=db;Password=pw00hunter22 x")]
     [InlineData("a hunter22Host=db;Password=pw00 b")]
+    [InlineData("hunter22 refused")]
     public void Of_OneTextWithNothingSplit_IsWhatOfIs(string text)
     {
         var secret = new ConnectionSecret("Host=db;Password=pw00", ["hunter22"]);
@@ -123,6 +124,11 @@ public sealed class JoinedRedactionTests
         JoinedRedaction.OfEveryPair(["ter22 y", "x!hun"], secret).ShouldBe(["*** y", "x***"]);
     }
 
+    // A whole is marked against any character beside it, as Redaction.Of marks it in one text.
+    [Fact]
+    public void OfEveryPair_WholeOverTwoTextsOutOfOrderBetweenLetters_IsTheMarkInBoth() =>
+        JoinedRedaction.OfEveryPair(["word=hunter22x", "aHost=db;Pass"], Password).ShouldBe(["***x", "a***"]);
+
     // Every text that holds a half is marked, whichever other text holds the rest.
     [Fact]
     public void OfEveryPair_HalfInSeveralTexts_IsTheMarkInEach() =>
@@ -135,6 +141,16 @@ public sealed class JoinedRedactionTests
         var secret = new ConnectionSecret("Host=db;\nPassword=pw");
 
         JoinedRedaction.OfEveryPair(["Password=pw b", "a Host=db;"], secret).ShouldBe(["*** b", "a ***"]);
+    }
+
+    // Halves that make the form less a character other than its break are no cut of it.
+    [Fact]
+    public void OfEveryPair_FormWithABreakOverTwoTextsLessACharacter_IsLeft()
+    {
+        var secret = new ConnectionSecret("Host=db;\nPassword=pw");
+        string[] texts = ["\nPassword=pw b", "a Host=db"];
+
+        JoinedRedaction.OfEveryPair(texts, secret).ShouldBe(texts);
     }
 
     [Fact]
