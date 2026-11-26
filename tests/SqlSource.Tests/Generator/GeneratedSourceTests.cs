@@ -142,7 +142,7 @@ public sealed class GeneratedSourceTests
         run.ShouldBeClean();
         var file = run.Sources[GeneratorHarness.SampleFile];
         file.ShouldContain("namespace App\n{\n    partial class Sample\n    {\n", Case.Sensitive);
-        file.ShouldContain("        public const string GetUser = \"SELECT 1;\";\n", Case.Sensitive);
+        file.ShouldContain("\n        public const string GetUser = \"SELECT 1;\";\n", Case.Sensitive);
         file.ShouldNotContain("class Sql");
     }
 
@@ -248,7 +248,7 @@ public sealed class GeneratedSourceTests
             """,
             Case.Sensitive
         );
-        file.ShouldContain("                    public const string GetUser = \"SELECT 1;\";\n", Case.Sensitive);
+        file.ShouldContain("\n                    public const string GetUser = \"SELECT 1;\";\n", Case.Sensitive);
     }
 
     // A list's uses are segments of their own, and a constant writes them as the SQL wrote them.
