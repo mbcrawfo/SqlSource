@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -653,6 +654,118 @@ public sealed class RunPlannerTests : IDisposable
 
         file.ProjectPath.ShouldBe(first.ProjectPath);
         file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
+    }
+
+    // The plan of a run on the first projects, with the last ones left out by --project.
+    private static RunPlanResult WithOthers(TestProject[] run, params TestProject[] others) =>
+        RunPlanner.Plan(
+            [.. run.Select(project => project.Manifest())],
+            RunFilters.None,
+            TestContext.Current.CancellationToken,
+            [.. others.Select(project => project.Manifest())]
+        );
+
+    // A shared file, which the run's project A finds the output sql for, and the left-out project B finds models for,
+    // by a nearer settings file that only B lists.  Its first query says models itself.
+    private (TestProject Run, TestProject Other, string Shared) SharedWithALeftOutProject()
+    {
+        var farther = _folder.WriteFile(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres", "output": "sql"}"""
+        );
+        var nearer = _folder.WriteFile(
+            "Shared/sqlsource.json", /*lang=json,strict*/
+            """{"output": "models"}"""
+        );
+        var shared = _folder.WriteFile(
+            "Shared/One.sql",
+            "-- name: Both\n-- output: models\nSELECT 1;\n\n-- name: OtherOnly\nSELECT 2;\n"
+        );
+        var run = Postgres("A");
+        run.ListSettings(farther);
+        _ = run.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../Shared\""));
+        run.ListSql(shared);
+        var other = Postgres("B");
+        other.ListSettings(farther);
+        other.ListSettings(nearer);
+        _ = other.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../Shared\""));
+        other.ListSql(shared);
+        return (run, other, shared);
+    }
+
+    [Fact]
+    public void Plan_QueryThatOnlyALeftOutProjectNeeds_NeedsAnEntryAndIsNotSelected()
+    {
+        var (run, other, _) = SharedWithALeftOutProject();
+
+        var result = WithOthers([run], other);
+
+        var file = result.Plan.Files.ShouldHaveSingleItem();
+        file.ProjectPath.ShouldBe(run.ProjectPath);
+        file.Queries.Select(query => (query.Query.Name, query.NeedsEntry, query.IsSelected))
+            .ShouldBe([("Both", true, true), ("OtherOnly", true, false)]);
+        file.Claims.Select(claim => claim.ProjectPath).ShouldBe([run.ProjectPath, other.ProjectPath]);
+        result.Unclaimed.ShouldBe([(run.ProjectPath, 0)]);
+    }
+
+    // A filter narrows the queries of the run's projects, and selects none that only the left-out project needs.
+    [Fact]
+    public void Plan_QueryThatOnlyALeftOutProjectNeeds_IsNotSelectedByAFileFilter()
+    {
+        var (run, other, shared) = SharedWithALeftOutProject();
+        var filters = RunFilters.Create([new UsageValue(null, shared, 1)], [], _folder.Path, [.. run.Manifest().Files]);
+
+        var plan = RunPlanner
+            .Plan([run.Manifest()], filters, TestContext.Current.CancellationToken, [other.Manifest()])
+            .Plan;
+
+        plan.Files.ShouldHaveSingleItem().Queries.Select(query => query.IsSelected).ShouldBe([true, false]);
+    }
+
+    [Fact]
+    public void Plan_FileThatOnlyALeftOutProjectClaims_IsNotPlanned()
+    {
+        var (run, other, shared) = SharedWithALeftOutProject();
+        _ = other.AddSource("Own.cs", Plans.TypeNamed("Own"));
+        _ = other.AddSql("Own.sql", "-- name: Own\nSELECT 3;\n");
+
+        var files = WithOthers([run], other).Plan.Files;
+
+        files.Select(file => file.Path).ShouldBe([shared]);
+    }
+
+    // The left-out project's errors are its own build's: a Source that is no literal, and its own settings file's
+    // output that is not valid, which a file it lists reaches.
+    [Fact]
+    public void Plan_LeftOutProjectsErrors_AreNotReported()
+    {
+        var (run, other, _) = SharedWithALeftOutProject();
+        _ = other.AddSource("Broken.cs", Plans.TypeNamed("Broken", "Source = Folder"));
+        other.Settings["output"] = "nonsense";
+        _ = other.AddSql("Own.sql", "-- name: Own\nSELECT 3;\n");
+
+        var result = WithOthers([run], other);
+
+        result.Errors.ShouldBeEmpty();
+        result.Plan.Files.ShouldHaveSingleItem().Queries[1].NeedsEntry.ShouldBeTrue();
+    }
+
+    // An error of the shared file under what the left-out project needs is the run's file's, as a run on the whole
+    // solution and the left-out project's build report it: here a token without a default in a query only it needs.
+    [Fact]
+    public void Plan_QueryThatOnlyALeftOutProjectNeeds_ReportsItsOwnPlanError()
+    {
+        var (run, other, shared) = SharedWithALeftOutProject();
+        File.WriteAllText(
+            shared,
+            "-- name: Both\n-- output: models\nSELECT 1;\n\n-- name: OtherOnly\nSELECT * FROM {{table}};\n"
+        );
+
+        var result = WithOthers([run], other);
+
+        result.Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC210"]);
+        result.Plan.Files.ShouldHaveSingleItem().Queries[1].Problems.ShouldBe(QueryProblems.TokenWithoutDefault);
+        Plans.Result(run).Errors.ShouldBeEmpty();
     }
 
     [Fact]

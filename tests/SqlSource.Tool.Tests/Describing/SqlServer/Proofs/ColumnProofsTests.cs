@@ -158,7 +158,8 @@ public sealed class ColumnProofsTests
             .ShouldBe([(true, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Expression)]);
     }
 
-    // A filter proves a column only when the server shows it stored, since the result reads the value again.
+    // A filter proves a column only when the server shows it stored, since the result reads the value again.  A
+    // column of a CTE is asked of the CTE's branch too, in a call after the query's, which is answered nullable here.
     [Theory]
     [InlineData("SELECT nickname FROM dbo.users WHERE nickname IS NOT NULL")]
     [InlineData("SELECT nickname FROM dbo.users WHERE nickname LIKE @q")]
@@ -177,11 +178,15 @@ public sealed class ColumnProofsTests
     public void Apply_FilteredColumn_ProvedWhenStored(string sql)
     {
         var proofs = Read(sql, ExpressionRow(1, "nickname"));
+        var branches = Enumerable.Repeat(
+            new OperandFacts(false, true),
+            proofs.OperandQueries.Skip(1).Sum(q => q.Count)
+        );
 
-        proofs.OperandQueries.ShouldHaveSingleItem().Count.ShouldBe(1);
-        Nullability(proofs.Apply([new OperandFacts(false, true, Stored: true)]))
+        proofs.OperandQueries[0].Count.ShouldBe(1);
+        Nullability(proofs.Apply([new OperandFacts(false, true, Stored: true), .. branches]))
             .ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
-        Nullability(proofs.Apply([new OperandFacts(false, true, Stored: false)]))
+        Nullability(proofs.Apply([new OperandFacts(false, true, Stored: false), .. branches]))
             .ShouldBe([(true, SidecarValues.NullableSource.Server)]);
         Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
@@ -204,29 +209,9 @@ public sealed class ColumnProofsTests
         "WITH q AS (SELECT id, nickname FROM dbo.users WHERE nickname > 'a') "
             + "SELECT dbo.users.nickname FROM q AS dbo JOIN dbo.users ON users.id = dbo.id + 1"
     )]
-    // Inside q, p is a table: a CTE sees only the CTEs before it.
-    [InlineData(
-        "WITH q AS (SELECT nickname FROM p), p AS (SELECT nickname FROM t WHERE nickname > 'a') "
-            + "SELECT nickname FROM q"
-    )]
-    // A join in a CTE's body, which has no call of "operands" to show that its filter is of a stored column.
-    [InlineData(
-        "WITH q AS (SELECT id, nickname FROM dbo.users WHERE nickname > 'a'), r AS (SELECT q.nickname "
-            + "FROM dbo.orders AS o LEFT JOIN q ON q.id = o.user_id WHERE q.Lat > 0) SELECT nickname FROM r"
-    )]
     [InlineData("SELECT a.nickname FROM dbo.users AS a JOIN dbo.users AS b ON b.id = a.id WHERE b.nickname > 'a'")]
-    [InlineData("WITH q AS (SELECT nickname FROM dbo.users) SELECT nickname FROM q")]
     [InlineData("WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM Q")]
-    [InlineData("WITH q AS (SELECT nickname FROM dbo.users WHERE id > 0 OR nickname > 'a') SELECT nickname FROM q")]
-    [InlineData(
-        "WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY ROLLUP (nickname)) "
-            + "SELECT nickname FROM q"
-    )]
-    [InlineData(
-        "WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY ALL nickname) SELECT nickname FROM q"
-    )]
     [InlineData("WITH q AS (SELECT * FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM q")]
-    [InlineData("WITH q AS (SELECT name AS nickname FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM q")]
     [InlineData(
         "WITH q AS (SELECT id, nickname FROM dbo.users WHERE nickname > 'a') "
             + "SELECT q.nickname FROM dbo.orders AS o LEFT JOIN q ON q.id = o.user_id"
@@ -244,6 +229,116 @@ public sealed class ColumnProofsTests
         var proofs = Read(sql, ExpressionRow(1, "nickname"));
 
         proofs.OperandQueries.ShouldBeEmpty();
+        Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    private const string Due =
+        "WITH due AS (SELECT i.amount - ISNULL(SUM(p.amount), 0) AS outstanding FROM billing.invoices AS i "
+        + "LEFT JOIN billing.payments AS p ON p.invoice_id = i.id GROUP BY i.amount)";
+
+    // A CTE of one branch is proved by its branch as one of several is: the query asks the column's type, and the
+    // branch's call its operand, over the branch's own FROM and WHERE.
+    [Fact]
+    public void Read_ComputedColumnOfACteOfOneBranch_IsProvedByItsBranch()
+    {
+        var proofs = Read($"{Due} SELECT d.outstanding FROM due AS d", ExpressionRow(1, "outstanding"));
+
+        proofs
+            .OperandQueries.Select(static query => query.Sql)
+            .ShouldBe([
+                $"{Due}\nSELECT d.outstanding\nAS [1]\nFROM due AS d",
+                $"{Due}\nSELECT i.amount\nAS [1]\n"
+                    + "FROM billing.invoices AS i LEFT JOIN billing.payments AS p ON p.invoice_id = i.id",
+            ]);
+        Nullability(proofs.Apply(Answers(false, true))).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply(Answers(false, false))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply([new OperandFacts(false, NotClr: false), new OperandFacts(true, NotClr: true)]))
+            .ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // A CTE read through an outer join is NULL where the join finds no match, whatever its branch proves.
+    [Fact]
+    public void Read_ComputedColumnOfACteOfOneBranch_ThroughALeftJoin_IsNotProved()
+    {
+        var proofs = Read(
+            $"{Due} SELECT d.outstanding FROM billing.invoices AS x LEFT JOIN due AS d ON d.outstanding = x.amount",
+            ExpressionRow(1, "outstanding")
+        );
+
+        proofs.OperandQueries.ShouldBeEmpty();
+        Nullability(proofs.Apply(Answers(true, true))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // A branch that can give NULL in the place leaves the column nullable, though the server answers every operand of a
+    // branch's call not null; the query's own call, which asks the CTE's column, it answers nullable, as it answered
+    // the column.
+    [Theory]
+    [InlineData("WITH q AS (SELECT NULL AS n FROM dbo.t) SELECT n FROM q")]
+    [InlineData("WITH q AS (SELECT @p AS n FROM dbo.t) SELECT q.n FROM q")]
+    [InlineData("WITH q AS (SELECT n FROM dbo.t GROUP BY ALL n) SELECT n FROM q")]
+    [InlineData("WITH q AS (SELECT * FROM dbo.t) SELECT n FROM q")]
+    [InlineData("WITH q (n, m) AS (SELECT 1 FROM dbo.t) SELECT n FROM q")]
+    [InlineData("WITH q AS (SELECT 1 AS n) SELECT n FROM Q")]
+    [InlineData("WITH q AS (SELECT 1 AS n) SELECT q.n FROM q RIGHT JOIN dbo.t AS t ON t.id = 1")]
+    [InlineData("WITH q AS (SELECT 1 AS n) SELECT x.n FROM (SELECT n FROM q) AS x")]
+    public void Apply_CteOfOneBranchThatCanBeNull_StaysNullable(string sql)
+    {
+        var proofs = Read(sql, ExpressionRow(1, "n"));
+
+        bool[] notNull = [.. proofs.OperandQueries.SelectMany((query, at) => Enumerable.Repeat(at > 0, query.Count))];
+
+        Nullability(proofs.Apply(Answers(notNull))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // What no filter keeps from NULL in a CTE's column is still asked of the CTE's branch, whose call alone can prove
+    // it: the query's own call, which asks the CTE's column, is answered nullable, as the server answered the column.
+    [Theory]
+    // A join in a CTE's body, which has no call of "operands" to show that its filter is of a stored column.
+    [InlineData(
+        "WITH q AS (SELECT id, nickname FROM dbo.users WHERE nickname > 'a'), r AS (SELECT q.nickname "
+            + "FROM dbo.orders AS o LEFT JOIN q ON q.id = o.user_id WHERE q.Lat > 0) SELECT nickname FROM r",
+        true
+    )]
+    [InlineData("WITH q AS (SELECT nickname FROM dbo.users) SELECT nickname FROM q", true)]
+    [InlineData(
+        "WITH q AS (SELECT nickname FROM dbo.users WHERE id > 0 OR nickname > 'a') SELECT nickname FROM q",
+        true
+    )]
+    [InlineData("WITH q AS (SELECT name AS nickname FROM dbo.users WHERE nickname > 'a') SELECT nickname FROM q", true)]
+    // Inside q, p is a table: a CTE sees only the CTEs before it.
+    [InlineData(
+        "WITH q AS (SELECT nickname FROM p), p AS (SELECT nickname FROM t WHERE nickname > 'a') "
+            + "SELECT nickname FROM q",
+        true
+    )]
+    // A grouping set's total, and GROUP BY ALL, in the CTE's branch prove nothing.
+    [InlineData(
+        "WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY ROLLUP (nickname)) "
+            + "SELECT nickname FROM q",
+        false
+    )]
+    [InlineData(
+        "WITH q AS (SELECT nickname FROM dbo.users WHERE nickname > 'a' GROUP BY ALL nickname) SELECT nickname FROM q",
+        false
+    )]
+    public void Apply_CteColumnNoFilterKeeps_ProvedOnlyByItsBranch(string sql, bool branchProves)
+    {
+        var proofs = Read(sql, ExpressionRow(1, "nickname"));
+        IReadOnlyList<OperandFacts> Facts(bool branchNotNull) =>
+            [
+                .. proofs.OperandQueries.SelectMany(
+                    (query, at) => Enumerable.Repeat(new OperandFacts(at > 0 && branchNotNull, true), query.Count)
+                ),
+            ];
+
+        Nullability(proofs.Apply(Facts(branchNotNull: true)))
+            .ShouldBe([
+                branchProves
+                    ? (false, SidecarValues.NullableSource.Expression)
+                    : (true, SidecarValues.NullableSource.Server),
+            ]);
+        Nullability(proofs.Apply(Facts(branchNotNull: false))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
         Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
 

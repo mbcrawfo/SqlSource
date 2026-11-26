@@ -944,6 +944,68 @@ public sealed class ExpressionProofsTests
             .ShouldBe(holds);
     }
 
+    // A value a SET writes: a literal needs nothing of the server.
+    [Theory]
+    [InlineData("'delivered'")]
+    [InlineData("1")]
+    [InlineData("N'x' + 'y'")]
+    public void OfAssigned_Literal_IsYes(string value)
+    {
+        var (proof, operands) = ProveAssigned(value);
+
+        proof.ShouldBe(Proof.Yes);
+        operands.ShouldBeEmpty();
+    }
+
+    // A value that is a lone column is asked, though an item that is one leaf alone is not: the server answered the
+    // column the SET writes, not its value, which must be not null and of no CLR type.
+    [Fact]
+    public void OfAssigned_Column_AsksItsNullabilityAndType()
+    {
+        var (proof, operands) = ProveAssigned("u.b");
+
+        proof.ShouldBeOfType<Proof.AllOf>().Parts.ShouldBe([new Proof.Operand(0), new Proof.NotClr(0)]);
+        operands.ShouldBe(["u.b"]);
+        proof.Holds([new OperandFacts(NotNull: true, NotClr: true)]).ShouldBeTrue();
+        proof.Holds([new OperandFacts(NotNull: false, NotClr: true)]).ShouldBeFalse();
+        proof.Holds([new OperandFacts(NotNull: true, NotClr: false)]).ShouldBeFalse();
+    }
+
+    // DEFAULT writes the column's default, which may be NULL, and is no expression to ask.
+    [Theory]
+    [InlineData("DEFAULT")]
+    [InlineData("default")]
+    public void OfAssigned_Default_IsNo(string value)
+    {
+        var (proof, operands) = ProveAssigned(value);
+
+        proof.ShouldBe(Proof.No);
+        operands.ShouldBeEmpty();
+    }
+
+    // A parameter may be NULL, and so may a value that holds one at its own level, whatever the server answers.
+    [Theory]
+    [InlineData("@p")]
+    [InlineData("NULL")]
+    [InlineData("u.b + @p")]
+    public void OfAssigned_Parameter_IsNo(string value)
+    {
+        var (proof, operands) = ProveAssigned(value);
+
+        operands.ShouldBeEmpty();
+        proof.Holds(Answers(true, true)).ShouldBeFalse();
+    }
+
+    // GROUP BY ALL returns a group that no row holds, so nothing is proved.
+    [Fact]
+    public void OfAssigned_UnderGroupByAll_IsNo()
+    {
+        var (_, _, proofs, body) = Read("SELECT 1 AS c FROM t AS t GROUP BY ALL t.a");
+
+        proofs.OfAssigned(body.Items[0].Expression).ShouldBe(Proof.No);
+        proofs.Operands.ShouldBeEmpty();
+    }
+
     private const string FullJoinOfB = "FULL JOIN dbo.b AS b ON b.id = a.id";
 
     private const string FullJoin = "FROM dbo.a AS a " + FullJoinOfB;
@@ -966,6 +1028,23 @@ public sealed class ExpressionProofsTests
                 ),
             ]
         );
+    }
+
+    // The proof of the value the SET of an UPDATE writes, read over the UPDATE's rows, and each operand's text.
+    private static (Proof Proof, List<string> Operands) ProveAssigned(string value)
+    {
+        var sql = $"UPDATE o SET o.a = {value} OUTPUT inserted.a FROM dbo.t AS o JOIN dbo.u AS u ON u.id = o.id";
+        var tokens = TsqlTokens.Read(sql);
+        var statement = OutputStatement.Read(tokens).ShouldNotBeNull();
+        var proofs = new ExpressionProofs(
+            tokens,
+            statement.Rows,
+            FilteredRows.Read(tokens, statement.Rows, statement.Ctes)
+        );
+
+        var proof = proofs.OfAssigned(statement.Assignments.ShouldNotBeNull().ShouldHaveSingleItem().Value);
+
+        return (proof, [.. proofs.Operands.Select(range => sql[tokens[range.Start].Start..tokens[range.End - 1].End])]);
     }
 
     // Every operand stored and of no CLR type, those of the rows answered nullable and those of a side as given.
