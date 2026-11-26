@@ -5,9 +5,9 @@
 
 ## What reaches the server
 
-- **In `Describing/SqlServer/`, the user's text and a declaration reach the server only as the values of `@tsql` and `@params`** of `sys.sp_describe_undeclared_parameters`, called as a `CommandType.StoredProcedure`, and of `sys.dm_exec_describe_first_result_set` in the tool's own text (`Describing/SqlServer/SqlServerLive.cs`), through `columns`, `operands`, whose text is the query's own tokens rearranged (`Describing/SqlServer/Proofs/OperandsQuery.cs`), and `origins`, and are never put into a text the tool sends.
-- **Both analyse a text and run nothing, so that is what keeps a `.sql` file from making the describer run a statement** ([why a query cannot run a statement](../../../../docs/architecture/sqlserver-describer.md#why-a-query-cannot-run-a-statement)).
-- **The canary tests prove it.**  Those of `tests/DatabaseTests/SqlServer/Describer/ParameterTests.cs` prove it through `parameters`, `probe`, `declared` and a describe, and those of `SafetyTests.cs` beside it through `columns`, each finding `dbo.victim` there after a text that drops it, through `operands`, finding a sequence not advanced by an operand that takes its next value, and through `origins`, finding `dbo.victim` after a view's `geometry` column and a text that drops it.
+- **In `Describing/SqlServer/`, the user's text and a declaration reach the server only as the values of `@tsql` and `@params`** of `sys.sp_describe_undeclared_parameters` and, through `batch`, `sys.sp_describe_first_result_set`, each called as a `CommandType.StoredProcedure`, and of `sys.dm_exec_describe_first_result_set` in the tool's own text (`Describing/SqlServer/SqlServerLive.cs`), through `columns`, `operands`, whose text is the query's own tokens rearranged (`Describing/SqlServer/Proofs/OperandsQuery.cs`), and `origins`, and are never put into a text the tool sends.
+- **Each analyses a text and runs nothing, so that is what keeps a `.sql` file from making the describer run a statement** ([why a query cannot run a statement](../../../../docs/architecture/sqlserver-describer.md#why-a-query-cannot-run-a-statement)).
+- **The canary tests prove it.**  Those of `tests/DatabaseTests/SqlServer/Describer/ParameterTests.cs` prove it through `parameters`, `probe`, `declared` and a describe, and those of `SafetyTests.cs` beside it through `columns`, each finding `dbo.victim` there after a text that drops it, through `operands`, finding a sequence not advanced by an operand that takes its next value, through `origins`, finding `dbo.victim` after a view's `geometry` column and a text that drops it, and through `batch`.
 - **A new place that sends a user's text sends it the same way and gets a canary beside them.**
 - **`Statements/DeclaredTypeText` is the first refusal, with an error that says what is wrong, and not the guarantee**: the server reads `@params` as a list of declarations and refuses one that is not.
 
@@ -18,7 +18,7 @@
   2. `declared` once for each declared parameter, before `parameters`, so that a `2715` or `2724` belongs to one declaration;
   3. the lists compared before any `probe`;
   4. a `probe` only for a reused parameter whose copies' types differ;
-  5. `columns` once the parameters are typed, with every parameter declared;
+  5. `columns` once the parameters are typed, with every parameter declared, then `batch` only for a query with no parameter that it refused with syntax errors alone;
   6. then `operands`, only when a proof needs the server, with the declarations of `columns`;
   7. then `origins`, the text of `columns` in browse mode 1, only when a column of a CLR type answered not null is a view's or an inline function's;
   8. then `table` for each of `ColumnProofs.ComputedTables`, whose failure proves nothing;

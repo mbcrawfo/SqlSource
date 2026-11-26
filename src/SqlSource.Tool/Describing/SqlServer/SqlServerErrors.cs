@@ -56,6 +56,14 @@ internal static class SqlServerErrors
     /// </summary>
     public const int RefusedBatch = 11501;
 
+    /// <summary>
+    /// The <c>error_type</c> of a row of <c>sys.dm_exec_describe_first_result_set</c> that is a syntax error,
+    /// <c>SYNTAX</c>.  A query that <c>parameters</c> took and whose every row of <c>columns</c> is of it is asked
+    /// again as <c>batch</c>: the function reads the text as the body of a parameterized batch, where
+    /// <c>CREATE SCHEMA</c> is a syntax error, and the procedure of <c>parameters</c> as its own batch.
+    /// </summary>
+    public const int SyntaxType = 2;
+
     public const string NoSuchTypeHelp =
         "write a type the database has, with its schema when it is not a built-in type: dbo.Email";
 

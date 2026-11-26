@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
@@ -12,7 +13,8 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // "columns" of a text that would harm the server if it ran, each in a session of its own: the procedure analyses the
 // text and runs none of it.  The canary of the schema, dbo.victim, must be there afterwards, and the server must
 // answer.  "operands", whose text is the query's own tokens rearranged, and "origins", the query's own text in another
-// browse mode, are sent the same way, and run none of it either.
+// browse mode, are sent the same way, and run none of it either.  "batch", the query's own text sent to
+// sys.sp_describe_first_result_set, runs none of it as well.
 [Collection(UsesSqlServer.Name)]
 public sealed class SafetyTests(SqlServerDatabases sqlServer)
 {
@@ -110,6 +112,36 @@ public sealed class SafetyTests(SqlServerDatabases sqlServer)
         {
             await sqlServer.ExecuteAsync("DROP VIEW dbo.safety_shapes; DROP TABLE dbo.safety_points");
         }
+    }
+
+    // "batch" of a text that drops the canary: the procedure describes it, a statement with no result set, and runs it
+    // not.
+    [Theory]
+    [InlineData("DROP TABLE dbo.victim")]
+    [InlineData("CREATE SCHEMA safety_schema AUTHORIZATION dbo; DROP TABLE dbo.victim")]
+    public async Task BatchAsync_TextThatDropsATable_RunsNothing(string sql)
+    {
+        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+        var live = new SqlServerLive(session.Connection);
+
+        _ = await live.BatchAsync(new SqlServerBatchRequest(sql), TestContext.Current.CancellationToken);
+
+        await ShouldStandAsync();
+    }
+
+    // A CREATE SCHEMA, which "columns" refuses and "batch" describes: it is a statement with no result set, and the
+    // schema is not made.
+    [Fact]
+    public async Task DescribeAsync_CreateSchema_AsksBatchAndMakesNoSchema()
+    {
+        var (described, capture) = await Sessions.DescribeCapturedAsync(
+            sqlServer.ConnectionString,
+            DescribeRequests.Of(SqlDialectRules.SqlServer, "CREATE SCHEMA safety_schema AUTHORIZATION dbo")
+        );
+
+        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
+        capture.Calls.Select(static call => call.Method).ShouldContain("batch");
+        _ = (await sqlServer.ScalarAsync("SELECT SCHEMA_ID('safety_schema')")).ShouldBeOfType<DBNull>();
     }
 
     // The answer of "columns" for the SQL, with no declarations.

@@ -10,8 +10,8 @@ using static SqlSource.Tool.Tests.SqlServerScript;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
-// What the describer says in the run's log of parameters, probe, declared and operands: each event's members for an
-// answer with rows and for an error.
+// What the describer says in the run's log of parameters, probe, declared, operands and batch: each event's members
+// for an answer with rows and for an error.
 public sealed class SqlServerEventsTests
 {
     [Fact]
@@ -326,5 +326,51 @@ public sealed class SqlServerEventsTests
                 Member(members, member).ShouldBe(Member(written, member));
             }
         }
+    }
+
+    [Fact]
+    public void Batch_ColumnsOfTheProcedure_WritesTheSqlAndTheCount()
+    {
+        var log = new RecordingLog();
+
+        SqlServerEvents.Batch(
+            log,
+            "CreateSchema",
+            new SqlServerBatchRequest("CREATE SCHEMA raw"),
+            new SqlServerBatchAnswer(0, null),
+            2
+        );
+
+        var (name, members) = log.Events.ShouldHaveSingleItem();
+        name.ShouldBe("batch");
+        NamesOf(members).ShouldBe(["query", "sql", "columns", "durationMs"]);
+        Member(members, "query").ShouldBe((LogValue)"CreateSchema");
+        Member(members, "sql").ShouldBe((LogValue)"CREATE SCHEMA raw");
+        Member(members, "columns").ShouldBe((LogValue)0L);
+        Member(members, "durationMs").ShouldBe((LogValue)2L);
+    }
+
+    [Fact]
+    public void Batch_ErrorOfTheProcedure_WritesEveryErrorInThePlaceOfTheCount()
+    {
+        var log = new RecordingLog();
+
+        SqlServerEvents.Batch(
+            log,
+            "CreateSchema",
+            new SqlServerBatchRequest("CREATE SCHEMA raw"),
+            new SqlServerBatchAnswer(null, Refused),
+            5
+        );
+
+        var members = log.Events.ShouldHaveSingleItem().Members;
+        NamesOf(members).ShouldBe(["query", "sql", "error", "durationMs"]);
+        Member(members, "error")
+            .ShouldBe(
+                ErrorsOf(
+                    (11508, 16, 1, "The parameter '@p' is used twice."),
+                    (8180, 16, 1, "Statement(s) could not be prepared.")
+                )
+            );
     }
 }

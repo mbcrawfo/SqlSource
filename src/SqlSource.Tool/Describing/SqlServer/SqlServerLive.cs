@@ -22,9 +22,10 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </para>
 /// <para>
 /// The user's SQL and the declarations reach the server only as the values of the parameters <c>@tsql</c> and
-/// <c>@params</c> of <c>sys.sp_describe_undeclared_parameters</c>, which is called as a procedure, and of
-/// <c>sys.dm_exec_describe_first_result_set</c>, whose text is the tool's own.  Neither runs the text it is given: it
-/// is analysed, so nothing a <c>.sql</c> file holds can make the describer run a statement.
+/// <c>@params</c> of <c>sys.sp_describe_undeclared_parameters</c> and <c>sys.sp_describe_first_result_set</c>, which
+/// are called as procedures, and of <c>sys.dm_exec_describe_first_result_set</c>, whose text is the tool's own.  None
+/// runs the text it is given: it is analysed, so nothing a <c>.sql</c> file holds can make the describer run a
+/// statement.
 /// </para>
 /// </remarks>
 internal sealed class SqlServerLive(SqlServerConnection connection)
@@ -52,6 +53,12 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
 
     /// <summary>The procedure that <c>parameters</c> and <c>probe</c> call.</summary>
     public const string DescribeUndeclaredParameters = "sys.sp_describe_undeclared_parameters";
+
+    /// <summary>The procedure that <c>batch</c> calls.</summary>
+    public const string DescribeFirstResultSet = "sys.sp_describe_first_result_set";
+
+    // The browse mode of "batch": the columns alone, with no hidden column added.
+    private const byte BatchMode = 0;
 
     // The type of a declared parameter, or the errors of its declaration as rows, for "declared".  Browse mode 0: the
     // columns alone, with no key columns of tables added.
@@ -280,6 +287,36 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
     /// </summary>
     public Task<SqlServerColumnsAnswer> TableAsync(SqlServerTableRequest request, CancellationToken token) =>
         DescribeColumnsAsync(TableSelect(request.Schema, request.Table), null, ColumnsMode, token);
+
+    /// <summary>
+    /// How many columns the procedure describes of the query's text as its own batch, with no declarations, for
+    /// <c>batch</c>; or what it raised.
+    /// </summary>
+    public Task<SqlServerBatchAnswer> BatchAsync(SqlServerBatchRequest request, CancellationToken token) =>
+        AnswerAsync(
+            async () =>
+            {
+                await using var command = await connection.ProcedureAsync(DescribeFirstResultSet, token);
+                _ = command.Parameters.Add(Text("@tsql", request.Sql));
+                _ = command.Parameters.Add(Text("@params", null));
+                _ = command.Parameters.Add(
+                    new SqlParameter("@browse_information_mode", SqlDbType.TinyInt) { Value = BatchMode }
+                );
+                await using var reader = await command.ExecuteReaderAsync(token);
+                var columns = 0;
+                while (await reader.ReadAsync(token))
+                {
+                    columns++;
+                }
+
+                await DrainAsync(reader, token);
+                return new SqlServerBatchAnswer(columns, null);
+            },
+            ConnectionErrors.Of,
+            static error => new SqlServerBatchAnswer(null, error),
+            connection,
+            token
+        );
 
     /// <summary>
     /// The text of <c>table</c> for one table or view: <c>SELECT * FROM [schema].[table]</c>, each name a catalog
