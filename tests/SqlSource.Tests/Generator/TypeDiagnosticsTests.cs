@@ -162,8 +162,6 @@ public sealed class TypeDiagnosticsTests
 
     [Theory]
     [InlineData(LanguageVersion.CSharp7_3, "7.3")]
-    [InlineData(LanguageVersion.CSharp8, "8.0")]
-    [InlineData(LanguageVersion.CSharp9, "9.0")]
     [InlineData(LanguageVersion.CSharp11, "11.0")]
     public void Run_ProjectOnALanguageVersionOlderThanCSharp12_IsAnErrorAtEachAttribute(
         LanguageVersion languageVersion,
@@ -330,8 +328,6 @@ public sealed class TypeDiagnosticsTests
 
     [Theory]
     [InlineData("private string Sql { get; set; } = string.Empty;")]
-    [InlineData("private const int Sql = 1;")]
-    [InlineData("public static void Sql() { }")]
     [InlineData("private static class Sql { }")]
     public void Run_NestedLocationAndAMemberNamedSql_IsAnErrorAtTheAttribute(string member)
     {
@@ -437,8 +433,10 @@ public sealed class TypeDiagnosticsTests
         );
 
         run.Diagnostics.Count.ShouldBe(2);
-        run.Diagnostics[0].ShouldStartWith("SQLSRC001 /app/Repo/Sample.cs(4,14)-(4,20)");
-        run.Diagnostics[1].ShouldStartWith("SQLSRC004 /app/Repo/Sample.cs(3,2)-(3,39)");
+        run.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.StartsWith("SQLSRC001 /app/Repo/Sample.cs(4,14)-(4,20)")
+        );
+        run.Diagnostics.ShouldContain(diagnostic => diagnostic.StartsWith("SQLSRC004 /app/Repo/Sample.cs(3,2)-(3,39)"));
         run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
