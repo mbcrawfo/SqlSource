@@ -237,7 +237,6 @@ internal static class DescribeRun
         connection.Value is not null
         || (connection.SharesVariableWith is not null && environment.Find(connection.Variable) is not null);
 
-    // The names of --database, for the steps that take no position.
     // What the log says of a sidecar that was checked: that it differs, when a difference was reported for the file;
     // that it is the same, only when every selected query of the file that needs an entry was described, so that each
     // was compared; and nothing otherwise, since a query that could not be checked is neither.
