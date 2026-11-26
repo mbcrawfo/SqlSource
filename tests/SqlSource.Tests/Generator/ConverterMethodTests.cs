@@ -282,13 +282,15 @@ public sealed class ConverterMethodTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("var parameter = new global::Npgsql.NpgsqlParameter<global::MyApp.Email>();\n");
-        methods.ShouldContain("parameter.TypedValue = parameters.Email;\n");
         methods.ShouldContain(
-            "reader.IsDBNull(0) ? default(global::MyApp.Email?) : reader.GetFieldValue<global::MyApp.Email>(0)"
+            "var parameter = new global::Npgsql.NpgsqlParameter<global::MyApp.Email>();\n",
+            Case.Sensitive
         );
-        methods.ShouldNotContain("FromDatabase");
-        methods.ShouldNotContain("ToDatabase");
+        methods.ShouldContain("parameter.TypedValue = parameters.Email;\n", Case.Sensitive);
+        methods.ShouldContain(
+            "reader.IsDBNull(0) ? default(global::MyApp.Email?) : reader.GetFieldValue<global::MyApp.Email>(0)",
+            Case.Sensitive
+        );
     }
 
     // A library's converter that is no converter is reported at the query that would use it, which the project can

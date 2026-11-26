@@ -27,9 +27,9 @@ public sealed class GeneratedSourceEscapingTests
 
         run.ShouldBeClean();
         var file = run.Sources["class.g.cs"];
-        file.ShouldStartWith(GeneratedFile.Header + "\npartial struct @class\n{\n");
+        file.ShouldStartWith(GeneratedFile.Header + "\npartial struct @class\n{\n", Case.Sensitive);
         file.ShouldNotContain("namespace");
-        file.ShouldContain("\n    public const string GetUser = \"SELECT 1;\";\n");
+        file.ShouldContain("\n    public const string GetUser = \"SELECT 1;\";\n", Case.Sensitive);
     }
 
     [Fact]

@@ -45,14 +45,15 @@ public sealed class RepositoryInterfaceTests
         methods.ShouldContain(
             "namespace App\n{\n    partial class UserRepository : global::App.IUserRepository\n    {\n"
         );
-        methods.ShouldContain("    public partial interface IUserRepository\n    {\n");
+        methods.ShouldContain("    public partial interface IUserRepository\n    {\n", Case.Sensitive);
         methods.ShouldContain(
             """
                     global::System.Threading.Tasks.Task<global::App.GetUserDto?> GetUser(
                         global::App.GetUserParams parameters,
                         global::System.Threading.CancellationToken cancellationToken = default);
 
-            """
+            """,
+            Case.Sensitive
         );
     }
 

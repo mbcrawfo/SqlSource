@@ -71,9 +71,9 @@ public sealed class ColumnMarkerTests
 
         run.Diagnostics.ShouldBeEmpty();
         var model = run.Sources["App.GetTotalsDto-Model.g.cs"];
-        model.ShouldContain("public sealed record GetTotalsDto(int Total, string? Note);\n");
-        model.ShouldContain("<param name=\"Total\">The column <c>total</c>");
-        model.ShouldContain("<param name=\"Note\">The column <c>note</c>");
+        model.ShouldContain("public sealed record GetTotalsDto(int Total, string? Note);\n", Case.Sensitive);
+        model.ShouldContain("<param name=\"Total\">The column <c>total</c>", Case.Sensitive);
+        model.ShouldContain("<param name=\"Note\">The column <c>note</c>", Case.Sensitive);
     }
 
     [Fact]
